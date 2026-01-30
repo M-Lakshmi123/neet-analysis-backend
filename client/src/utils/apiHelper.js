@@ -1,4 +1,8 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+export const API_URL = 'https://neet-backend-3oxu.onrender.com';
+// export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+
+export const ADMIN_WHATSAPP = '7204408619';
 
 export const buildQueryParams = (filters) => {
     const params = new URLSearchParams();
@@ -31,7 +35,21 @@ export const buildQueryParams = (filters) => {
  */
 export const formatDate = (dateStr, format = 'dd/mm/yyyy') => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
+
+    // Handle DD-MM-YYYY or DD/MM/YYYY manually
+    // Regex matches starts with 1 or 2 digits, separator, 1 or 2 digits, separator, 4 digits
+    const dmyPattern = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/;
+    const match = String(dateStr).match(dmyPattern);
+
+    let date;
+    if (match) {
+        // match[1] = day, match[2] = month, match[3] = year
+        // Month is 0-indexed in JS Date
+        date = new Date(match[3], match[2] - 1, match[1]);
+    } else {
+        date = new Date(dateStr);
+    }
+
     if (isNaN(date.getTime())) return dateStr;
 
     const day = String(date.getDate()).padStart(2, '0');
