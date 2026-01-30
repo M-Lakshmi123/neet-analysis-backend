@@ -1,0 +1,32 @@
+<service>
+	<id>neet_backend_service.exe</id>
+	<name>NEET_Backend_Service</name>
+	<description>Node.js Backend for NEET Analysis System</description>
+	<executable>C:\Program Files\nodejs\node.exe</executable>
+	<argument>--harmony</argument>
+	<argument>F:\Projects\NEET Analysis\service_setup\node_modules\node-windows\lib\wrapper.js</argument>
+	<argument>--file</argument>
+	<argument>F:\Projects\NEET Analysis\server\index.js</argument>
+	<argument>--scriptoptions=</argument>
+	<argument>--log</argument>
+	<argument>NEET_Backend_Service wrapper</argument>
+	<argument>--grow</argument>
+	<argument>0.25</argument>
+	<argument>--wait</argument>
+	<argument>1</argument>
+	<argument>--maxrestarts</argument>
+	<argument>3</argument>
+	<argument>--abortonerror</argument>
+	<argument>n</argument>
+	<argument>--stopparentfirst</argument>
+	<argument>undefined</argument>
+	<logmode>rotate</logmode>
+	<stoptimeout>30sec</stoptimeout>
+	<env name="PORT" value="5000"/>
+	<serviceaccount>
+		<domain>ECITYDAYSH-DEAN</domain>
+		<user>LocalSystem</user>
+		<password></password>
+	</serviceaccount>
+	<workingdirectory>F:\Projects\NEET Analysis</workingdirectory>
+</service>

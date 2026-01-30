@@ -1,0 +1,415 @@
+
+import React, { useState, useEffect } from 'react';
+import { buildQueryParams, formatDate, API_URL } from '../utils/apiHelper';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { Trophy, AlertCircle, FileSpreadsheet, FileText } from 'lucide-react';
+
+
+const AverageMarksReport = ({ filters }) => {
+    const [data, setData] = useState([]);
+    const [examMeta, setExamMeta] = useState([]);
+    const [totalConducted, setTotalConducted] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [selectedRange, setSelectedRange] = useState(null);
+
+
+    const ranges = [
+        { label: '>=710', min: 710 }, { label: '>=700', min: 700 },
+        { label: '>=685', min: 685 }, { label: '>=655', min: 655 },
+        { label: '>=640', min: 640 }, { label: '>=595', min: 595 },
+        { label: '>=570', min: 570 }, { label: '>=550', min: 550 },
+        { label: '>=530', min: 530 }, { label: '>=490', min: 490 },
+        { label: '>=450', min: 450 }, { label: '>=400', min: 400 },
+        { label: '>=300', min: 300 }, { label: '>=200', min: 200 },
+    ];
+
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const queryParams = buildQueryParams(filters).toString();
+                const response = await fetch(`${API_URL}/api/analysis-report?${queryParams}`);
+                const result = await response.json();
+                setData(result.students || []);
+                setExamMeta(result.exams || []);
+                setTotalConducted(result.t_cnt || 0);
+            } catch (error) {
+                console.error("Failed to fetch average report:", error);
+                setData([]);
+                setExamMeta([]);
+                setTotalConducted(0);
+            } finally {
+                setLoading(false);
+            }
+        };
+        const timeoutId = setTimeout(() => { fetchData(); }, 500);
+        return () => clearTimeout(timeoutId);
+    }, [filters]);
+
+    const getRankedData = (students) => {
+        if (!students || students.length === 0) return [];
+        // Sort by tot descending to ensure correct ranking
+        const sorted = [...students].sort((a, b) => b.tot - a.tot);
+        let currentRank = 1;
+        return sorted.map((s, idx) => {
+            if (idx > 0 && Math.round(s.tot) < Math.round(sorted[idx - 1].tot)) {
+                currentRank = idx + 1;
+            }
+            return { ...s, calculatedRank: currentRank };
+        });
+    };
+
+    const getFilteredData = () => {
+        const baseData = selectedRange
+            ? data.filter(s => s.tot >= selectedRange.min)
+            : data;
+        return getRankedData(baseData);
+    };
+
+    const getRangeCount = (min) => {
+        return data.filter(s => s.tot >= min).length;
+    };
+
+    const stats = {
+        highest: data.length > 0 ? Math.max(...data.map(s => s.tot)) : 0,
+        lowest: data.length > 0 ? Math.min(...data.map(s => s.tot)) : 0,
+    };
+
+    const rankedStudents = getFilteredData();
+
+    const calculateFooterAverages = () => {
+        if (rankedStudents.length === 0) return null;
+        const count = rankedStudents.length;
+        const sum = (key) => rankedStudents.reduce((acc, curr) => acc + (Number(curr[key]) || 0), 0);
+        return {
+            tot: Math.round(sum('tot') / count),
+            bot: Math.round(sum('bot') / count),
+            zoo: Math.round(sum('zoo') / count),
+            phy: Math.round(sum('phy') / count),
+            che: Math.round(sum('che') / count),
+            air: Math.round(sum('air') / count)
+        };
+    };
+
+    const footerAvg = calculateFooterAverages();
+
+    const getStreamLabel = () => {
+        const selectedStreams = Array.isArray(filters.stream) ? filters.stream : [];
+        if (selectedStreams.length === 0) return "ALL";
+        const srEliteMatches = ["SR ELITE", "SR_ELITE_SET_01", "SET-02"];
+        const jrEliteMatches = ["JR ELITE"];
+        const isSrElite = selectedStreams.every(s => srEliteMatches.includes(s));
+        if (isSrElite) return "SR ELITE";
+        const isJrElite = selectedStreams.every(s => jrEliteMatches.includes(s));
+        if (isJrElite) return "JR ELITE";
+        return selectedStreams.join(', ');
+    };
+
+    const getExamDatesString = (formatType = 'pdf') => {
+        if (formatType === 'excel_wrap') {
+            return examMeta.map((ex, idx) => `${idx + 1}.(${formatDate(ex.DATE, 'dd-mmm-yy')})`).join('  ');
+        }
+        return examMeta.map((ex, idx) => `${idx + 1}.(${formatDate(ex.DATE, 'dd/mm/yyyy')})`).join(' ');
+    };
+
+    const getDynamicFileName = () => {
+        const stream = getStreamLabel();
+        return `2025-26_${stream}_NEET_Estimated Avg's`.replace(/[^a-z0-9\-_]/gi, '_');
+    };
+
+    const downloadExcel = async () => {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Estimated Avg');
+        const stream = getStreamLabel();
+        const datesStrWrap = getExamDatesString('excel_wrap');
+
+        worksheet.columns = [
+            { width: 12 }, { width: 35 }, { width: 25 },
+            { width: 10 }, { width: 8 },
+            { width: 10 }, { width: 8 },
+            { width: 10 }, { width: 8 },
+            { width: 10 }, { width: 8 },
+            { width: 10 }, { width: 12 },
+            { width: 10 }, { width: 10 }
+        ];
+
+        const borderStyle = {
+            top: { style: 'thin', color: { argb: 'FF00B0F0' } },
+            left: { style: 'thin', color: { argb: 'FF00B0F0' } },
+            bottom: { style: 'thin', color: { argb: 'FF00B0F0' } },
+            right: { style: 'thin', color: { argb: 'FF00B0F0' } }
+        };
+
+        const getHeaderBaseStyle = (bgColor, fgColor = 'FF0000FF') => ({
+            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } },
+            font: { color: { argb: fgColor }, bold: true },
+            alignment: { horizontal: 'center', vertical: 'middle' },
+            border: borderStyle
+        });
+
+        // ROW 1: Logo + SRI CHAITANYA... Header (Merged A1:O1)
+        worksheet.mergeCells('A1:O1');
+        const row1 = worksheet.getCell('A1');
+        row1.value = {
+            richText: [
+                { text: '          Sri Chaitanya ', font: { name: 'Impact', size: 30, color: { argb: 'FF00B0F0' } } },
+                { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 30, color: { argb: 'FF00B0F0' } } }
+            ]
+        };
+        row1.alignment = { horizontal: 'center', vertical: 'middle' };
+        row1.border = borderStyle;
+        worksheet.getRow(1).height = 60;
+
+        // Add Logo inside A1 area
+        try {
+            const response = await fetch('/logo.png');
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const imageId = workbook.addImage({
+                buffer: arrayBuffer,
+                extension: 'png',
+            });
+            worksheet.addImage(imageId, {
+                tl: { col: 0.1, row: 0.1 },
+                ext: { width: 65, height: 60 },
+                editAs: 'oneCell'
+            });
+        } catch (e) {
+            console.error("Failed to add logo to excel:", e);
+        }
+
+        // ROW 2: Left Header Block (A2:C2) - MS Gothic 16
+        worksheet.mergeCells('A2:C2');
+        const cellA2 = worksheet.getCell('A2');
+        const headerTextStr = `2025-26_${stream}_NEET_Estimated Avg's`;
+        const parts = headerTextStr.split(stream);
+        cellA2.value = {
+            richText: [
+                { text: parts[0] || '', font: { name: 'MS Gothic', size: 16, color: { argb: 'FFCCCCFF' }, bold: true } },
+                { text: stream, font: { name: 'MS Gothic', size: 16, color: { argb: 'FFFFFF00' }, bold: true } },
+                { text: parts[1] || '', font: { name: 'MS Gothic', size: 16, color: { argb: 'FFCCCCFF' }, bold: true } },
+            ]
+        };
+        cellA2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF31869B' } };
+        cellA2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cellA2.border = borderStyle;
+
+        // ROW 2: Right Header Block (D2:O2) - Wrap text
+        worksheet.mergeCells('D2:O2');
+        const cellD2 = worksheet.getCell('D2');
+        cellD2.value = {
+            richText: [
+                { text: `Over All NEET INCOMMING ${stream} Avg's : \n`, font: { color: { argb: 'FF0066CC' }, name: 'Arial', size: 10, bold: true } },
+                { text: datesStrWrap, font: { color: { argb: 'FF000000' }, name: 'Arial', size: 10 } }
+            ]
+        };
+        cellD2.alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
+        cellD2.border = borderStyle;
+        worksheet.getRow(2).height = 75;
+
+        // ROW 3: Column Headers
+        const headerLabels = ["STUD_ID", "Name", "Campus", "BOT\n180", "B_R", "ZOO\n180", "Z_R", "PHY\n180", "P_R", "CHE\n180", "C_R", "TOT\n720", "Rank", "T_App", "T_Cnt"];
+        const row3 = worksheet.addRow(headerLabels);
+        row3.height = 35;
+        row3.eachCell((cell, colNumber) => {
+            if (colNumber >= 1 && colNumber <= 5) cell.style = getHeaderBaseStyle('FFFFFFCC');
+            else if (colNumber >= 6 && colNumber <= 7) cell.style = getHeaderBaseStyle('FFFDE9D9');
+            else if (colNumber >= 8 && colNumber <= 9) cell.style = getHeaderBaseStyle('FFE4DFEC');
+            else if (colNumber >= 10 && colNumber <= 11) cell.style = getHeaderBaseStyle('FFDDD9C4');
+            else if (colNumber === 12) cell.style = getHeaderBaseStyle('FF002060', 'FFFFFF00');
+            else if (colNumber === 13) cell.style = getHeaderBaseStyle('FFFFFF00', 'FF0000FF');
+            else if (colNumber === 14) cell.style = getHeaderBaseStyle('FFFCD5B4');
+            else if (colNumber === 15) cell.style = getHeaderBaseStyle('FFD9D9D9');
+
+            // Enable wrap text for headers with \n
+            cell.alignment = { ...cell.alignment, wrapText: true };
+        });
+
+        // Data Rows
+        rankedStudents.forEach((s) => {
+            const rowData = [
+                s.STUD_ID || '', s.name || '', s.campus || '',
+                Number(s.bot || 0), Math.round(s.b_rank || 0),
+                Number(s.zoo || 0), Math.round(s.z_rank || 0),
+                Number(s.phy || 0), Math.round(s.p_rank || 0),
+                Number(s.che || 0), Math.round(s.c_rank || 0),
+                Number(s.tot || 0), s.calculatedRank,
+                s.t_app || 0, totalConducted
+            ];
+            const dataRow = worksheet.addRow(rowData);
+            dataRow.eachCell((cell, colNumber) => {
+                cell.border = borderStyle;
+                cell.alignment = { vertical: 'middle' };
+
+                // Format numbers with 1 decimal point for BOT, ZOO, PHY, CHE, TOT
+                if ([4, 6, 8, 10, 12].includes(colNumber)) {
+                    cell.numFmt = '0.0';
+                }
+
+                if (colNumber <= 3) {
+                    cell.font = { name: 'Arial', size: 9, color: { argb: 'FF000000' } };
+                } else if ([4, 6, 8, 10].includes(colNumber)) {
+                    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF7030A0' } };
+                    cell.alignment.horizontal = 'center';
+                } else if ([5, 7, 9, 11].includes(colNumber)) {
+                    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFF0000' } };
+                    cell.alignment.horizontal = 'center';
+                } else if (colNumber === 12) {
+                    cell.font = { name: 'Arial Black', size: 10, bold: true, color: { argb: 'FF0070C0' } };
+                    cell.alignment.horizontal = 'center';
+                } else if (colNumber === 13) {
+                    cell.font = { name: 'Arial', size: 12, bold: true, italic: true, color: { argb: 'FF0000FF' } };
+                    cell.alignment.horizontal = 'center';
+                } else {
+                    cell.font = { name: 'Arial', size: 10, color: { argb: 'FF000000' } };
+                    cell.alignment.horizontal = 'center';
+                }
+            });
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `${getDynamicFileName()}.xlsx`);
+    };
+
+
+    return (
+        <div className="average-marks-container">
+            <div className="avg-summary-row" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '15px' }}>
+                    <div className="avg-stat-card highest">
+                        <div className="stat-label">Highest</div>
+                        <div className="stat-value">{stats.highest > 0 ? Math.round(stats.highest) : '--'}</div>
+                    </div>
+                    <div className="avg-stat-card lowest">
+                        <div className="stat-label">Lowest</div>
+                        <div className="stat-value">{stats.lowest > 0 ? Math.round(stats.lowest) : '--'}</div>
+                    </div>
+                </div>
+                <div className="report-actions">
+                    <button className="btn-secondary" onClick={downloadExcel} style={{ backgroundColor: '#2563eb', color: 'white', padding: '8px 15px' }}><FileSpreadsheet size={16} /> Export Excel</button>
+                </div>
+            </div>
+            <div className="avg-main-layout">
+                <div className="avg-table-section">
+                    <div className="table-header-title">Estimated Average's Report - {getStreamLabel()}</div>
+                    <div className="table-container">
+                        <table className="analysis-table merit-style">
+                            <thead>
+                                <tr className="table-main-header">
+                                    <th>NAME_OF_THE_STUDENT</th>
+                                    <th>CAMPUS_NAME</th>
+                                    <th className="col-yellow">TOT</th>
+                                    <th className="col-green">BOT</th>
+                                    <th className="col-blue-light">ZOO</th>
+                                    <th className="col-green-pale">PHY</th>
+                                    <th className="col-pink-pale">CHE</th>
+                                    <th>RANK</th>
+                                    <th>T_APP</th>
+                                    <th>T_CNT</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loading ? (<tr><td colSpan={10} align="center">Loading data...</td></tr>) : rankedStudents.length === 0 ? (<tr><td colSpan={10} align="center">No data matching criteria</td></tr>) : (
+                                    <>
+                                        {rankedStudents.map((s, idx) => (
+                                            <tr key={idx}>
+                                                <td className="text-left font-bold" style={{ color: '#101828' }}>
+                                                    {s.name}
+                                                </td>
+
+                                                <td style={{ color: '#101828' }}>{s.campus}</td>
+                                                <td className="col-yellow font-bold" style={{ color: '#000000' }}>{Math.round(s.tot)}</td>
+                                                <td className="col-green" style={{ color: '#000000' }}>{Math.round(s.bot)}</td>
+                                                <td className="col-blue-light" style={{ color: '#000000' }}>{Math.round(s.zoo)}</td>
+                                                <td className="col-green-pale" style={{ color: '#000000' }}>{Math.round(s.phy)}</td>
+                                                <td className="col-pink-pale" style={{ color: '#000000' }}>{Math.round(s.che)}</td>
+                                                <td className="font-bold" style={{ color: '#0000ff', fontStyle: 'italic' }}>{s.calculatedRank}</td>
+                                                <td className="font-bold" style={{ color: '#000000' }}>{s.t_app}</td>
+                                                <td className="font-bold" style={{ color: '#000000' }}>{totalConducted}</td>
+                                            </tr>
+                                        ))}
+                                        {footerAvg && (
+                                            <tr className="total-row">
+                                                <td colSpan={2} className="text-right font-bold" style={{ backgroundColor: '#f1f5f9', color: '#000000' }}>Average Marks</td>
+                                                <td className="col-yellow font-bold" style={{ color: '#000000' }}>{footerAvg.tot}</td>
+                                                <td className="col-green font-bold" style={{ color: '#000000' }}>{footerAvg.bot}</td>
+                                                <td className="col-blue-light font-bold" style={{ color: '#000000' }}>{footerAvg.zoo}</td>
+                                                <td className="col-green-pale font-bold" style={{ color: '#000000' }}>{footerAvg.phy}</td>
+                                                <td className="col-pink-pale font-bold" style={{ color: '#000000' }}>{footerAvg.che}</td>
+                                                <td colSpan={3} style={{ backgroundColor: '#f1f5f9' }}></td>
+                                            </tr>
+                                        )}
+                                    </>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div className="avg-range-column">{ranges.map((r, i) => { const count = getRangeCount(r.min); const isActive = selectedRange?.min === r.min; return (<button key={i} className={`range-card ${isActive ? 'active' : ''}`} onClick={() => setSelectedRange(isActive ? null : r)}><div className="range-label">{r.label}</div><div className="range-count">{count || '--'}</div></button>); })}</div>
+            </div>
+            <style>{`
+                .average-marks-container { padding: 0; }
+                .avg-summary-row { display: flex; gap: 15px; margin-bottom: 20px; align-items: center; }
+                .avg-stat-card { background: white; padding: 6px 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column; min-width: 120px; }
+                .avg-stat-card.highest { border-left: 4px solid #eab308; }
+                .avg-stat-card.lowest { border-left: 4px solid #ef4444; }
+                .stat-label { font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.025em; }
+                .stat-value { font-size: 1.5rem; font-weight: 800; color: #1e293b; margin-top: 2px; }
+                .stat-icon { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); opacity: 0.1; }
+                .avg-main-layout { display: grid; grid-template-columns: 1fr 200px; gap: 20px; }
+                .table-header-title { background: #1e293b; color: white; padding: 10px 15px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 0.95rem; text-align: center; }
+                .table-container { overflow-x: auto; background: white; border-radius: 0 0 8px 8px; }
+                .analysis-table.merit-style { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #00b0f0; }
+                .analysis-table.merit-style th { font-size: 0.7rem; padding: 8px 4px; border: 1px solid #00b0f0; color: #000000; }
+                .analysis-table.merit-style td { font-size: 0.75rem; padding: 6px 4px; border: 1px solid #00b0f0; text-align: center; color: #000000; }
+                .col-yellow { background-color: #fffbeb !important; }
+                .col-green { background-color: #f0fdf4 !important; }
+                .col-blue-light { background-color: #eff6ff !important; }
+                .col-green-pale { background-color: #f7fee7 !important; }
+                .col-pink-pale { background-color: #fdf2f8 !important; }
+                .sub-th.bot { background: #ffffcc; color: #000000; }
+                .sub-th.zoo { background: #fde9d9; color: #000000; }
+                .sub-th.phy { background: #e4dfec; color: #000000; }
+                .sub-th.che { background: #ddd9c4; color: #000000; }
+                .col-tot { background: #002060 !important; color: #ffffff !important; }
+                .col-rank { background: #ffff00 !important; color: #000000 !important; }
+                
+                .avg-range-column { display: flex; flex-direction: column; gap: 6px; }
+                .range-card { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center; 
+                    background: white; 
+                    border: 1px solid #e2e8f0; 
+                    border-radius: 8px; 
+                    padding: 8px 12px; 
+                    cursor: pointer; 
+                    transition: all 0.2s;
+                    width: 100%;
+                }
+                .range-card:hover { border-color: #6366f1; transform: translateX(-2px); }
+                .range-card.active { background: #6366f1; border-color: #6366f1; }
+                .range-label { font-weight: 700; font-size: 0.85rem; color: #475569; }
+                .range-card.active .range-label { color: white; }
+                .range-count { 
+                    background: #f1f5f9; 
+                    color: #1e293b; 
+                    padding: 2px 8px; 
+                    border-radius: 6px; 
+                    font-size: 0.8rem; 
+                    font-weight: 800; 
+                    min-width: 40px; 
+                    text-align: center; 
+                }
+                .range-card.active .range-count { background: rgba(255,255,255,0.2); color: white; }
+            `}</style>
+
+        </div>
+
+    );
+};
+
+export default AverageMarksReport;

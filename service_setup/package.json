@@ -1,0 +1,13 @@
+{
+    "name": "neet-analysis-service-setup",
+    "version": "1.0.0",
+    "description": "Scripts to install NEET Analysis as Windows Services",
+    "main": "install.js",
+    "scripts": {
+        "install-services": "node install.js",
+        "uninstall-services": "node uninstall.js"
+    },
+    "dependencies": {
+        "node-windows": "^1.0.0-beta.8"
+    }
+}

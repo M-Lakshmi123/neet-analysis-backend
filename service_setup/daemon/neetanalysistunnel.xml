@@ -1,0 +1,31 @@
+<service>
+	<id>neetanalysistunnel.exe</id>
+	<name>NeetAnalysisTunnel</name>
+	<description>Auto-redeploying Cloudflare Tunnel for NEET Analysis</description>
+	<executable>C:\Program Files\nodejs\node.exe</executable>
+	<argument>--harmony</argument>
+	<argument>f:\Projects\NEET Analysis\service_setup\node_modules\node-windows\lib\wrapper.js</argument>
+	<argument>--file</argument>
+	<argument>f:\Projects\NEET Analysis\service_setup\tunnel_wrapper.js</argument>
+	<argument>--scriptoptions=</argument>
+	<argument>--log</argument>
+	<argument>NeetAnalysisTunnel wrapper</argument>
+	<argument>--grow</argument>
+	<argument>0.25</argument>
+	<argument>--wait</argument>
+	<argument>1</argument>
+	<argument>--maxrestarts</argument>
+	<argument>3</argument>
+	<argument>--abortonerror</argument>
+	<argument>n</argument>
+	<argument>--stopparentfirst</argument>
+	<argument>undefined</argument>
+	<logmode>rotate</logmode>
+	<stoptimeout>30sec</stoptimeout>
+	<serviceaccount>
+		<domain>ECITYDAYSH-DEAN</domain>
+		<user>LocalSystem</user>
+		<password></password>
+	</serviceaccount>
+	<workingdirectory>f:\Projects\NEET Analysis\service_setup</workingdirectory>
+</service>
