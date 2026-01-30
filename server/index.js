@@ -170,7 +170,8 @@ app.get('/api/filters', async (req, res) => {
 
         console.log(`[Filters] Success (${Date.now() - start}ms): ${responseData.campuses.length} campuses, ${responseData.streams.length} streams`);
 
-        cache.set(cacheKey, responseData, 300);
+        // Cache for only 10 seconds to allow quick updates during data upload
+        cache.set(cacheKey, responseData, 10);
         res.json(responseData);
     } catch (err) {
         console.error("[Filters] CRITICAL ERROR:", err);
