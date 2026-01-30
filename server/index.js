@@ -463,23 +463,17 @@ app.get('/api/analysis-report', async (req, res) => {
 console.log(`[Email Config] User: ${process.env.EMAIL_USER}, Pass Length: ${process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0}`);
 
 const transporter = require('nodemailer').createTransport({
-    host: 'smtp.office365.com',
+    host: 'smtp-mail.outlook.com', // Alternative endpoint often works better than smtp.office365.com
     port: 587,
-    secure: false, // true for 465, false for other ports
+    secure: false, // Must be false for port 587
+    requireTLS: true, // Force STARTTLS
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        ciphers: 'SSLv3',
-        rejectUnauthorized: false
-    },
-    // CONNECTION FIXES FOR CLOUD/RENDER:
-    family: 4,              // Force IPv4 (fixes timeouts on some docker networks that struggle with Office365 IPv6)
-    connectionTimeout: 10000, // 10 seconds (default is 2 min, but we want to fail faster or handle it)
-    greetingTimeout: 5000,  // Wait 5s for greeting
-    debug: true,            // Log details
-    logger: true            // Log to console
+        ciphers: 'SSLv3'
+    }
 });
 
 // Endpoint to send approval email
