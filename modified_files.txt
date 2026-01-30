@@ -1,0 +1,618 @@
+[
+  {
+    "path": ".gitignore",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\.env.production",
+    "mtime": "2026-01-30T17:32:07.332Z"
+  },
+  {
+    "path": "client\\.firebase\\hosting.ZGlzdA.cache",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\.firebaserc",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\copy-bg.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\dist\\assets\\html2canvas.esm-CBrSDip1.js",
+    "mtime": "2026-01-30T17:39:48.053Z"
+  },
+  {
+    "path": "client\\dist\\assets\\index-CdTIjtK-.js",
+    "mtime": "2026-01-30T17:39:48.053Z"
+  },
+  {
+    "path": "client\\dist\\assets\\index-CU_-R50M.css",
+    "mtime": "2026-01-30T17:39:48.053Z"
+  },
+  {
+    "path": "client\\dist\\assets\\index.es-C_2w9lMb.js",
+    "mtime": "2026-01-30T17:39:48.053Z"
+  },
+  {
+    "path": "client\\dist\\assets\\purify.es-B9ZVCkUG.js",
+    "mtime": "2026-01-30T17:39:48.053Z"
+  },
+  {
+    "path": "client\\dist\\brooke-cagle-g1Kr4Ozfoac-unsplash.jpg",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\dist\\college-bg.png",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\dist\\david-schultz-kM97y3aWWQw-unsplash.jpg",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\dist\\index.html",
+    "mtime": "2026-01-30T17:39:48.053Z"
+  },
+  {
+    "path": "client\\dist\\logo.png",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\dist\\pang-yuhao-_kd5cxwZOK4-unsplash.jpg",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\dist\\student-bg.png",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\firebase-debug.log",
+    "mtime": "2026-01-30T17:41:00.190Z"
+  },
+  {
+    "path": "client\\firebase.json",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\index.html",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\lint_errors.txt",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\package-lock.json",
+    "mtime": "2026-01-30T14:26:52.900Z"
+  },
+  {
+    "path": "client\\package.json",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\public\\brooke-cagle-g1Kr4Ozfoac-unsplash.jpg",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\public\\college-bg.png",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\public\\david-schultz-kM97y3aWWQw-unsplash.jpg",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\public\\logo.png",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\public\\pang-yuhao-_kd5cxwZOK4-unsplash.jpg",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\public\\student-bg.png",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\App.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\components\\admin\\ActivityLogs.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\components\\admin\\AdminDashboard.jsx",
+    "mtime": "2026-01-30T15:36:42.571Z"
+  },
+  {
+    "path": "client\\src\\components\\admin\\UserApprovals.jsx",
+    "mtime": "2026-01-30T15:36:40.527Z"
+  },
+  {
+    "path": "client\\src\\components\\AnalysisReport.jsx",
+    "mtime": "2026-01-30T16:34:44.814Z"
+  },
+  {
+    "path": "client\\src\\components\\auth\\AuthProvider.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\components\\auth\\LoginPage.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\components\\auth\\RegisterPage.jsx",
+    "mtime": "2026-01-30T15:21:25.850Z"
+  },
+  {
+    "path": "client\\src\\components\\AverageMarksReport.jsx",
+    "mtime": "2026-01-30T15:48:50.774Z"
+  },
+  {
+    "path": "client\\src\\components\\AverageReport.jsx",
+    "mtime": "2026-01-30T15:49:05.296Z"
+  },
+  {
+    "path": "client\\src\\components\\FilterBar.jsx",
+    "mtime": "2026-01-30T16:52:25.118Z"
+  },
+  {
+    "path": "client\\src\\components\\Header.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\components\\Modal.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\components\\MultiSelectDropdown.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\components\\Sidebar.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\components\\Toast.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\firebase.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\index.css",
+    "mtime": "2026-01-30T15:55:51.985Z"
+  },
+  {
+    "path": "client\\src\\main.jsx",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "client\\src\\utils\\apiHelper.js",
+    "mtime": "2026-01-30T15:26:03.392Z"
+  },
+  {
+    "path": "client\\vite.config.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "DATA_UPLOAD_GUIDE.md",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "delete",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "DEPLOY_FRONTEND.md",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "DEPLOY_GUIDE.md",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "DEPLOY_TO_RENDER.md",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "env.txt",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "git_diag.js",
+    "mtime": "2026-01-30T17:45:15.297Z"
+  },
+  {
+    "path": "git_diag.txt",
+    "mtime": "2026-01-30T17:45:21.483Z"
+  },
+  {
+    "path": "git_diag_paths.js",
+    "mtime": "2026-01-30T17:45:48.785Z"
+  },
+  {
+    "path": "git_path_check.txt",
+    "mtime": "2026-01-30T17:45:56.792Z"
+  },
+  {
+    "path": "identify_mods.js",
+    "mtime": "2026-01-30T17:46:10.333Z"
+  },
+  {
+    "path": "output.txt",
+    "mtime": "2026-01-30T14:14:48.668Z"
+  },
+  {
+    "path": "query",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "render.yaml",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "repro_date.js",
+    "mtime": "2026-01-30T14:09:47.615Z"
+  },
+  {
+    "path": "repro_date_fixed.js",
+    "mtime": "2026-01-30T14:14:19.022Z"
+  },
+  {
+    "path": "server\\.env",
+    "mtime": "2026-01-30T15:22:32.198Z"
+  },
+  {
+    "path": "server\\.env.example",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\access.log",
+    "mtime": "2026-01-30T17:22:20.476Z"
+  },
+  {
+    "path": "server\\analyze-data.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\auto_upload.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\check-schema.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\check_data.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\check_db_content.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\check_db_status.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\check_output.txt",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\check_tables.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\crash.log",
+    "mtime": "2026-01-30T15:22:16.938Z"
+  },
+  {
+    "path": "server\\create_erp_table.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\daemon\\neetanalysisbackend.exe",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\daemon\\neetanalysisbackend.xml",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\daemon\\neet_analysis_system.exe",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\daemon\\neet_analysis_system.exe.config",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\daemon\\neet_analysis_system.xml",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\daemon\\neet_backend_service.exe",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\daemon\\neet_backend_service.exe.config",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\daemon\\neet_backend_service.xml",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\data_dump.json",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\db.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\debug-connection.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\debug-data.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\debug.txt",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\debug_error.txt",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\debug_error_utf8.txt",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\debug_out.txt",
+    "mtime": "2026-01-30T14:35:14.065Z"
+  },
+  {
+    "path": "server\\debug_output.txt",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\deep-inspect.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\email.log",
+    "mtime": "2026-01-30T14:52:38.470Z"
+  },
+  {
+    "path": "server\\email_debug.log",
+    "mtime": "2026-01-30T14:43:39.042Z"
+  },
+  {
+    "path": "server\\error.log",
+    "mtime": "2026-01-30T14:33:07.837Z"
+  },
+  {
+    "path": "server\\find-target-table.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\fix_columns.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\index.js",
+    "mtime": "2026-01-30T17:20:21.146Z"
+  },
+  {
+    "path": "server\\init_db.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\inspect-columns.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\inspect-db.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\inspect-real-columns.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\inspect-table-details.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\inspect-target.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\list-all-tables.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\list-erp-tables.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\list-tables.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\list_cols.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\list_columns.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\log_output.txt",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\mt01_check.json",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\output.txt",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\package-lock.json",
+    "mtime": "2026-01-30T14:35:44.598Z"
+  },
+  {
+    "path": "server\\package.json",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\query",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\query_debug.log",
+    "mtime": "2026-01-30T17:22:20.476Z"
+  },
+  {
+    "path": "server\\read_log.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\recreate_erp_correct.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\reset_table_strict.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\startup_verify.log",
+    "mtime": "2026-01-30T14:57:35.434Z"
+  },
+  {
+    "path": "server\\start_hidden.bat",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\test-db.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\test-email-v2.js",
+    "mtime": "2026-01-30T14:43:20.476Z"
+  },
+  {
+    "path": "server\\test-email.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\test_campuses.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\test_direct.txt",
+    "mtime": "2026-01-30T14:58:03.100Z"
+  },
+  {
+    "path": "server\\test_email_out.txt",
+    "mtime": "2026-01-30T14:42:50.720Z"
+  },
+  {
+    "path": "server\\test_tidb.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "server\\upload_manual.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "SERVICE_GUIDE.md",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\client_wrapper.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\daemon\\neetanalysisfrontend.exe",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\daemon\\neetanalysisfrontend.xml",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\daemon\\neetanalysistunnel.exe",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\daemon\\neetanalysistunnel.xml",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\daemon\\neet_frontend_service.exe",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\daemon\\neet_frontend_service.exe.config",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\daemon\\neet_frontend_service.xml",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\install.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\install_backend_only.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\install_services.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\install_tunnel.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\install_unified.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\package-lock.json",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\package.json",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\README.md",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\tunnel_wrapper.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\uninstall.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  },
+  {
+    "path": "service_setup\\uninstall_services.js",
+    "mtime": "2026-01-30T12:52:01.000Z"
+  }
+]
