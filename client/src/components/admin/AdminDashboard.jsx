@@ -85,7 +85,7 @@ const AdminDashboard = () => {
 
             // 2. Send Email Notification via Backend
             try {
-                const response = await fetch(`${API_URL} /api/send - approval - email`, {
+                const response = await fetch(`${API_URL}/api/send-approval-email`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

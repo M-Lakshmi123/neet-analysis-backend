@@ -58,10 +58,17 @@ const UserApprovals = () => {
                 });
 
                 if (!response.ok) {
-                    const data = await response.text();
+                    const data = await response.json();
                     console.error("Failed to send approval email:", data);
-                    // Don't show modal for email failure to avoid blocking workflow, just log it
-                    // The user is already approved, which is the important part
+
+                    // Alert the user that looking good but email failed
+                    setModal({
+                        isOpen: true,
+                        type: 'danger',
+                        title: 'Email Delivery Failed',
+                        message: `The user was approved, but the notification email could not be sent. Error: ${data.details || 'Unknown Error'}`,
+                        onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
+                    });
                 } else {
                     console.log("Approval email sent successfully");
                 }
