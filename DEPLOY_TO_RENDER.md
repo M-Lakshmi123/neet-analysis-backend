@@ -28,13 +28,15 @@ Since you already have the code on your laptop, the easiest way is to use GitHub
 
 ### Step 3: Add Environment Variables
 In the Render setup page (or in Settings -> Environment Variables later), add the credentials from your local `server/.env` file:
-*   `DB_HOST`: (Copy from your .env)
-*   `DB_USER`: (Copy from your .env)
-*   `DB_PASSWORD`: (Copy from your .env)
+*   `DB_HOST`: Copy from your `.env` file (e.g., `gateway01....tidbcloud.com`)
+*   `DB_USER`: Copy from your `.env` file
+*   `DB_PASSWORD`: Copy from your `.env` file
 *   `DB_NAME`: `NEET`
 *   `DB_PORT`: `4000`
 *   `EMAIL_USER`: `yenjarappa.s@varsitymgmt.com`
 *   `EMAIL_PASS`: `Neet@123#`
+
+**IMPORTANT:** If you changed your TiDB cluster, you **MUST** update `DB_HOST`, `DB_USER`, and `DB_PASSWORD` in the Render Dashboard (Environment tab) to match your new `.env` file.
 
 ### Step 4: Finalize
 1.  Click **Create Web Service**.

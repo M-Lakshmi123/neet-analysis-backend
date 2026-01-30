@@ -326,7 +326,7 @@ app.get('/api/history', async (req, res) => {
                 STUD_ID
             FROM MEDICAL_RESULT 
             ${whereClause}
-            ORDER BY DATE ASC
+            ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') ASC
         `;
 
         logQuery(query, req.query);
@@ -392,7 +392,7 @@ app.get('/api/exam-stats', async (req, res) => {
             FROM MEDICAL_RESULT
             ${where}
             GROUP BY Test, DATE
-            ORDER BY DATE DESC
+            ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') DESC
         `;
 
         logQuery(query, req.query);
@@ -438,7 +438,7 @@ app.get('/api/analysis-report', async (req, res) => {
             SELECT DISTINCT Test, DATE 
             FROM MEDICAL_RESULT
             ${where}
-            ORDER BY DATE ASC
+            ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') ASC
         `;
 
         logQuery(studentQuery, req.query);
@@ -471,15 +471,29 @@ const transporter = require('nodemailer').createTransport({
         pass: process.env.EMAIL_PASS
     },
     tls: {
+        ciphers: 'SSLv3',
         rejectUnauthorized: false
-    }
+    },
+    // CONNECTION FIXES FOR CLOUD/RENDER:
+    family: 4,              // Force IPv4 (fixes timeouts on some docker networks that struggle with Office365 IPv6)
+    connectionTimeout: 10000, // 10 seconds (default is 2 min, but we want to fail faster or handle it)
+    greetingTimeout: 5000,  // Wait 5s for greeting
+    debug: true,            // Log details
+    logger: true            // Log to console
 });
 
 // Endpoint to send approval email
 app.post('/api/send-approval-email', async (req, res) => {
     const { email, name, campus } = req.body;
 
+    const logEmail = (msg) => {
+        const entry = `[${new Date().toISOString()}] [EMAIL] ${msg}\n`;
+        fs.appendFileSync(path.join(__dirname, 'email.log'), entry);
+        console.log(entry.trim());
+    };
+
     if (!email || !name) {
+        logEmail(`Failed: Missing email or name. Body: ${JSON.stringify(req.body)}`);
         return res.status(400).json({ error: "Missing email or name" });
     }
 
@@ -495,7 +509,7 @@ app.post('/api/send-approval-email', async (req, res) => {
                 <p>You can now log in to the portal using your registered email and password.</p>
                 <br/>
                 <div style="text-align: center;">
-                    <a href="http://localhost:5173/login" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Dashboard</a>
+                    <a href="http://sri-chaitanya-neet.web.app/login" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Dashboard</a>
                 </div>
                 <br/>
                 <p style="color: #64748b; font-size: 12px; text-align: center;">This is an automated message. Please do not reply.</p>
@@ -504,12 +518,12 @@ app.post('/api/send-approval-email', async (req, res) => {
     };
 
     try {
-        console.log(`[Email] Attempting to send approval email to: ${email} from: ${process.env.EMAIL_USER}`);
+        logEmail(`Attempting to send approval email to: ${email} (Name: ${name})`);
         const info = await transporter.sendMail(mailOptions);
-        console.log(`[Email] Email sent successfully. MessageId: ${info.messageId}`);
+        logEmail(`Success! MessageId: ${info.messageId}`);
         res.json({ success: true, message: "Email sent successfully", messageId: info.messageId });
     } catch (error) {
-        console.error("[Email] CRITICAL ERROR sending email:", error);
+        logEmail(`CRITICAL ERROR: ${error.message}`);
         res.status(500).json({ error: "Failed to send email", details: error.message, stack: error.stack });
     }
 });

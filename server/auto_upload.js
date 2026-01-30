@@ -6,19 +6,20 @@ const path = require('path');
 
 // --- CONFIGURATION ---
 const WATCH_FOLDER = 'F:/Project files';
-const TARGET_FILE = 'MEDICAL_RESULT.csv';
-const FILE_PATH = path.join(WATCH_FOLDER, TARGET_FILE);
+const FILES_TO_WATCH = ['MEDICAL_RESULT.csv', 'ERP_REPORT.csv'];
+const WATCH_PATHS = FILES_TO_WATCH.map(f => path.join(WATCH_FOLDER, f));
 
 console.log("-----------------------------------------");
 console.log("   NEET DATA AUTO-UPLOADER (TiDB Cloud)  ");
 console.log("-----------------------------------------");
-console.log(`Watching for file: ${FILE_PATH}`);
+console.log(`Watching folder: ${WATCH_FOLDER}`);
+console.log(`Files: ${FILES_TO_WATCH.join(', ')}`);
 
 // Debounce to avoid double-uploads on save
 let isProcessing = false;
 
 // Initialize Watcher
-const watcher = chokidar.watch(FILE_PATH, {
+const watcher = chokidar.watch(WATCH_PATHS, {
     persistent: true,
     awaitWriteFinish: {
         stabilityThreshold: 2000,
@@ -27,25 +28,42 @@ const watcher = chokidar.watch(FILE_PATH, {
 });
 
 watcher
-    .on('add', processFile)
-    .on('change', processFile)
+    .on('add', (path) => processFile(path))
+    .on('change', (path) => processFile(path))
     .on('error', error => console.error(`Watcher error: ${error}`));
 
-async function processFile(path) {
+async function processFile(filePath) {
     if (isProcessing) return;
     isProcessing = true;
 
-    console.log(`\n📄 Change detected! Processing: ${path}`);
+    // Determine Table Name from Filename
+    const filename = require('path').basename(filePath); // Safe usage even if shadowed, but better to use require
+    // actually 'path' module is top level. But 'filePath' argument avoids shadowing 'path' module if I renamed it.
+    // The previous code had 'path' as argument which SHADOWED the module.
+    // So I can just use 'path.basename(filePath)' if I rename argument to filePath.
+
+    let tableName = 'MEDICAL_RESULT';
+    if (filename.toUpperCase().includes('ERP_REPORT')) {
+        tableName = 'ERP_REPORT';
+    } else if (filename.toUpperCase().includes('MEDICAL_RESULT')) {
+        tableName = 'MEDICAL_RESULT';
+    } else {
+        console.log(`Skipping file: ${filename}`);
+        isProcessing = false;
+        return;
+    }
+
+    console.log(`\n📄 Change detected! File: ${filename} -> Table: ${tableName}`);
 
     const results = [];
 
-    fs.createReadStream(path)
+    fs.createReadStream(filePath)
         .pipe(csv())
         .on('data', (data) => results.push(data))
         .on('end', async () => {
             console.log(`Parsed ${results.length} rows from CSV.`);
             if (results.length > 0) {
-                await uploadToDB(results);
+                await uploadToDB(results, tableName);
             } else {
                 console.log("⚠️ File is empty. Skipping.");
             }
@@ -57,7 +75,7 @@ async function processFile(path) {
         });
 }
 
-async function uploadToDB(rows) {
+async function uploadToDB(rows, tableName) {
     let pool;
     try {
         console.log("Connecting to TiDB...");
@@ -94,8 +112,24 @@ async function uploadToDB(rows) {
                 if (v === null || v === undefined) return "NULL";
                 let s = String(v).trim();
 
-                // Fix Date Format (DD-MM-YY or DD-MM-YYYY -> YYYY-MM-DD)
-                if (key.toUpperCase() === 'DATE' && s.includes('-')) {
+                // Fix STUD_ID Scientific Notation (e.g. 1.23E+10 -> 12300000000)
+                if (key.toUpperCase() === 'STUD_ID') {
+                    // Check if it looks like scientific notation
+                    if (/[eE][+-]?\d+$/.test(s)) {
+                        try {
+                            // Use BigInt or toLocaleString to verify
+                            const n = Number(s);
+                            if (!isNaN(n)) {
+                                s = n.toLocaleString('fullwide', { useGrouping: false });
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                }
+
+                // Format Date to DD-MM-YYYY (User requested format in DB)
+                // Appy to 'DATE' or 'Exam_Date'
+                const upperKey = key.toUpperCase();
+                if ((upperKey === 'DATE' || upperKey === 'EXAM_DATE') && s.includes('-')) {
                     const parts = s.split('-');
                     if (parts.length === 3) {
                         let d = parseInt(parts[0]);
@@ -105,10 +139,9 @@ async function uploadToDB(rows) {
                         // Handle 2 digit year (e.g., 25 -> 2025)
                         if (y < 100) y += 2000;
 
-                        // If it looks like DD-MM-YYYY, return YYYY-MM-DD
-                        // Basic check: Month must be <= 12, Day <= 31
                         if (m <= 12 && d <= 31) {
-                            s = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                            // Storing as DD-MM-YYYY per user request
+                            s = `${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}-${y}`;
                         }
                     }
                 }
@@ -117,7 +150,7 @@ async function uploadToDB(rows) {
                 return `'${s}'`;
             });
 
-            const sql = `INSERT INTO MEDICAL_RESULT (${safeKeys}) VALUES (${values.join(',')})`;
+            const sql = `INSERT INTO ${tableName} (${safeKeys}) VALUES (${values.join(',')})`;
 
             try {
                 await pool.request().query(sql);

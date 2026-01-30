@@ -67,7 +67,15 @@ async function uploadToDB(rows) {
                 if (v === null || v === undefined) return "NULL";
                 let s = String(v).trim();
 
-                // Fix Date Format if needed (DD-MM-YYYY -> YYYY-MM-DD)
+                // Fix STUD_ID Scientific Notation
+                if (key.toUpperCase() === 'STUD_ID' && /[eE][+-]?\d+$/.test(s)) {
+                    try {
+                        const n = Number(s);
+                        if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false });
+                    } catch (e) { }
+                }
+
+                // Fix Date Format (Convert to DD-MM-YYYY per user request)
                 if (key.toUpperCase().includes('DATE') && s.includes('-')) {
                     const parts = s.split('-');
                     if (parts.length === 3) {
@@ -76,7 +84,7 @@ async function uploadToDB(rows) {
                         let y = parseInt(parts[2]);
                         if (y < 100) y += 2000;
                         if (m <= 12 && d <= 31) {
-                            s = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                            s = `${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}-${y}`;
                         }
                     }
                 }
