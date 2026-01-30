@@ -479,10 +479,25 @@ app.get('/api/analysis-report', async (req, res) => {
 //     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 // });
 
+// One-Time Startup DB Connection Test
+(async () => {
+    try {
+        console.log("----------------------------------------");
+        console.log("STARTUP: Testing Database Connection...");
+        const pool = await connectToDb();
+        await pool.request().query('SELECT 1');
+        console.log("STARTUP: Database Connection Verified! ✅");
+        console.log("----------------------------------------");
+    } catch (err) {
+        console.error("STARTUP: Database Connection FAILED! ❌");
+        console.error(err);
+    }
+})();
+
 const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     // Auto-open browser
-    require('child_process').exec('start http://localhost:5000');
+    // require('child_process').exec('start http://localhost:5000');
 });
 
 server.on('error', (err) => {
