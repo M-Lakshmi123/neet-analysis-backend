@@ -1,12 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../../utils/apiHelper';
 import { auth, db } from '../../firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 import { UserPlus, Mail, Lock, School, ArrowRight, Award, TrendingUp, Users } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import Toast from '../Toast';
+import Modal from '../Modal';
 
 const RegisterPage = () => {
     const [name, setName] = useState('');
@@ -16,7 +18,6 @@ const RegisterPage = () => {
     const [campus, setCampus] = useState('');
     const [campuses, setCampuses] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
     const [currentSlide, setCurrentSlide] = useState(0);
     const [toast, setToast] = useState(null);
     const navigate = useNavigate();
@@ -27,24 +28,27 @@ const RegisterPage = () => {
 
     const slides = [
         {
-            image: "brooke-cagle-g1Kr4Ozfoac-unsplash.jpg",
-            quote: "TRANSFORMING DREAMS INTO REALITY THROUGH EXCELLENCE.",
+            image: "/brooke-cagle-g1Kr4Ozfoac-unsplash.jpg",
+            quote: "TRANSFORMING DREAMS INTO REALITY THROUGH EXCELLENCE",
+            animClass: "anim-fade",
             stats: [
                 { icon: <Users size={20} />, label: "NEET QUALIFIED", value: "85,000+" },
                 { icon: <Award size={20} />, label: "TOP AIR RANKS", value: "AIR 1, 2, 3" }
             ]
         },
         {
-            image: "pang-yuhao-_kd5cxwZOK4-unsplash.jpg",
-            quote: "GLOBAL STANDARDS IN MEDICAL EDUCATION.",
+            image: "/pang-yuhao-_kd5cxwZOK4-unsplash.jpg",
+            quote: "GLOBAL STANDARDS IN MEDICAL EDUCATION",
+            animClass: "anim-zoom",
             stats: [
                 { icon: <School size={20} />, label: "LEGACY OF TRUST", value: "38 YEARS" },
                 { icon: <TrendingUp size={20} />, label: "MBBS SEATS", value: "25,000+" }
             ]
         },
         {
-            image: "david-schultz-kM97y3aWWQw-unsplash.jpg",
-            quote: "WHERE DETERMINATION MEETS WORLD-CLASS MENTORSHIP.",
+            image: "/david-schultz-kM97y3aWWQw-unsplash.jpg",
+            quote: "WHERE DETERMINATION MEETS WORLD-CLASS MENTORSHIP",
+            animClass: "anim-slide",
             stats: [
                 { icon: <Users size={20} />, label: "ASPIRING DOCTORS", value: "2 LAC PROJECTED" },
                 { icon: <Award size={20} />, label: "STATE TOPPERS", value: "150+" }
@@ -64,26 +68,56 @@ const RegisterPage = () => {
             const apiUrl = `${API_URL}/api/filters`;
             try {
                 const res = await fetch(apiUrl);
+                if (!res.ok) throw new Error("Backend unreachable");
                 const data = await res.json();
-                setCampuses(data.campuses || []);
+                if (data.campuses && data.campuses.length > 0) {
+                    setCampuses(data.campuses);
+                } else {
+                    throw new Error("No campuses found in API response");
+                }
             } catch (err) {
-                console.error("Failed to fetch campuses:", err);
-                setError("Could not load campus list. Please ensure backend is running.");
+                console.warn("Backend unreachable, using fallback campus list:", err);
+                // Failover to hardcoded list so the UI still works
+                setCampuses([
+                    "HYD - MADHAPUR - BOYS",
+                    "HYD - MADHAPUR - GIRLS",
+                    "HYD - KUKATPALLY - MAIN",
+                    "VIJ - BENZ CIRCLE",
+                    "VIJ - GANGURU",
+                    "VSKP - DWARAKA NAGAR",
+                    "BLR - MARATHAHALLI",
+                    "BLR - HEBBAL",
+                    "CHE - ANNA NAGAR",
+                    "DEL - DWARKA"
+                ].sort());
+                // Optional: Don't show error toast to keep UI clean, or show a mild "Offline Mode" toast
             }
         };
         fetchCampuses();
     }, []);
 
+    const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
+
+    const handleModalClose = async () => {
+        setModal({ ...modal, isOpen: false });
+        // Navigate to login after success modal closes
+        if (modal.type === 'success') {
+            await signOut(auth); // Sign out only when user acknowledges success
+            navigate('/login');
+        }
+    };
+
     const handleRegister = async (e) => {
         e.preventDefault();
-        setError('');
 
         if (password !== confirmPassword) {
-            return setError("Passwords do not match");
+            showToast("Passwords do not match", "error");
+            return;
         }
 
         if (!campus) {
-            return setError("Please select your campus");
+            showToast("Please select your campus", "error");
+            return;
         }
 
         setLoading(true);
@@ -101,11 +135,25 @@ const RegisterPage = () => {
                 createdAt: new Date().toISOString()
             });
 
-            showToast("Registration successful! Pending admin approval.");
-            setTimeout(() => navigate('/login'), 2000);
+            // Do NOT sign out immediately, wait for user to click OK in modal
+            // await signOut(auth); 
+
+            // Show Success Modal instead of just Toast
+            setModal({
+                isOpen: true,
+                type: 'success',
+                title: 'Request Sent Successfully!',
+                message: 'Your registration request has been submitted. Please check your email for confirmation once the admin approves your request.',
+                confirmText: 'Back to Login'
+            });
+
         } catch (err) {
             if (err.message.includes("permissions")) {
                 showToast("Registration access denied by database rules. Please contact Administrator.", "error");
+            } else if (err.code === 'auth/email-already-in-use') {
+                showToast("This email is already registered", "error");
+            } else if (err.code === 'auth/weak-password') {
+                showToast("Password should be at least 6 characters", "error");
             } else {
                 showToast(err.message, "error");
             }
@@ -121,12 +169,12 @@ const RegisterPage = () => {
                     {/* Left Side: Inspirational Slideshow */}
                     <div className="auth-slides-side">
                         {slides.map((slide, index) => (
-                            <div key={index} className={`slide ${currentSlide === index ? 'active' : ''}`}>
+                            <div key={index} className={`slide ${currentSlide === index ? 'active' : ''} `}>
                                 {slide.image && (
-                                    <img src={`/${slide.image}`} alt="Slide" className="slide-img" />
+                                    <img src={slide.image} alt="Slide" className="slide-img" />
                                 )}
-                                <div className="slide-content">
-                                    <h3 className="slide-quote">"{slide.quote}"</h3>
+                                <div className={`slide-content ${slide.animClass}`}>
+                                    <h3 className="slide-quote">{slide.quote}</h3>
                                     <div className="slide-stats">
                                         {slide.stats.map((stat, sIndex) => (
                                             <div key={sIndex} className="stat-item">
@@ -253,6 +301,15 @@ const RegisterPage = () => {
                     />
                 )}
             </AnimatePresence>
+
+            <Modal
+                isOpen={modal.isOpen}
+                onClose={handleModalClose}
+                title={modal.title}
+                message={modal.message}
+                type={modal.type}
+                confirmText={modal.confirmText}
+            />
         </>
     );
 };

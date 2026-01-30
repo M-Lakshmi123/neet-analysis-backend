@@ -163,27 +163,45 @@ const AnalysisReport = ({ filters }) => {
             let currentY = 12; // Reduced top margin
 
             // 1. Logo & Institution Name - Centered Together
-            const title = "SRI CHAITANYA EDUCATIONAL INSTITUTIONS";
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(26);
-            doc.setTextColor(0, 0, 0);
-            const titleWidth = doc.getTextWidth(title);
+            // Single Line Title with mixed styles
+            // SRI CHAITANYA: #0070C0 - Helvetica Bold (Proxy for Impact)
+            // EDUCATIONAL INSTITUTIONS: #0066CC - Helvetica Normal (Proxy for Gill Sans)
+
+            const part1 = "Sri Chaitanya";
+            const part2 = " Educational Institutions";
+            const fontSize = 24;
 
             if (logoImg) {
                 const aspect = logoImg.width / logoImg.height;
-                const logoH = 22; // Larger logo for landscape
+                const logoH = 22;
                 const logoW = logoH * aspect;
 
-                // 1. Draw Logo Centered Top
+                // Draw Logo Centered Top
                 const logoX = (pageWidth - logoW) / 2;
                 doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-                currentY += logoH + 12; // Increased gap to prevent overlap
-
-                // 2. Draw Title Centered below logo
-                doc.text(title, pageWidth / 2, currentY, { align: 'center' });
-            } else {
-                doc.text(title, pageWidth / 2, currentY, { align: 'center' });
+                currentY += logoH + 10; // Increased gap to prevent overlap with text
             }
+
+            // Calculate centering X for the combined line
+            doc.setFontSize(fontSize);
+            doc.setFont("helvetica", "bold");
+            const w1 = doc.getTextWidth(part1);
+            doc.setFont("helvetica", "normal");
+            const w2 = doc.getTextWidth(part2);
+            const totalWidth = w1 + w2;
+            const startX = (pageWidth - totalWidth) / 2;
+
+            // Draw Part 1
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 112, 192); // #0070C0
+            doc.text(part1, startX, currentY);
+
+            // Draw Part 2
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(0, 102, 204); // #0066CC
+            doc.text(part2, startX + w1, currentY);
+
+            currentY += 6; // Reduced gap below title
             currentY += 8; // Reduced gap below title
 
             // 3. Custom Header Pattern
@@ -228,17 +246,17 @@ const AnalysisReport = ({ filters }) => {
                 row.STUD_ID || '',
                 (row.name || '').toUpperCase(),
                 (row.campus || '').toUpperCase(),
-                Math.round(row.tot) || '0',
+                Math.round(row.tot || 0),
                 Math.round(row.air) || '-',
-                Math.round(row.bot) || '0',
-                Math.round(row.b_rank) || '-',
-                Math.round(row.zoo) || '0',
-                Math.round(row.z_rank) || '-',
+                Math.round(row.bot || 0),
+                Math.round(row.b_rank || 0),
+                Math.round(row.zoo || 0),
+                Math.round(row.z_rank || 0),
                 Math.round((Number(row.bot) || 0) + (Number(row.zoo) || 0)),
-                Math.round(row.phy) || '0',
-                Math.round(row.p_rank) || '-',
-                Math.round(row.che) || '0',
-                Math.round(row.c_rank) || '-'
+                Math.round(row.phy || 0),
+                Math.round(row.p_rank || 0),
+                Math.round(row.che || 0),
+                Math.round(row.c_rank || 0)
             ]);
 
             autoTable(doc, {
@@ -311,10 +329,12 @@ const AnalysisReport = ({ filters }) => {
             const worksheet = workbook.addWorksheet('Analysis Report');
 
             // 1. Add Title (Merged Row 1)
+            // Excel Export - split lines? Excel merges are tricky for multi-color in one cell.
+            // We'll keep it one cell but change color to main Blue #0070C0
             worksheet.addRow(['SRI CHAITANYA EDUCATIONAL INSTITUTIONS']);
             worksheet.mergeCells('A1:O1');
             const titleCell = worksheet.getCell('A1');
-            titleCell.font = { size: 20, bold: true, color: { argb: 'FF800040' } };
+            titleCell.font = { size: 20, bold: true, color: { argb: 'FF0070C0' } }; // Updated Color
             titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
             worksheet.getRow(1).height = 30;
 
@@ -386,17 +406,17 @@ const AnalysisReport = ({ filters }) => {
                     student.STUD_ID,
                     (student.name || '').toUpperCase(),
                     (student.campus || '').toUpperCase(),
-                    Math.round(student.tot),
+                    Number(student.tot || 0).toFixed(1),
                     Math.round(student.air) || '-',
-                    Math.round(student.bot),
-                    Math.round(student.b_rank) || '-',
-                    Math.round(student.zoo),
-                    Math.round(student.z_rank) || '-',
-                    Math.round((Number(student.bot) || 0) + (Number(student.zoo) || 0)),
-                    Math.round(student.phy),
-                    Math.round(student.p_rank) || '-',
-                    Math.round(student.che),
-                    Math.round(student.c_rank) || '-',
+                    Number(student.bot || 0).toFixed(1),
+                    Number(student.b_rank || 0).toFixed(1),
+                    Number(student.zoo || 0).toFixed(1),
+                    Number(student.z_rank || 0).toFixed(1),
+                    ((Number(student.bot) || 0) + (Number(student.zoo) || 0)).toFixed(1),
+                    Number(student.phy || 0).toFixed(1),
+                    Number(student.p_rank || 0).toFixed(1),
+                    Number(student.che || 0).toFixed(1),
+                    Number(student.c_rank || 0).toFixed(1),
                     student.t_app
                 ];
                 const row = worksheet.addRow(rowData);
@@ -607,34 +627,34 @@ const AnalysisReport = ({ filters }) => {
                                                 {student.name}
                                             </td>
                                             <td className="text-left" style={{ color: 'black' }}>{student.campus}</td>
-                                            <td className="col-yellow" style={{ fontWeight: '800', color: 'black' }}>{Math.round(student.tot)}</td>
+                                            <td className="col-yellow" style={{ fontWeight: '800', color: 'black' }}>{Number(student.tot || 0).toFixed(1)}</td>
                                             <td className="col-white" style={{ fontWeight: '700', color: '#6c361e' }}>{Math.round(student.air) || '-'}</td>
-                                            <td className="col-green" style={{ color: 'black' }}>{Math.round(student.bot)}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{Math.round(student.b_rank) || '-'}</td>
-                                            <td className="col-blue-light" style={{ color: 'black' }}>{Math.round(student.zoo)}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{Math.round(student.z_rank) || '-'}</td>
-                                            <td className="col-blue-med" style={{ fontWeight: '800', color: '#1e4a80' }}>{Math.round((Number(student.bot) || 0) + (Number(student.zoo) || 0))}</td>
-                                            <td className="col-green-pale" style={{ color: 'black' }}>{Math.round(student.phy)}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{Math.round(student.p_rank) || '-'}</td>
-                                            <td className="col-pink-pale" style={{ color: 'black' }}>{Math.round(student.che)}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{Math.round(student.c_rank) || '-'}</td>
+                                            <td className="col-green" style={{ color: 'black' }}>{Number(student.bot || 0).toFixed(1)}</td>
+                                            <td className="col-white" style={{ color: 'black' }}>{Number(student.b_rank || 0).toFixed(1)}</td>
+                                            <td className="col-blue-light" style={{ color: 'black' }}>{Number(student.zoo || 0).toFixed(1)}</td>
+                                            <td className="col-white" style={{ color: 'black' }}>{Number(student.z_rank || 0).toFixed(1)}</td>
+                                            <td className="col-blue-med" style={{ fontWeight: '800', color: '#1e4a80' }}>{((Number(student.bot) || 0) + (Number(student.zoo) || 0)).toFixed(1)}</td>
+                                            <td className="col-green-pale" style={{ color: 'black' }}>{Number(student.phy || 0).toFixed(1)}</td>
+                                            <td className="col-white" style={{ color: 'black' }}>{Number(student.p_rank || 0).toFixed(1)}</td>
+                                            <td className="col-pink-pale" style={{ color: 'black' }}>{Number(student.che || 0).toFixed(1)}</td>
+                                            <td className="col-white" style={{ color: 'black' }}>{Number(student.c_rank || 0).toFixed(1)}</td>
                                             <td className="col-exams" style={{ fontWeight: '700', color: 'black' }}>{student.t_app}</td>
                                         </tr>
                                     ))}
                                     {totals && (
                                         <tr className="total-row">
                                             <td colSpan="3" className="text-left" style={{ color: 'black' }}>Campus Selection Average</td>
-                                            <td className="col-yellow" style={{ color: 'black' }}>{totals.tot}</td>
-                                            <td className="col-white" style={{ color: '#6c361e' }}>{totals.air}</td>
-                                            <td className="col-green" style={{ color: 'black' }}>{totals.bot}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{totals.b_rank}</td>
-                                            <td className="col-blue-light" style={{ color: 'black' }}>{totals.zoo}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{totals.z_rank}</td>
-                                            <td className="col-blue-med" style={{ color: '#1e4a80' }}>{(Number(totals.bot) || 0) + (Number(totals.zoo) || 0)}</td>
-                                            <td className="col-green-pale" style={{ color: 'black' }}>{totals.phy}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{totals.p_rank}</td>
-                                            <td className="col-pink-pale" style={{ color: 'black' }}>{totals.che}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{totals.c_rank}</td>
+                                            <td className="col-yellow" style={{ color: 'black' }}>{Number(totals.tot || 0).toFixed(1)}</td>
+                                            <td className="col-white" style={{ color: '#6c361e' }}>{Math.round(totals.air) || '-'}</td>
+                                            <td className="col-green" style={{ color: 'black' }}>{Number(totals.bot || 0).toFixed(1)}</td>
+                                            <td className="col-white" style={{ color: 'black' }}>{Number(totals.b_rank || 0).toFixed(1)}</td>
+                                            <td className="col-blue-light" style={{ color: 'black' }}>{Number(totals.zoo || 0).toFixed(1)}</td>
+                                            <td className="col-white" style={{ color: 'black' }}>{Number(totals.z_rank || 0).toFixed(1)}</td>
+                                            <td className="col-blue-med" style={{ color: '#1e4a80' }}>{((Number(totals.bot) || 0) + (Number(totals.zoo) || 0)).toFixed(1)}</td>
+                                            <td className="col-green-pale" style={{ color: 'black' }}>{Number(totals.phy || 0).toFixed(1)}</td>
+                                            <td className="col-white" style={{ color: 'black' }}>{Number(totals.p_rank || 0).toFixed(1)}</td>
+                                            <td className="col-pink-pale" style={{ color: 'black' }}>{Number(totals.che || 0).toFixed(1)}</td>
+                                            <td className="col-white" style={{ color: 'black' }}>{Number(totals.c_rank || 0).toFixed(1)}</td>
                                             <td className="col-exams"></td>
                                         </tr>
                                     )}
@@ -653,23 +673,23 @@ const AnalysisReport = ({ filters }) => {
                     width: 100%;
                 }
                 .merit-table {
-                    font-size: 0.75rem !important;
+                    font-size: 0.7rem !important;
                     table-layout: fixed !important;
                 }
                 .merit-table th, .merit-table td {
-                    padding: 0.25rem 0.1rem !important;
+                    padding: 0.2rem 0.1rem !important;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
                 .w-id-col { width: 45px !important; }
                 .w-campus-col { 
-                    width: 85px !important; 
+                    width: 80px !important; 
                     white-space: normal !important;
                     line-height: 1.1 !important;
                 }
                 .w-name-col { 
-                    width: 75px !important; 
+                    width: 70px !important; 
                     text-align: left !important; 
                     white-space: normal !important; 
                     overflow-wrap: break-word !important; 

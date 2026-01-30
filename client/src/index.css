@@ -1,3 +1,20 @@
+/* Modern CSS Reset */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    height: 100%;
+    width: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 :root {
     --bg-light: #f8fafc;
     /* Slate 50 */
@@ -34,7 +51,7 @@ body {
     color: var(--text-primary);
     background-image:
         linear-gradient(rgba(240, 249, 255, 0.94), rgba(240, 249, 255, 0.94)),
-        url('/pang-yuhao-_kd5cxwZOK4-unsplash.jpg');
+        url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1920&q=80');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -74,20 +91,22 @@ body {
 
 .logo-text {
     font-size: 1.1rem;
-    font-weight: 900;
+    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-weight: 500;
     margin: 0;
-    color: var(--medicon-navy);
+    color: #0070C0;
     letter-spacing: 0.5px;
 }
 
 .logo-subtext {
     font-size: 0.6rem;
-    color: var(--medicon-navy);
+    font-family: "Gill Sans MT", "Gill Sans", "Trebuchet MS", sans-serif;
+    color: #0066CC;
     margin: 0.3rem 0 0 0;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     font-weight: 700;
-    opacity: 0.7;
+    opacity: 1;
 }
 
 .menu-items {
@@ -1524,6 +1543,7 @@ body {
 .disabled-logic .react-select__control {
     background-color: #f8fafc !important;
 }
+
 /* Modal Styles */
 .modal-overlay {
     position: fixed;
@@ -1647,4 +1667,3 @@ body {
 .btn-modal-confirm.danger:hover {
     background: #dc2626;
 }
-

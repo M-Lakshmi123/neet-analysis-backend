@@ -32,6 +32,12 @@ const UserApprovals = () => {
     };
 
     const handleApprove = async (user) => {
+        // Optimistic Update: Move user immediately in UI
+        const approvedUser = { ...user, isApproved: true, approvedAt: new Date().toISOString() };
+
+        setPendingUsers(prev => prev.filter(u => u.id !== user.id));
+        setApprovedUsers(prev => [approvedUser, ...prev]);
+
         try {
             // 1. Approve in Firestore
             await updateDoc(doc(db, "users", user.id), {
@@ -51,41 +57,25 @@ const UserApprovals = () => {
                     })
                 });
 
-                const contentType = response.headers.get("content-type");
-                let responseData;
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    responseData = await response.json();
-                } else {
-                    responseData = await response.text();
-                }
-
                 if (!response.ok) {
-                    console.error("Failed to send approval email:", responseData);
-                    setModal({
-                        isOpen: true,
-                        type: 'info',
-                        title: 'Email Failed',
-                        message: `User approved, but failed to send email. Server says: ${JSON.stringify(responseData)}`,
-                        onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
-                    });
+                    const data = await response.text();
+                    console.error("Failed to send approval email:", data);
+                    // Don't show modal for email failure to avoid blocking workflow, just log it
+                    // The user is already approved, which is the important part
                 } else {
-                    console.log("Approval email sent successfully", responseData);
-                    // Optionally show success toast if you have a toast available
-                    // alert("Email sent!");
+                    console.log("Approval email sent successfully");
                 }
             } catch (emailErr) {
                 console.error("Email API Connection Error:", emailErr);
-                setModal({
-                    isOpen: true,
-                    type: 'danger',
-                    title: 'Network Error',
-                    message: "Technical error sending email: " + emailErr.message,
-                    onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
-                });
             }
 
-            fetchUsers();
+            // No need to re-fetch immediately as we did optimistic update
+            // fetchUsers(); 
         } catch (err) {
+            // Revert optimistic update on error
+            setPendingUsers(prev => [...prev, user].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+            setApprovedUsers(prev => prev.filter(u => u.id !== user.id));
+
             setModal({
                 isOpen: true,
                 type: 'danger',

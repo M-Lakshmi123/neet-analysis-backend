@@ -1,10 +1,13 @@
 const nodemailer = require('nodemailer');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 async function testEmail() {
     console.log('--- Email Configuration Test ---');
     console.log('EMAIL_USER:', process.env.EMAIL_USER);
-    console.log('EMAIL_PASS:', process.env.EMAIL_PASS ? '********' : 'NOT SET');
+    console.log('EMAIL_PASS length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0);
+    console.log('EMAIL_PASS first char:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS[0] : 'N/A');
+    console.log('EMAIL_PASS last char:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS[process.env.EMAIL_PASS.length - 1] : 'N/A');
 
     const transporter = nodemailer.createTransport({
         host: 'smtp.office365.com',

@@ -1,12 +1,12 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { connectToDb, sql } = require('./db');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const fs = require('fs');
-const path = require('path');
 
 const logQuery = (query, params) => {
     const logPath = path.join(__dirname, 'query_debug.log');
@@ -459,6 +459,8 @@ app.get('/api/analysis-report', async (req, res) => {
 
 // Email Transporter Configuration (Outlook / Office 365)
 // You must set EMAIL_USER and EMAIL_PASS in your .env file
+console.log(`[Email Config] User: ${process.env.EMAIL_USER}, Pass Length: ${process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0}`);
+
 const transporter = require('nodemailer').createTransport({
     host: 'smtp.office365.com',
     port: 587,
@@ -468,7 +470,6 @@ const transporter = require('nodemailer').createTransport({
         pass: process.env.EMAIL_PASS
     },
     tls: {
-        ciphers: 'SSLv3',
         rejectUnauthorized: false
     }
 });

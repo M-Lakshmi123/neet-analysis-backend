@@ -88,29 +88,50 @@ const AverageReport = ({ filters }) => {
         let currentY = 11; // Reduced top margin
 
         // 1. Logo & Institution Name - Centered Together
-        const title = "SRI CHAITANYA EDUCATIONAL INSTITUTIONS";
+        // Split Title into two lines with custom colors/fonts
+        const title1 = "SRI CHAITANYA";
+        const title2 = "EDUCATIONAL INSTITUTIONS";
+
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(22); // Consistent size
-        doc.setTextColor(0, 0, 0);
-        const titleWidth = doc.getTextWidth(title);
+        doc.setFontSize(22); // Consistent size as before
+        doc.setTextColor(0, 112, 192); // #0070C0
 
         if (logoImg) {
             const aspect = logoImg.width / logoImg.height;
             let logoH = 20; // Slightly larger logo
             let logoW = logoH * aspect;
 
-            // 1. Draw Logo Centered Top
+            // Draw Logo Centered Top
             const logoX = (210 - logoW) / 2;
             doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
             currentY += logoH + 8; // Reduced gap below logo
 
-            // 2. Draw Title Centered below logo
-            doc.text(title, 105, currentY, { align: 'center' });
-            currentY += 6; // Reduced gap below title
+            // Draw Title 1
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.setTextColor(0, 112, 192);
+            doc.text(title1, 105, currentY, { align: 'center' });
+            currentY += 7;
+
+            // Draw Title 2
+            doc.setFontSize(16);
+            doc.setTextColor(0, 102, 204);
+            doc.text(title2, 105, currentY, { align: 'center' });
+
         } else {
-            doc.text(title, 105, currentY, { align: 'center' });
-            currentY += 8;
+            // Draw Title 1
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.setTextColor(0, 112, 192);
+            doc.text(title1, 105, currentY, { align: 'center' });
+            currentY += 7;
+
+            // Draw Title 2
+            doc.setFontSize(16);
+            doc.setTextColor(0, 102, 204);
+            doc.text(title2, 105, currentY, { align: 'center' });
         }
+        currentY += 8; // Reduced gap below title
 
         // 3. Subtitle
         doc.setFont("helvetica", "bolditalic");
@@ -163,22 +184,24 @@ const AverageReport = ({ filters }) => {
         const tableRows = studentData.map(row => [
             row.Test,
             formatDate(row.DATE),
-            row.Tot_720,
-            row.AIR,
-            row.Botany,
-            row.Zoology,
-            row.Physics,
-            row.Chemistry
+            Math.round(row.Tot_720 || 0),
+            Math.round(row.AIR) || '-',
+            Math.round(row.Botany || 0),
+            Math.round(row.Zoology || 0),
+            Math.round(row.Physics || 0),
+            Math.round(row.Chemistry || 0)
         ]);
 
         // Average
         if (studentData.length > 0) {
-            const avg = (key) => (studentData.reduce((a, b) => a + (Number(b[key]) || 0), 0) / studentData.length).toFixed(1);
+            const avg = (key) => Math.round(studentData.reduce((a, b) => a + (Number(b[key]) || 0), 0) / studentData.length);
+            const avgAIR = Math.round(studentData.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / studentData.length);
+
             tableRows.push([
                 "AVERAGE",
                 "",
                 avg('Tot_720'),
-                avg('AIR'),
+                avgAIR,
                 avg('Botany'),
                 avg('Zoology'),
                 avg('Physics'),
@@ -368,19 +391,19 @@ const AverageReport = ({ filters }) => {
                                             <tr key={idx}>
                                                 <td>{row.Test}</td>
                                                 <td>{formatDate(row.DATE)}</td>
-                                                <td className="col-yellow font-bold">{row.Tot_720}</td>
-                                                <td className="text-brown">{row.AIR}</td>
-                                                <td className="col-orange">{row.Botany}</td>
-                                                <td className="col-blue-light">{row.Zoology}</td>
-                                                <td className="col-blue-med font-bold">{(Number(row.Botany || 0) + Number(row.Zoology || 0))}</td>
-                                                <td className="col-green-pale">{row.Physics}</td>
-                                                <td className="col-pink-pale">{row.Chemistry}</td>
+                                                <td className="col-yellow font-bold">{Number(row.Tot_720 || 0).toFixed(1)}</td>
+                                                <td className="text-brown">{Math.round(row.AIR) || '-'}</td>
+                                                <td className="col-orange">{Number(row.Botany || 0).toFixed(1)}</td>
+                                                <td className="col-blue-light">{Number(row.Zoology || 0).toFixed(1)}</td>
+                                                <td className="col-blue-med font-bold">{((Number(row.Botany || 0) + Number(row.Zoology || 0))).toFixed(1)}</td>
+                                                <td className="col-green-pale">{Number(row.Physics || 0).toFixed(1)}</td>
+                                                <td className="col-pink-pale">{Number(row.Chemistry || 0).toFixed(1)}</td>
                                             </tr>
                                         ))}
                                         <tr className="total-row">
                                             <td colSpan={2} className="text-right">AVERAGES</td>
                                             <td className="col-yellow">{(previewRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / previewRows.length).toFixed(1)}</td>
-                                            <td>{(previewRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / previewRows.length).toFixed(1)}</td>
+                                            <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / previewRows.length)}</td>
                                             <td className="col-orange">{(previewRows.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / previewRows.length).toFixed(1)}</td>
                                             <td className="col-blue-light">{(previewRows.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / previewRows.length).toFixed(1)}</td>
                                             <td className="col-blue-med">{(previewRows.reduce((a, b) => a + (Number(b.Botany || 0) + Number(b.Zoology || 0)), 0) / previewRows.length).toFixed(1)}</td>

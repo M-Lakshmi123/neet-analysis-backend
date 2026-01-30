@@ -22,7 +22,7 @@ const LoginPage = () => {
 
     const slides = [
         {
-            image: "brooke-cagle-g1Kr4Ozfoac-unsplash.jpg",
+            image: "/brooke-cagle-g1Kr4Ozfoac-unsplash.jpg",
             quote: "TRANSFORMING DREAMS INTO REALITY THROUGH EXCELLENCE",
             animClass: "anim-fade",
             stats: [
@@ -31,7 +31,7 @@ const LoginPage = () => {
             ]
         },
         {
-            image: "pang-yuhao-_kd5cxwZOK4-unsplash.jpg",
+            image: "/pang-yuhao-_kd5cxwZOK4-unsplash.jpg",
             quote: "GLOBAL STANDARDS IN MEDICAL EDUCATION",
             animClass: "anim-zoom",
             stats: [
@@ -40,7 +40,7 @@ const LoginPage = () => {
             ]
         },
         {
-            image: "david-schultz-kM97y3aWWQw-unsplash.jpg",
+            image: "/david-schultz-kM97y3aWWQw-unsplash.jpg",
             quote: "WHERE DETERMINATION MEETS WORLD-CLASS MENTORSHIP",
             animClass: "anim-slide",
             stats: [
@@ -99,7 +99,7 @@ const LoginPage = () => {
                         {slides.map((slide, index) => (
                             <div key={index} className={`slide ${currentSlide === index ? 'active' : ''}`}>
                                 {slide.image && (
-                                    <img src={`/${slide.image}`} alt="Slide" className="slide-img" />
+                                    <img src={slide.image} alt="Slide" className="slide-img" />
                                 )}
                                 <div className={`slide-content ${slide.animClass}`}>
                                     <h3 className="slide-quote">{slide.quote}</h3>

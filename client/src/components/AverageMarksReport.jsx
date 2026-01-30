@@ -85,11 +85,11 @@ const AverageMarksReport = ({ filters }) => {
         const count = rankedStudents.length;
         const sum = (key) => rankedStudents.reduce((acc, curr) => acc + (Number(curr[key]) || 0), 0);
         return {
-            tot: Math.round(sum('tot') / count),
-            bot: Math.round(sum('bot') / count),
-            zoo: Math.round(sum('zoo') / count),
-            phy: Math.round(sum('phy') / count),
-            che: Math.round(sum('che') / count),
+            tot: (sum('tot') / count).toFixed(1),
+            bot: (sum('bot') / count).toFixed(1),
+            zoo: (sum('zoo') / count).toFixed(1),
+            phy: (sum('phy') / count).toFixed(1),
+            che: (sum('che') / count).toFixed(1),
             air: Math.round(sum('air') / count)
         };
     };
@@ -321,11 +321,11 @@ const AverageMarksReport = ({ filters }) => {
                                                 </td>
 
                                                 <td style={{ color: '#101828' }}>{s.campus}</td>
-                                                <td className="col-yellow font-bold" style={{ color: '#000000' }}>{Math.round(s.tot)}</td>
-                                                <td className="col-green" style={{ color: '#000000' }}>{Math.round(s.bot)}</td>
-                                                <td className="col-blue-light" style={{ color: '#000000' }}>{Math.round(s.zoo)}</td>
-                                                <td className="col-green-pale" style={{ color: '#000000' }}>{Math.round(s.phy)}</td>
-                                                <td className="col-pink-pale" style={{ color: '#000000' }}>{Math.round(s.che)}</td>
+                                                <td className="col-yellow font-bold" style={{ color: '#000000' }}>{Number(s.tot || 0).toFixed(1)}</td>
+                                                <td className="col-green" style={{ color: '#000000' }}>{Number(s.bot || 0).toFixed(1)}</td>
+                                                <td className="col-blue-light" style={{ color: '#000000' }}>{Number(s.zoo || 0).toFixed(1)}</td>
+                                                <td className="col-green-pale" style={{ color: '#000000' }}>{Number(s.phy || 0).toFixed(1)}</td>
+                                                <td className="col-pink-pale" style={{ color: '#000000' }}>{Number(s.che || 0).toFixed(1)}</td>
                                                 <td className="font-bold" style={{ color: '#0000ff', fontStyle: 'italic' }}>{s.calculatedRank}</td>
                                                 <td className="font-bold" style={{ color: '#000000' }}>{s.t_app}</td>
                                                 <td className="font-bold" style={{ color: '#000000' }}>{totalConducted}</td>
@@ -390,21 +390,21 @@ const AverageMarksReport = ({ filters }) => {
                     transition: all 0.2s;
                     width: 100%;
                 }
-                .range-card:hover { border-color: #6366f1; transform: translateX(-2px); }
-                .range-card.active { background: #6366f1; border-color: #6366f1; }
+                .range-card:hover { border-color: #C4D79B; transform: translateX(-2px); }
+                .range-card.active { background: #C4D79B; border-color: #C4D79B; }
                 .range-label { font-weight: 700; font-size: 0.85rem; color: #475569; }
-                .range-card.active .range-label { color: white; }
+                .range-card.active .range-label { color: #000066; } /* Dark Blue for contrast on light green */
                 .range-count { 
                     background: #f1f5f9; 
-                    color: #1e293b; 
+                    color: #000066; /* Requested Color */
                     padding: 2px 8px; 
                     border-radius: 6px; 
                     font-size: 0.8rem; 
-                    font-weight: 800; 
+                    font-weight: bold; /* Requested Bold */
                     min-width: 40px; 
                     text-align: center; 
                 }
-                .range-card.active .range-count { background: rgba(255,255,255,0.2); color: white; }
+                .range-card.active .range-count { background: rgba(255,255,255,0.4); color: #000066; }
             `}</style>
 
         </div>
