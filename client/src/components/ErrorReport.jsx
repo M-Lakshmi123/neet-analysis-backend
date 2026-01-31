@@ -417,191 +417,163 @@ const ErrorReport = () => {
     };
 
     return (
-        <div className="error-report-page min-h-screen bg-gray-100 p-4">
-            <div className="max-w-[1200px] mx-auto">
-                <div className="no-print mb-6">
-                    <FilterBar
-                        filters={filters}
-                        setFilters={setFilters}
-                        restrictedCampus={!isAdmin ? userData?.campus : null}
-                        apiEndpoints={{
-                            filters: '/api/erp/filters',
-                            students: '/api/erp/students'
-                        }}
-                    />
+        <div className="error-report-page min-h-screen bg-gray-500 p-8 overflow-auto">
+            {/* Controls */}
+            <div className="no-print max-w-[210mm] mx-auto mb-6 bg-white rounded p-4 shadow">
+                <FilterBar
+                    filters={filters}
+                    setFilters={setFilters}
+                    restrictedCampus={!isAdmin ? userData?.campus : null}
+                    apiEndpoints={{
+                        filters: '/api/erp/filters',
+                        students: '/api/erp/students'
+                    }}
+                />
 
-                    <div className="controls flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-200 mt-4">
-                        <div className="text-sm text-gray-600 font-bold">
-                            {reportData.length > 0 ? `${reportData.length} Student(s) Loaded` : 'No Data Loaded'}
-                        </div>
-                        <button
-                            onClick={generatePDF}
-                            disabled={reportData.length === 0 || generatingPdf}
-                            className={`btn-primary ${reportData.length === 0 || generatingPdf ? 'opacity-50 cursor-not-allowed' : ''} flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors`}
-                        >
-                            {generatingPdf ? (
-                                <>
-                                    <span className="animate-spin">↻</span> {pdfProgress || 'Generating PDF...'}
-                                </>
-                            ) : (
-                                '⬇ Download PDF File'
-                            )}
-                        </button>
+                <div className="flex justify-between items-center mt-4 pt-4 border-t">
+                    <div className="font-bold text-gray-700">
+                        {reportData.length} Student(s) Loaded
                     </div>
+                    <button
+                        onClick={generatePDF}
+                        disabled={reportData.length === 0 || generatingPdf}
+                        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {generatingPdf ? 'Generating PDF...' : '⬇ Download PDF File'}
+                    </button>
                 </div>
-
-                {loading && (
-                    <div className="bg-white p-12 rounded shadow text-center mx-auto max-w-lg">
-                        <div className="animate-spin text-4xl mb-4 text-blue-600">↻</div>
-                        <div className="text-gray-600">Loading Report Data...</div>
-                    </div>
-                )}
-
-                {!loading && reportData.length === 0 && (
-                    <div className="bg-white p-12 rounded shadow text-center mx-auto max-w-xl">
-                        <h2 className="text-xl font-bold text-gray-700 mb-2">No Report Data</h2>
-                        <p className="text-gray-500">Select a Test or Student to generate the report.</p>
-                    </div>
-                )}
-
-                {/* VISUAL REPORT DISPLAY */}
-                {/* This mimics the PDF layout but using standard HTML/CSS for screen readability */}
-                {!loading && reportData.length > 0 && (
-                    <div className="report-display-container space-y-8">
-                        {reportData.map((student, sIdx) => (
-                            <div key={sIdx} className="student-card bg-white shadow-lg p-8 border-t-4 border-blue-900">
-
-                                {/* Header */}
-                                <div className="brand-header text-center mb-6">
-                                    <div className="flex justify-center items-end text-[#0070c0] mb-1">
-                                        <span className="font-bold text-3xl font-sans tracking-tight">Sri Chaitanya</span>
-                                        <span className="font-serif text-3xl ml-2"> Educational Institutions</span>
-                                    </div>
-                                    <div className="text-xs font-bold uppercase tracking-wider mb-1">
-                                        A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
-                                    </div>
-                                    <div className="font-serif italic text-lg text-gray-700 mb-1">
-                                        A Right Choice for the Real Aspirant
-                                    </div>
-                                    <div className="font-bold text-sm uppercase text-gray-800">
-                                        Central Office, Bangalore
-                                    </div>
-                                </div>
-
-                                {/* Student Info Table */}
-                                <div className="info-table w-full border border-black mb-6 text-sm">
-                                    {/* Name Row */}
-                                    <div className="flex border-b border-black bg-[#fff8dc]">
-                                        <div className="flex-1 p-2 border-r border-black font-bold text-center uppercase text-black">
-                                            {student.info.name}
-                                        </div>
-                                        <div className="flex-1 p-2 font-bold text-center uppercase text-black">
-                                            {student.info.branch}
-                                        </div>
-                                    </div>
-
-                                    {/* Test Loop for Info */}
-                                    {student.tests.map((test, tIdx) => (
-                                        <div key={tIdx} className="test-section">
-                                            {/* Headers */}
-                                            <div className="grid grid-cols-12 text-center border-b border-black bg-[#fce4d6] font-bold text-xs">
-                                                {["Test", "Date", "TOT", "AIR", "BOT", "Rank", "ZOO", "Rank", "PHY", "Rank", "CHEM", "Rank"].map((h, i) => (
-                                                    <div key={i} className={`p-1 ${i < 11 ? 'border-r border-black' : ''}`}>{h}</div>
-                                                ))}
-                                            </div>
-                                            {/* Values */}
-                                            <div className="grid grid-cols-12 text-center bg-white text-md font-medium text-red-700">
-                                                <div className="p-1 border-r border-black">{test.meta.testName}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.date}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.tot}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.air}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.bot}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.b_rank}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.zoo}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.z_rank}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.phy}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.p_rank}</div>
-                                                <div className="p-1 border-r border-black">{test.meta.chem}</div>
-                                                <div className="p-1">{test.meta.c_rank}</div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Questions List */}
-                                <div className="questions-container">
-                                    {student.tests.map((test, tIdx) => (
-                                        <div key={tIdx}>
-                                            {test.questions.map((q, qIdx) => (
-                                                <div key={qIdx} className="question-item border border-black mb-4 break-inside-avoid">
-
-                                                    {/* Q Header Bar */}
-                                                    <div className="flex items-center bg-[#800000] text-white text-xs font-bold h-8 border-b border-black px-2">
-                                                        <div className="w-12 text-center border-r border-white/30 h-full flex items-center justify-center">{q.W_U}</div>
-                                                        <div className="w-12 text-center border-r border-white/30 h-full flex items-center justify-center">{q.Q_No}</div>
-                                                        <div className="flex-1 px-4 border-r border-white/30 h-full flex items-center overflow-hidden whitespace-nowrap">
-                                                            Topic: <span className="text-yellow-200 ml-1">{q.Topic}</span>
-                                                        </div>
-                                                        <div className="flex-1 px-4 border-r border-white/30 h-full flex items-center overflow-hidden whitespace-nowrap">
-                                                            Sub: <span className="text-yellow-200 ml-1">{q.Sub_Topic}</span>
-                                                        </div>
-                                                        <div className="w-24 text-center h-full flex items-center justify-center">
-                                                            Key: {q.Key_Value}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Q Content Body */}
-                                                    <div className="flex bg-white">
-                                                        {/* Blue Subject Strip */}
-                                                        <div className="w-8 bg-[#4682b4] text-white flex items-center justify-center border-r border-black shrink-0 relative">
-                                                            <div className="transform -rotate-90 whitespace-nowrap font-bold text-xs tracking-wider absolute">
-                                                                {q.Subject}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Images Container */}
-                                                        <div className="flex flex-1">
-                                                            {/* Question Image */}
-                                                            <div className="w-1/2 border-r border-black p-2 flex flex-col items-center justify-start bg-white relative">
-                                                                <span className="self-start text-xs font-bold mb-1 ml-1 text-gray-500">Q.{q.Q_No}</span>
-                                                                {q.Q_URL ? (
-                                                                    <img
-                                                                        src={q.Q_URL}
-                                                                        alt="Question"
-                                                                        style={{ width: '321px', height: 'auto', display: 'block' }}
-                                                                    />
-                                                                ) : (
-                                                                    <div className="text-gray-400 text-sm mt-8 italic">No Image Available</div>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Solution Image */}
-                                                            <div className="w-1/2 p-2 flex flex-col items-center justify-start bg-white">
-                                                                <span className="self-start text-xs font-bold mb-1 ml-1 text-gray-500">Sol</span>
-                                                                {q.S_URL ? (
-                                                                    <img
-                                                                        src={q.S_URL}
-                                                                        alt="Solution"
-                                                                        style={{ width: '321px', height: 'auto', display: 'block' }}
-                                                                    />
-                                                                ) : (
-                                                                    <div className="text-gray-400 text-sm mt-8 italic">No Solution Available</div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
-
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
+
+            {loading && (
+                <div className="text-white text-center text-xl font-bold mt-10">Loading Data...</div>
+            )}
+
+            {!loading && reportData.length > 0 && (
+                <div className="reports-container flex flex-col gap-8 items-center">
+                    {reportData.map((student, sIdx) => (
+                        <div key={sIdx} className="student-sheet bg-white shadow-2xl" style={{ width: '210mm', minHeight: '297mm', padding: '10mm', boxSizing: 'border-box' }}>
+
+                            {/* HEADER */}
+                            <div className="text-center mb-4">
+                                <div className="flex justify-center items-end" style={{ color: '#0070c0' }}>
+                                    <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
+                                    <span style={{ fontFamily: 'Bookman, serif', fontSize: '26px', marginLeft: '5px' }}> Educational Institutions</span>
+                                </div>
+                                <div className="text-[10px] font-bold uppercase mt-1">
+                                    A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
+                                </div>
+                                <div className="font-serif italic text-lg mt-1">
+                                    A Right Choice for the Real Aspirant
+                                </div>
+                                <div className="text-sm font-bold uppercase mt-1">
+                                    Central Office, Bangalore
+                                </div>
+                            </div>
+
+                            {/* STUDENT INFO TABLE */}
+                            <table className="w-full border-collapse border border-black mb-4 text-xs font-bold font-sans">
+                                <tbody>
+                                    <tr className="bg-[#fff8dc]">
+                                        <td className="border border-black p-2 text-center w-1/2 uppercase">{student.info.name}</td>
+                                        <td className="border border-black p-2 text-center w-1/2 uppercase">{student.info.branch}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            {/* TESTS LOOP */}
+                            {student.tests.map((test, tIdx) => (
+                                <div key={tIdx} className="mb-6">
+
+                                    {/* SCORES TABLE */}
+                                    <table className="w-full border-collapse border border-black mb-4 text-xs text-center font-bold">
+                                        <thead>
+                                            <tr className="bg-[#fce4d6]">
+                                                {["Test", "Date", "TOT", "AIR", "BOT", "Rank", "ZOO", "Rank", "PHY", "Rank", "CHEM", "Rank"].map((h, i) => (
+                                                    <td key={i} className="border border-black p-1">{h}</td>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr className="text-[#b40000]">
+                                                <td className="border border-black p-1 text-black">{test.meta.testName}</td>
+                                                <td className="border border-black p-1 text-black">{test.meta.date}</td>
+                                                <td className="border border-black p-1 text-black">{test.meta.tot}</td>
+                                                <td className="border border-black p-1 text-black">{test.meta.air}</td>
+                                                <td className="border border-black p-1">{test.meta.bot}</td>
+                                                <td className="border border-black p-1">{test.meta.b_rank}</td>
+                                                <td className="border border-black p-1">{test.meta.zoo}</td>
+                                                <td className="border border-black p-1">{test.meta.z_rank}</td>
+                                                <td className="border border-black p-1">{test.meta.phy}</td>
+                                                <td className="border border-black p-1">{test.meta.p_rank}</td>
+                                                <td className="border border-black p-1">{test.meta.chem}</td>
+                                                <td className="border border-black p-1">{test.meta.c_rank}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    {/* QUESTIONS LIST */}
+                                    <div className="flex flex-col gap-2">
+                                        {test.questions.map((q, qIdx) => (
+                                            <div key={qIdx} className="border border-black flex flex-col break-inside-avoid">
+                                                {/* Header Bar */}
+                                                <div className="flex h-7 bg-[#800000] text-white text-xs font-bold border-b border-black">
+                                                    <div className="w-10 flex items-center justify-center border-r border-white">{q.W_U}</div>
+                                                    <div className="w-10 flex items-center justify-center border-r border-white">{q.Q_No}</div>
+                                                    <div className="flex-1 flex items-center px-2 border-r border-white truncate">
+                                                        Topic: <span className="text-[#ffff00] ml-1">{q.Topic}</span>
+                                                    </div>
+                                                    <div className="flex-1 flex items-center px-2 border-r border-white truncate">
+                                                        Sub: <span className="text-[#ffff00] ml-1">{q.Sub_Topic}</span>
+                                                    </div>
+                                                    <div className="w-20 flex items-center justify-center">Key: {q.Key_Value}</div>
+                                                </div>
+
+                                                {/* Body */}
+                                                <div className="flex">
+                                                    {/* Subject Strip */}
+                                                    <div className="w-8 bg-[#4682b4] flex items-center justify-center border-r border-black relative">
+                                                        {/* Rotated Text */}
+                                                        <div style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)', color: 'white', fontSize: '10px', fontWeight: 'bold' }}>
+                                                            {q.Subject}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Content: Q Image & S Image */}
+                                                    <div className="flex flex-1">
+                                                        {/* Question Cell */}
+                                                        <div className="w-1/2 border-r border-black flex flex-col bg-white">
+                                                            <div className="p-1 text-[10px] font-bold text-gray-400">Q.{q.Q_No}</div>
+                                                            <div className="flex justify-center items-start pb-2">
+                                                                {q.Q_URL ? (
+                                                                    <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block' }} alt="Question" />
+                                                                ) : (
+                                                                    <span className="text-xs text-gray-300 italic p-4">No Image</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Solution Cell */}
+                                                        <div className="w-1/2 flex flex-col bg-white">
+                                                            <div className="p-1 text-[10px] font-bold text-gray-400">Sol</div>
+                                                            <div className="flex justify-center items-start pb-2">
+                                                                {q.S_URL ? (
+                                                                    <img src={q.S_URL} style={{ width: '321px', height: 'auto', display: 'block' }} alt="Solution" />
+                                                                ) : (
+                                                                    <span className="text-xs text-gray-300 italic p-4">No Solution</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
