@@ -246,7 +246,6 @@ const ErrorReport = () => {
                     yPos += 8;
 
                     // Row 2 & 3: Headers & Values
-                    // Define columns for exact width control
                     const colDefs = [
                         { name: "Test", w: 25, bg: [255, 255, 255] },
                         { name: "Date", w: 25, bg: [255, 255, 255] },
@@ -289,7 +288,7 @@ const ErrorReport = () => {
                     // Draw Values
                     currentX = margin;
                     doc.setFontSize(10);
-                    doc.setTextColor(128, 0, 0); // Maroon Values #800000
+                    doc.setTextColor(128, 0, 0); // Maroon Values
 
                     colDefs.forEach((col, i) => {
                         doc.setFillColor(...col.bg);
@@ -310,9 +309,16 @@ const ErrorReport = () => {
                         const qImg = await loadImage(q.Q_URL);
                         const sImg = await loadImage(q.S_URL);
 
+                        // Layout Constants
+                        const wStat = 18; // Width for W/U Status & Subject
+                        const wQ = 12;    // Width for Q No
+                        const wKey = 25;  // Width for Key
+
                         // Calculate Dynamic Height based on Width
                         const headerH = 7;
-                        // const colW = (contentWidth - 8) / 2; // ~91mm
+
+                        // Image Area Width
+                        const imgAreaW = contentWidth - wStat;
                         const imgTargetW = 85;
 
                         let qH = 0;
@@ -338,69 +344,119 @@ const ErrorReport = () => {
                             yPos += 2;
                         }
 
-                        // 1. Header Bar (Red)
+                        // 1. Header Bar (Maroon)
                         doc.setFillColor(128, 0, 0); // Maroon
                         doc.rect(margin, yPos, contentWidth, headerH, 'F');
 
-                        doc.setTextColor(255);
+                        // Setup Font for Header
                         if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                         else doc.setFont("helvetica", "bold");
                         doc.setFontSize(9);
 
-                        // Header Content
-                        let x = margin;
+                        let currentX = margin;
+                        const textY = yPos + 4.5;
 
-                        // W/U
-                        doc.text(String(q.W_U || ''), x + 5, yPos + 4.5);
+                        // [Col 1] W/U
+                        doc.setTextColor(255, 255, 255); // White
+                        const statText = String(q.W_U || '');
+                        doc.text(statText, currentX + (wStat / 2), textY, { align: 'center' });
+
+                        // Divider
                         doc.setDrawColor(255);
-                        doc.line(x + 10, yPos, x + 10, yPos + headerH);
-                        x += 10;
+                        doc.line(currentX + wStat, yPos, currentX + wStat, yPos + headerH);
+                        currentX += wStat;
 
-                        // Q No
-                        doc.text(String(q.Q_No), x + 5, yPos + 4.5);
-                        doc.line(x + 10, yPos, x + 10, yPos + headerH);
-                        x += 10;
+                        // [Col 2] Q No
+                        const qNoText = String(q.Q_No);
+                        doc.text(qNoText, currentX + (wQ / 2), textY, { align: 'center' });
 
-                        // Topic
-                        doc.text(`Topic: ${q.Topic || ''}`, x + 2, yPos + 4.5);
-                        // Subtopic
-                        const subX = margin + contentWidth - 60;
-                        doc.text(`Sub Topic: ${q.Sub_Topic || ''}`, subX - 30, yPos + 4.5);
+                        // Divider
+                        doc.line(currentX + wQ, yPos, currentX + wQ, yPos + headerH);
+                        currentX += wQ;
 
-                        // Key
-                        const keyX = margin + contentWidth - 15;
-                        doc.line(keyX - 5, yPos, keyX - 5, yPos + headerH);
-                        doc.text(`Key: ${q.Key_Value}`, keyX, yPos + 4.5, { align: 'center' });
+                        // [Col 3 & 4] Topic & SubTopic
+                        // We'll just draw them sequentially
+                        const topicLabel = "Topic: ";
+                        const topicVal = q.Topic || '';
+                        const subLabel = "Sub Topic: ";
+                        const subVal = q.Sub_Topic || '';
+                        const keyLabel = "Key: ";
+                        const keyVal = q.Key_Value || '';
+
+                        // Draw Topic
+                        currentX += 2; // padding
+                        doc.setTextColor(255, 255, 255); // White Label
+                        doc.text(topicLabel, currentX, textY);
+                        currentX += doc.getTextWidth(topicLabel);
+
+                        doc.setTextColor(240, 230, 140); // Khaki Value
+                        doc.text(topicVal, currentX, textY);
+                        currentX += doc.getTextWidth(topicVal) + 10; // Extra padding
+
+                        // Draw SubTopic
+                        doc.setTextColor(255, 255, 255); // White Label
+                        doc.text(subLabel, currentX, textY);
+                        currentX += doc.getTextWidth(subLabel);
+
+                        doc.setTextColor(240, 230, 140); // Khaki Value
+                        doc.text(subVal, currentX, textY);
+
+                        // [Col 5] Key (Far Right)
+                        const keyX = margin + contentWidth - wKey;
+                        doc.setDrawColor(255);
+                        doc.line(keyX, yPos, keyX, yPos + headerH);
+
+                        // Draw "Key: label" (White) + Value (White to match pic, or could be Khaki)
+                        // I'll stick to White Label + Same Khaki Value for data consistency 
+                        const keyCenter = keyX + (wKey / 2);
+                        doc.setTextAlign('center');
+                        // Just simple centered text, since it's short
+                        // Actually, I'll split it to bold the value or color it if requested. 
+                        // User request: "key also same" (Khaki data).
+                        const kLabelW = doc.getTextWidth(keyLabel);
+                        const kValW = doc.getTextWidth(keyVal);
+                        const kTotalW = kLabelW + kValW;
+                        const kStart = keyCenter - (kTotalW / 2); // Center the group
+
+                        doc.text(keyLabel, kStart, textY, { align: 'left' });
+                        doc.setTextColor(240, 230, 140); // Khaki Value
+                        doc.text(keyVal, kStart + kLabelW, textY, { align: 'left' });
+                        doc.setTextAlign('left'); // Reset
 
                         // 2. Content Block Border
                         doc.setDrawColor(0);
                         doc.rect(margin, yPos, contentWidth, blockH); // Outer Border
 
-                        // 3. Subject Strip (Blue Vertical)
-                        doc.setFillColor(70, 130, 180); // SteelBlue
-                        doc.rect(margin, yPos + headerH, 8, blockH - headerH, 'F');
-                        doc.setTextColor(255);
-                        doc.setFontSize(8);
+                        // 3. Subject Strip (Blue Vertical Block)
+                        // It covers the width of wStat (18mm)
+                        doc.setFillColor(79, 129, 189); // Steel Blue #4F81BD
+                        doc.rect(margin, yPos + headerH, wStat, blockH - headerH, 'F');
 
-                        // Vertical Text
+                        doc.setTextColor(255);
+                        doc.setFontSize(9);
+
+                        // Horizontal Text Centered in the Blue Box
+                        const subjectText = String(q.Subject || '');
                         const stripCenterY = yPos + headerH + ((blockH - headerH) / 2);
-                        doc.text(String(q.Subject || ''), margin + 5, stripCenterY + 5, { angle: 90, align: 'center' });
+                        const stripCenterX = margin + (wStat / 2);
+
+                        doc.text(subjectText, stripCenterX, stripCenterY + 1.5, { align: 'center' });
 
                         // 4. Images Area
-                        const imgAreaX = margin + 8;
-                        const imgAreaW = contentWidth - 8;
-                        const imgAreaY = yPos + headerH;
+                        const imgBaseX = margin + wStat;
+                        const imgContentY = yPos + headerH;
 
-                        // Split Q and Sol line
+                        // Content Divider Line (between QImg and SImg)
                         doc.setDrawColor(0);
-                        doc.line(imgAreaX + (imgAreaW / 2), imgAreaY, imgAreaX + (imgAreaW / 2), yPos + blockH);
+                        const halfW = imgAreaW / 2;
+                        doc.line(imgBaseX + halfW, imgContentY, imgBaseX + halfW, yPos + blockH);
 
                         const drawImage = (img, x, y, drawnH) => {
                             if (!img) return;
                             const aspect = img.width / img.height;
                             let w = drawnH * aspect;
                             // Center in column
-                            const colWidth = imgAreaW / 2;
+                            const colWidth = halfW;
                             const offX = (colWidth - w) / 2;
                             try {
                                 doc.addImage(img, 'PNG', x + offX, y + 1, w, drawnH);
@@ -408,14 +464,15 @@ const ErrorReport = () => {
                         };
 
                         if (qImg) {
-                            drawImage(qImg, imgAreaX, imgAreaY, qH);
+                            drawImage(qImg, imgBaseX, imgContentY, qH);
                         } else {
                             doc.setTextColor(150);
-                            doc.text("No Q Image", imgAreaX + 10, imgAreaY + 10);
+                            doc.setFontSize(8);
+                            doc.text("No Q Image", imgBaseX + 5, imgContentY + 5);
                         }
 
                         if (sImg) {
-                            drawImage(sImg, imgAreaX + (imgAreaW / 2), imgAreaY, sH);
+                            drawImage(sImg, imgBaseX + halfW, imgContentY, sH);
                         }
 
                         yPos += blockH;
@@ -558,41 +615,54 @@ const ErrorReport = () => {
                             {/* Questions */}
                             {test.questions.map((q, qIdx) => (
                                 <table key={qIdx} style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '10px', backgroundColor: 'white' }}>
+                                    <colgroup>
+                                        <col style={{ width: '18mm' }} /> {/* Match PDF wStat */}
+                                        <col style={{ width: '12mm' }} /> {/* Match PDF wQ */}
+                                        <col style={{ width: 'auto' }} />
+                                        <col style={{ width: 'auto' }} />
+                                        <col style={{ width: '25mm' }} /> {/* Match PDF wKey */}
+                                    </colgroup>
                                     {/* Header Row */}
                                     <thead>
-                                        <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '12px', fontWeight: 'bold', height: '28px' }}>
-                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', width: '40px', textAlign: 'center' }}>{q.W_U}</td>
-                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', width: '40px', textAlign: 'center' }}>{q.Q_No}</td>
-                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '0 8px', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
-                                                Topic: <span style={{ color: '#ffff00', marginLeft: '5px' }}>{q.Topic}</span>
+                                        <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold', height: '28px' }}>
+                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.W_U}</td>
+                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.Q_No}</td>
+
+                                            {/* Topic & SubTopic with Rich Colors */}
+                                            <td style={{ border: '1px solid black', borderRight: 'none', padding: '0 5px' }}>
+                                                <span>Topic: </span>
+                                                <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Topic}</span>
                                             </td>
-                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '0 8px', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
-                                                Sub: <span style={{ color: '#ffff00', marginLeft: '5px' }}>{q.Sub_Topic}</span>
+                                            <td style={{ border: '1px solid black', borderLeft: 'none', borderRight: '1px solid white', padding: '0 5px' }}>
+                                                <span>Sub Topic: </span>
+                                                <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Sub_Topic}</span>
                                             </td>
-                                            <td style={{ border: '1px solid black', width: '80px', textAlign: 'center' }}>Key: {q.Key_Value}</td>
+
+                                            <td style={{ border: '1px solid black', textAlign: 'center' }}>
+                                                <span>Key: </span>
+                                                <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Key_Value}</span>
+                                            </td>
                                         </tr>
                                     </thead>
                                     {/* Body Row */}
                                     <tbody>
                                         <tr>
-                                            {/* We use a nested table in a single cell spanning 5 cols to handle strict column widths of the body independent of header */}
-                                            <td colSpan="5" style={{ padding: 0, border: '1px solid black' }}>
+                                            {/* Subject Horizontal Strip */}
+                                            <td style={{ backgroundColor: '#4F81BD', border: '1px solid black', verticalAlign: 'middle', textAlign: 'center', padding: '0 5px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
+                                                {q.Subject}
+                                            </td>
+
+                                            {/* Images Area Spanning 4 cols */}
+                                            <td colSpan="4" style={{ padding: 0, border: '1px solid black' }}>
                                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                     <tbody>
                                                         <tr>
-                                                            {/* Vertical Strip */}
-                                                            <td style={{ width: '30px', backgroundColor: '#4682b4', borderRight: '1px solid black', verticalAlign: 'middle', textAlign: 'center', padding: 0 }}>
-                                                                <div style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)', color: 'white', fontWeight: 'bold', fontSize: '10px', whiteSpace: 'nowrap', margin: 'auto' }}>
-                                                                    {q.Subject}
-                                                                </div>
-                                                            </td>
-
                                                             {/* Q Image */}
                                                             <td style={{ width: '50%', borderRight: '1px solid black', verticalAlign: 'top', padding: 0 }}>
                                                                 <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
                                                                 <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
                                                                     {q.Q_URL ? (
-                                                                        <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
+                                                                        <img src={q.Q_URL} style={{ width: '320px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
                                                                     ) : (
                                                                         <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Image</div>
                                                                     )}
@@ -604,7 +674,7 @@ const ErrorReport = () => {
                                                                 <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Sol</div>
                                                                 <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
                                                                     {q.S_URL ? (
-                                                                        <img src={q.S_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
+                                                                        <img src={q.S_URL} style={{ width: '320px', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
                                                                     ) : (
                                                                         <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Solution</div>
                                                                     )}
