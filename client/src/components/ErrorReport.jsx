@@ -245,23 +245,23 @@ const ErrorReport = () => {
                     doc.line(pageWidth / 2, yPos, pageWidth / 2, yPos + 8); // Split Name/Branch
                     yPos += 8;
 
-                    // Row 2: Headers
-                    const colCount = 12;
-                    const colW = contentWidth / colCount;
-                    const headers = ["Test", "Date", "TOT", "AIR", "BOT", "Rank", "ZOO", "Rank", "PHY", "Rank", "CHEM", "Rank"];
+                    // Row 2 & 3: Headers & Values
+                    // Define columns for exact width control
+                    const colDefs = [
+                        { name: "Test", w: 25, bg: [255, 255, 255] },
+                        { name: "Date", w: 25, bg: [255, 255, 255] },
+                        { name: "TOT", w: 14, bg: [255, 255, 204] }, // #ffffcc
+                        { name: "AIR", w: 14, bg: [255, 255, 255] }, // White
+                        { name: "BOT", w: 14, bg: [253, 233, 217] }, // #fde9d9
+                        { name: "Rank", w: 14, bg: [253, 233, 217] },
+                        { name: "ZOO", w: 14, bg: [218, 238, 243] }, // #daeef3
+                        { name: "Rank", w: 14, bg: [218, 238, 243] },
+                        { name: "PHY", w: 14, bg: [235, 241, 222] }, // #ebf1de
+                        { name: "Rank", w: 14, bg: [235, 241, 222] },
+                        { name: "CHEM", w: 14, bg: [242, 220, 219] }, // #f2dcdb
+                        { name: "Rank", w: 14, bg: [242, 220, 219] }
+                    ];
 
-                    doc.setFillColor(252, 228, 214); // Light Orange header
-                    doc.rect(margin, yPos, contentWidth, 6, 'FD');
-
-                    doc.setFontSize(9);
-                    headers.forEach((h, i) => {
-                        const x = margin + (i * colW);
-                        doc.text(h, x + (colW / 2), yPos + 4, { align: 'center' });
-                        if (i > 0) doc.line(x, yPos, x, yPos + 6);
-                    });
-                    yPos += 6;
-
-                    // Row 3: Values
                     const values = [
                         test.meta.testName, test.meta.date,
                         test.meta.tot, test.meta.air,
@@ -271,19 +271,34 @@ const ErrorReport = () => {
                         test.meta.chem, test.meta.c_rank
                     ];
 
-                    doc.setFillColor(255, 255, 255);
-                    doc.rect(margin, yPos, contentWidth, 6, 'FD');
-                    doc.setTextColor(180, 0, 0); // Red text
+                    // Draw Headers
+                    let currentX = margin;
+                    doc.setFontSize(9);
+                    doc.setTextColor(0, 0, 0); // Black Headers
 
-                    values.forEach((v, i) => {
-                        const x = margin + (i * colW);
-                        doc.text(String(v || '-'), x + (colW / 2), yPos + 4, { align: 'center' });
-                        if (i > 0) doc.line(x, yPos, x, yPos + 6);
+                    // Draw Header Row
+                    colDefs.forEach((col) => {
+                        doc.setFillColor(...col.bg);
+                        doc.rect(currentX, yPos, col.w, 6, 'FD');
+                        doc.text(col.name, currentX + (col.w / 2), yPos + 4, { align: 'center' });
+                        currentX += col.w;
                     });
 
-                    // Outer border for table
-                    doc.rect(margin, yPos - 12, contentWidth, 18);
-                    yPos += 8; // Small gap
+                    yPos += 6;
+
+                    // Draw Values
+                    currentX = margin;
+                    doc.setFontSize(10);
+                    doc.setTextColor(128, 0, 0); // Maroon Values #800000
+
+                    colDefs.forEach((col, i) => {
+                        doc.setFillColor(...col.bg);
+                        doc.rect(currentX, yPos, col.w, 6, 'FD');
+                        doc.text(String(values[i] || '-'), currentX + (col.w / 2), yPos + 4, { align: 'center' });
+                        currentX += col.w;
+                    });
+
+                    yPos += 8;
 
                     // QUESTIONS Loop
                     setPdfProgress(`Processing ${student.info.name}...`);
@@ -297,7 +312,7 @@ const ErrorReport = () => {
 
                         // Calculate Dynamic Height based on Width
                         const headerH = 7;
-                        const colW = (contentWidth - 8) / 2; // ~91mm
+                        // const colW = (contentWidth - 8) / 2; // ~91mm
                         const imgTargetW = 85;
 
                         let qH = 0;
@@ -477,42 +492,65 @@ const ErrorReport = () => {
                         </div>
                     </div>
 
-                    {/* Student Info Table */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '20px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
-                        <tbody>
-                            <tr style={{ backgroundColor: '#fff8dc' }}>
-                                <td style={{ border: '1px solid black', padding: '8px', width: '50%', textAlign: 'center', textTransform: 'uppercase' }}>{student.info.name}</td>
-                                <td style={{ border: '1px solid black', padding: '8px', width: '50%', textAlign: 'center', textTransform: 'uppercase' }}>{student.info.branch}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    {/* Student Info Box */}
+                    <div style={{ width: '100%', border: '1px solid black', display: 'flex', backgroundColor: '#fff8dc', marginBottom: '20px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
+                        <div style={{ flex: 1, padding: '8px', textAlign: 'center', textTransform: 'uppercase', borderRight: '1px solid black' }}>
+                            {student.info.name}
+                        </div>
+                        <div style={{ flex: 1, padding: '8px', textAlign: 'center', textTransform: 'uppercase' }}>
+                            {student.info.branch}
+                        </div>
+                    </div>
 
                     {/* Tests Loop */}
                     {student.tests.map((test, tIdx) => (
                         <div key={tIdx} style={{ marginBottom: '30px' }}>
                             {/* Score Table */}
                             <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '15px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }}>
+                                <colgroup>
+                                    <col style={{ width: '13.15%' }} /> {/* Test - 25mm */}
+                                    <col style={{ width: '13.15%' }} /> {/* Date - 25mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* TOT - 14mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* AIR - 14mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* BOT - 14mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* Rank - 14mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* ZOO - 14mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* Rank - 14mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* PHY - 14mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* Rank - 14mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* CHEM - 14mm */}
+                                    <col style={{ width: '7.36%' }} /> {/* Rank - 14mm */}
+                                </colgroup>
                                 <thead>
-                                    <tr style={{ backgroundColor: '#fce4d6' }}>
-                                        {["Test", "Date", "TOT", "AIR", "BOT", "Rank", "ZOO", "Rank", "PHY", "Rank", "CHEM", "Rank"].map((h, i) => (
-                                            <td key={i} style={{ border: '1px solid black', padding: '4px' }}>{h}</td>
-                                        ))}
+                                    <tr style={{ height: '24px' }}>
+                                        <td style={{ border: '1px solid black', backgroundColor: 'white' }}>Test</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: 'white' }}>Date</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#ffffcc' }}>TOT</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: 'white' }}>AIR</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>BOT</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>Rank</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>ZOO</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>Rank</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>PHY</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>Rank</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>CHEM</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>Rank</td>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr style={{ color: '#b40000', backgroundColor: 'white' }}>
-                                        <td style={{ border: '1px solid black', padding: '4px', color: 'black' }}>{test.meta.testName}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px', color: 'black' }}>{test.meta.date}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px', color: 'black' }}>{test.meta.tot}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px', color: 'black' }}>{test.meta.air}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.bot}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.b_rank}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.zoo}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.z_rank}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.phy}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.p_rank}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.chem}</td>
-                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.c_rank}</td>
+                                    <tr style={{ color: '#800000', height: '24px' }}>
+                                        <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.testName}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.date}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#ffffcc' }}>{test.meta.tot}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.air}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>{test.meta.bot}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>{test.meta.b_rank}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>{test.meta.zoo}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>{test.meta.z_rank}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>{test.meta.phy}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>{test.meta.p_rank}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>{test.meta.chem}</td>
+                                        <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>{test.meta.c_rank}</td>
                                     </tr>
                                 </tbody>
                             </table>
