@@ -514,52 +514,130 @@ const ErrorReport = () => {
                                     {/* QUESTIONS LIST */}
                                     <div className="flex flex-col gap-2">
                                         {test.questions.map((q, qIdx) => (
-                                            <div key={qIdx} className="border border-black flex flex-col break-inside-avoid">
+                                            <table key={qIdx} className="w-full border-collapse border border-black break-inside-avoid mb-2 shadow-sm">
+                                                {/* Header Row */}
+                                                <tbody>
+                                                    <tr className="bg-[#800000] text-white text-xs font-bold h-7">
+                                                        <td className="border border-white w-10 text-center border-r">{q.W_U}</td>
+                                                        <td className="border border-white w-10 text-center border-r">{q.Q_No}</td>
+                                                        <td className="border border-white border-r px-2 truncate max-w-[150px]">
+                                                            Topic: <span className="text-[#ffff00] ml-1">{q.Topic}</span>
+                                                        </td>
+                                                        <td className="border border-white border-r px-2 truncate max-w-[150px]">
+                                                            Sub: <span className="text-[#ffff00] ml-1">{q.Sub_Topic}</span>
+                                                        </td>
+                                                        <td className="border border-white w-20 text-center">Key: {q.Key_Value}</td>
+                                                    </tr>
+                                                </tbody>
+                                                {/* Content Row */}
+                                                <tbody>
+                                                    <tr className="bg-white">
+                                                        {/* Subject Strip: Merged cell or separate layout? 
+                                                            In HTML tables, to have the strip span nicely, we can't easily put the header *above* the strip 
+                                                            without colspan. 
+                                                            Actually, the header spans the WHOLE width (images + strip).
+                                                            So Row 1 Colspan = 3.
+                                                        */}
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        ))}
+
+                                        {/* 
+                                            CORRECTION: The header spans everything.
+                                            Let's use a nested structure or precise Colspans.
+                                            Row 1: 5 Cells (W, Q, Topic, Sub, Key).
+                                            Row 2: Subject Strip, Q Image, S Image.
+                                            This implies the columns don't align perfectly between header and body.
+                                            Solution: One main container table with two rows? No, the header columns are specific widths.
+                                            
+                                            Better: Two separate parts visually, but structurally strictly aligned?
+                                            Actually, the user wants the "Header" to look like the header, and "Body" to look like the body.
+                                            The Subject Strip is ONLY in the body section in the PDF.
+                                            
+                                            Let's use a Table for the WHOLE block.
+                                            Row 1: Header (Single Cell with nested flex? OR strict columns?)
+                                            The Header has specific strict columns (W, Q, Topic...).
+                                            The Body has specific strict columns (Strip, Q Img, S Img).
+                                            These do not share column widths.
+                                            
+                                            So, we can use a Table for opacity/borders, but maybe nested tables?
+                                            
+                                            Let's simply stack two Tables or Divs? 
+                                            NO, the edges must align.
+                                            
+                                            Let's use the layout:
+                                            <div className="border border-black">
+                                                <div className="header-row flex ... h-7 ..."> (Strict heights/borders) </div>
+                                                <div className="body-row flex items-stretch"> (This ensures equal height)
+                                                     <div className="subject-strip w-8 ..."></div>
+                                                     <div className="images-area flex-1 flex">
+                                                         <div className="q-img w-1/2"></div>
+                                                         <div className="s-img w-1/2"></div>
+                                                     </div>
+                                                </div>
+                                            </div>
+                                            
+                                            This is what I had before, but flexbox was failing to center the vertical text or user disliked it?
+                                            The user said "height is showing same for all".
+                                            Maybe the flex-stretch was *forcing* a height bigger than the image?
+                                            If `align-items: stretch` is on, the row height is determined by the TALLER content.
+                                            If the text is small and image is small, it's small.
+                                            
+                                            The visual "Second Pic" shows the Blue Strip is perfect height.
+                                            
+                                            I will retry the FLEXBOX approach but with:
+                                            1. `display: flex` on the body row.
+                                            2. `items-stretch`.
+                                            3. The Image divs will have `h-auto`.
+                                            4. crucial: The Vertical Text container needs to be `flex items-center justify-center`.
+                                        */}
+
+                                        {test.questions.map((q, qIdx) => (
+                                            <div key={qIdx} className="border border-black break-inside-avoid mb-2 shadow-sm bg-white">
                                                 {/* Header Bar */}
-                                                <div className="flex h-7 bg-[#800000] text-white text-xs font-bold border-b border-black">
-                                                    <div className="w-10 flex items-center justify-center border-r border-white">{q.W_U}</div>
-                                                    <div className="w-10 flex items-center justify-center border-r border-white">{q.Q_No}</div>
-                                                    <div className="flex-1 flex items-center px-2 border-r border-white truncate">
+                                                <div className="grid grid-cols-[40px_40px_1fr_1fr_80px] bg-[#800000] text-white text-xs font-bold min-h-[28px] border-b border-black">
+                                                    <div className="border-r border-white flex items-center justify-center py-1">{q.W_U}</div>
+                                                    <div className="border-r border-white flex items-center justify-center py-1">{q.Q_No}</div>
+                                                    <div className="border-r border-white flex items-center px-2 py-1 truncate">
                                                         Topic: <span className="text-[#ffff00] ml-1">{q.Topic}</span>
                                                     </div>
-                                                    <div className="flex-1 flex items-center px-2 border-r border-white truncate">
+                                                    <div className="border-r border-white flex items-center px-2 py-1 truncate">
                                                         Sub: <span className="text-[#ffff00] ml-1">{q.Sub_Topic}</span>
                                                     </div>
-                                                    <div className="w-20 flex items-center justify-center">Key: {q.Key_Value}</div>
+                                                    <div className="flex items-center justify-center py-1">Key: {q.Key_Value}</div>
                                                 </div>
 
-                                                {/* Body */}
-                                                <div className="flex">
+                                                {/* Body Area */}
+                                                <div className="flex items-stretch">
                                                     {/* Subject Strip */}
-                                                    <div className="w-8 bg-[#4682b4] flex items-center justify-center border-r border-black relative">
-                                                        {/* Rotated Text */}
-                                                        <div style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)', color: 'white', fontSize: '10px', fontWeight: 'bold' }}>
+                                                    <div className="w-8 bg-[#4682b4] flex items-center justify-center border-r border-black" >
+                                                        <div style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)', color: 'white', fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                                                             {q.Subject}
                                                         </div>
                                                     </div>
 
-                                                    {/* Content: Q Image & S Image */}
-                                                    <div className="flex flex-1">
-                                                        {/* Question Cell */}
-                                                        <div className="w-1/2 border-r border-black flex flex-col bg-white">
-                                                            <div className="p-1 text-[10px] font-bold text-gray-400">Q.{q.Q_No}</div>
-                                                            <div className="flex justify-center items-start pb-2">
+                                                    {/* Images */}
+                                                    <div className="flex-1 flex">
+                                                        {/* Q Col */}
+                                                        <div className="w-1/2 border-r border-black flex flex-col">
+                                                            <div className="p-1 text-[10px] font-bold text-gray-500">Q.{q.Q_No}</div>
+                                                            <div className="flex justify-center pb-2 px-1">
                                                                 {q.Q_URL ? (
-                                                                    <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block' }} alt="Question" />
+                                                                    <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block' }} alt="Q" />
                                                                 ) : (
-                                                                    <span className="text-xs text-gray-300 italic p-4">No Image</span>
+                                                                    <div className="py-8 text-xs text-gray-300 italic">No Image</div>
                                                                 )}
                                                             </div>
                                                         </div>
-
-                                                        {/* Solution Cell */}
-                                                        <div className="w-1/2 flex flex-col bg-white">
-                                                            <div className="p-1 text-[10px] font-bold text-gray-400">Sol</div>
-                                                            <div className="flex justify-center items-start pb-2">
+                                                        {/* S Col */}
+                                                        <div className="w-1/2 flex flex-col">
+                                                            <div className="p-1 text-[10px] font-bold text-gray-500">Sol</div>
+                                                            <div className="flex justify-center pb-2 px-1">
                                                                 {q.S_URL ? (
-                                                                    <img src={q.S_URL} style={{ width: '321px', height: 'auto', display: 'block' }} alt="Solution" />
+                                                                    <img src={q.S_URL} style={{ width: '321px', height: 'auto', display: 'block' }} alt="S" />
                                                                 ) : (
-                                                                    <span className="text-xs text-gray-300 italic p-4">No Solution</span>
+                                                                    <div className="py-8 text-xs text-gray-300 italic">No Solution</div>
                                                                 )}
                                                             </div>
                                                         </div>
