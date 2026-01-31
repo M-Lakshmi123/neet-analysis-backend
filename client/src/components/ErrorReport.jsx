@@ -5,6 +5,7 @@ import { useAuth } from './auth/AuthProvider';
 import jsPDF from 'jspdf';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
+import Select from 'react-select';
 
 // Subject Sorting Order
 const SUBJECT_ORDER = {
@@ -29,11 +30,21 @@ const ErrorReport = () => {
         topAll: [],
         studentSearch: []
     });
+    const [subjectFilter, setSubjectFilter] = useState({ value: 'ALL', label: 'All Subjects' });
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
     const [pdfProgress, setPdfProgress] = useState('');
     const reportRef = useRef(null);
+
+    // Subject Options
+    const subjectOptions = [
+        { value: 'ALL', label: 'All Subjects' },
+        { value: 'PHYSICS', label: 'Physics' },
+        { value: 'CHEMISTRY', label: 'Chemistry' },
+        { value: 'BOTANY', label: 'Botany' },
+        { value: 'ZOOLOGY', label: 'Zoology' }
+    ];
 
     // Fetch Report Data
     useEffect(() => {
@@ -89,17 +100,16 @@ const ErrorReport = () => {
 
                 // Process & Sort
                 const processed = Object.values(grouped).map(student => {
-                    // 1. Convert tests object to array
                     let testsArr = Object.values(student.tests);
 
-                    // 2. Sort Tests by Date (Latest First)
+                    // Sort Tests by Date (Latest First)
                     testsArr.sort((a, b) => {
                         const d1 = new Date(a.meta.date);
                         const d2 = new Date(b.meta.date);
-                        return d2 - d1; // Descending
+                        return d2 - d1;
                     });
 
-                    // 3. Sort Questions by Subject within each test
+                    // Sort Questions by Subject
                     testsArr = testsArr.map(t => {
                         t.questions.sort((a, b) => getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject));
                         return t;
@@ -120,6 +130,12 @@ const ErrorReport = () => {
         const timeout = setTimeout(fetchData, 500);
         return () => clearTimeout(timeout);
     }, [filters]);
+
+    // Apply Subject Filter
+    const getFilteredQuestions = (questions) => {
+        if (subjectFilter.value === 'ALL') return questions;
+        return questions.filter(q => q.Subject && q.Subject.toUpperCase() === subjectFilter.value);
+    };
 
     // Helper: Load Image
     const loadImage = (src) => {
@@ -226,7 +242,6 @@ const ErrorReport = () => {
         };
 
         // --- START PAGE 1 ---
-        // Header
         const headerBottom = drawMainHeader(doc);
         let yPos = headerBottom + 1;
 
@@ -252,7 +267,7 @@ const ErrorReport = () => {
 
         // Iterate Tests
         for (const test of student.tests) {
-            // Check space for Score Table (approx 20mm needed)
+            // Check space
             if (yPos + 30 > pageHeight - margin) {
                 doc.addPage();
                 yPos = 15;
@@ -287,7 +302,6 @@ const ErrorReport = () => {
             doc.setFontSize(9);
             doc.setTextColor(0, 0, 0);
 
-            // Header Row
             colDefs.forEach((col) => {
                 doc.setFillColor(...col.bg);
                 doc.rect(currentX, yPos, col.w, 6, 'FD');
@@ -296,10 +310,9 @@ const ErrorReport = () => {
             });
             yPos += 6;
 
-            // Value Row
             currentX = margin;
             doc.setFontSize(10);
-            doc.setTextColor(128, 0, 0); // Maroon
+            doc.setTextColor(128, 0, 0);
 
             colDefs.forEach((col, i) => {
                 doc.setFillColor(...col.bg);
@@ -309,13 +322,14 @@ const ErrorReport = () => {
             });
             yPos += 8;
 
-            // Questions Loop
-            for (let i = 0; i < test.questions.length; i++) {
-                const q = test.questions[i];
+            // FILTER QUESTIONS BEFORE LOOP
+            const filteredQs = getFilteredQuestions(test.questions);
+
+            for (let i = 0; i < filteredQs.length; i++) {
+                const q = filteredQs[i];
                 const qImg = await loadImage(q.Q_URL);
                 const sImg = await loadImage(q.S_URL);
 
-                // Layout Calc
                 const wStat = 18;
                 const wQ = 12;
                 const wKey = 18;
@@ -325,12 +339,10 @@ const ErrorReport = () => {
                 const wTopic = halfImgW - wQ;
                 const wSub = halfImgW - 18;
 
-                // Font
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                 else doc.setFont("helvetica", "bold");
                 doc.setFontSize(9);
 
-                // Wrapping
                 const topicLabel = "Topic: ";
                 const topicVal = q.Topic || '';
                 const topicMaxW = wTopic - doc.getTextWidth(topicLabel) - 2;
@@ -351,7 +363,6 @@ const ErrorReport = () => {
                 const maxContentH = Math.max(qH, sH, 20);
                 const blockH = headerH + maxContentH + 2;
 
-                // Page Break
                 if (yPos + blockH > pageHeight - margin) {
                     doc.addPage();
                     yPos = 15;
@@ -359,7 +370,6 @@ const ErrorReport = () => {
                     yPos += 2;
                 }
 
-                // Render Block
                 doc.setFillColor(128, 0, 0);
                 doc.rect(margin, yPos, contentWidth, headerH, 'F');
                 doc.setTextColor(255);
@@ -407,11 +417,9 @@ const ErrorReport = () => {
                 doc.setTextColor(240, 230, 140);
                 doc.text(keyVal, kStart + doc.getTextWidth(keyLabel), ty);
 
-                // Content Box
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, blockH);
 
-                // Subject Strip
                 doc.setFillColor(79, 129, 189);
                 doc.rect(margin, yPos + headerH, wStat, blockH - headerH, 'F');
 
@@ -425,7 +433,6 @@ const ErrorReport = () => {
                 const scy = yPos + headerH + ((blockH - headerH) / 2);
                 doc.text(subTxt, margin + (wStat / 2), scy + (fs / 3), { align: 'center' });
 
-                // Images
                 const ibx = margin + wStat;
                 const iby = yPos + headerH;
                 doc.setDrawColor(0);
@@ -451,7 +458,6 @@ const ErrorReport = () => {
             }
         }
 
-        // Pagination
         const totalPages = doc.internal.getNumberOfPages();
         doc.setFontSize(9);
         doc.setTextColor(0);
@@ -465,14 +471,12 @@ const ErrorReport = () => {
         return doc;
     };
 
-    // --- MAIN GENERATE HANDLER ---
     const generatePDF = async () => {
         if (reportData.length === 0) return;
         setGeneratingPdf(true);
         setPdfProgress('Loading Resources...');
 
         try {
-            // Load Fonts Once
             const [impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
                 loadFont('/fonts/unicode.impact.ttf'),
                 loadFont('/fonts/bookman-old-style.ttf'),
@@ -482,11 +486,9 @@ const ErrorReport = () => {
             const fonts = { impactFont, bookmanFont, bookmanBoldFont };
 
             if (reportData.length === 1) {
-                // Single PDF
                 const doc = await createStudentPDF(reportData[0], fonts);
-                doc.save(`Error_Report_${reportData[0].info.name}.pdf`);
+                doc.save(`Error_Report_${reportData[0].info.name}_${subjectFilter.value}.pdf`);
             } else {
-                // ZIP Download
                 const zip = new JSZip();
 
                 for (let i = 0; i < reportData.length; i++) {
@@ -499,7 +501,7 @@ const ErrorReport = () => {
 
                 setPdfProgress('Compressing...');
                 const zipContent = await zip.generateAsync({ type: 'blob' });
-                saveAs(zipContent, `Error_Reports_Batch.zip`);
+                saveAs(zipContent, `Error_Reports_${subjectFilter.value}.zip`);
             }
 
         } catch (err) {
@@ -520,6 +522,19 @@ const ErrorReport = () => {
                     restrictedCampus={!isAdmin ? userData?.campus : null}
                     apiEndpoints={{ filters: '/api/erp/filters', students: '/api/erp/students' }}
                 />
+
+                {/* SUBJECT FILTER */}
+                <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ marginRight: '10px', fontWeight: 'bold' }}>Subject:</span>
+                    <div style={{ width: '250px' }}>
+                        <Select
+                            options={subjectOptions}
+                            value={subjectFilter}
+                            onChange={setSubjectFilter}
+                        />
+                    </div>
+                </div>
+
                 <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #ccc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 'bold', color: '#333' }}>{reportData.length} Student(s) Loaded</span>
                     <button
@@ -534,162 +549,172 @@ const ErrorReport = () => {
 
             {loading && <div style={{ textAlign: 'center', fontSize: '20px', marginTop: '50px', color: 'white', fontFamily: 'Arial' }}>Loading Data...</div>}
 
-            {!loading && reportData.map((student, sIdx) => (
-                <div key={sIdx} style={{ width: '210mm', minHeight: '297mm', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '10mm', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', boxSizing: 'border-box' }}>
+            {!loading && reportData.map((student, sIdx) => {
+                // Filter questions for rendering
 
-                    {/* Header - Always Show on Page 1 of View */}
-                    <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-                        <div style={{ color: '#0070c0', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
-                            <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
-                            <span style={{ fontFamily: '"Bookman Old Style", serif', fontSize: '26px', marginLeft: '5px' }}> Educational Institutions</span>
-                        </div>
-                        <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '4px', fontFamily: '"Bookman Old Style", serif' }}>
-                            A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
-                        </div>
-                        <div style={{ fontFamily: '"Bookman Old Style", serif', fontStyle: 'italic', fontSize: '18px', margin: '2px 0' }}>
-                            A Right Choice for the Real Aspirant
-                        </div>
-                        <div style={{ fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '2px', fontFamily: '"Bookman Old Style", serif' }}>
-                            CENTRAL OFFICE, BANGALORE
-                        </div>
-                    </div>
+                return (
+                    <div key={sIdx} style={{ width: '210mm', minHeight: '297mm', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '10mm', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', boxSizing: 'border-box' }}>
 
-                    <div style={{ width: '100%', border: '1px solid black', display: 'flex', backgroundColor: '#fff8dc', marginBottom: '20px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
-                        <div style={{ flex: 1, padding: '8px', textAlign: 'center', textTransform: 'uppercase', borderRight: '1px solid black' }}>
-                            {student.info.name}
-                        </div>
-                        <div style={{ flex: 1, padding: '8px', textAlign: 'center', textTransform: 'uppercase' }}>
-                            {student.info.branch}
-                        </div>
-                    </div>
-
-                    {student.tests.map((test, tIdx) => (
-                        <div key={tIdx} style={{ marginBottom: '30px' }}>
-                            {/* Score Table */}
-                            <div style={{ overflowX: 'auto' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '15px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }}>
-                                    <colgroup>
-                                        <col style={{ width: '13.15%' }} />
-                                        <col style={{ width: '13.15%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                        <col style={{ width: '7.36%' }} />
-                                    </colgroup>
-                                    <thead>
-                                        <tr style={{ height: '24px' }}>
-                                            <td style={{ border: '1px solid black', backgroundColor: 'white' }}>Test</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: 'white' }}>Date</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#ffffcc' }}>TOT</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: 'white' }}>AIR</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>BOT</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>Rank</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>ZOO</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>Rank</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>PHY</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>Rank</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>CHEM</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>Rank</td>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr style={{ color: '#800000', height: '24px' }}>
-                                            <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.testName}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.date}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#ffffcc' }}>{test.meta.tot}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.air}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>{test.meta.bot}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>{test.meta.b_rank}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>{test.meta.zoo}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>{test.meta.z_rank}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>{test.meta.phy}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>{test.meta.p_rank}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>{test.meta.chem}</td>
-                                            <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>{test.meta.c_rank}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
+                        {/* Header */}
+                        <div style={{ textAlign: 'center', marginBottom: '15px' }}>
+                            <div style={{ color: '#0070c0', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
+                                <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
+                                <span style={{ fontFamily: '"Bookman Old Style", serif', fontSize: '26px', marginLeft: '5px' }}> Educational Institutions</span>
                             </div>
-
-                            {/* Sorted Questions Render */}
-                            {test.questions.map((q, qIdx) => (
-                                <table key={qIdx} style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '10px', backgroundColor: 'white' }}>
-                                    <colgroup>
-                                        <col style={{ width: '18mm' }} />
-                                        <col style={{ width: '12mm' }} />
-                                        <col style={{ width: '74mm' }} />
-                                        <col style={{ width: '68mm' }} />
-                                        <col style={{ width: '18mm' }} />
-                                    </colgroup>
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
-                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
-                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.Q_No}</td>
-
-                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
-                                                <span>Topic: </span>
-                                                <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Topic}</span>
-                                            </td>
-                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
-                                                <span>Sub Topic: </span>
-                                                <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Sub_Topic}</span>
-                                            </td>
-
-                                            <td style={{ border: '1px solid black', textAlign: 'center' }}>
-                                                <span>Key: </span>
-                                                <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Key_Value}</span>
-                                            </td>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr>
-                                            <td style={{ backgroundColor: '#4F81BD', border: '1px solid black', verticalAlign: 'middle', textAlign: 'center', padding: '0 5px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
-                                                {q.Subject}
-                                            </td>
-
-                                            <td colSpan="4" style={{ padding: 0, border: '1px solid black' }}>
-                                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                                    <tbody>
-                                                        <tr>
-                                                            <td style={{ width: '50%', borderRight: '1px solid black', verticalAlign: 'top', padding: 0 }}>
-                                                                <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
-                                                                <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
-                                                                    {q.Q_URL ? (
-                                                                        <img src={q.Q_URL} style={{ width: '320px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
-                                                                    ) : (
-                                                                        <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Image</div>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-
-                                                            <td style={{ width: '50%', verticalAlign: 'top', padding: 0 }}>
-                                                                <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Sol</div>
-                                                                <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
-                                                                    {q.S_URL ? (
-                                                                        <img src={q.S_URL} style={{ width: '320px', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
-                                                                    ) : (
-                                                                        <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Solution</div>
-                                                                    )}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            ))}
+                            <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '4px', fontFamily: '"Bookman Old Style", serif' }}>
+                                A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
+                            </div>
+                            <div style={{ fontFamily: '"Bookman Old Style", serif', fontStyle: 'italic', fontSize: '18px', margin: '2px 0' }}>
+                                A Right Choice for the Real Aspirant
+                            </div>
+                            <div style={{ fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '2px', fontFamily: '"Bookman Old Style", serif' }}>
+                                CENTRAL OFFICE, BANGALORE
+                            </div>
                         </div>
-                    ))}
-                </div>
-            ))}
+
+                        {/* STUDENT INFO HEADER -- Updated to Bookman font */}
+                        <div style={{ width: '100%', border: '1px solid black', display: 'flex', backgroundColor: '#fff8dc', marginBottom: '20px', fontSize: '12px', fontWeight: 'bold', fontFamily: '"Bookman Old Style", serif' }}>
+                            <div style={{ flex: 1, padding: '8px', textAlign: 'center', textTransform: 'uppercase', borderRight: '1px solid black' }}>
+                                {student.info.name}
+                            </div>
+                            <div style={{ flex: 1, padding: '8px', textAlign: 'center', textTransform: 'uppercase' }}>
+                                {student.info.branch}
+                            </div>
+                        </div>
+
+                        {student.tests.map((test, tIdx) => {
+                            const renderQs = getFilteredQuestions(test.questions);
+                            if (renderQs.length === 0) return null; // Skip test if no qs match subject
+
+                            return (
+                                <div key={tIdx} style={{ marginBottom: '30px' }}>
+                                    {/* Score Table */}
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '15px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }}>
+                                            <colgroup>
+                                                <col style={{ width: '13.15%' }} />
+                                                <col style={{ width: '13.15%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                                <col style={{ width: '7.36%' }} />
+                                            </colgroup>
+                                            <thead>
+                                                <tr style={{ height: '24px' }}>
+                                                    <td style={{ border: '1px solid black', backgroundColor: 'white' }}>Test</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: 'white' }}>Date</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#ffffcc' }}>TOT</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: 'white' }}>AIR</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>BOT</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>Rank</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>ZOO</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>Rank</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>PHY</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>Rank</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>CHEM</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>Rank</td>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style={{ color: '#800000', height: '24px' }}>
+                                                    <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.testName}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.date}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#ffffcc' }}>{test.meta.tot}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: 'white' }}>{test.meta.air}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>{test.meta.bot}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#fde9d9' }}>{test.meta.b_rank}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>{test.meta.zoo}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#daeef3' }}>{test.meta.z_rank}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>{test.meta.phy}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#ebf1de' }}>{test.meta.p_rank}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>{test.meta.chem}</td>
+                                                    <td style={{ border: '1px solid black', backgroundColor: '#f2dcdb' }}>{test.meta.c_rank}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Questions */}
+                                    {renderQs.map((q, qIdx) => (
+                                        <table key={qIdx} style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '10px', backgroundColor: 'white' }}>
+                                            <colgroup>
+                                                <col style={{ width: '18mm' }} />
+                                                <col style={{ width: '12mm' }} />
+                                                <col style={{ width: '74mm' }} />
+                                                <col style={{ width: '68mm' }} />
+                                                <col style={{ width: '18mm' }} />
+                                            </colgroup>
+                                            <thead>
+                                                <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.Q_No}</td>
+
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
+                                                        <span>Topic: </span>
+                                                        <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Topic}</span>
+                                                    </td>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
+                                                        <span>Sub Topic: </span>
+                                                        <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Sub_Topic}</span>
+                                                    </td>
+
+                                                    <td style={{ border: '1px solid black', textAlign: 'center' }}>
+                                                        <span>Key: </span>
+                                                        <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Key_Value}</span>
+                                                    </td>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td style={{ backgroundColor: '#4F81BD', border: '1px solid black', verticalAlign: 'middle', textAlign: 'center', padding: '0 5px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
+                                                        {q.Subject}
+                                                    </td>
+
+                                                    <td colSpan="4" style={{ padding: 0, border: '1px solid black' }}>
+                                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td style={{ width: '50%', borderRight: '1px solid black', verticalAlign: 'top', padding: 0 }}>
+                                                                        <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
+                                                                        <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
+                                                                            {q.Q_URL ? (
+                                                                                <img src={q.Q_URL} style={{ width: '320px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
+                                                                            ) : (
+                                                                                <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Image</div>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+
+                                                                    <td style={{ width: '50%', verticalAlign: 'top', padding: 0 }}>
+                                                                        <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Sol</div>
+                                                                        <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
+                                                                            {q.S_URL ? (
+                                                                                <img src={q.S_URL} style={{ width: '320px', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
+                                                                            ) : (
+                                                                                <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Solution</div>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    ))}
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            })}
         </div>
     );
 };
