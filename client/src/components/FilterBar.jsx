@@ -345,6 +345,13 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
                         value={filters.studentSearch && filters.studentSearch.length > 0 ? { value: filters.studentSearch[0], label: filters.quickSearch } : null}
                     />
                 </div>
+                <button
+                    onClick={resetFilters}
+                    className="btn-primary reset-btn"
+                    style={{ marginLeft: '10px', height: '42px', whiteSpace: 'nowrap' }}
+                >
+                    Clear All
+                </button>
             </div>
 
             <div className="filter-bar">
@@ -454,14 +461,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
                         isDisabled={loadingStudents || filters.test.length === 0}
                     />
                 </div>
-                <div className="filter-actions">
-                    <button
-                        onClick={resetFilters}
-                        className="btn-primary reset-btn"
-                    >
-                        Clear All
-                    </button>
-                </div>
+
             </div>
         </div>
     );

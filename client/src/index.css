@@ -1888,11 +1888,12 @@ body {
 
 .global-search-wrapper {
     margin-bottom: 1rem;
-    /* Reduced from 1.5rem */
     padding-bottom: 0.75rem;
-    /* Reduced */
     border-bottom: 1px solid #e2e8f0;
-    /* Thinner border */
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    /* Space between search box and Clear All button */
 }
 
 .search-box {
@@ -1923,6 +1924,8 @@ body {
     padding: 0 8px 0 12px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    flex: 1;
+    /* Allow it to take up remaining space */
 }
 
 .search-box-autocomplete:focus-within {
