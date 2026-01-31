@@ -74,6 +74,7 @@ const LoginPage = () => {
             }
 
             // Perform Login
+            sessionStorage.setItem('NEET_SESSION_ACTIVE', 'true');
             await signInWithEmailAndPassword(auth, email, password);
 
             // On success, we navigate to root. 
@@ -82,6 +83,7 @@ const LoginPage = () => {
             navigate('/', { replace: true });
         } catch (err) {
             console.error("Login Error:", err);
+            sessionStorage.removeItem('NEET_SESSION_ACTIVE');
             const msg = err.code === 'auth/user-not-found' ? "Account not found." :
                 err.code === 'auth/wrong-password' ? "Incorrect password." :
                     "Invalid email or password.";

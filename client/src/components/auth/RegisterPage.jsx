@@ -137,6 +137,9 @@ const RegisterPage = () => {
                 createdAt: new Date().toISOString()
             });
 
+            // Mark session as active since they are now logged in
+            sessionStorage.setItem('NEET_SESSION_ACTIVE', 'true');
+
             // Do NOT sign out immediately, wait for user to click OK in modal
             // await signOut(auth); 
 

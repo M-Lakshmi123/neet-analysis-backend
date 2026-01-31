@@ -19,9 +19,28 @@ export const AuthProvider = ({ children }) => {
         });
 
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            setLoading(true);
-            setCurrentUser(user);
             if (user) {
+                // Check if this is a valid session
+                // If the user closes the window, sessionStorage is cleared.
+                // When they reopen, 'NEET_SESSION_ACTIVE' will be missing.
+                // We force logout in that case.
+                const isSessionActive = sessionStorage.getItem('NEET_SESSION_ACTIVE');
+
+                if (!isSessionActive) {
+                    // Valid logic to prevent race condition on initial login:
+                    // If the user just logged in via LoginPage, the flag is set there.
+                    // If the user is reopening a closed tab, the flag is missing -> Logout.
+                    console.log("No active session flag found. Logging out...");
+                    await auth.signOut();
+                    setUserData(null);
+                    setCurrentUser(null);
+                    setLoading(false);
+                    return;
+                }
+
+                setLoading(true);
+                setCurrentUser(user);
+
                 // Fetch extra user data from Firestore (campus, role, isApproved)
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
@@ -38,6 +57,7 @@ export const AuthProvider = ({ children }) => {
                 }
             } else {
                 setUserData(null);
+                setCurrentUser(null);
             }
             setLoading(false);
         });
