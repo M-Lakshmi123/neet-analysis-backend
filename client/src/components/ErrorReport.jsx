@@ -417,44 +417,43 @@ const ErrorReport = () => {
     };
 
     return (
-        <div className="error-report-page">
-            <div className="no-print">
-                <FilterBar
-                    filters={filters}
-                    setFilters={setFilters}
-                    restrictedCampus={!isAdmin ? userData?.campus : null}
-                    apiEndpoints={{
-                        filters: '/api/erp/filters',
-                        students: '/api/erp/students'
-                    }}
-                />
+        <div className="error-report-page min-h-screen bg-gray-100 p-4">
+            <div className="max-w-[1200px] mx-auto">
+                <div className="no-print mb-6">
+                    <FilterBar
+                        filters={filters}
+                        setFilters={setFilters}
+                        restrictedCampus={!isAdmin ? userData?.campus : null}
+                        apiEndpoints={{
+                            filters: '/api/erp/filters',
+                            students: '/api/erp/students'
+                        }}
+                    />
 
-                <div className="controls flex justify-between items-center bg-white p-4 rounded-lg shadow-sm mb-4 border border-gray-200">
-                    <div className="text-sm text-gray-600 font-bold">
-                        {reportData.length > 0 ? `${reportData.length} Student(s) Loaded` : 'No Data Loaded'}
+                    <div className="controls flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-gray-200 mt-4">
+                        <div className="text-sm text-gray-600 font-bold">
+                            {reportData.length > 0 ? `${reportData.length} Student(s) Loaded` : 'No Data Loaded'}
+                        </div>
+                        <button
+                            onClick={generatePDF}
+                            disabled={reportData.length === 0 || generatingPdf}
+                            className={`btn-primary ${reportData.length === 0 || generatingPdf ? 'opacity-50 cursor-not-allowed' : ''} flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors`}
+                        >
+                            {generatingPdf ? (
+                                <>
+                                    <span className="animate-spin">↻</span> {pdfProgress || 'Generating PDF...'}
+                                </>
+                            ) : (
+                                '⬇ Download PDF File'
+                            )}
+                        </button>
                     </div>
-                    <button
-                        onClick={generatePDF}
-                        disabled={reportData.length === 0 || generatingPdf}
-                        className={`btn-primary ${reportData.length === 0 || generatingPdf ? 'opacity-50 cursor-not-allowed' : ''} flex items-center gap-2`}
-                    >
-                        {generatingPdf ? (
-                            <>
-                                <span className="animate-spin">↻</span> {pdfProgress || 'Generating PDF...'}
-                            </>
-                        ) : (
-                            '⬇ Download PDF File'
-                        )}
-                    </button>
                 </div>
-            </div>
 
-            {/* Preview Section */}
-            <div className="pdf-viewer-container" style={{ background: '#525659', padding: '20px', minHeight: '600px', overflowX: 'auto' }}>
                 {loading && (
-                    <div className="bg-white p-8 rounded shadow text-center mx-auto max-w-lg">
-                        <div className="animate-spin text-4xl mb-4">↻</div>
-                        <div>Loading Report Data...</div>
+                    <div className="bg-white p-12 rounded shadow text-center mx-auto max-w-lg">
+                        <div className="animate-spin text-4xl mb-4 text-blue-600">↻</div>
+                        <div className="text-gray-600">Loading Report Data...</div>
                     </div>
                 )}
 
@@ -465,103 +464,139 @@ const ErrorReport = () => {
                     </div>
                 )}
 
-                {reportData.length > 0 && (
-                    <div ref={reportRef} className="report-content">
+                {/* VISUAL REPORT DISPLAY */}
+                {/* This mimics the PDF layout but using standard HTML/CSS for screen readability */}
+                {!loading && reportData.length > 0 && (
+                    <div className="report-display-container space-y-8">
                         {reportData.map((student, sIdx) => (
-                            <div key={sIdx} className="student-group">
-                                {student.tests.map((test, tIdx) => (
-                                    <div key={tIdx} className="report-page shadow-lg mx-auto bg-white mb-8" style={{ width: '210mm', minHeight: '297mm', padding: '10mm', position: 'relative' }}>
+                            <div key={sIdx} className="student-card bg-white shadow-lg p-8 border-t-4 border-blue-900">
 
-                                        {/* SCREEN PREVIEW HEADER */}
-                                        <div className="brand-header text-center mb-4">
-                                            <div className="flex justify-center items-end" style={{ color: '#0070c0' }}>
-                                                <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
-                                                <span style={{ fontFamily: 'Bookman, serif', fontSize: '26px', marginLeft: '5px' }}> Educational Institutions</span>
+                                {/* Header */}
+                                <div className="brand-header text-center mb-6">
+                                    <div className="flex justify-center items-end text-[#0070c0] mb-1">
+                                        <span className="font-bold text-3xl font-sans tracking-tight">Sri Chaitanya</span>
+                                        <span className="font-serif text-3xl ml-2"> Educational Institutions</span>
+                                    </div>
+                                    <div className="text-xs font-bold uppercase tracking-wider mb-1">
+                                        A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
+                                    </div>
+                                    <div className="font-serif italic text-lg text-gray-700 mb-1">
+                                        A Right Choice for the Real Aspirant
+                                    </div>
+                                    <div className="font-bold text-sm uppercase text-gray-800">
+                                        Central Office, Bangalore
+                                    </div>
+                                </div>
+
+                                {/* Student Info Table */}
+                                <div className="info-table w-full border border-black mb-6 text-sm">
+                                    {/* Name Row */}
+                                    <div className="flex border-b border-black bg-[#fff8dc]">
+                                        <div className="flex-1 p-2 border-r border-black font-bold text-center uppercase text-black">
+                                            {student.info.name}
+                                        </div>
+                                        <div className="flex-1 p-2 font-bold text-center uppercase text-black">
+                                            {student.info.branch}
+                                        </div>
+                                    </div>
+
+                                    {/* Test Loop for Info */}
+                                    {student.tests.map((test, tIdx) => (
+                                        <div key={tIdx} className="test-section">
+                                            {/* Headers */}
+                                            <div className="grid grid-cols-12 text-center border-b border-black bg-[#fce4d6] font-bold text-xs">
+                                                {["Test", "Date", "TOT", "AIR", "BOT", "Rank", "ZOO", "Rank", "PHY", "Rank", "CHEM", "Rank"].map((h, i) => (
+                                                    <div key={i} className={`p-1 ${i < 11 ? 'border-r border-black' : ''}`}>{h}</div>
+                                                ))}
                                             </div>
-                                            <div className="text-center font-bold text-[10px] uppercase mb-1">
-                                                A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
-                                            </div>
-                                            <div className="font-serif italic text-lg mb-1">
-                                                A Right Choice for the Real Aspirant
-                                            </div>
-                                            <div className="font-bold text-sm uppercase">
-                                                Central Office, Bangalore
+                                            {/* Values */}
+                                            <div className="grid grid-cols-12 text-center bg-white text-md font-medium text-red-700">
+                                                <div className="p-1 border-r border-black">{test.meta.testName}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.date}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.tot}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.air}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.bot}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.b_rank}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.zoo}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.z_rank}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.phy}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.p_rank}</div>
+                                                <div className="p-1 border-r border-black">{test.meta.chem}</div>
+                                                <div className="p-1">{test.meta.c_rank}</div>
                                             </div>
                                         </div>
+                                    ))}
+                                </div>
 
-                                        {/* INFO TABLE */}
-                                        <div className="info-section border border-black mb-4 text-xs font-bold">
-                                            <div className="flex border-b border-black bg-[#fff8dc]">
-                                                <div className="flex-1 p-2 border-r border-black uppercase text-center">{student.info.name}</div>
-                                                <div className="flex-1 p-2 uppercase text-center">{student.info.branch}</div>
-                                            </div>
-                                            <div className="flex text-center bg-[#fce4d6] border-b border-black">
-                                                <div className="flex-1 border-r border-black p-1">Test</div>
-                                                <div className="flex-1 border-r border-black p-1">Date</div>
-                                                <div className="flex-1 border-r border-black p-1">TOT</div>
-                                                <div className="flex-1 border-r border-black p-1">AIR</div>
-                                                <div className="flex-1 border-r border-black p-1">BOT</div>
-                                                <div className="flex-1 border-r border-black p-1">Rank</div>
-                                                <div className="flex-1 border-r border-black p-1">ZOO</div>
-                                                <div className="flex-1 border-r border-black p-1">Rank</div>
-                                                <div className="flex-1 border-r border-black p-1">PHY</div>
-                                                <div className="flex-1 border-r border-black p-1">Rank</div>
-                                                <div className="flex-1 border-r border-black p-1">CHEM</div>
-                                                <div className="flex-1 p-1">Rank</div>
-                                            </div>
-                                            <div className="flex text-center bg-white text-red-700">
-                                                <div className="flex-1 border-r border-black p-1">{test.meta.testName}</div>
-                                                <div className="flex-1 border-r border-black p-1">{test.meta.date}</div>
-                                                <div className="flex-1 border-r border-black p-1">{test.meta.tot}</div>
-                                                <div className="flex-1 border-r border-black p-1">{test.meta.air}</div>
-                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.bot}</div>
-                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.b_rank}</div>
-                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.zoo}</div>
-                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.z_rank}</div>
-                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.phy}</div>
-                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.p_rank}</div>
-                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.chem}</div>
-                                                <div className="flex-1 p-1 text-red-800">{test.meta.c_rank}</div>
-                                            </div>
-                                        </div>
+                                {/* Questions List */}
+                                <div className="questions-container">
+                                    {student.tests.map((test, tIdx) => (
+                                        <div key={tIdx}>
+                                            {test.questions.map((q, qIdx) => (
+                                                <div key={qIdx} className="question-item border border-black mb-4 break-inside-avoid">
 
-                                        {/* QUESTIONS */}
-                                        <div className="questions-list">
-                                            {test.questions.map((q, idx) => (
-                                                <div key={idx} className="question-block mb-2 border border-black break-inside-avoid">
-                                                    {/* Q Header */}
-                                                    <div className="flex items-center bg-[#800000] text-white text-xs font-bold h-6 border-b border-black">
-                                                        <div className="w-10 text-center border-r border-white">{q.W_U}</div>
-                                                        <div className="w-10 text-center border-r border-white">{q.Q_No}</div>
-                                                        <div className="flex-1 pl-2 truncate border-r border-white">Topic: <span className="text-yellow-200">{q.Topic}</span></div>
-                                                        <div className="flex-1 pl-2 truncate border-r border-white">Sub: <span className="text-yellow-200">{q.Sub_Topic}</span></div>
-                                                        <div className="w-20 text-center">Key: {q.Key_Value}</div>
+                                                    {/* Q Header Bar */}
+                                                    <div className="flex items-center bg-[#800000] text-white text-xs font-bold h-8 border-b border-black px-2">
+                                                        <div className="w-12 text-center border-r border-white/30 h-full flex items-center justify-center">{q.W_U}</div>
+                                                        <div className="w-12 text-center border-r border-white/30 h-full flex items-center justify-center">{q.Q_No}</div>
+                                                        <div className="flex-1 px-4 border-r border-white/30 h-full flex items-center overflow-hidden whitespace-nowrap">
+                                                            Topic: <span className="text-yellow-200 ml-1">{q.Topic}</span>
+                                                        </div>
+                                                        <div className="flex-1 px-4 border-r border-white/30 h-full flex items-center overflow-hidden whitespace-nowrap">
+                                                            Sub: <span className="text-yellow-200 ml-1">{q.Sub_Topic}</span>
+                                                        </div>
+                                                        <div className="w-24 text-center h-full flex items-center justify-center">
+                                                            Key: {q.Key_Value}
+                                                        </div>
                                                     </div>
 
-                                                    {/* Q Content */}
-                                                    <div className="flex h-[180px]">
-                                                        {/* Side Strip */}
-                                                        <div className="w-8 bg-[#4682b4] text-white flex items-center justify-center border-r border-black">
-                                                            <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '10px', fontWeight: 'bold', letterSpacing: '1px' }}>
+                                                    {/* Q Content Body */}
+                                                    <div className="flex bg-white">
+                                                        {/* Blue Subject Strip */}
+                                                        <div className="w-8 bg-[#4682b4] text-white flex items-center justify-center border-r border-black shrink-0 relative">
+                                                            <div className="transform -rotate-90 whitespace-nowrap font-bold text-xs tracking-wider absolute">
                                                                 {q.Subject}
                                                             </div>
                                                         </div>
-                                                        {/* Images */}
+
+                                                        {/* Images Container */}
                                                         <div className="flex flex-1">
-                                                            <div className="w-1/2 border-r border-black flex relative">
-                                                                <span className="absolute top-1 left-1 text-xs font-bold z-10">{q.Q_No}</span>
-                                                                {q.Q_URL ? <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" /> : <span className="text-xs text-gray-300 m-auto">No Image</span>}
+                                                            {/* Question Image */}
+                                                            <div className="w-1/2 border-r border-black p-2 flex flex-col items-center justify-start bg-white relative">
+                                                                <span className="self-start text-xs font-bold mb-1 ml-1 text-gray-500">Q.{q.Q_No}</span>
+                                                                {q.Q_URL ? (
+                                                                    <img
+                                                                        src={q.Q_URL}
+                                                                        alt="Question"
+                                                                        style={{ width: '321px', height: 'auto', display: 'block' }}
+                                                                    />
+                                                                ) : (
+                                                                    <div className="text-gray-400 text-sm mt-8 italic">No Image Available</div>
+                                                                )}
                                                             </div>
-                                                            <div className="w-1/2 flex">
-                                                                {q.S_URL ? <img src={q.S_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Sol" /> : <span className="text-xs text-gray-300 m-auto">No Solution</span>}
+
+                                                            {/* Solution Image */}
+                                                            <div className="w-1/2 p-2 flex flex-col items-center justify-start bg-white">
+                                                                <span className="self-start text-xs font-bold mb-1 ml-1 text-gray-500">Sol</span>
+                                                                {q.S_URL ? (
+                                                                    <img
+                                                                        src={q.S_URL}
+                                                                        alt="Solution"
+                                                                        style={{ width: '321px', height: 'auto', display: 'block' }}
+                                                                    />
+                                                                ) : (
+                                                                    <div className="text-gray-400 text-sm mt-8 italic">No Solution Available</div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
+
                                                 </div>
                                             ))}
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
+
                             </div>
                         ))}
                     </div>
