@@ -1,4 +1,28 @@
 /* Modern CSS Reset */
+@font-face {
+    font-family: 'ImpactCustom';
+    src: url('/fonts/unicode.impact.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Bookman';
+    src: url('/fonts/bookman-old-style.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Bookman';
+    src: url('/fonts/BOOKOSB.TTF') format('truetype');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
 *,
 *::before,
 *::after {
@@ -68,7 +92,7 @@ body {
 /* Sidebar Styling */
 .branding-wrapper {
     background: transparent;
-    padding: 1.5rem 1rem;
+    padding: 1.5rem 0.5rem;
     margin-bottom: 0.5rem;
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
@@ -91,10 +115,10 @@ body {
 
 .logo-text {
     font-size: 1.1rem;
-    font-family: 'Impact', 'Arial Black', sans-serif;
+    font-family: 'ImpactCustom', 'Impact', 'Arial Black', sans-serif;
     font-weight: 500;
     margin: 0;
-    color: #0070C0;
+    color: #FF0000;
     letter-spacing: 0.5px;
 }
 
@@ -103,10 +127,11 @@ body {
     font-family: "Gill Sans MT", "Gill Sans", "Trebuchet MS", sans-serif;
     color: #0066CC;
     margin: 0.3rem 0 0 0;
-    letter-spacing: 0.05em;
+    letter-spacing: 0px;
     text-transform: uppercase;
     font-weight: 700;
     opacity: 1;
+    white-space: nowrap;
 }
 
 .menu-items {

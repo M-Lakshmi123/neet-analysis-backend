@@ -66,8 +66,22 @@ const AverageReport = ({ filters }) => {
         });
     };
 
-    const generateStudentPDF = (studentData, bgImg, logoImg) => {
+    const generateStudentPDF = (studentData, bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont) => {
         const doc = new jsPDF('p', 'mm', 'a4');
+
+        // Add Fonts
+        if (impactFont) {
+            doc.addFileToVFS("unicode.impact.ttf", impactFont);
+            doc.addFont("unicode.impact.ttf", "Impact", "normal");
+        }
+        if (bookmanFont) {
+            doc.addFileToVFS("bookman-old-style.ttf", bookmanFont);
+            doc.addFont("bookman-old-style.ttf", "Bookman", "normal");
+        }
+        if (bookmanBoldFont) {
+            doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont);
+            doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
+        }
 
         // Draw background on first page
         if (bgImg) {
@@ -92,61 +106,72 @@ const AverageReport = ({ filters }) => {
         const title1 = "SRI CHAITANYA";
         const title2 = "EDUCATIONAL INSTITUTIONS";
 
-        doc.setFont("helvetica", "bold");
+        if (impactFont) {
+            doc.setFont("Impact", "normal");
+        } else {
+            doc.setFont("helvetica", "bold");
+        }
         doc.setFontSize(22); // Consistent size as before
         doc.setTextColor(0, 112, 192); // #0070C0
 
         if (logoImg) {
             const aspect = logoImg.width / logoImg.height;
-            let logoH = 20; // Slightly larger logo
+            let logoH = 20;
             let logoW = logoH * aspect;
 
             // Draw Logo Centered Top
             const logoX = (210 - logoW) / 2;
             doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-            currentY += logoH + 6; // Reduced gap below logo
-
-            // Draw Title 1
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(36); // Increased size from 30
-            doc.setTextColor(0, 112, 192);
-            doc.text(title1, 105, currentY, { align: 'center' });
-            currentY += 12; // Adjusted for larger font
-
-            currentY += 8;
-
-            // Draw Title 2
-            doc.setFontSize(18); // Slightly larger
-            doc.setTextColor(0, 102, 204);
-            doc.text(title2, 105, currentY, { align: 'center' });
+            currentY += logoH + 6;
         } else {
-            // Draw Title 1
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(36); // Increased size from 30
-            doc.setTextColor(0, 112, 192);
-            doc.text(title1, 105, currentY, { align: 'center' });
-            currentY += 12; // Adjusted for larger font
-
-            // Draw Title 2
-            doc.setFontSize(18); // Slightly larger
-            doc.setTextColor(0, 102, 204);
-            doc.text(title2, 105, currentY, { align: 'center' });
+            currentY += 10;
         }
-        currentY += 10; // Reduced gap below title
+
+        // Draw Single Line Header: "Sri Chaitanya" (Impact) + " Educational Institutions" (Bookman)
+        const part1 = "Sri Chaitanya";
+        const part2 = " Educational Institutions";
+        doc.setFontSize(26); // Adjusted size to fit A4 Portrait
+
+        // Measure widths
+        if (impactFont) doc.setFont("Impact", "normal");
+        else doc.setFont("helvetica", "bold");
+        const w1 = doc.getTextWidth(part1);
+
+        if (bookmanFont) doc.setFont("Bookman", "normal");
+        else doc.setFont("helvetica", "normal");
+        const w2 = doc.getTextWidth(part2);
+
+        const totalWidth = w1 + w2;
+        const startX = (210 - totalWidth) / 2;
+
+        // Draw Part 1
+        if (impactFont) doc.setFont("Impact", "normal");
+        else doc.setFont("helvetica", "bold");
+        doc.setTextColor(0, 112, 192); // #0070C0
+        doc.text(part1, startX, currentY);
+
+        // Draw Part 2
+        if (bookmanFont) doc.setFont("Bookman", "normal");
+        else doc.setFont("helvetica", "normal");
+        doc.setTextColor(0, 102, 204); // #0066CC
+        doc.text(part2, startX + w1, currentY);
+
+        currentY += 8;
 
         // 3. Subtitle
-        doc.setFont("helvetica", "bolditalic");
-        doc.setFontSize(12); // Slightly smaller
+        if (bookmanFont) doc.setFont("Bookman", "bold"); // Changed to bold
+        else doc.setFont("helvetica", "bolditalic");
+        doc.setFontSize(14);
         doc.setTextColor(0, 0, 0); // Pure Black
         const subTitle = "P R O G R E S S   R E P O R T";
         doc.text(subTitle, 105, currentY, { align: 'center' });
-        currentY += 6; // Slightly increased gap below subtitle
+        currentY += 6; // Reduced gap (was 8)
 
         // 4. Line
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.4);
         doc.line(15, currentY, 195, currentY);
-        currentY += 15; // Increased gap below line to push table down
+        currentY += 4; // Further reduced gap below line (was 6)
 
         // 5. Details Header - Pastel Background
         if (studentData.length > 0) {
@@ -156,7 +181,8 @@ const AverageReport = ({ filters }) => {
             doc.setLineWidth(0.1);
             doc.roundedRect(15, currentY, 180, 20, 1, 1, 'FD'); // FD = Fill then Draw
 
-            doc.setFont("helvetica", "bold");
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
             doc.setFontSize(10);
             doc.setTextColor(0, 0, 0);
 
@@ -164,21 +190,35 @@ const AverageReport = ({ filters }) => {
             const col1X = 20;
             const col2X = 115;
 
+            // Student Name
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
             doc.text("Student Name:", col1X, textYStart);
-            doc.setFont("helvetica", "normal");
+
+            if (bookmanFont) doc.setFont("Bookman", "bold"); // Also bold for values as per "same progress report also Bold"? Or just labels? Usually values are normal. keeping normal for values based on typical reports, but user said "same progress report also Bold". Let's assume headers/labels are bold.
+            else doc.setFont("helvetica", "normal");
             doc.text(student.NAME_OF_THE_STUDENT || '', col1X + 30, textYStart);
 
-            doc.setFont("helvetica", "bold");
+            // Campus
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
             doc.text("Campus:", col2X, textYStart);
-            doc.setFont("helvetica", "normal");
+
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "normal");
             doc.text(student.CAMPUS_NAME || '', col2X + 22, textYStart);
 
             const row2Y = textYStart + 7;
-            doc.setFont("helvetica", "bold");
+
+            // Student ID
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
             doc.text("Student ID:", col1X, row2Y);
-            doc.setFont("helvetica", "normal");
+
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "normal");
             doc.text(student.STUD_ID?.toString() || '', col1X + 30, row2Y);
-            currentY += 20;
+            currentY += 18;
         }
 
         const tableColumn = ["Test Name", "Date", "Total\n720", "AIR", "Bot\n180", "Zoo\n180", "Phy\n180", "Chem\n180"];
@@ -218,22 +258,23 @@ const AverageReport = ({ filters }) => {
             headStyles: {
                 fillColor: [0, 0, 0], // Pure Black headers
                 textColor: [255, 255, 255],
-                font: "helvetica",
-                fontStyle: "bold",
+                font: bookmanFont ? "Bookman" : "helvetica", // Use Bookman
+                fontStyle: "bold", // Use Bold
                 halign: 'center',
                 valign: 'middle',
-                lineWidth: 0.2
+                lineWidth: 0.2,
+                fontSize: 10 // Increased by 1 point (was default or smaller)
             },
             styles: {
-                font: "helvetica",
-                fontSize: 9, // Smaller font for compactness
-                cellPadding: 2.5, // Tighter padding
+                font: bookmanFont ? "Bookman" : "helvetica", // Use Bookman
+                fontSize: 9,
+                cellPadding: 2.5,
                 overflow: 'linebreak',
                 halign: 'center',
                 valign: 'middle',
                 lineColor: [0, 0, 0],
                 lineWidth: 0.1,
-                textColor: [0, 0, 0] // Black text in cells
+                textColor: [0, 0, 0]
             },
             columnStyles: {
                 0: { halign: 'center' } // Centered and auto-fit
@@ -241,7 +282,14 @@ const AverageReport = ({ filters }) => {
             margin: { left: 15, right: 15, bottom: 15 },
             didParseCell: (data) => {
                 if (data.row.index === tableRows.length - 1) {
-                    data.cell.styles.fontStyle = 'bold';
+                    // Start of Average Row Styling
+                    // Ensure font remains Bookman if loaded
+                    if (bookmanFont) {
+                        data.cell.styles.font = "Bookman";
+                        data.cell.styles.fontStyle = 'bold'; // Changed to bold
+                    } else {
+                        data.cell.styles.fontStyle = 'bold';
+                    }
                     data.cell.styles.fillColor = [224, 231, 255];
                     data.cell.styles.textColor = [0, 0, 0];
                 }
@@ -253,9 +301,29 @@ const AverageReport = ({ filters }) => {
 
     const downloadPDF = async () => {
         try {
-            const [bgImg, logoImg] = await Promise.all([
+            // Helper to load font
+            const loadFont = async (url) => {
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error(`Failed to load font: ${url}`);
+                    const blob = await res.blob();
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (err) {
+                    console.error("[PDF] Font loading error:", err);
+                    return null;
+                }
+            };
+
+            const [bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
                 loadImage('/college-bg.png'),
-                loadImage('/logo.png')
+                loadImage('/logo.png'),
+                loadFont('/fonts/unicode.impact.ttf'),
+                loadFont('/fonts/bookman-old-style.ttf'),
+                loadFont('/fonts/BOOKOSB.TTF')
             ]);
 
             // Group by Student ID
@@ -271,7 +339,7 @@ const AverageReport = ({ filters }) => {
 
             if (studentIds.length === 1) {
                 // Single Download
-                const doc = generateStudentPDF(grouped[studentIds[0]], bgImg, logoImg);
+                const doc = generateStudentPDF(grouped[studentIds[0]], bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont);
                 const sName = grouped[studentIds[0]][0].NAME_OF_THE_STUDENT || 'Report';
                 doc.save(`${sName}_Progress_Report.pdf`);
             } else {
@@ -282,7 +350,7 @@ const AverageReport = ({ filters }) => {
                 studentIds.forEach(id => {
                     const sRows = grouped[id];
                     const sName = sRows[0].NAME_OF_THE_STUDENT || id;
-                    const doc = generateStudentPDF(sRows, bgImg, logoImg);
+                    const doc = generateStudentPDF(sRows, bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont);
                     const pdfBlob = doc.output('blob');
                     zip.file(`${sName}_Progress_Report.pdf`, pdfBlob);
                 });
@@ -356,8 +424,8 @@ const AverageReport = ({ filters }) => {
                     <>
                         {previewRows.length > 0 && (
                             <div className="table-container">
-                                <table className="analysis-table merit-style">
-                                    <thead>
+                                <table className="analysis-table merit-style" style={{ fontFamily: 'Bookman, serif' }}>
+                                    <thead style={{ fontWeight: 'bold' }}>
                                         <tr className="grouped-header">
                                             <th colSpan={3} className="header-group-blue">
                                                 <div className="header-label">CAMPUS</div>

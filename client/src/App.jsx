@@ -9,6 +9,7 @@ import FilterBar from './components/FilterBar';
 import AnalysisReport from './components/AnalysisReport';
 import AverageReport from './components/AverageReport';
 import AverageMarksReport from './components/AverageMarksReport';
+import ErrorReport from './components/ErrorReport';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -17,7 +18,6 @@ import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import Sidebar from './components/Sidebar';
 import UserApprovals from './components/admin/UserApprovals';
 import ActivityLogs from './components/admin/ActivityLogs';
-import LoadingTimer from './components/LoadingTimer';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
     const { currentUser, userData, loading, isAdmin } = useAuth();
@@ -35,7 +35,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
     // But if we want the timer component to handle the "cutting", 
     // it's cleaner to use it as a conditional return.
 
-    if (isLoading) return <LoadingTimer isLoading={true} />;
+    if (isLoading) return <div className="loading-state">Loading...</div>;
 
     // No user -> straight to login
     if (!currentUser) return <Navigate to="/login" replace />;
@@ -145,6 +145,8 @@ const Dashboard = () => {
                         </div>
                     </>
                 );
+            case 'errors':
+                return <ErrorReport />;
             case 'approvals':
                 return <UserApprovals />;
             case 'logs':

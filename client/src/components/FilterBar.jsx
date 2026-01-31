@@ -3,7 +3,7 @@ import Select from 'react-select';
 import AsyncSelect from 'react-select/async';
 import { buildQueryParams, API_URL } from '../utils/apiHelper';
 
-const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
+const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} }) => {
     const [options, setOptions] = useState({
         campuses: [],
         streams: [],
@@ -14,6 +14,12 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
     const [students, setStudents] = useState([]);
     const [loadingFilters, setLoadingFilters] = useState(false);
     const [loadingStudents, setLoadingStudents] = useState(false);
+
+    // Default Endpoints
+    const endpoints = {
+        filters: apiEndpoints.filters || '/api/filters',
+        students: apiEndpoints.students || '/api/studentsByCampus'
+    };
 
     // Transform string array to { value, label } for React Select
     const toOptions = (arr) => {
@@ -66,7 +72,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
                 testType: filters.testType,
                 test: filters.test
             });
-            const urlOptions = `${API_URL}/api/filters?${paramsOptions.toString()}`;
+            const urlOptions = `${API_URL}${endpoints.filters}?${paramsOptions.toString()}`;
 
             setLoadingFilters(true);
             try {
@@ -124,7 +130,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
             delete filtersForStudents.studentSearch;
 
             const paramsStudents = buildQueryParams(filtersForStudents);
-            const urlStudents = `${API_URL}/api/studentsByCampus?${paramsStudents.toString()}`;
+            const urlStudents = `${API_URL}${endpoints.students}?${paramsStudents.toString()}`;
 
             setLoadingStudents(true);
             try {
@@ -162,7 +168,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
         if (!inputValue || inputValue.length < 1) return []; // Search from 1 character
 
         try {
-            let url = `${API_URL}/api/studentsByCampus?quickSearch=${encodeURIComponent(inputValue)}`;
+            let url = `${API_URL}${endpoints.students}?quickSearch=${encodeURIComponent(inputValue)}`;
             // Enforce restricted campus in search
             if (restrictedCampus) {
                 url += `&campus=${encodeURIComponent(restrictedCampus)}`;

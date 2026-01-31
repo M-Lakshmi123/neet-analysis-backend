@@ -4,7 +4,8 @@ import {
     BarChart3,
     ClipboardList,
     Users,
-    Activity
+    Activity,
+    FileWarning
 } from 'lucide-react';
 
 const Sidebar = ({ activePage, setActivePage }) => {
@@ -13,7 +14,8 @@ const Sidebar = ({ activePage, setActivePage }) => {
     const menuItems = [
         { id: 'analysis', label: 'Analysis Report', icon: <BarChart3 size={18} />, roles: ['principal', 'admin'] },
         { id: 'averages', label: 'Average Marks Report', icon: <ClipboardList size={18} />, roles: ['principal', 'admin'] },
-        { id: 'progress', label: 'Progress Report', icon: <Users size={18} />, roles: ['principal', 'admin'] }
+        { id: 'progress', label: 'Progress Report', icon: <Users size={18} />, roles: ['principal', 'admin'] },
+        { id: 'errors', label: 'Error Report', icon: <FileWarning size={18} />, roles: ['principal', 'admin'] }
     ];
 
     const adminItems = [
@@ -28,7 +30,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
             <div className="branding-wrapper">
                 <div className="brand-container">
                     <img src="/logo.png" alt="Sri Chaitanya" className="sidebar-logo" />
-                    <h1 className="logo-text">SRI CHAITANYA</h1>
+                    <h1 className="logo-text">Sri Chaitanya</h1>
                     <p className="logo-subtext">Educational Institutions</p>
                 </div>
             </div>

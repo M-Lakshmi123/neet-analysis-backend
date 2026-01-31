@@ -3,6 +3,7 @@ import { buildQueryParams, formatDate, API_URL } from '../utils/apiHelper';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Modal from './Modal';
+import LoadingTimer from './LoadingTimer';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
@@ -238,7 +239,7 @@ const AnalysisReport = ({ filters }) => {
             if (logoImg) {
                 const logoX = (pageWidth - logoW) / 2;
                 doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-                currentY += logoH + 10; // Explicit Large Gap below logo
+                currentY += logoH + 2; // Reduced gap below logo
             } else {
                 currentY += 10;
             }
@@ -280,7 +281,7 @@ const AnalysisReport = ({ filters }) => {
             doc.setTextColor(0, 102, 204); // #0066CC
             doc.text(part2, titleStartX + w1, currentY + 10);
 
-            currentY += 25; // Large gap below title
+            currentY += 20; // Increased gap below title for better separation
 
             // 4. Custom Subtitle Pattern
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
@@ -289,11 +290,11 @@ const AnalysisReport = ({ filters }) => {
             const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
 
             doc.setFont("helvetica", "bolditalic");
-            doc.setFontSize(14);
+            doc.setFontSize(18); // Increased font size (+2 more -> 18)
             doc.setTextColor(128, 0, 64); // Maroon
             doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center' });
 
-            currentY += 15; // Gap before table
+            currentY += 8; // Reduced gap before table
 
             // 4. Data Tables
             const tableColumn = [
@@ -412,7 +413,7 @@ const AnalysisReport = ({ filters }) => {
             worksheet.addRow(['SRI CHAITANYA EDUCATIONAL INSTITUTIONS']);
             worksheet.mergeCells('A1:O1');
             const titleCell = worksheet.getCell('A1');
-            titleCell.font = { size: 28, bold: true, color: { argb: 'FF0070C0' } }; // Increased Size
+            titleCell.font = { name: 'Impact', size: 28, bold: true, color: { argb: 'FF0070C0' } }; // Increased Size
             titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
             worksheet.getRow(1).height = 40; // Adjusted height for larger font
 
@@ -559,7 +560,7 @@ const AnalysisReport = ({ filters }) => {
         }
     };
 
-    if (loading) return <div className="loading-state">Updating analytics...</div>;
+    if (loading) return <LoadingTimer isLoading={true} initialDuration={50} />;
 
     const noData = examStats.length === 0 && studentMarks.length === 0;
 
