@@ -26,3 +26,6 @@ yarn-debug.log*
 yarn-error.log*
 logs/
 *.log
+
+# Secrets
+medical-2025-*.json
