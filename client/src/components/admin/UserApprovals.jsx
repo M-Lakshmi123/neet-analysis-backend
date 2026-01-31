@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL } from '../../utils/apiHelper';
+import { API_URL, ADMIN_WHATSAPP } from '../../utils/apiHelper';
 import Modal from '../Modal';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
-import { Users, Mail, School, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Users, Mail, School, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react';
 
 const UserApprovals = () => {
     const [pendingUsers, setPendingUsers] = useState([]);
@@ -45,35 +45,19 @@ const UserApprovals = () => {
                 approvedAt: new Date().toISOString()
             });
 
-            // 2. Send Email Notification via Backend
-            try {
-                const response = await fetch(`${API_URL}/api/send-approval-email`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: user.email,
-                        name: user.name,
-                        campus: user.campus
-                    })
+            // 2. Open WhatsApp Web for notification
+            if (user.phone) {
+                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2025-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
+                window.open(whatsappUrl, '_blank');
+            } else {
+                setModal({
+                    isOpen: true,
+                    type: 'info',
+                    title: 'Approved',
+                    message: `User ${user.name} approved successfully, but no WhatsApp number was found to send a notification.`,
+                    onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
                 });
-
-                if (!response.ok) {
-                    const data = await response.json();
-                    console.error("Failed to send approval email:", data);
-
-                    // Alert the user that looking good but email failed
-                    setModal({
-                        isOpen: true,
-                        type: 'danger',
-                        title: 'Email Delivery Failed',
-                        message: `The user was approved, but the notification email could not be sent. Error: ${data.details || 'Unknown Error'}`,
-                        onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
-                    });
-                } else {
-                    console.log("Approval email sent successfully");
-                }
-            } catch (emailErr) {
-                console.error("Email API Connection Error:", emailErr);
             }
 
             // No need to re-fetch immediately as we did optimistic update
@@ -142,6 +126,7 @@ const UserApprovals = () => {
                                             <h5>{user.name}</h5>
                                             <span className="info-sub"><Mail size={12} /> {user.email}</span>
                                             <span className="info-sub"><School size={12} /> {user.campus}</span>
+                                            {user.phone && <span className="info-sub"><MessageSquare size={12} /> +91 {user.phone}</span>}
                                         </div>
                                         <div className="item-btns">
                                             <button className="approve-small" onClick={() => handleApprove(user)}>Approve</button>
@@ -178,12 +163,27 @@ const UserApprovals = () => {
                                         <td><span className="campus-tag">{user.campus}</span></td>
                                         <td>{new Date(user.approvedAt).toLocaleDateString()}</td>
                                         <td>
-                                            <button
-                                                className="text-danger"
-                                                onClick={() => confirmReject(user.id)}
-                                            >
-                                                Revoke
-                                            </button>
+                                            <div className="flex-actions" style={{ display: 'flex', gap: '10px' }}>
+                                                {user.phone && (
+                                                    <button
+                                                        className="btn-whatsapp"
+                                                        onClick={() => {
+                                                            const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2025-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                                                            const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
+                                                            window.open(whatsappUrl, '_blank');
+                                                        }}
+                                                        title="Send WhatsApp Notification"
+                                                    >
+                                                        <MessageSquare size={14} /> Notify
+                                                    </button>
+                                                )}
+                                                <button
+                                                    className="text-danger"
+                                                    onClick={() => confirmReject(user.id)}
+                                                >
+                                                    Revoke
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

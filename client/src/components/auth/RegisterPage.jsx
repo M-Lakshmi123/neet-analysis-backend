@@ -15,6 +15,7 @@ const RegisterPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [phone, setPhone] = useState('');
     const [campus, setCampus] = useState('');
     const [campuses, setCampuses] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -129,6 +130,7 @@ const RegisterPage = () => {
                 uid: user.uid,
                 name,
                 email,
+                phone,
                 campus,
                 role: 'principal',
                 isApproved: false,
@@ -143,7 +145,7 @@ const RegisterPage = () => {
                 isOpen: true,
                 type: 'success',
                 title: 'Request Sent Successfully!',
-                message: 'Your registration request has been submitted. Please check your email for confirmation once the admin approves your request.',
+                message: 'Your registration request has been submitted. Please wait for the admin to approve your request via WhatsApp.',
                 confirmText: 'Back to Login'
             });
 
@@ -227,6 +229,24 @@ const RegisterPage = () => {
                                             onChange={(e) => setEmail(e.target.value)}
                                             required
                                         />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label>WhatsApp Number</label>
+                                        <div className="input-with-icon">
+                                            <div className="icon" style={{ fontSize: '14px', fontWeight: 'bold' }}>+91</div>
+                                            <input
+                                                type="tel"
+                                                placeholder="10 digit mobile number"
+                                                value={phone}
+                                                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                                                pattern="[0-9]{10}"
+                                                required
+                                            />
+                                        </div>
+                                        <small style={{ color: '#64748b', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                                            Used for sending approval notifications via WhatsApp
+                                        </small>
                                     </div>
                                 </div>
 

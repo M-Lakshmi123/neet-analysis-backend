@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
@@ -13,6 +13,11 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Enforce session persistence (logout on window close)
+        setPersistence(auth, browserSessionPersistence).catch(error => {
+            console.error("Failed to set auth persistence:", error);
+        });
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setLoading(true);
             setCurrentUser(user);

@@ -104,34 +104,35 @@ const AverageReport = ({ filters }) => {
             // Draw Logo Centered Top
             const logoX = (210 - logoW) / 2;
             doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-            currentY += logoH + 8; // Reduced gap below logo
+            currentY += logoH + 6; // Reduced gap below logo
 
             // Draw Title 1
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(22);
+            doc.setFontSize(30); // Increased size
             doc.setTextColor(0, 112, 192);
             doc.text(title1, 105, currentY, { align: 'center' });
-            currentY += 7;
+            currentY += 8;
+
+            currentY += 8;
 
             // Draw Title 2
-            doc.setFontSize(16);
+            doc.setFontSize(18); // Slightly larger
             doc.setTextColor(0, 102, 204);
             doc.text(title2, 105, currentY, { align: 'center' });
-
         } else {
             // Draw Title 1
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(22);
+            doc.setFontSize(30); // Increased size
             doc.setTextColor(0, 112, 192);
             doc.text(title1, 105, currentY, { align: 'center' });
-            currentY += 7;
+            currentY += 8;
 
             // Draw Title 2
-            doc.setFontSize(16);
+            doc.setFontSize(18); // Slightly larger
             doc.setTextColor(0, 102, 204);
             doc.text(title2, 105, currentY, { align: 'center' });
         }
-        currentY += 8; // Reduced gap below title
+        currentY += 10; // Reduced gap below title
 
         // 3. Subtitle
         doc.setFont("helvetica", "bolditalic");

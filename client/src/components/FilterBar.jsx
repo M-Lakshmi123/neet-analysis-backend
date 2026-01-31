@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
+import AsyncSelect from 'react-select/async';
 import { buildQueryParams, API_URL } from '../utils/apiHelper';
 
 const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
@@ -150,11 +151,31 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
         ...toOptions(arr)
     ];
 
-    // Prepare Student Options with Select All
+    // prepared initial student options for the normal dropdown
     const studentOptions = [
         { value: "SELECT_ALL", label: "Select All Students" },
         ...(students || []).map(s => ({ value: s.id, label: `${s.name} (${s.id})` }))
     ];
+
+    // Load options for the Async Global Search
+    const loadStudentOptions = async (inputValue) => {
+        if (!inputValue || inputValue.length < 1) return []; // Search from 1 character
+
+        try {
+            const res = await fetch(`${API_URL}/api/studentsByCampus?quickSearch=${encodeURIComponent(inputValue)}`);
+            const data = await res.json();
+            console.log("[loadStudentOptions] Data received:", data);
+            return data.map(s => ({
+                value: s.id,
+                label: `${s.name} (${s.id})`,
+                campus: s.campus,
+                stream: s.stream
+            }));
+        } catch (err) {
+            console.error("Async Search Error:", err);
+            return [];
+        }
+    };
 
     // Check if "Select All" is active for a field
     const isSelectAllActive = (field) => {
@@ -220,12 +241,40 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
         }),
         multiValueRemove: (base) => ({
             ...base,
-            display: 'flex', // Always show remove button
+            display: 'flex',
             color: '#ef4444',
             ':hover': {
                 backgroundColor: '#ef4444',
                 color: 'white',
             },
+        })
+    };
+
+    // Compact styles for the row filters
+    const compactStyles = {
+        ...customStyles,
+        control: (base, state) => ({
+            ...customStyles.control(base, state),
+            minHeight: '32px',
+            height: '32px',
+            fontSize: '0.75rem',
+        }),
+        valueContainer: (base) => ({
+            ...customStyles.valueContainer(base),
+            maxHeight: '32px',
+        }),
+        placeholder: (base) => ({
+            ...customStyles.placeholder(base),
+            fontSize: '0.75rem',
+        }),
+        multiValue: (base, state) => ({
+            ...customStyles.multiValue(base, state),
+            margin: '1px',
+        }),
+        multiValueLabel: (base, state) => ({
+            ...customStyles.multiValueLabel(base, state),
+            fontSize: '0.65rem',
+            padding: '1px 4px',
         })
     };
 
@@ -236,127 +285,177 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
             testType: [],
             test: [],
             topAll: [],
-            studentSearch: []
+            studentSearch: [],
+            quickSearch: ''
         });
     };
 
     return (
-        <div className="filter-bar">
-            <div className={`filter-group campus-filter ${restrictedCampus ? 'disabled' : ''}`}>
-                <label>Campus {restrictedCampus && <span style={{ fontSize: '0.7rem', color: 'var(--primary)' }}>(Locked)</span>}</label>
-                <Select
-                    isMulti
-                    name="campus"
-                    options={withSelectAll(options.campuses, "Campuses")}
-                    value={getValue('campus')}
-                    onChange={(opts, meta) => handleSelectChange('campus', opts, meta)}
-                    className="react-select-container"
-                    isLoading={loadingFilters}
-                    classNamePrefix="react-select"
-                    placeholder="Select Campus..."
-                    styles={customStyles}
-                    isDisabled={!!restrictedCampus}
-                />
+        <div className="filter-bar-container compact-view">
+            {/* 0. Global Student Search - Autocomplete */}
+            <div className="global-search-wrapper">
+                <div className="search-box-autocomplete">
+                    <div className="search-icon">🔍</div>
+                    <AsyncSelect
+                        cacheOptions
+                        loadOptions={loadStudentOptions}
+                        defaultOptions={[]}
+                        placeholder="Search Student Name or ID..."
+                        onChange={(opt) => {
+                            console.log("Global Search Selection:", opt);
+                            if (opt) {
+                                setFilters(prev => ({
+                                    ...prev,
+                                    studentSearch: [opt.value],
+                                    quickSearch: opt.label, // Keep the label for display
+                                    // Auto-select Campus and Stream
+                                    campus: opt.campus ? [opt.campus] : [],
+                                    stream: opt.stream ? [opt.stream] : [],
+                                    testType: [], test: [], topAll: []
+                                }));
+                            } else {
+                                // Cleared
+                                setFilters(prev => ({
+                                    ...prev,
+                                    studentSearch: [],
+                                    quickSearch: ''
+                                }));
+                            }
+                        }}
+                        styles={{
+                            ...customStyles,
+                            container: (base) => ({ ...base, flex: 1 }),
+                            control: (base, state) => ({
+                                ...customStyles.control(base, state),
+                                border: 'none',
+                                height: '42px',
+                                background: 'transparent'
+                            })
+                        }}
+                        className="global-search-select"
+                        noOptionsMessage={({ inputValue }) => !inputValue || inputValue.length < 1 ? "Start typing to search..." : "No students found"}
+                        filterOption={() => true}
+                        isClearable
+                        value={filters.studentSearch && filters.studentSearch.length > 0 ? { value: filters.studentSearch[0], label: filters.quickSearch } : null}
+                    />
+                </div>
             </div>
 
-            {/* Stream Select */}
-            <div className={`filter-group ${loadingFilters || (!restrictedCampus && filters.campus.length === 0) ? 'disabled-logic' : ''}`}>
-                <label>Stream</label>
-                <Select
-                    isMulti
-                    name="stream"
-                    options={withSelectAll(options.streams, "Streams")}
-                    value={getValue('stream')}
-                    onChange={(opts, meta) => handleSelectChange('stream', opts, meta)}
-                    className="react-select-container"
-                    isLoading={loadingFilters}
-                    classNamePrefix="react-select"
-                    placeholder="Select Stream..."
-                    styles={customStyles}
-                    isDisabled={loadingFilters || (!restrictedCampus && filters.campus.length === 0)}
-                />
-            </div>
+            <div className="filter-bar">
+                <div className={`filter-group campus-filter ${restrictedCampus ? 'disabled' : ''}`}>
+                    <label>Campus {restrictedCampus && <span style={{ fontSize: '0.7rem', color: 'var(--primary)' }}>(Locked)</span>}</label>
+                    <Select
+                        isMulti
+                        name="campus"
+                        options={withSelectAll(options.campuses, "Campuses")}
+                        value={getValue('campus')}
+                        onChange={(opts, meta) => handleSelectChange('campus', opts, meta)}
+                        className="react-select-container"
+                        isLoading={loadingFilters}
+                        classNamePrefix="react-select"
+                        placeholder="Select Campus..."
+                        styles={customStyles}
+                        isDisabled={!!restrictedCampus}
+                    />
+                </div>
 
-            {/* Test Type Select */}
-            <div className={`filter-group ${loadingFilters || filters.stream.length === 0 ? 'disabled-logic' : ''}`}>
-                <label>Test Type</label>
-                <Select
-                    isMulti
-                    name="testType"
-                    options={withSelectAll(options.testTypes, "Types")}
-                    value={getValue('testType')}
-                    onChange={(opts, meta) => handleSelectChange('testType', opts, meta)}
-                    className="react-select-container"
-                    isLoading={loadingFilters}
-                    classNamePrefix="react-select"
-                    placeholder="Select Test Type..."
-                    styles={customStyles}
-                    isDisabled={loadingFilters || filters.stream.length === 0}
-                />
-            </div>
+                {/* Stream Select */}
+                <div className={`filter-group ${loadingFilters || (!restrictedCampus && filters.campus.length === 0) ? 'disabled-logic' : ''}`}>
+                    <label>Stream</label>
+                    <Select
+                        isMulti
+                        name="stream"
+                        options={withSelectAll(options.streams, "Streams")}
+                        value={getValue('stream')}
+                        onChange={(opts, meta) => handleSelectChange('stream', opts, meta)}
+                        className="react-select-container"
+                        isLoading={loadingFilters}
+                        classNamePrefix="react-select"
+                        placeholder="Select Stream..."
+                        styles={customStyles}
+                        isDisabled={loadingFilters || (!restrictedCampus && filters.campus.length === 0)}
+                    />
+                </div>
 
-            {/* Test Select */}
-            <div className={`filter-group ${loadingFilters || filters.testType.length === 0 ? 'disabled-logic' : ''}`}>
-                <label>Test</label>
-                <Select
-                    isMulti
-                    name="test"
-                    options={withSelectAll(options.tests, "Tests")}
-                    value={getValue('test')}
-                    onChange={(opts, meta) => handleSelectChange('test', opts, meta)}
-                    className="react-select-container"
-                    isLoading={loadingFilters}
-                    classNamePrefix="react-select"
-                    placeholder="Select Test..."
-                    styles={customStyles}
-                    isDisabled={loadingFilters || filters.testType.length === 0}
-                />
-            </div>
+                {/* Test Type Select */}
+                <div className={`filter-group ${loadingFilters || filters.stream.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>Test Type</label>
+                    <Select
+                        isMulti
+                        name="testType"
+                        options={withSelectAll(options.testTypes, "Types")}
+                        value={getValue('testType')}
+                        onChange={(opts, meta) => handleSelectChange('testType', opts, meta)}
+                        className="react-select-container"
+                        isLoading={loadingFilters}
+                        classNamePrefix="react-select"
+                        placeholder="Select Test Type..."
+                        styles={customStyles}
+                        isDisabled={loadingFilters || filters.stream.length === 0}
+                    />
+                </div>
 
-            {/* Top_ALL Select */}
-            <div className={`filter-group ${loadingFilters || filters.test.length === 0 ? 'disabled-logic' : ''}`}>
-                <label>Top_ALL</label>
-                <Select
-                    isMulti
-                    name="topAll"
-                    options={withSelectAll(options.topAll || [], "Top_ALL")}
-                    value={getValue('topAll')}
-                    onChange={(opts, meta) => handleSelectChange('topAll', opts, meta)}
-                    className="react-select-container"
-                    isLoading={loadingFilters}
-                    classNamePrefix="react-select"
-                    placeholder="Select Top_ALL..."
-                    styles={customStyles}
-                    isDisabled={loadingFilters || filters.test.length === 0}
-                />
-            </div>
+                {/* Test Select */}
+                <div className={`filter-group ${loadingFilters || filters.testType.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>Test</label>
+                    <Select
+                        isMulti
+                        name="test"
+                        options={withSelectAll(options.tests, "Tests")}
+                        value={getValue('test')}
+                        onChange={(opts, meta) => handleSelectChange('test', opts, meta)}
+                        className="react-select-container"
+                        isLoading={loadingFilters}
+                        classNamePrefix="react-select"
+                        placeholder="Select Test..."
+                        styles={customStyles}
+                        isDisabled={loadingFilters || filters.testType.length === 0}
+                    />
+                </div>
 
-            {/* Student Name Select */}
-            <div className={`filter-group wide-filter ${loadingStudents || filters.topAll.length === 0 ? 'disabled-logic' : ''}`}>
-                <label>Student Name</label>
-                <Select
-                    isMulti
-                    name="studentSearch"
-                    options={studentOptions}
-                    value={getValue('studentSearch')}
-                    onChange={(opts, meta) => handleSelectChange('studentSearch', opts, meta)}
-                    className="react-select-container"
-                    isLoading={loadingStudents}
-                    classNamePrefix="react-select"
-                    placeholder="Select Students..."
-                    styles={customStyles}
-                    isDisabled={loadingStudents || filters.test.length === 0}
-                />
-            </div>
+                {/* Top_ALL Select */}
+                <div className={`filter-group ${loadingFilters || filters.test.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>Top_ALL</label>
+                    <Select
+                        isMulti
+                        name="topAll"
+                        options={withSelectAll(options.topAll || [], "Top_ALL")}
+                        value={getValue('topAll')}
+                        onChange={(opts, meta) => handleSelectChange('topAll', opts, meta)}
+                        className="react-select-container"
+                        isLoading={loadingFilters}
+                        classNamePrefix="react-select"
+                        placeholder="Select Top_ALL..."
+                        styles={customStyles}
+                        isDisabled={loadingFilters || filters.test.length === 0}
+                    />
+                </div>
 
-            <div className="filter-actions">
-                <button
-                    onClick={resetFilters}
-                    className="btn-primary reset-btn"
-                    style={{ backgroundColor: '#ef4444' }}
-                >
-                    Clear All
-                </button>
+                {/* Student Name Select */}
+                <div className={`filter-group wide-filter ${loadingStudents || filters.topAll.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>Student Name</label>
+                    <Select
+                        isMulti
+                        name="studentSearch"
+                        options={studentOptions}
+                        value={getValue('studentSearch')}
+                        onChange={(opts, meta) => handleSelectChange('studentSearch', opts, meta)}
+                        className="react-select-container"
+                        isLoading={loadingStudents}
+                        classNamePrefix="react-select"
+                        placeholder="Select Students..."
+                        styles={compactStyles}
+                        isDisabled={loadingStudents || filters.test.length === 0}
+                    />
+                </div>
+                <div className="filter-actions">
+                    <button
+                        onClick={resetFilters}
+                        className="btn-primary reset-btn"
+                    >
+                        Clear All
+                    </button>
+                </div>
             </div>
         </div>
     );

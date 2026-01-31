@@ -155,13 +155,13 @@ const AverageMarksReport = ({ filters }) => {
         const row1 = worksheet.getCell('A1');
         row1.value = {
             richText: [
-                { text: '          Sri Chaitanya ', font: { name: 'Impact', size: 30, color: { argb: 'FF00B0F0' } } },
-                { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 30, color: { argb: 'FF00B0F0' } } }
+                { text: '          Sri Chaitanya ', font: { name: 'Impact', size: 32, color: { argb: 'FF00B0F0' } } },
+                { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 32, color: { argb: 'FF00B0F0' } } }
             ]
         };
         row1.alignment = { horizontal: 'center', vertical: 'middle' };
         row1.border = borderStyle;
-        worksheet.getRow(1).height = 60;
+        worksheet.getRow(1).height = 50; // Reduced height to tighten space
 
         // Add Logo inside A1 area
         try {
@@ -208,7 +208,7 @@ const AverageMarksReport = ({ filters }) => {
         };
         cellD2.alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
         cellD2.border = borderStyle;
-        worksheet.getRow(2).height = 75;
+        worksheet.getRow(2).height = 60; // Reduced height to tighten space
 
         // ROW 3: Column Headers
         const headerLabels = ["STUD_ID", "Name", "Campus", "BOT\n180", "B_R", "ZOO\n180", "Z_R", "PHY\n180", "P_R", "CHE\n180", "C_R", "TOT\n720", "Rank", "T_App", "T_Cnt"];

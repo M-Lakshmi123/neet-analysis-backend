@@ -54,23 +54,19 @@ app.use((req, res, next) => {
 // Helper to build WHERE clause
 // Helper to build WHERE clause
 const buildWhereClause = (req, options = {}) => {
-    const { campus, stream, test, testType, topAll, studentSearch } = req.query;
+    const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
     let clauses = [];
 
     const addClause = (field, value) => {
-        if (!value || value === 'All') return;
-
+        if (!value || value === 'All' || value === '__ALL__') return;
         const valArray = Array.isArray(value) ? value : [value];
         const cleanValues = valArray
-            .map(v => v ? v.toString().trim() : '')
+            .map(v => v ? v.toString().trim().toUpperCase() : '')
             .filter(v => v !== '' && v !== '__ALL__')
             .map(v => v.replace(/'/g, "''"));
-
         if (cleanValues.length === 0) return;
-
         const list = cleanValues.map(v => `'${v}'`).join(',');
-        // Optimized: No TRIM() to allow Index usage
-        clauses.push(`${field} IN (${list})`);
+        clauses.push(`UPPER(TRIM(${field})) IN (${list})`);
     };
 
     if (!options.ignoreCampus) addClause('CAMPUS_NAME', campus);
@@ -79,22 +75,24 @@ const buildWhereClause = (req, options = {}) => {
     if (!options.ignoreTestType) addClause('Test_Type', testType);
     if (!options.ignoreTopAll) addClause('Top_ALL', topAll);
 
-    if (studentSearch) {
-        const valArray = Array.isArray(studentSearch) ? studentSearch : [studentSearch];
-        const ids = valArray
-            .filter(id => id !== null && id !== undefined && id !== '')
-            .map(id => `'${id.toString().trim().replace(/'/g, "''")}'`)
-            .join(', ');
+    // If specific student IDs are selected, use them exclusively
+    const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
+    const cleanIds = sSearch
+        .filter(id => id && id !== 'null' && id !== 'undefined')
+        .map(id => id.toString().trim().toUpperCase().replace(/'/g, "''"))
+        .filter(v => v !== '');
 
-        if (ids && ids !== "''") {
-            clauses.push(`STUD_ID IN (${ids})`);
-        } else if (typeof studentSearch === 'string' && studentSearch.trim() !== '') {
-            const safeSearch = studentSearch.trim().replace(/'/g, "''");
-            clauses.push(`(NAME_OF_THE_STUDENT LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
-        }
+    if (cleanIds.length > 0) {
+        const list = cleanIds.map(v => `'${v}'`).join(',');
+        clauses.push(`UPPER(TRIM(STUD_ID)) IN (${list})`);
+    } else if (quickSearch && typeof quickSearch === 'string' && quickSearch.trim() !== '') {
+        // Only use quickSearch LIKE if no specific student is selected
+        const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
+        clauses.push(`(UPPER(TRIM(NAME_OF_THE_STUDENT)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
     }
 
-    return clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+    return where;
 };
 
 // Get Filter Options
@@ -122,26 +120,26 @@ app.get('/api/filters', async (req, res) => {
         const testTypeClause = buildOptionClause('Test_Type', testType);
         const testClause = buildOptionClause('Test', test);
 
-        const campusesQuery = 'SELECT DISTINCT CAMPUS_NAME FROM MEDICAL_RESULT WHERE CAMPUS_NAME IS NOT NULL AND CAMPUS_NAME != \'\' ORDER BY CAMPUS_NAME';
+        const campusesQuery = 'SELECT DISTINCT TRIM(CAMPUS_NAME) as CAMPUS_NAME FROM MEDICAL_RESULT WHERE CAMPUS_NAME IS NOT NULL AND CAMPUS_NAME != \'\' ORDER BY CAMPUS_NAME';
 
         const sWhere = campusClause ? `WHERE ${campusClause}` : 'WHERE 1=1';
-        const streamsQuery = `SELECT DISTINCT Stream FROM MEDICAL_RESULT ${sWhere} AND Stream IS NOT NULL AND Stream != '' ORDER BY Stream`;
+        const streamsQuery = `SELECT DISTINCT TRIM(Stream) as Stream FROM MEDICAL_RESULT ${sWhere} AND Stream IS NOT NULL AND Stream != '' ORDER BY Stream`;
 
         let ttClauses = [];
         if (campusClause) ttClauses.push(campusClause);
         if (streamClause) ttClauses.push(streamClause);
         const ttWhere = ttClauses.length > 0 ? `WHERE ${ttClauses.join(' AND ')}` : 'WHERE 1=1';
-        const testTypesQuery = `SELECT DISTINCT Test_Type FROM MEDICAL_RESULT ${ttWhere} AND Test_Type IS NOT NULL AND Test_Type != '' ORDER BY Test_Type`;
+        const testTypesQuery = `SELECT DISTINCT TRIM(Test_Type) as Test_Type FROM MEDICAL_RESULT ${ttWhere} AND Test_Type IS NOT NULL AND Test_Type != '' ORDER BY Test_Type`;
 
         let tClauses = [...ttClauses];
         if (testTypeClause) tClauses.push(testTypeClause);
         const tWhere = tClauses.length > 0 ? `WHERE ${tClauses.join(' AND ')}` : 'WHERE 1=1';
-        const testsQuery = `SELECT DISTINCT Test FROM MEDICAL_RESULT ${tWhere} AND Test IS NOT NULL AND Test != '' ORDER BY Test`;
+        const testsQuery = `SELECT DISTINCT TRIM(Test) as Test FROM MEDICAL_RESULT ${tWhere} AND Test IS NOT NULL AND Test != '' ORDER BY Test`;
 
         let topClauses = [...tClauses];
         if (testClause) topClauses.push(testClause);
         const topWhere = topClauses.length > 0 ? `WHERE ${topClauses.join(' AND ')}` : 'WHERE 1=1';
-        const topQuery = `SELECT DISTINCT Top_ALL FROM MEDICAL_RESULT ${topWhere} AND Top_ALL IS NOT NULL AND Top_ALL != '' ORDER BY Top_ALL`;
+        const topQuery = `SELECT DISTINCT TRIM(Top_ALL) as Top_ALL FROM MEDICAL_RESULT ${topWhere} AND Top_ALL IS NOT NULL AND Top_ALL != '' ORDER BY Top_ALL`;
 
         const cacheKey = `filters_${JSON.stringify(req.query)}`;
         const cachedData = cache.get(cacheKey);
@@ -203,6 +201,7 @@ app.get('/api/students', async (req, res) => {
         console.log("Connected. Querying MEDICAL_RESULT...");
 
         const whereClause = buildWhereClause(req);
+        console.log(`[students] Generated WHERE clause: "${whereClause}"`);
         // We will select Top 100 to avoid overwhelming the frontend if DB is huge
         const result = await pool.request().query(`
             SELECT 
@@ -231,6 +230,7 @@ app.get('/api/top10', async (req, res) => {
     try {
         const pool = await connectToDb();
         const whereClause = buildWhereClause(req);
+        console.log(`[top10] Generated WHERE clause: "${whereClause}"`);
 
         const result = await pool.request().query(`
             SELECT 
@@ -252,7 +252,7 @@ app.get('/api/performance', async (req, res) => {
     try {
         const pool = await connectToDb();
         const whereClause = buildWhereClause(req);
-        console.log(`[Performance] Where clause: "${whereClause}"`);
+        console.log(`[Performance] Generated WHERE clause: "${whereClause}"`);
 
         // Calculate Pass/Fail (Assuming 50% of 720 which is 360 is pass, or generic 50%)
         // Let's assume total mark is 720 for NEET.
@@ -310,6 +310,7 @@ app.get('/api/history', async (req, res) => {
             const top = await pool.request().query('SELECT STUD_ID FROM MEDICAL_RESULT ORDER BY Tot_720 DESC LIMIT 1');
             if (top.recordset.length > 0) whereClause = `WHERE STUD_ID = ${top.recordset[0].STUD_ID}`;
         }
+        console.log(`[history] Generated WHERE clause: "${whereClause}"`);
 
         const query = `
             SELECT 
@@ -342,18 +343,33 @@ app.get('/api/history', async (req, res) => {
 app.get('/api/studentsByCampus', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const where = buildWhereClause(req);
+        // Ignore other filters for global student search
+        const where = buildWhereClause(req, {
+            ignoreCampus: true,
+            ignoreStream: true,
+            ignoreTestType: true,
+            ignoreTest: true,
+            ignoreTopAll: true
+        });
+        console.log(`[studentsByCampus] Global Search - Generated WHERE: "${where}"`);
 
-        // Try Cache First
-        const cacheKey = `students_${JSON.stringify(req.query)}`;
-        const cachedData = cache.get(cacheKey);
-        if (cachedData) {
-            return res.json(cachedData);
-        }
+        const query = `
+            SELECT 
+                TRIM(STUD_ID) as id, 
+                MAX(TRIM(NAME_OF_THE_STUDENT)) as name,
+                MAX(TRIM(CAMPUS_NAME)) as campus,
+                MAX(TRIM(Stream)) as stream
+            FROM MEDICAL_RESULT 
+            ${where} 
+            GROUP BY STUD_ID
+            ORDER BY name
+            LIMIT 100`;
 
-        const students = await pool.request().query(`SELECT DISTINCT STUD_ID as id, NAME_OF_THE_STUDENT as name FROM MEDICAL_RESULT ${where} ORDER BY NAME_OF_THE_STUDENT`);
+        const students = await pool.request().query(query);
+        console.log(`[studentsByCampus] Found ${students.recordset.length} students. First result:`, students.recordset[0]);
 
-        cache.set(cacheKey, students.recordset, 120); // Cache for 2 mins
+        logQuery(query, req.query);
+        // cache.set(cacheKey, students.recordset, 30); // Disabled for debug
         res.json(students.recordset);
     } catch (err) {
         res.status(500).send(err.message);
@@ -458,79 +474,30 @@ app.get('/api/analysis-report', async (req, res) => {
     }
 });
 
-// Email Transporter Configuration (Outlook / Office 365)
-// You must set EMAIL_USER and EMAIL_PASS in your .env file
-console.log(`[Email Config] User: ${process.env.EMAIL_USER}, Pass Length: ${process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 0}`);
-
-const transporter = require('nodemailer').createTransport({
-    host: 'smtp-mail.outlook.com', // Alternative endpoint often works better than smtp.office365.com
-    port: 587,
-    secure: false, // Must be false for port 587
-    requireTLS: true, // Force STARTTLS
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    },
-    tls: {
-        ciphers: 'SSLv3'
-    }
-});
-
-// Endpoint to send approval email
-app.post('/api/send-approval-email', async (req, res) => {
-    const { email, name, campus } = req.body;
-
-    const logEmail = (msg) => {
-        const entry = `[${new Date().toISOString()}] [EMAIL] ${msg}\n`;
-        fs.appendFileSync(path.join(__dirname, 'email.log'), entry);
-        console.log(entry.trim());
-    };
-
-    if (!email || !name) {
-        logEmail(`Failed: Missing email or name. Body: ${JSON.stringify(req.body)}`);
-        return res.status(400).json({ error: "Missing email or name" });
-    }
-
-    const mailOptions = {
-        from: `"Sri Chaitanya Admin" <${process.env.EMAIL_USER || 'admin@srichaitanya.net'}>`,
-        to: email,
-        subject: 'Account Approved - Sri Chaitanya Dashboard',
-        html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;">
-                <h2 style="color: #1e3a8a; text-align: center;">Welcome to Sri Chaitanya!</h2>
-                <p>Dear <strong>${name}</strong>,</p>
-                <p>We are pleased to inform you that your request for access to the <strong>${campus}</strong> dashboard has been <span style="color: #10b981; font-weight: bold;">APPROVED</span>.</p>
-                <p>You can now log in to the portal using your registered email and password.</p>
-                <br/>
-                <div style="text-align: center;">
-                    <a href="http://sri-chaitanya-neet.web.app/login" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">Login to Dashboard</a>
-                </div>
-                <br/>
-                <p style="color: #64748b; font-size: 12px; text-align: center;">This is an automated message. Please do not reply.</p>
-            </div>
-        `
-    };
-
-    try {
-        logEmail(`Attempting to send approval email to: ${email} (Name: ${name})`);
-        const info = await transporter.sendMail(mailOptions);
-        logEmail(`Success! MessageId: ${info.messageId}`);
-        res.json({ success: true, message: "Email sent successfully", messageId: info.messageId });
-    } catch (error) {
-        logEmail(`CRITICAL ERROR: ${error.message}`);
-        res.status(500).json({ error: "Failed to send email", details: error.message, stack: error.stack });
-    }
-});
-
 // SERVE REACT APP FOR ANY OTHER ROUTE
 // app.get('*', (req, res) => {
 //     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 // });
 
+// One-Time Startup DB Connection Test
+(async () => {
+    try {
+        console.log("----------------------------------------");
+        console.log("STARTUP: Testing Database Connection...");
+        const pool = await connectToDb();
+        await pool.request().query('SELECT 1');
+        console.log("STARTUP: Database Connection Verified! ✅");
+        console.log("----------------------------------------");
+    } catch (err) {
+        console.error("STARTUP: Database Connection FAILED! ❌");
+        console.error(err);
+    }
+})();
+
 const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     // Auto-open browser
-    require('child_process').exec('start http://localhost:5000');
+    // require('child_process').exec('start http://localhost:5000');
 });
 
 server.on('error', (err) => {

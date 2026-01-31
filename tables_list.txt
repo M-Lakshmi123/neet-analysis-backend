@@ -1,0 +1,8 @@
+[
+  {
+    "Tables_in_NEET": "ERP_REPORT"
+  },
+  {
+    "Tables_in_NEET": "MEDICAL_RESULT"
+  }
+]

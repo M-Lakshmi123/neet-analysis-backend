@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { API_URL } from '../../utils/apiHelper';
+import { API_URL, ADMIN_WHATSAPP } from '../../utils/apiHelper';
 import { db, auth } from '../../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, deleteDoc, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import {
     Users, CheckCircle, XCircle, LogOut, Shield, Mail, School,
-    BarChart3, Activity, Clock, Search, Filter as FilterIcon
+    BarChart3, Activity, Clock, Search, Filter as FilterIcon, MessageSquare
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import FilterBar from '../FilterBar';
@@ -83,45 +83,17 @@ const AdminDashboard = () => {
                 approvedAt: new Date().toISOString()
             });
 
-            // 2. Send Email Notification via Backend
-            try {
-                const response = await fetch(`${API_URL}/api/send-approval-email`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: user.email,
-                        name: user.name,
-                        campus: user.campus
-                    })
-                });
-
-                const contentType = response.headers.get("content-type");
-                let responseData;
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    responseData = await response.json();
-                } else {
-                    responseData = await response.text();
-                }
-
-                if (!response.ok) {
-                    console.error("Failed to send approval email:", responseData);
-                    setModal({
-                        isOpen: true,
-                        type: 'info',
-                        title: 'Email Failed',
-                        message: `User approved, but failed to send email.Server says: ${JSON.stringify(responseData)} `,
-                        onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
-                    });
-                } else {
-                    console.log("Approval email sent successfully", responseData);
-                }
-            } catch (emailErr) {
-                console.error("Email API Connection Error:", emailErr);
+            // 2. Open WhatsApp Web for notification
+            if (user.phone) {
+                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2025-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
+                window.open(whatsappUrl, '_blank');
+            } else {
                 setModal({
                     isOpen: true,
-                    type: 'danger',
-                    title: 'Network Error',
-                    message: "Technical error sending email: " + emailErr.message,
+                    type: 'info',
+                    title: 'Approved',
+                    message: `User ${user.name} approved successfully, but no WhatsApp number was found to send a notification.`,
                     onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
                 });
             }
@@ -246,6 +218,7 @@ const AdminDashboard = () => {
                                                         <h5>{user.name}</h5>
                                                         <span className="info-sub"><Mail size={12} /> {user.email}</span>
                                                         <span className="info-sub"><School size={12} /> {user.campus}</span>
+                                                        {user.phone && <span className="info-sub"><MessageSquare size={12} /> +91 {user.phone}</span>}
                                                     </div>
                                                     <div className="item-btns">
                                                         <button className="approve-small" onClick={() => handleApprove(user)}>Approve</button>
@@ -282,12 +255,27 @@ const AdminDashboard = () => {
                                                     <td><span className="campus-tag">{user.campus}</span></td>
                                                     <td>{new Date(user.approvedAt).toLocaleDateString()}</td>
                                                     <td>
-                                                        <button
-                                                            className="text-danger"
-                                                            onClick={() => confirmReject(user.id)}
-                                                        >
-                                                            Revoke
-                                                        </button>
+                                                        <div className="flex-actions" style={{ display: 'flex', gap: '10px' }}>
+                                                            {user.phone && (
+                                                                <button
+                                                                    className="btn-whatsapp"
+                                                                    onClick={() => {
+                                                                        const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2025-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                                                                        const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
+                                                                        window.open(whatsappUrl, '_blank');
+                                                                    }}
+                                                                    title="Send WhatsApp Notification"
+                                                                >
+                                                                    <MessageSquare size={14} /> Notify
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                className="text-danger"
+                                                                onClick={() => confirmReject(user.id)}
+                                                            >
+                                                                Revoke
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}

@@ -110,19 +110,39 @@ const AnalysisReport = ({ filters }) => {
                 aVal = (Number(a.bot) || 0) + (Number(a.zoo) || 0);
                 bVal = (Number(b.bot) || 0) + (Number(b.zoo) || 0);
             } else {
-                aVal = a[key];
-                bVal = b[key];
+                aVal = a[key] ?? '';
+                bVal = b[key] ?? '';
             }
 
             // Handle numeric conversion for marks/ranks
-            if (!isNaN(aVal) && !isNaN(bVal)) {
+            const isNumeric = (val) => typeof val === 'number' || (typeof val === 'string' && val.trim() !== '' && !isNaN(val));
+
+            const parseDateVal = (dateStr) => {
+                if (!dateStr) return new Date(0);
+                if (dateStr instanceof Date) return dateStr;
+                const dmyPattern = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/;
+                const match = String(dateStr).match(dmyPattern);
+                if (match) {
+                    return new Date(match[3], match[2] - 1, match[1]);
+                }
+                const d = new Date(dateStr);
+                return isNaN(d.getTime()) ? new Date(0) : d;
+            };
+
+            if (key === 'DATE') {
+                aVal = parseDateVal(aVal).getTime();
+                bVal = parseDateVal(bVal).getTime();
+            } else if (isNumeric(aVal) && isNumeric(bVal)) {
                 aVal = Number(aVal);
                 bVal = Number(bVal);
-            } else if (key === 'DATE') {
-                aVal = new Date(aVal);
-                bVal = new Date(bVal);
+            } else {
+                // String comparison
+                return direction === 'asc'
+                    ? String(aVal).localeCompare(String(bVal))
+                    : String(bVal).localeCompare(String(aVal));
             }
 
+            if (aVal === bVal) return 0;
             if (aVal < bVal) return direction === 'asc' ? -1 : 1;
             if (aVal > bVal) return direction === 'asc' ? 1 : -1;
             return 0;
@@ -131,18 +151,27 @@ const AnalysisReport = ({ filters }) => {
     };
 
     const requestSort = (configSetter, key) => {
-        configSetter(prev => ({
-            key,
-            direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
-        }));
+        configSetter(prev => {
+            // Default direction based on column type
+            const isNumericCol = ['tot', 'air', 'bot', 'b_rank', 'zoo', 'z_rank', 'bio', 'phy', 'p_rank', 'che', 'c_rank', 'STUD_ID'].includes(key);
+            const isDateCol = key === 'DATE';
+            const defaultDir = (isNumericCol || isDateCol) ? 'desc' : 'asc';
+
+            return {
+                key,
+                direction: prev.key === key
+                    ? (prev.direction === 'desc' ? 'asc' : 'desc')
+                    : defaultDir
+            };
+        });
     };
 
     const sortedExamStats = sortData(examStats, statsSortConfig.key, statsSortConfig.direction);
     const sortedStudentMarks = sortData(studentMarks, meritSortConfig.key, meritSortConfig.direction);
 
     const SortIcon = ({ config, columnKey }) => {
-        if (config.key !== columnKey) return <span style={{ opacity: 0.3, marginLeft: '4px', fontSize: '0.6rem' }}>↕</span>;
-        return <span style={{ marginLeft: '4px', fontSize: '0.6rem' }}>{config.direction === 'desc' ? '▼' : '▲'}</span>;
+        if (config.key !== columnKey) return <span style={{ opacity: 0.2, marginLeft: '4px', fontSize: '0.8rem' }}>⇅</span>;
+        return <span style={{ marginLeft: '4px', fontSize: '0.8rem', fontWeight: 'bold', color: '#6366f1' }}>{config.direction === 'desc' ? '↓' : '↑'}</span>;
     };
 
     const loadImage = (src) => {
@@ -169,7 +198,7 @@ const AnalysisReport = ({ filters }) => {
 
             const part1 = "Sri Chaitanya";
             const part2 = " Educational Institutions";
-            const fontSize = 24;
+            const fontSize = 30; // Increased font size
 
             if (logoImg) {
                 const aspect = logoImg.width / logoImg.height;
@@ -179,7 +208,7 @@ const AnalysisReport = ({ filters }) => {
                 // Draw Logo Centered Top
                 const logoX = (pageWidth - logoW) / 2;
                 doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-                currentY += logoH + 10; // Increased gap to prevent overlap with text
+                currentY += logoH + 4; // Significantly reduced gap between logo and title
             }
 
             // Calculate centering X for the combined line
@@ -201,7 +230,6 @@ const AnalysisReport = ({ filters }) => {
             doc.setTextColor(0, 102, 204); // #0066CC
             doc.text(part2, startX + w1, currentY);
 
-            currentY += 6; // Reduced gap below title
             currentY += 8; // Reduced gap below title
 
             // 3. Custom Header Pattern
@@ -212,7 +240,7 @@ const AnalysisReport = ({ filters }) => {
             const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
 
             doc.setFont("helvetica", "bolditalic");
-            doc.setFontSize(16);
+            doc.setFontSize(15); // Slightly smaller subtitle for better fit
             doc.setTextColor(128, 0, 64); // Reverted to Maroon (#800040)
             doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center' });
             currentY += 8; // Reduced gap below subtitle
@@ -334,9 +362,9 @@ const AnalysisReport = ({ filters }) => {
             worksheet.addRow(['SRI CHAITANYA EDUCATIONAL INSTITUTIONS']);
             worksheet.mergeCells('A1:O1');
             const titleCell = worksheet.getCell('A1');
-            titleCell.font = { size: 20, bold: true, color: { argb: 'FF0070C0' } }; // Updated Color
+            titleCell.font = { size: 28, bold: true, color: { argb: 'FF0070C0' } }; // Increased Size
             titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-            worksheet.getRow(1).height = 30;
+            worksheet.getRow(1).height = 40; // Adjusted height for larger font
 
             // 2. Add Subtitle (Pattern Row 2)
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
@@ -349,7 +377,7 @@ const AnalysisReport = ({ filters }) => {
             const subTitleCell = worksheet.getCell('A2');
             subTitleCell.font = { size: 14, bold: true, italic: true, color: { argb: 'FF800040' } };
             subTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-            worksheet.getRow(2).height = 25;
+            worksheet.getRow(2).height = 20; // Reduced height to tighten space
 
             // Empty spacer row
             worksheet.addRow([]);
