@@ -189,61 +189,68 @@ const AnalysisReport = ({ filters }) => {
             const logoImg = await loadImage('/logo.png');
 
             const pageWidth = doc.internal.pageSize.getWidth();
-            let currentY = 12; // Reduced top margin
+            let currentY = 15; // Set Top Margin
 
-            // 1. Logo & Institution Name - Centered Together
-            // Single Line Title with mixed styles
-            // SRI CHAITANYA: #0070C0 - Helvetica Bold (Proxy for Impact)
-            // EDUCATIONAL INSTITUTIONS: #0066CC - Helvetica Normal (Proxy for Gill Sans)
+            // --- HEADER LAYOUT: LOGO + TITLE SIDE-BY-SIDE ---
 
             const part1 = "Sri Chaitanya";
             const part2 = " Educational Institutions";
-            const fontSize = 30; // Increased font size
+            doc.setFontSize(28); // Font size for title
 
-            if (logoImg) {
-                const aspect = logoImg.width / logoImg.height;
-                const logoH = 22;
-                const logoW = logoH * aspect;
-
-                // Draw Logo Centered Top
-                const logoX = (pageWidth - logoW) / 2;
-                doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-                currentY += logoH + 4; // Significantly reduced gap between logo and title
-            }
-
-            // Calculate centering X for the combined line
-            doc.setFontSize(fontSize);
+            // Calculate Title Width
             doc.setFont("helvetica", "bold");
             const w1 = doc.getTextWidth(part1);
             doc.setFont("helvetica", "normal");
             const w2 = doc.getTextWidth(part2);
-            const totalWidth = w1 + w2;
-            const startX = (pageWidth - totalWidth) / 2;
+            const totalTitleWidth = w1 + w2;
 
-            // Draw Part 1
+            // Logo Dimensions
+            const logoH = 20;
+            let logoW = 20; // default placeholder
+            let logoGap = 5; // Gap between logo and text
+
+            if (logoImg) {
+                const aspect = logoImg.width / logoImg.height;
+                logoW = logoH * aspect;
+            } else {
+                logoW = 0;
+                logoGap = 0;
+            }
+
+            // Calculate Center Position for [Logo + Gap + Title]
+            const totalContentWidth = logoW + logoGap + totalTitleWidth;
+            const startX = (pageWidth - totalContentWidth) / 2;
+
+            // 1. Draw Logo
+            if (logoImg) {
+                // Adjust Y to center logo with text roughly
+                doc.addImage(logoImg, 'PNG', startX, currentY - (logoH * 0.65), logoW, logoH, undefined, 'FAST');
+            }
+
+            // 2. Draw Title Text (Part 1)
             doc.setFont("helvetica", "bold");
             doc.setTextColor(0, 112, 192); // #0070C0
-            doc.text(part1, startX, currentY);
+            doc.text(part1, startX + logoW + logoGap, currentY);
 
-            // Draw Part 2
+            // 3. Draw Title Text (Part 2)
             doc.setFont("helvetica", "normal");
             doc.setTextColor(0, 102, 204); // #0066CC
-            doc.text(part2, startX + w1, currentY);
+            doc.text(part2, startX + logoW + logoGap + w1, currentY);
 
-            currentY += 8; // Reduced gap below title
+            currentY += 8; // Small gap before subtitle
 
-            // 3. Custom Header Pattern
-            // Pattern: Exam_date_Stream_Test_All India Marks Analysis
+            // 4. Custom Subtitle Pattern
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
             const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
 
             doc.setFont("helvetica", "bolditalic");
-            doc.setFontSize(15); // Slightly smaller subtitle for better fit
-            doc.setTextColor(128, 0, 64); // Reverted to Maroon (#800040)
+            doc.setFontSize(14);
+            doc.setTextColor(128, 0, 64); // Maroon
             doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center' });
-            currentY += 8; // Reduced gap below subtitle
+
+            currentY += 6; // Reduced gap below subtitle
 
             // 4. Data Tables
             const tableColumn = [
