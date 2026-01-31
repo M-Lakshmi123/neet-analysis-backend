@@ -17,28 +17,28 @@ import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import Sidebar from './components/Sidebar';
 import UserApprovals from './components/admin/UserApprovals';
 import ActivityLogs from './components/admin/ActivityLogs';
+import LoadingTimer from './components/LoadingTimer';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
     const { currentUser, userData, loading, isAdmin } = useAuth();
 
-    // While loading AUTH or USER DATA, stay in loading state
-    if (loading) return (
-        <div className="loading-state">
-            <div className="spinner"></div>
-            <span>Verifying Credentials...</span>
-        </div>
-    );
+    // Combined loading state for Auth or User Data
+    const isLoading = loading || (currentUser && !userData);
+
+    // Show the Timer if loading
+    // Note: We render children hidden or null while loading? 
+    // Actually, we should just return the Timer if loading, 
+    // but the timer needs to handle the unmount.
+    // However, the LoadingTimer component returns null if !isLoading.
+    // So we can return <LoadingTimer /> AND the rest?
+    // No, if we want to BLOCK the view, we should return the timer.
+    // But if we want the timer component to handle the "cutting", 
+    // it's cleaner to use it as a conditional return.
+
+    if (isLoading) return <LoadingTimer isLoading={true} />;
 
     // No user -> straight to login
     if (!currentUser) return <Navigate to="/login" replace />;
-
-    // Logged in but no profile data yet (this should be caught by 'loading' usually)
-    if (!userData) return (
-        <div className="loading-state">
-            <div className="spinner"></div>
-            <span>Loading Profile...</span>
-        </div>
-    );
 
     // Authorization checks
     if (requireAdmin && !isAdmin) return <Navigate to="/" replace />;
