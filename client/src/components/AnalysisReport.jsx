@@ -186,16 +186,44 @@ const AnalysisReport = ({ filters }) => {
     const downloadPDF = async () => {
         try {
             const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
-            const logoImg = await loadImage('/logo.png');
+
+            // Helper to load font
+            const loadFont = async (url) => {
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error(`Failed to load font: ${url}`);
+                    const blob = await res.blob();
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (err) {
+                    console.error("Font loading error:", err);
+                    return null;
+                }
+            };
+
+            const [bgImg, logoImg, impactFont] = await Promise.all([
+                loadImage('/college-bg.png'),
+                loadImage('/logo.png'),
+                loadFont('/fonts/unicode.impact.ttf')
+            ]);
+
+            // Add Font
+            if (impactFont) {
+                doc.addFileToVFS("unicode.impact.ttf", impactFont);
+                doc.addFont("unicode.impact.ttf", "Impact", "normal");
+            }
 
             const pageWidth = doc.internal.pageSize.getWidth();
-            let currentY = 15; // Set Top Margin
+            let currentY = 20; // Top Margin
 
             // --- HEADER LAYOUT: VERTICAL STACK (Logo -> Title -> Subtitle) ---
 
             // Logo Dimensions
-            const logoH = 24;
-            let logoW = 24;
+            const logoH = 25;
+            let logoW = 25;
             if (logoImg) {
                 const aspect = logoImg.width / logoImg.height;
                 logoW = logoH * aspect;
@@ -205,40 +233,49 @@ const AnalysisReport = ({ filters }) => {
             if (logoImg) {
                 const logoX = (pageWidth - logoW) / 2;
                 doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-                currentY += logoH + 5; // Gap below logo
+                currentY += logoH + 10; // Explicit Large Gap below logo
+            } else {
+                currentY += 10;
             }
 
-            // Title Text Parts
+            // Title Configuration
             const part1 = "Sri Chaitanya";
             const part2 = " Educational Institutions";
-            doc.setFontSize(36); // Large Title
+            doc.setFontSize(36);
 
-            // Calculate Title Widths to Center the Combined Line
-            doc.setFont("helvetica", "bold");
-            if (doc.setCharSpace) doc.setCharSpace(-0.75); // Apply "Impact" simulation for measurement
+            // Calculate Widths
+            // Part 1: Impact (User provided font)
+            // Fallback to helvetica bold if font didn't load
+            if (impactFont) {
+                doc.setFont("Impact", "normal");
+            } else {
+                doc.setFont("helvetica", "bold");
+            }
             const w1 = doc.getTextWidth(part1);
-            if (doc.setCharSpace) doc.setCharSpace(0); // Reset for Part 2 measurement
 
+            // Part 2: Helvetica
             doc.setFont("helvetica", "normal");
             const w2 = doc.getTextWidth(part2);
+
+            // Total centering width
             const totalTitleWidth = w1 + w2;
             const titleStartX = (pageWidth - totalTitleWidth) / 2;
 
-            // 2. Draw Title Text (Part 1)
-            doc.setFont("helvetica", "bold");
+            // 2. Draw Title Text (Part 1 - "Sri Chaitanya")
+            if (impactFont) {
+                doc.setFont("Impact", "normal");
+            } else {
+                doc.setFont("helvetica", "bold");
+            }
             doc.setTextColor(0, 112, 192); // #0070C0
+            doc.text(part1, titleStartX, currentY + 10);
 
-            // Simulate "Impact" style (Bold + Condensed)
-            if (doc.setCharSpace) doc.setCharSpace(-0.75);
-            doc.text(part1, titleStartX, currentY + 8); // Shift down for baseline
-
-            // 3. Draw Title Text (Part 2)
-            if (doc.setCharSpace) doc.setCharSpace(0); // Reset for standard text
+            // 3. Draw Title Text (Part 2 - "Educational Institutions") - Normal Style
             doc.setFont("helvetica", "normal");
             doc.setTextColor(0, 102, 204); // #0066CC
-            doc.text(part2, titleStartX + w1, currentY + 8);
+            doc.text(part2, titleStartX + w1, currentY + 10);
 
-            currentY += 20; // Gap below title
+            currentY += 25; // Large gap below title
 
             // 4. Custom Subtitle Pattern
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
@@ -251,7 +288,7 @@ const AnalysisReport = ({ filters }) => {
             doc.setTextColor(128, 0, 64); // Maroon
             doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center' });
 
-            currentY += 15; // Gap below subtitle before table
+            currentY += 15; // Gap before table
 
             // 4. Data Tables
             const tableColumn = [
