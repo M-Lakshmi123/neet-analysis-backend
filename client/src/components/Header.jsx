@@ -33,7 +33,7 @@ const Header = ({ title }) => {
     return (
         <header className="main-header">
             <div className="header-left-area">
-                <h1>Medicon Results - {title}</h1>
+                <h1>Medicon Results - {title} <span style={{ fontSize: '0.8rem', opacity: 0.5 }}>(v1.2)</span></h1>
             </div>
 
             <div className="header-right-area">
