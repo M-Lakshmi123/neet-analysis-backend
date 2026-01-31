@@ -148,131 +148,147 @@ const ErrorReport = () => {
                     </div>
                 )}
 
-                {/* Actual Report Content */}
                 <div ref={reportRef} className="report-content">
                     {reportData.map((student, sIdx) => (
                         <div key={sIdx} className="student-group">
                             {student.tests.map((test, tIdx) => (
-                                <div key={tIdx} className="report-page print-break shadow-lg mx-auto">
-                                    {/* HEADER */}
-                                    <div className="brand-header text-center mb-2">
+                                <div key={tIdx} className="report-page print-break shadow-lg mx-auto bg-white" style={{ border: '2px solid #000', padding: '10px' }}>
+
+                                    {/* HEADER SECTION - Full Width */}
+                                    <div className="brand-header text-center mb-1">
                                         <h1 style={{
                                             fontFamily: 'Impact, sans-serif',
                                             color: '#000080',
-                                            fontSize: '23px',
-                                            letterSpacing: '1px',
+                                            fontSize: '26px',
+                                            letterSpacing: '0.5px',
                                             margin: '0',
-                                            textTransform: 'uppercase'
+                                            textTransform: 'uppercase',
+                                            textShadow: '1px 1px 0px rgba(0,0,0,0.1)'
                                         }}>
                                             Sri Chaitanya Educational Institutions
                                         </h1>
-                                        <div className="text-center text-xs font-bold uppercase tracking-wide mb-1">
+                                        <div className="text-center font-bold text-[10px] uppercase tracking-wider mb-0 text-black">
                                             A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
                                         </div>
-                                        <div className="font-serif italic text-lg mb-1">
+                                        <div className="font-serif italic text-lg mb-0 text-black leading-tight">
                                             A Right Choice for the Real Aspirant
                                         </div>
-                                        <div className="font-bold text-sm uppercase">
+                                        <div className="font-bold text-sm uppercase text-black leading-tight mb-2">
                                             Central Office, Bangalore
                                         </div>
                                     </div>
 
-                                    {/* STUDENT & TEST INFO TABLE */}
-                                    <table className="info-table w-full mb-4 border-collapse border border-black text-xs">
-                                        <tbody>
-                                            <tr className="bg-[#fff8dc]">
-                                                <td colSpan="6" className="border border-black p-1 text-center font-bold text-base uppercase">
-                                                    {student.info.name}
-                                                </td>
-                                                <td colSpan="6" className="border border-black p-1 text-center font-bold text-base uppercase">
-                                                    {student.info.branch}
-                                                </td>
-                                            </tr>
-                                            <tr className="text-center font-bold bg-gray-50">
-                                                <td className="border border-black p-1">Test</td>
-                                                <td className="border border-black p-1">Date</td>
-                                                <td className="border border-black p-1 text-red-600">TOT</td>
-                                                <td className="border border-black p-1 text-red-600">AIR</td>
-                                                <td className="border border-black p-1">BOT</td>
-                                                <td className="border border-black p-1">Rank</td>
-                                                <td className="border border-black p-1">ZOO</td>
-                                                <td className="border border-black p-1">Rank</td>
-                                                <td className="border border-black p-1">PHY</td>
-                                                <td className="border border-black p-1">Rank</td>
-                                                <td className="border border-black p-1">CHEM</td>
-                                                <td className="border border-black p-1">Rank</td>
-                                            </tr>
-                                            <tr className="text-center font-bold">
-                                                <td className="border border-black p-1 text-red-700">{test.meta.testName}</td>
-                                                <td className="border border-black p-1 text-red-700">{test.meta.date}</td>
-                                                <td className="border border-black p-1 text-red-700">{test.meta.tot}</td>
-                                                <td className="border border-black p-1 text-red-700">{test.meta.air}</td>
-                                                <td className="border border-black p-1 text-red-800">{test.meta.bot}</td>
-                                                <td className="border border-black p-1 text-red-800">{test.meta.b_rank}</td>
-                                                <td className="border border-black p-1 text-red-800">{test.meta.zoo}</td>
-                                                <td className="border border-black p-1 text-red-800">{test.meta.z_rank}</td>
-                                                <td className="border border-black p-1 text-red-800">{test.meta.phy}</td>
-                                                <td className="border border-black p-1 text-red-800">{test.meta.p_rank}</td>
-                                                <td className="border border-black p-1 text-red-800">{test.meta.chem}</td>
-                                                <td className="border border-black p-1 text-red-800">{test.meta.c_rank}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                    {/* STUDENT INFO & MARKS - Table Structure */}
+                                    <div className="info-section border border-black mb-1">
+                                        {/* Row 1: Name and Campus */}
+                                        <div className="flex border-b border-black bg-[#fff8dc]">
+                                            <div className="flex-1 border-r border-black p-1 pl-2 font-bold uppercase text-sm text-left">
+                                                {student.info.name}
+                                            </div>
+                                            <div className="flex-1 p-1 pr-2 font-bold uppercase text-sm text-right">
+                                                {student.info.branch}
+                                            </div>
+                                        </div>
+
+                                        {/* Row 2: Test Info Headers */}
+                                        <div className="flex text-center text-[11px] font-bold bg-[#fce4d6]">
+                                            <div className="w-[12%] border-r border-black border-b border-black p-0.5 pt-1">Test</div>
+                                            <div className="w-[12%] border-r border-black border-b border-black p-0.5 pt-1">Date</div>
+                                            <div className="w-[8%] border-r border-black border-b border-black p-0.5 pt-1">TOT</div>
+                                            <div className="w-[8%] border-r border-black border-b border-black p-0.5 pt-1">AIR</div>
+                                            <div className="w-[8%] border-r border-black border-b border-black p-0.5 pt-1">BOT</div>
+                                            <div className="w-[7%] border-r border-black border-b border-black p-0.5 pt-1">Rank</div>
+                                            <div className="w-[8%] border-r border-black border-b border-black p-0.5 pt-1">ZOO</div>
+                                            <div className="w-[7%] border-r border-black border-b border-black p-0.5 pt-1">Rank</div>
+                                            <div className="w-[8%] border-r border-black border-b border-black p-0.5 pt-1">PHY</div>
+                                            <div className="w-[7%] border-r border-black border-b border-black p-0.5 pt-1">Rank</div>
+                                            <div className="w-[8%] border-r border-black border-b border-black p-0.5 pt-1">CHEM</div>
+                                            <div className="w-[7%] border-b border-black p-0.5 pt-1">Rank</div>
+                                        </div>
+
+                                        {/* Row 3: Test Info Values */}
+                                        <div className="flex text-center text-[12px] font-bold bg-[#fff]">
+                                            <div className="w-[12%] border-r border-black p-0.5 text-red-700">{test.meta.testName}</div>
+                                            <div className="w-[12%] border-r border-black p-0.5 text-red-700">{test.meta.date}</div>
+                                            <div className="w-[8%] border-r border-black p-0.5 text-red-700">{test.meta.tot}</div>
+                                            <div className="w-[8%] border-r border-black p-0.5 text-red-700">{test.meta.air}</div>
+                                            <div className="w-[8%] border-r border-black p-0.5 text-red-800">{test.meta.bot}</div>
+                                            <div className="w-[7%] border-r border-black p-0.5 text-red-800">{test.meta.b_rank}</div>
+                                            <div className="w-[8%] border-r border-black p-0.5 text-red-800">{test.meta.zoo}</div>
+                                            <div className="w-[7%] border-r border-black p-0.5 text-red-800">{test.meta.z_rank}</div>
+                                            <div className="w-[8%] border-r border-black p-0.5 text-red-800">{test.meta.phy}</div>
+                                            <div className="w-[7%] border-r border-black p-0.5 text-red-800">{test.meta.p_rank}</div>
+                                            <div className="w-[8%] border-r border-black p-0.5 text-red-800">{test.meta.chem}</div>
+                                            <div className="w-[7%] p-0.5 text-red-800">{test.meta.c_rank}</div>
+                                        </div>
+                                    </div>
 
                                     {/* QUESTIONS LIST */}
-                                    <div className="questions-container">
+                                    <div className="questions-container border border-black text-xs">
                                         {test.questions.map((q, qIdx) => (
-                                            <div key={qIdx} className="question-block mb-2 border border-black break-inside-avoid">
-                                                {/* Red Header Bar */}
-                                                <div className="q-header bg-[#800000] text-white flex text-xs font-bold items-center">
-                                                    <div className="w-[40px] p-1 text-center border-r border-white">{q.W_U}</div>
-                                                    <div className="w-[40px] p-1 text-center border-r border-white">{q.Q_No}</div>
-                                                    <div className="flex-1 p-1 pl-2 border-r border-white truncate">
-                                                        Topic: <span className="text-yellow-200">{q.Topic}</span>
+                                            <div key={qIdx} className="question-block border-b border-black last:border-b-0 break-inside-avoid">
+                                                {/* Header Row (Red Bar) */}
+                                                <div className="q-header flex items-center bg-[#800000] text-white font-bold h-[24px] border-b border-black">
+                                                    <div className="w-[40px] flex items-center justify-center border-r border-white h-full">{q.W_U}</div>
+                                                    <div className="w-[40px] flex items-center justify-center border-r border-white h-full">{q.Q_No}</div>
+                                                    <div className="flex-1 flex items-center pl-2 border-r border-white h-full overflow-hidden whitespace-nowrap">
+                                                        <span className="mr-2">Topic: <span className="text-[#ffffcc]">{q.Topic}</span></span>
                                                     </div>
-                                                    <div className="flex-1 p-1 pl-2 border-r border-white truncate">
-                                                        Sub Topic: <span className="text-yellow-200">{q.Sub_Topic}</span>
+                                                    <div className="flex-1 flex items-center pl-2 border-r border-white h-full overflow-hidden whitespace-nowrap">
+                                                        <span className="mr-2">Sub Topic: <span className="text-[#ffffcc]">{q.Sub_Topic}</span></span>
                                                     </div>
-                                                    <div className="w-[80px] p-1 text-center">
-                                                        Key: {q.Key_Value}
+                                                    <div className="w-[60px] flex items-center justify-center h-full bg-[#800000]">
+                                                        Key : {q.Key_Value}
                                                     </div>
                                                 </div>
 
-                                                {/* Content Area */}
-                                                <div className="q-content flex min-h-[120px]">
-                                                    {/* Left Subject Strip */}
-                                                    <div className="subject-strip w-[30px] bg-[#4682b4] text-white flex items-center justify-center p-1 border-r border-black">
-                                                        <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 'bold', fontSize: '10px', letterSpacing: '1px' }}>
+                                                {/* Main Content Row */}
+                                                <div className="q-content flex h-[180px]">
+                                                    {/* Subject Strip (Blue Vertical) */}
+                                                    <div className="subject-strip w-[40px] bg-[#4682b4] text-white flex items-center justify-center border-r border-black">
+                                                        <span style={{
+                                                            writingMode: 'vertical-rl',
+                                                            transform: 'rotate(180deg)',
+                                                            fontWeight: 'bold',
+                                                            fontSize: '11px',
+                                                            letterSpacing: '1px'
+                                                        }}>
                                                             {q.Subject}
                                                         </span>
                                                     </div>
 
-                                                    {/* Right Image Area */}
-                                                    <div className="images-area flex-1 p-1 bg-white flex flex-col">
-                                                        <div className="q-row flex gap-2 h-full">
-                                                            {/* Question Image */}
-                                                            <div className="q-img-col flex-1 flex items-center justify-center p-1">
+                                                    {/* Q & A Split */}
+                                                    <div className="flex flex-1">
+                                                        {/* Question Column */}
+                                                        <div className="w-1/2 p-2 relative flex items-start border-r border-black">
+                                                            <span className="absolute top-1 left-2 font-bold text-gray-700">{q.Q_No}.</span>
+                                                            <div className="w-full h-full flex items-center justify-center pl-6">
                                                                 {q.Q_URL ? (
                                                                     <img
                                                                         src={q.Q_URL}
-                                                                        alt={`Q${q.Q_No}`}
-                                                                        className="max-w-full max-h-[250px] object-contain"
+                                                                        alt={`Q`}
+                                                                        className="max-w-full max-h-full object-contain"
                                                                     />
                                                                 ) : (
-                                                                    <span className="text-gray-300 text-xs">No Question Image</span>
+                                                                    <span className="text-gray-300 italic">No Question Image</span>
                                                                 )}
                                                             </div>
+                                                        </div>
 
-                                                            {/* Solution Image - Only if exists */}
-                                                            {q.S_URL && (
-                                                                <div className="s-img-col flex-1 flex items-center justify-center p-1 border-l border-gray-300">
+                                                        {/* Solution Column */}
+                                                        <div className="w-1/2 p-2 relative flex items-start">
+                                                            <span className="absolute top-1 left-2 font-bold text-gray-700">{q.Q_No}.</span>
+                                                            <div className="w-full h-full flex items-center justify-center pl-6">
+                                                                {q.S_URL ? (
                                                                     <img
                                                                         src={q.S_URL}
-                                                                        alt={`Sol${q.Q_No}`}
-                                                                        className="max-w-full max-h-[250px] object-contain"
+                                                                        alt={`Sol`}
+                                                                        className="max-w-full max-h-full object-contain"
                                                                     />
-                                                                </div>
-                                                            )}
+                                                                ) : (
+                                                                    <span className="text-gray-400 italic">Conceptual / No Solution Image</span>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
