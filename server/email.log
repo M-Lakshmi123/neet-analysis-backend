@@ -1,0 +1,2 @@
+[2026-01-30T14:52:31.966Z] [EMAIL] Attempting to send approval email to: mlakshmi.lakimca@gmail.com (Name: M Lakshmi)
+[2026-01-30T14:52:38.468Z] [EMAIL] CRITICAL ERROR: Invalid login: 535 5.7.139 Authentication unsuccessful, the user credentials were incorrect. [MA5P287CA0124.INDP287.PROD.OUTLOOK.COM 2026-01-30T14:52:49.877Z 08DE5F632DC6A731]

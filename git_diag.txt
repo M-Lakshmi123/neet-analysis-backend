@@ -1,0 +1,49 @@
+
+--- Running: git --version ---
+ERROR: Command failed: git --version
+'git' is not recognized as an internal or external command,
+operable program or batch file.
+
+STDERR: 'git' is not recognized as an internal or external command,
+operable program or batch file.
+
+
+--- Running: dir /a ---
+ Volume in drive F is Blender
+ Volume Serial Number is 84F3-6BDE
+
+ Directory of F:\neet-analysis-backend-master\neet-analysis-backend-master
+
+30-01-2026  23:15    <DIR>          .
+30-01-2026  23:05    <DIR>          ..
+30-01-2026  18:22               277 .gitignore
+30-01-2026  23:10    <DIR>          client
+30-01-2026  18:22             1,447 DATA_UPLOAD_GUIDE.md
+30-01-2026  18:22                19 delete
+30-01-2026  18:22               734 DEPLOY_FRONTEND.md
+30-01-2026  18:22             1,548 DEPLOY_GUIDE.md
+30-01-2026  18:22             2,419 DEPLOY_TO_RENDER.md
+30-01-2026  18:22                47 env.txt
+30-01-2026  23:15               576 git_diag.js
+30-01-2026  19:44               404 output.txt
+30-01-2026  18:22                19 query
+30-01-2026  18:22               486 render.yaml
+30-01-2026  19:39               779 repro_date.js
+30-01-2026  19:44             1,403 repro_date_fixed.js
+30-01-2026  22:52    <DIR>          server
+30-01-2026  18:22             1,121 SERVICE_GUIDE.md
+30-01-2026  18:22    <DIR>          service_setup
+              14 File(s)         11,279 bytes
+               5 Dir(s)   6,959,865,856 bytes free
+
+--- Running: git status ---
+ERROR: Command failed: git status
+'git' is not recognized as an internal or external command,
+operable program or batch file.
+
+STDERR: 'git' is not recognized as an internal or external command,
+operable program or batch file.
+
+
+--- Running: whoami ---
+lakshmi-munirat\mlaks

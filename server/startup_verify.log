@@ -1,0 +1,71 @@
+﻿[dotenv@17.2.3] injecting env (7) from .env -- tip: ≡ƒöÉ prevent building .env in docker: https://dotenvx.com/prebuild
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+[Email Config] User: yenjarappa.s@varsitymgmt.com, Pass Length: 8
+Server running on port 5000
+node : SERVER ERROR: 
+Error: listen 
+EADDRINUSE: address 
+already in use 
+:::5000
+At line:1 char:1
++ node index.js *>&1 
+| Out-File -FilePath 
+startup_verify.log 
+-Encoding  ...
++ ~~~~~~~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (SERVER    
+ ERROR: E... in u    
+se :::5000:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+    at Server.setupLi
+stenHandle [as 
+_listen2] 
+(node:net:1940:16)
+    at 
+listenInCluster 
+(node:net:1997:12)
+    at Server.listen 
+(node:net:2102:7)
+    at app.listen (F:
+\neet-analysis-backen
+d-master\neet-analysi
+s-backend-master\serv
+er\node_modules\expre
+ss\lib\application.js
+:605:24)
+    at 
+Object.<anonymous> (F
+:\neet-analysis-backe
+nd-master\neet-analys
+is-backend-master\ser
+ver\index.js:539:20)
+    at 
+Module._compile (node
+:internal/modules/cjs
+/loader:1760:14)
+    at Object..js (no
+de:internal/modules/c
+js/loader:1893:10)
+    at Module.load (n
+ode:internal/modules/
+cjs/loader:1480:32)
+    at Module._load (
+node:internal/modules
+/cjs/loader:1299:12)
+    at TracingChannel
+.traceSync (node:diag
+nostics_channel:328:1
+4) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 5000
+}
