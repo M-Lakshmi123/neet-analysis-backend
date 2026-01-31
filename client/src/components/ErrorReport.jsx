@@ -291,19 +291,37 @@ const ErrorReport = () => {
                     for (let i = 0; i < test.questions.length; i++) {
                         const q = test.questions[i];
 
-                        // Check Page Break
-                        // Need approx 50mm for a question block
-                        if (yPos + 55 > pageHeight - margin) {
-                            doc.addPage();
-                            addHeader(doc);
-                            yPos = 35; // Reset Y (approx) or calculate dynamic
-                        } else if (i > 0) {
-                            yPos += 2; // Gap between questions
+                        // Load Images First to calculate height
+                        const qImg = await loadImage(q.Q_URL);
+                        const sImg = await loadImage(q.S_URL);
+
+                        // Calculate Dynamic Height based on Width
+                        const headerH = 7;
+                        const colW = (contentWidth - 8) / 2; // ~91mm
+                        const imgTargetW = 85;
+
+                        let qH = 0;
+                        if (qImg) {
+                            qH = (qImg.height / qImg.width) * imgTargetW;
                         }
 
-                        // Block Height and Layout
-                        const blockH = 45; // Fixed height for block
-                        const headerH = 7;
+                        let sH = 0;
+                        if (sImg) {
+                            sH = (sImg.height / sImg.width) * imgTargetW;
+                        }
+
+                        // Min content height or max of images
+                        const maxContentH = Math.max(qH, sH, 20); // Min 20mm for content
+                        const blockH = headerH + maxContentH + 2; // +2mm padding
+
+                        // Check Page Break
+                        if (yPos + blockH > pageHeight - margin) {
+                            doc.addPage();
+                            addHeader(doc);
+                            yPos = 35;
+                        } else if (i > 0) {
+                            yPos += 2;
+                        }
 
                         // 1. Header Bar (Red)
                         doc.setFillColor(128, 0, 0); // Maroon
@@ -315,7 +333,6 @@ const ErrorReport = () => {
                         doc.setFontSize(9);
 
                         // Header Content
-                        // W/U | Q No | Topic | Sub Topic | Key
                         let x = margin;
 
                         // W/U
@@ -331,7 +348,7 @@ const ErrorReport = () => {
 
                         // Topic
                         doc.text(`Topic: ${q.Topic || ''}`, x + 2, yPos + 4.5);
-                        // Subtopic (Right aligned-ish)
+                        // Subtopic
                         const subX = margin + contentWidth - 60;
                         doc.text(`Sub Topic: ${q.Sub_Topic || ''}`, subX - 30, yPos + 4.5);
 
@@ -350,54 +367,40 @@ const ErrorReport = () => {
                         doc.setTextColor(255);
                         doc.setFontSize(8);
 
-                        // Vertical Text Helper
-                        // Calculate center Y for vertical text
+                        // Vertical Text
                         const stripCenterY = yPos + headerH + ((blockH - headerH) / 2);
                         doc.text(String(q.Subject || ''), margin + 5, stripCenterY + 5, { angle: 90, align: 'center' });
 
                         // 4. Images Area
                         const imgAreaX = margin + 8;
                         const imgAreaW = contentWidth - 8;
-                        const imgAreaH = blockH - headerH;
+                        const imgAreaY = yPos + headerH;
 
-                        // Split Q and Sol
+                        // Split Q and Sol line
                         doc.setDrawColor(0);
-                        doc.line(imgAreaX + (imgAreaW / 2), yPos + headerH, imgAreaX + (imgAreaW / 2), yPos + blockH);
+                        doc.line(imgAreaX + (imgAreaW / 2), imgAreaY, imgAreaX + (imgAreaW / 2), yPos + blockH);
 
-                        // Load Images
-                        const qImg = await loadImage(q.Q_URL);
-                        const sImg = await loadImage(q.S_URL);
-
-                        const fitImage = (img, x, y, w, h) => {
+                        const drawImage = (img, x, y, drawnH) => {
                             if (!img) return;
                             const aspect = img.width / img.height;
-                            // Target width 321px approx 85mm
-                            let drawW = 85;
-                            if (drawW > w - 2) drawW = w - 2; // Constrain to column if smaller than target
-
-                            let drawH = drawW / aspect;
-                            if (drawH > h - 2) {
-                                drawH = h - 2;
-                                drawW = drawH * aspect;
-                            }
-                            const offX = (w - drawW) / 2;
-                            const offY = (h - drawH) / 2;
+                            let w = drawnH * aspect;
+                            // Center in column
+                            const colWidth = imgAreaW / 2;
+                            const offX = (colWidth - w) / 2;
                             try {
-                                doc.addImage(img, 'PNG', x + offX, y + offY, drawW, drawH);
+                                doc.addImage(img, 'PNG', x + offX, y + 1, w, drawnH);
                             } catch (e) { console.warn("Image add error", e); }
                         };
 
-                        // Draw Q Image
                         if (qImg) {
-                            fitImage(qImg, imgAreaX, yPos + headerH, imgAreaW / 2, imgAreaH);
+                            drawImage(qImg, imgAreaX, imgAreaY, qH);
                         } else {
                             doc.setTextColor(150);
-                            doc.text("No Q Image", imgAreaX + 10, yPos + headerH + 10);
+                            doc.text("No Q Image", imgAreaX + 10, imgAreaY + 10);
                         }
 
-                        // Draw S Image
                         if (sImg) {
-                            fitImage(sImg, imgAreaX + (imgAreaW / 2), yPos + headerH, imgAreaW / 2, imgAreaH);
+                            drawImage(sImg, imgAreaX + (imgAreaW / 2), imgAreaY, sH);
                         }
 
                         yPos += blockH;
@@ -417,9 +420,9 @@ const ErrorReport = () => {
     };
 
     return (
-        <div className="error-report-page min-h-screen bg-gray-500 p-8 overflow-auto">
-            {/* Controls */}
-            <div className="no-print max-w-[210mm] mx-auto mb-6 bg-white rounded p-4 shadow">
+        <div style={{ padding: '20px', backgroundColor: '#808080', fontFamily: 'Arial, sans-serif', minHeight: '100vh', boxSizing: 'border-box', overflow: 'auto' }}>
+            {/* Control Bar */}
+            <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                 <FilterBar
                     filters={filters}
                     setFilters={setFilters}
@@ -429,229 +432,158 @@ const ErrorReport = () => {
                         students: '/api/erp/students'
                     }}
                 />
-
-                <div className="flex justify-between items-center mt-4 pt-4 border-t">
-                    <div className="font-bold text-gray-700">
-                        {reportData.length} Student(s) Loaded
-                    </div>
+                <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #ccc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 'bold', color: '#333' }}>{reportData.length} Student(s) Loaded</span>
                     <button
                         onClick={generatePDF}
                         disabled={reportData.length === 0 || generatingPdf}
-                        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                        style={{
+                            backgroundColor: '#0070c0',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 20px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            opacity: generatingPdf || reportData.length === 0 ? 0.6 : 1,
+                            fontSize: '14px',
+                            fontWeight: 'bold'
+                        }}
                     >
                         {generatingPdf ? 'Generating PDF...' : '⬇ Download PDF File'}
                     </button>
                 </div>
             </div>
 
-            {loading && (
-                <div className="text-white text-center text-xl font-bold mt-10">Loading Data...</div>
-            )}
+            {loading && <div style={{ textAlign: 'center', fontSize: '20px', marginTop: '50px', color: 'white' }}>Loading Data...</div>}
 
-            {!loading && reportData.length > 0 && (
-                <div className="reports-container flex flex-col gap-8 items-center">
-                    {reportData.map((student, sIdx) => (
-                        <div key={sIdx} className="student-sheet bg-white shadow-2xl" style={{ width: '210mm', minHeight: '297mm', padding: '10mm', boxSizing: 'border-box' }}>
+            {/* Main Report Area */}
+            {!loading && reportData.map((student, sIdx) => (
+                <div key={sIdx} style={{ width: '210mm', minHeight: '297mm', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '10mm', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', boxSizing: 'border-box' }}>
 
-                            {/* HEADER */}
-                            <div className="text-center mb-4">
-                                <div className="flex justify-center items-end" style={{ color: '#0070c0' }}>
-                                    <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
-                                    <span style={{ fontFamily: 'Bookman, serif', fontSize: '26px', marginLeft: '5px' }}> Educational Institutions</span>
-                                </div>
-                                <div className="text-[10px] font-bold uppercase mt-1">
-                                    A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
-                                </div>
-                                <div className="font-serif italic text-lg mt-1">
-                                    A Right Choice for the Real Aspirant
-                                </div>
-                                <div className="text-sm font-bold uppercase mt-1">
-                                    Central Office, Bangalore
-                                </div>
-                            </div>
+                    {/* Header */}
+                    <div style={{ textAlign: 'center', marginBottom: '15px' }}>
+                        <div style={{ color: '#0070c0', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
+                            <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
+                            <span style={{ fontFamily: 'Bookman, serif', fontSize: '26px', marginLeft: '5px' }}> Educational Institutions</span>
+                        </div>
+                        <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '4px' }}>
+                            A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
+                        </div>
+                        <div style={{ fontFamily: 'serif', fontStyle: 'italic', fontSize: '18px', margin: '2px 0' }}>
+                            A Right Choice for the Real Aspirant
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '2px' }}>
+                            CENTRAL OFFICE, BANGALORE
+                        </div>
+                    </div>
 
-                            {/* STUDENT INFO TABLE */}
-                            <table className="w-full border-collapse border border-black mb-4 text-xs font-bold font-sans">
+                    {/* Student Info Table */}
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '20px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
+                        <tbody>
+                            <tr style={{ backgroundColor: '#fff8dc' }}>
+                                <td style={{ border: '1px solid black', padding: '8px', width: '50%', textAlign: 'center', textTransform: 'uppercase' }}>{student.info.name}</td>
+                                <td style={{ border: '1px solid black', padding: '8px', width: '50%', textAlign: 'center', textTransform: 'uppercase' }}>{student.info.branch}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    {/* Tests Loop */}
+                    {student.tests.map((test, tIdx) => (
+                        <div key={tIdx} style={{ marginBottom: '30px' }}>
+                            {/* Score Table */}
+                            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '15px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#fce4d6' }}>
+                                        {["Test", "Date", "TOT", "AIR", "BOT", "Rank", "ZOO", "Rank", "PHY", "Rank", "CHEM", "Rank"].map((h, i) => (
+                                            <td key={i} style={{ border: '1px solid black', padding: '4px' }}>{h}</td>
+                                        ))}
+                                    </tr>
+                                </thead>
                                 <tbody>
-                                    <tr className="bg-[#fff8dc]">
-                                        <td className="border border-black p-2 text-center w-1/2 uppercase">{student.info.name}</td>
-                                        <td className="border border-black p-2 text-center w-1/2 uppercase">{student.info.branch}</td>
+                                    <tr style={{ color: '#b40000', backgroundColor: 'white' }}>
+                                        <td style={{ border: '1px solid black', padding: '4px', color: 'black' }}>{test.meta.testName}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px', color: 'black' }}>{test.meta.date}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px', color: 'black' }}>{test.meta.tot}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px', color: 'black' }}>{test.meta.air}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.bot}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.b_rank}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.zoo}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.z_rank}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.phy}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.p_rank}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.chem}</td>
+                                        <td style={{ border: '1px solid black', padding: '4px' }}>{test.meta.c_rank}</td>
                                     </tr>
                                 </tbody>
                             </table>
 
-                            {/* TESTS LOOP */}
-                            {student.tests.map((test, tIdx) => (
-                                <div key={tIdx} className="mb-6">
+                            {/* Questions */}
+                            {test.questions.map((q, qIdx) => (
+                                <table key={qIdx} style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '10px', backgroundColor: 'white' }}>
+                                    {/* Header Row */}
+                                    <thead>
+                                        <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '12px', fontWeight: 'bold', height: '28px' }}>
+                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', width: '40px', textAlign: 'center' }}>{q.W_U}</td>
+                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', width: '40px', textAlign: 'center' }}>{q.Q_No}</td>
+                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '0 8px', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
+                                                Topic: <span style={{ color: '#ffff00', marginLeft: '5px' }}>{q.Topic}</span>
+                                            </td>
+                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '0 8px', textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
+                                                Sub: <span style={{ color: '#ffff00', marginLeft: '5px' }}>{q.Sub_Topic}</span>
+                                            </td>
+                                            <td style={{ border: '1px solid black', width: '80px', textAlign: 'center' }}>Key: {q.Key_Value}</td>
+                                        </tr>
+                                    </thead>
+                                    {/* Body Row */}
+                                    <tbody>
+                                        <tr>
+                                            {/* We use a nested table in a single cell spanning 5 cols to handle strict column widths of the body independent of header */}
+                                            <td colSpan="5" style={{ padding: 0, border: '1px solid black' }}>
+                                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                    <tbody>
+                                                        <tr>
+                                                            {/* Vertical Strip */}
+                                                            <td style={{ width: '30px', backgroundColor: '#4682b4', borderRight: '1px solid black', verticalAlign: 'middle', textAlign: 'center', padding: 0 }}>
+                                                                <div style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)', color: 'white', fontWeight: 'bold', fontSize: '10px', whiteSpace: 'nowrap', margin: 'auto' }}>
+                                                                    {q.Subject}
+                                                                </div>
+                                                            </td>
 
-                                    {/* SCORES TABLE */}
-                                    <table className="w-full border-collapse border border-black mb-4 text-xs text-center font-bold">
-                                        <thead>
-                                            <tr className="bg-[#fce4d6]">
-                                                {["Test", "Date", "TOT", "AIR", "BOT", "Rank", "ZOO", "Rank", "PHY", "Rank", "CHEM", "Rank"].map((h, i) => (
-                                                    <td key={i} className="border border-black p-1">{h}</td>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr className="text-[#b40000]">
-                                                <td className="border border-black p-1 text-black">{test.meta.testName}</td>
-                                                <td className="border border-black p-1 text-black">{test.meta.date}</td>
-                                                <td className="border border-black p-1 text-black">{test.meta.tot}</td>
-                                                <td className="border border-black p-1 text-black">{test.meta.air}</td>
-                                                <td className="border border-black p-1">{test.meta.bot}</td>
-                                                <td className="border border-black p-1">{test.meta.b_rank}</td>
-                                                <td className="border border-black p-1">{test.meta.zoo}</td>
-                                                <td className="border border-black p-1">{test.meta.z_rank}</td>
-                                                <td className="border border-black p-1">{test.meta.phy}</td>
-                                                <td className="border border-black p-1">{test.meta.p_rank}</td>
-                                                <td className="border border-black p-1">{test.meta.chem}</td>
-                                                <td className="border border-black p-1">{test.meta.c_rank}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                                            {/* Q Image */}
+                                                            <td style={{ width: '50%', borderRight: '1px solid black', verticalAlign: 'top', padding: 0 }}>
+                                                                <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
+                                                                <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
+                                                                    {q.Q_URL ? (
+                                                                        <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
+                                                                    ) : (
+                                                                        <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Image</div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
 
-                                    {/* QUESTIONS LIST */}
-                                    <div className="flex flex-col gap-2">
-                                        {test.questions.map((q, qIdx) => (
-                                            <table key={qIdx} className="w-full border-collapse border border-black break-inside-avoid mb-2 shadow-sm">
-                                                {/* Header Row */}
-                                                <tbody>
-                                                    <tr className="bg-[#800000] text-white text-xs font-bold h-7">
-                                                        <td className="border border-white w-10 text-center border-r">{q.W_U}</td>
-                                                        <td className="border border-white w-10 text-center border-r">{q.Q_No}</td>
-                                                        <td className="border border-white border-r px-2 truncate max-w-[150px]">
-                                                            Topic: <span className="text-[#ffff00] ml-1">{q.Topic}</span>
-                                                        </td>
-                                                        <td className="border border-white border-r px-2 truncate max-w-[150px]">
-                                                            Sub: <span className="text-[#ffff00] ml-1">{q.Sub_Topic}</span>
-                                                        </td>
-                                                        <td className="border border-white w-20 text-center">Key: {q.Key_Value}</td>
-                                                    </tr>
-                                                </tbody>
-                                                {/* Content Row */}
-                                                <tbody>
-                                                    <tr className="bg-white">
-                                                        {/* Subject Strip: Merged cell or separate layout? 
-                                                            In HTML tables, to have the strip span nicely, we can't easily put the header *above* the strip 
-                                                            without colspan. 
-                                                            Actually, the header spans the WHOLE width (images + strip).
-                                                            So Row 1 Colspan = 3.
-                                                        */}
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        ))}
-
-                                        {/* 
-                                            CORRECTION: The header spans everything.
-                                            Let's use a nested structure or precise Colspans.
-                                            Row 1: 5 Cells (W, Q, Topic, Sub, Key).
-                                            Row 2: Subject Strip, Q Image, S Image.
-                                            This implies the columns don't align perfectly between header and body.
-                                            Solution: One main container table with two rows? No, the header columns are specific widths.
-                                            
-                                            Better: Two separate parts visually, but structurally strictly aligned?
-                                            Actually, the user wants the "Header" to look like the header, and "Body" to look like the body.
-                                            The Subject Strip is ONLY in the body section in the PDF.
-                                            
-                                            Let's use a Table for the WHOLE block.
-                                            Row 1: Header (Single Cell with nested flex? OR strict columns?)
-                                            The Header has specific strict columns (W, Q, Topic...).
-                                            The Body has specific strict columns (Strip, Q Img, S Img).
-                                            These do not share column widths.
-                                            
-                                            So, we can use a Table for opacity/borders, but maybe nested tables?
-                                            
-                                            Let's simply stack two Tables or Divs? 
-                                            NO, the edges must align.
-                                            
-                                            Let's use the layout:
-                                            <div className="border border-black">
-                                                <div className="header-row flex ... h-7 ..."> (Strict heights/borders) </div>
-                                                <div className="body-row flex items-stretch"> (This ensures equal height)
-                                                     <div className="subject-strip w-8 ..."></div>
-                                                     <div className="images-area flex-1 flex">
-                                                         <div className="q-img w-1/2"></div>
-                                                         <div className="s-img w-1/2"></div>
-                                                     </div>
-                                                </div>
-                                            </div>
-                                            
-                                            This is what I had before, but flexbox was failing to center the vertical text or user disliked it?
-                                            The user said "height is showing same for all".
-                                            Maybe the flex-stretch was *forcing* a height bigger than the image?
-                                            If `align-items: stretch` is on, the row height is determined by the TALLER content.
-                                            If the text is small and image is small, it's small.
-                                            
-                                            The visual "Second Pic" shows the Blue Strip is perfect height.
-                                            
-                                            I will retry the FLEXBOX approach but with:
-                                            1. `display: flex` on the body row.
-                                            2. `items-stretch`.
-                                            3. The Image divs will have `h-auto`.
-                                            4. crucial: The Vertical Text container needs to be `flex items-center justify-center`.
-                                        */}
-
-                                        {test.questions.map((q, qIdx) => (
-                                            <div key={qIdx} className="border border-black break-inside-avoid mb-2 shadow-sm bg-white">
-                                                {/* Header Bar */}
-                                                <div className="grid grid-cols-[40px_40px_1fr_1fr_80px] bg-[#800000] text-white text-xs font-bold min-h-[28px] border-b border-black">
-                                                    <div className="border-r border-white flex items-center justify-center py-1">{q.W_U}</div>
-                                                    <div className="border-r border-white flex items-center justify-center py-1">{q.Q_No}</div>
-                                                    <div className="border-r border-white flex items-center px-2 py-1 truncate">
-                                                        Topic: <span className="text-[#ffff00] ml-1">{q.Topic}</span>
-                                                    </div>
-                                                    <div className="border-r border-white flex items-center px-2 py-1 truncate">
-                                                        Sub: <span className="text-[#ffff00] ml-1">{q.Sub_Topic}</span>
-                                                    </div>
-                                                    <div className="flex items-center justify-center py-1">Key: {q.Key_Value}</div>
-                                                </div>
-
-                                                {/* Body Area */}
-                                                <div className="flex items-stretch">
-                                                    {/* Subject Strip */}
-                                                    <div className="w-8 bg-[#4682b4] flex items-center justify-center border-r border-black" >
-                                                        <div style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)', color: 'white', fontSize: '10px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                                                            {q.Subject}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Images */}
-                                                    <div className="flex-1 flex">
-                                                        {/* Q Col */}
-                                                        <div className="w-1/2 border-r border-black flex flex-col">
-                                                            <div className="p-1 text-[10px] font-bold text-gray-500">Q.{q.Q_No}</div>
-                                                            <div className="flex justify-center pb-2 px-1">
-                                                                {q.Q_URL ? (
-                                                                    <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block' }} alt="Q" />
-                                                                ) : (
-                                                                    <div className="py-8 text-xs text-gray-300 italic">No Image</div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        {/* S Col */}
-                                                        <div className="w-1/2 flex flex-col">
-                                                            <div className="p-1 text-[10px] font-bold text-gray-500">Sol</div>
-                                                            <div className="flex justify-center pb-2 px-1">
-                                                                {q.S_URL ? (
-                                                                    <img src={q.S_URL} style={{ width: '321px', height: 'auto', display: 'block' }} alt="S" />
-                                                                ) : (
-                                                                    <div className="py-8 text-xs text-gray-300 italic">No Solution</div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                                                            {/* S Image */}
+                                                            <td style={{ width: '50%', verticalAlign: 'top', padding: 0 }}>
+                                                                <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Sol</div>
+                                                                <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
+                                                                    {q.S_URL ? (
+                                                                        <img src={q.S_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
+                                                                    ) : (
+                                                                        <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Solution</div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             ))}
                         </div>
                     ))}
                 </div>
-            )}
+            ))}
         </div>
     );
 };
