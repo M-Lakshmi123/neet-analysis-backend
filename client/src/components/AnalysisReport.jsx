@@ -189,17 +189,22 @@ const AnalysisReport = ({ filters }) => {
 
             // Helper to load font
             const loadFont = async (url) => {
+                console.log(`[PDF] Attempting to load font from: ${url}`);
                 try {
                     const res = await fetch(url);
-                    if (!res.ok) throw new Error(`Failed to load font: ${url}`);
+                    if (!res.ok) {
+                        console.error(`[PDF] Failed to fetch font: ${res.statusText}`);
+                        throw new Error(`Failed to load font: ${url}`);
+                    }
                     const blob = await res.blob();
+                    console.log(`[PDF] Font loaded successfully. Size: ${blob.size}`);
                     return new Promise((resolve) => {
                         const reader = new FileReader();
                         reader.onloadend = () => resolve(reader.result.split(',')[1]);
                         reader.readAsDataURL(blob);
                     });
                 } catch (err) {
-                    console.error("Font loading error:", err);
+                    console.error("[PDF] Font loading error:", err);
                     return null;
                 }
             };
