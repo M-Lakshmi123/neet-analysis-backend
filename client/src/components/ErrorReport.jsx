@@ -161,13 +161,11 @@ const ErrorReport = () => {
             const addHeader = (doc) => {
                 let y = 15;
 
-                // 1. Title: "Sri Chaitanya" (Impact) + " Educational Institutions" (Bookman)
+                // 1. Title
                 const part1 = "Sri Chaitanya";
                 const part2 = " Educational Institutions";
 
                 doc.setFontSize(26);
-
-                // Measure
                 if (impactFont) doc.setFont("Impact", "normal");
                 else doc.setFont("helvetica", "bold");
                 const w1 = doc.getTextWidth(part1);
@@ -178,16 +176,14 @@ const ErrorReport = () => {
 
                 const startX = (pageWidth - (w1 + w2)) / 2;
 
-                // Draw Part 1
                 if (impactFont) doc.setFont("Impact", "normal");
                 else doc.setFont("helvetica", "bold");
-                doc.setTextColor(0, 112, 192); // #0070C0
+                doc.setTextColor(0, 112, 192);
                 doc.text(part1, startX, y);
 
-                // Draw Part 2
                 if (bookmanFont) doc.setFont("Bookman", "normal");
                 else doc.setFont("helvetica", "normal");
-                doc.setTextColor(0, 112, 192); // Same Blue
+                doc.setTextColor(0, 112, 192);
                 doc.text(part2, startX + w1, y);
 
                 y += 6;
@@ -200,7 +196,7 @@ const ErrorReport = () => {
                 doc.text("A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi", pageWidth / 2, y, { align: 'center' });
                 y += 5;
 
-                doc.setFont("times", "italic"); // Serif italic
+                doc.setFont("times", "italic");
                 doc.setFontSize(14);
                 doc.text("A Right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
                 y += 5;
@@ -210,7 +206,7 @@ const ErrorReport = () => {
                 doc.setFontSize(10);
                 doc.text("CENTRAL OFFICE, BANGALORE", pageWidth / 2, y, { align: 'center' });
 
-                return y + 2; // Reduced bottom margin (was 5)
+                return y + 2;
             };
 
             for (const student of reportData) {
@@ -219,45 +215,41 @@ const ErrorReport = () => {
                     const headerBottom = addHeader(doc);
                     isFirstPage = false;
 
-                    let yPos = headerBottom + 1; // Start immediately after header (reduced gap)
+                    let yPos = headerBottom + 1;
 
-                    // Student & Test Info Table
-                    // Row 1: Name and Campus
-                    // Centered Text in each half
+                    // Student & Test Info
                     doc.setLineWidth(0.3);
                     doc.setDrawColor(0);
                     doc.setFillColor(255, 248, 220); // Cornsilk
-                    doc.rect(margin, yPos, contentWidth, 8, 'FD'); // Name Row BG
+                    doc.rect(margin, yPos, contentWidth, 8, 'FD');
 
                     if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                     else doc.setFont("helvetica", "bold");
                     doc.setFontSize(11);
                     doc.setTextColor(0);
 
-                    // Left Half Center
                     const leftCenter = margin + (contentWidth / 4);
                     doc.text(student.info.name || '', leftCenter, yPos + 5.5, { align: 'center' });
 
-                    // Right Half Center
                     const rightCenter = margin + (contentWidth * 0.75);
                     doc.text(student.info.branch || '', rightCenter, yPos + 5.5, { align: 'center' });
 
-                    doc.line(pageWidth / 2, yPos, pageWidth / 2, yPos + 8); // Split Name/Branch
+                    doc.line(pageWidth / 2, yPos, pageWidth / 2, yPos + 8);
                     yPos += 8;
 
-                    // Row 2 & 3: Headers & Values
+                    // Score Table
                     const colDefs = [
                         { name: "Test", w: 25, bg: [255, 255, 255] },
                         { name: "Date", w: 25, bg: [255, 255, 255] },
-                        { name: "TOT", w: 14, bg: [255, 255, 204] }, // #ffffcc
-                        { name: "AIR", w: 14, bg: [255, 255, 255] }, // White
-                        { name: "BOT", w: 14, bg: [253, 233, 217] }, // #fde9d9
+                        { name: "TOT", w: 14, bg: [255, 255, 204] },
+                        { name: "AIR", w: 14, bg: [255, 255, 255] },
+                        { name: "BOT", w: 14, bg: [253, 233, 217] },
                         { name: "Rank", w: 14, bg: [253, 233, 217] },
-                        { name: "ZOO", w: 14, bg: [218, 238, 243] }, // #daeef3
+                        { name: "ZOO", w: 14, bg: [218, 238, 243] },
                         { name: "Rank", w: 14, bg: [218, 238, 243] },
-                        { name: "PHY", w: 14, bg: [235, 241, 222] }, // #ebf1de
+                        { name: "PHY", w: 14, bg: [235, 241, 222] },
                         { name: "Rank", w: 14, bg: [235, 241, 222] },
-                        { name: "CHEM", w: 14, bg: [242, 220, 219] }, // #f2dcdb
+                        { name: "CHEM", w: 14, bg: [242, 220, 219] },
                         { name: "Rank", w: 14, bg: [242, 220, 219] }
                     ];
 
@@ -273,9 +265,8 @@ const ErrorReport = () => {
                     // Draw Headers
                     let currentX = margin;
                     doc.setFontSize(9);
-                    doc.setTextColor(0, 0, 0); // Black Headers
+                    doc.setTextColor(0, 0, 0);
 
-                    // Draw Header Row
                     colDefs.forEach((col) => {
                         doc.setFillColor(...col.bg);
                         doc.rect(currentX, yPos, col.w, 6, 'FD');
@@ -288,7 +279,7 @@ const ErrorReport = () => {
                     // Draw Values
                     currentX = margin;
                     doc.setFontSize(10);
-                    doc.setTextColor(128, 0, 0); // Maroon Values
+                    doc.setTextColor(128, 0, 0);
 
                     colDefs.forEach((col, i) => {
                         doc.setFillColor(...col.bg);
@@ -305,35 +296,51 @@ const ErrorReport = () => {
                     for (let i = 0; i < test.questions.length; i++) {
                         const q = test.questions[i];
 
-                        // Load Images First to calculate height
                         const qImg = await loadImage(q.Q_URL);
                         const sImg = await loadImage(q.S_URL);
 
                         // Layout Constants
-                        const wStat = 18; // Width for W/U Status & Subject
-                        const wQ = 12;    // Width for Q No
-                        const wKey = 25;  // Width for Key
+                        const wStat = 18; // W/U
+                        const wQ = 12;    // Q No
+                        const wKey = 18;  // Key
+                        const wMiddle = contentWidth - (wStat + wQ + wKey);
+                        const wTopic = wMiddle / 2;
+                        const wSub = wMiddle / 2;
 
-                        // Calculate Dynamic Height based on Width
-                        const headerH = 7;
+                        // Header Text Wrapping Calc
+                        if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                        else doc.setFont("helvetica", "bold");
+                        doc.setFontSize(9);
 
-                        // Image Area Width
-                        const imgAreaW = contentWidth - wStat;
+                        // Topic Wrapped
+                        const topicLabel = "Topic: ";
+                        const topicVal = q.Topic || '';
+                        const topicFull = topicLabel + topicVal;
+                        // For width calc, we'll assume approx chars or use splitText
+                        const topicLines = doc.splitTextToSize(topicFull, wTopic - 2);
+
+                        // SubTopic Wrapped
+                        const subLabel = "Sub Topic: ";
+                        const subVal = q.Sub_Topic || '';
+                        const subFull = subLabel + subVal;
+                        const subLines = doc.splitTextToSize(subFull, wSub - 2);
+
+                        const maxHeaderLines = Math.max(1, topicLines.length, subLines.length);
+                        const lineHeight = 4; // mm
+                        const headerH = Math.max(7, (maxHeaderLines * lineHeight) + 3); // Min 7mm, plus padding
+
+                        // Image Area
+                        const imgAreaW = contentWidth - wStat; // Images to right of Subject
                         const imgTargetW = 85;
 
                         let qH = 0;
-                        if (qImg) {
-                            qH = (qImg.height / qImg.width) * imgTargetW;
-                        }
+                        if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
 
                         let sH = 0;
-                        if (sImg) {
-                            sH = (sImg.height / sImg.width) * imgTargetW;
-                        }
+                        if (sImg) sH = (sImg.height / sImg.width) * imgTargetW;
 
-                        // Min content height or max of images
-                        const maxContentH = Math.max(qH, sH, 20); // Min 20mm for content
-                        const blockH = headerH + maxContentH + 2; // +2mm padding
+                        const maxContentH = Math.max(qH, sH, 20);
+                        const blockH = headerH + maxContentH + 2;
 
                         // Check Page Break
                         if (yPos + blockH > pageHeight - margin) {
@@ -345,108 +352,101 @@ const ErrorReport = () => {
                         }
 
                         // 1. Header Bar (Maroon)
-                        doc.setFillColor(128, 0, 0); // Maroon
+                        doc.setFillColor(128, 0, 0);
                         doc.rect(margin, yPos, contentWidth, headerH, 'F');
 
-                        // Setup Font for Header
-                        if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                        else doc.setFont("helvetica", "bold");
-                        doc.setFontSize(9);
+                        doc.setTextColor(255);
+                        // Font already set above
 
                         let currentX = margin;
-                        const textY = yPos + 4.5;
+                        const textYStart = yPos + 4.5;
 
                         // [Col 1] W/U
-                        doc.setTextColor(255, 255, 255); // White
-                        const statText = String(q.W_U || '');
-                        doc.text(statText, currentX + (wStat / 2), textY, { align: 'center' });
-
-                        // Divider
+                        doc.text(String(q.W_U || ''), currentX + (wStat / 2), textYStart, { align: 'center' });
                         doc.setDrawColor(255);
                         doc.line(currentX + wStat, yPos, currentX + wStat, yPos + headerH);
                         currentX += wStat;
 
                         // [Col 2] Q No
-                        const qNoText = String(q.Q_No);
-                        doc.text(qNoText, currentX + (wQ / 2), textY, { align: 'center' });
-
-                        // Divider
+                        doc.text(String(q.Q_No), currentX + (wQ / 2), textYStart, { align: 'center' });
                         doc.line(currentX + wQ, yPos, currentX + wQ, yPos + headerH);
                         currentX += wQ;
 
-                        // [Col 3 & 4] Topic & SubTopic
-                        // We'll just draw them sequentially
-                        const topicLabel = "Topic: ";
-                        const topicVal = q.Topic || '';
-                        const subLabel = "Sub Topic: ";
-                        const subVal = q.Sub_Topic || '';
+                        // [Col 3] Topic
+                        // Draw Label then Value... simplified to drawing specific colored words is hard with wrap
+                        // Simplification: Print "Topic: <Val>" all white, or try separate logic?
+                        // Multi-color wrapped text is very hard in jsPDF. 
+                        // STICK TO: White Label, Khaki Value?
+                        // If it wraps, we need precise coord control.
+                        // Simple approach: Print whole string in White for now to ensure wrapping works safely.
+                        // Or: Print "Topic:" then "Value" if it fits. 
+                        // Given complexity, let's print "Topic:" (White) and if Value is long, wrap it.
+
+                        // Let's rely on splitting. 
+                        // We will print the lines. If line starts with "Topic:", color that part white?
+                        // Easier: Just print all White/Khaki based on line index? No.
+                        // Let's print Topic Label, then wrap Value.
+
+                        const tLabelW = doc.getTextWidth(topicLabel);
+                        doc.setTextColor(255, 255, 255);
+                        doc.text(topicLabel, currentX + 1, textYStart);
+
+                        doc.setTextColor(240, 230, 140); // Khaki
+                        const tValLines = doc.splitTextToSize(topicVal, wTopic - tLabelW - 2);
+                        doc.text(tValLines, currentX + tLabelW + 1, textYStart);
+
+                        doc.setDrawColor(255);
+                        doc.line(currentX + wTopic, yPos, currentX + wTopic, yPos + headerH);
+                        currentX += wTopic;
+
+                        // [Col 4] Sub Topic
+                        const sLabelW = doc.getTextWidth(subLabel);
+                        doc.setTextColor(255, 255, 255);
+                        doc.text(subLabel, currentX + 1, textYStart);
+
+                        doc.setTextColor(240, 230, 140);
+                        const sValLines = doc.splitTextToSize(subVal, wSub - sLabelW - 2);
+                        doc.text(sValLines, currentX + sLabelW + 1, textYStart);
+
+                        doc.setDrawColor(255);
+                        doc.line(currentX + wSub, yPos, currentX + wSub, yPos + headerH);
+                        currentX += wSub;
+
+                        // [Col 5] Key
                         const keyLabel = "Key: ";
                         const keyVal = q.Key_Value || '';
-
-                        // Draw Topic
-                        currentX += 2; // padding
-                        doc.setTextColor(255, 255, 255); // White Label
-                        doc.text(topicLabel, currentX, textY);
-                        currentX += doc.getTextWidth(topicLabel);
-
-                        doc.setTextColor(240, 230, 140); // Khaki Value
-                        doc.text(topicVal, currentX, textY);
-                        currentX += doc.getTextWidth(topicVal) + 10; // Extra padding
-
-                        // Draw SubTopic
-                        doc.setTextColor(255, 255, 255); // White Label
-                        doc.text(subLabel, currentX, textY);
-                        currentX += doc.getTextWidth(subLabel);
-
-                        doc.setTextColor(240, 230, 140); // Khaki Value
-                        doc.text(subVal, currentX, textY);
-
-                        // [Col 5] Key (Far Right)
-                        const keyX = margin + contentWidth - wKey;
-                        doc.setDrawColor(255);
-                        doc.line(keyX, yPos, keyX, yPos + headerH);
-
-                        // Draw "Key: label" (White) + Value (White to match pic, or could be Khaki)
-                        // I'll stick to White Label + Same Khaki Value for data consistency 
-                        const keyCenter = keyX + (wKey / 2);
-                        doc.setTextAlign('center');
-                        // Just simple centered text, since it's short
-                        // Actually, I'll split it to bold the value or color it if requested. 
-                        // User request: "key also same" (Khaki data).
+                        // Center Logic
                         const kLabelW = doc.getTextWidth(keyLabel);
                         const kValW = doc.getTextWidth(keyVal);
                         const kTotalW = kLabelW + kValW;
-                        const kStart = keyCenter - (kTotalW / 2); // Center the group
+                        const kStart = (currentX + (wKey / 2)) - (kTotalW / 2);
 
-                        doc.text(keyLabel, kStart, textY, { align: 'left' });
-                        doc.setTextColor(240, 230, 140); // Khaki Value
-                        doc.text(keyVal, kStart + kLabelW, textY, { align: 'left' });
-                        doc.setTextAlign('left'); // Reset
+                        doc.setTextColor(255, 255, 255);
+                        doc.text(keyLabel, kStart, textYStart);
+                        doc.setTextColor(240, 230, 140);
+                        doc.text(keyVal, kStart + kLabelW, textYStart);
 
                         // 2. Content Block Border
                         doc.setDrawColor(0);
-                        doc.rect(margin, yPos, contentWidth, blockH); // Outer Border
+                        doc.rect(margin, yPos, contentWidth, blockH);
 
-                        // 3. Subject Strip (Blue Vertical Block)
-                        // It covers the width of wStat (18mm)
-                        doc.setFillColor(79, 129, 189); // Steel Blue #4F81BD
+                        // 3. Subject Strip
+                        doc.setFillColor(79, 129, 189);
                         doc.rect(margin, yPos + headerH, wStat, blockH - headerH, 'F');
 
                         doc.setTextColor(255);
                         doc.setFontSize(9);
 
-                        // Horizontal Text Centered in the Blue Box
                         const subjectText = String(q.Subject || '');
                         const stripCenterY = yPos + headerH + ((blockH - headerH) / 2);
                         const stripCenterX = margin + (wStat / 2);
 
                         doc.text(subjectText, stripCenterX, stripCenterY + 1.5, { align: 'center' });
 
-                        // 4. Images Area
+                        // 4. Images
                         const imgBaseX = margin + wStat;
                         const imgContentY = yPos + headerH;
 
-                        // Content Divider Line (between QImg and SImg)
                         doc.setDrawColor(0);
                         const halfW = imgAreaW / 2;
                         doc.line(imgBaseX + halfW, imgContentY, imgBaseX + halfW, yPos + blockH);
@@ -455,25 +455,20 @@ const ErrorReport = () => {
                             if (!img) return;
                             const aspect = img.width / img.height;
                             let w = drawnH * aspect;
-                            // Center in column
                             const colWidth = halfW;
                             const offX = (colWidth - w) / 2;
                             try {
                                 doc.addImage(img, 'PNG', x + offX, y + 1, w, drawnH);
-                            } catch (e) { console.warn("Image add error", e); }
+                            } catch (e) { console.warn(e); }
                         };
 
-                        if (qImg) {
-                            drawImage(qImg, imgBaseX, imgContentY, qH);
-                        } else {
+                        if (qImg) drawImage(qImg, imgBaseX, imgContentY, qH);
+                        else {
                             doc.setTextColor(150);
-                            doc.setFontSize(8);
                             doc.text("No Q Image", imgBaseX + 5, imgContentY + 5);
                         }
 
-                        if (sImg) {
-                            drawImage(sImg, imgBaseX + halfW, imgContentY, sH);
-                        }
+                        if (sImg) drawImage(sImg, imgBaseX + halfW, imgContentY, sH);
 
                         yPos += blockH;
                     }
@@ -493,16 +488,12 @@ const ErrorReport = () => {
 
     return (
         <div style={{ padding: '20px', backgroundColor: '#808080', fontFamily: 'Arial, sans-serif', minHeight: '100vh', boxSizing: 'border-box', overflow: 'auto' }}>
-            {/* Control Bar */}
             <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                 <FilterBar
                     filters={filters}
                     setFilters={setFilters}
                     restrictedCampus={!isAdmin ? userData?.campus : null}
-                    apiEndpoints={{
-                        filters: '/api/erp/filters',
-                        students: '/api/erp/students'
-                    }}
+                    apiEndpoints={{ filters: '/api/erp/filters', students: '/api/erp/students' }}
                 />
                 <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #ccc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 'bold', color: '#333' }}>{reportData.length} Student(s) Loaded</span>
@@ -528,11 +519,9 @@ const ErrorReport = () => {
 
             {loading && <div style={{ textAlign: 'center', fontSize: '20px', marginTop: '50px', color: 'white' }}>Loading Data...</div>}
 
-            {/* Main Report Area */}
             {!loading && reportData.map((student, sIdx) => (
                 <div key={sIdx} style={{ width: '210mm', minHeight: '297mm', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '10mm', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', boxSizing: 'border-box' }}>
 
-                    {/* Header */}
                     <div style={{ textAlign: 'center', marginBottom: '15px' }}>
                         <div style={{ color: '#0070c0', marginBottom: '5px', display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
                             <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
@@ -549,7 +538,6 @@ const ErrorReport = () => {
                         </div>
                     </div>
 
-                    {/* Student Info Box */}
                     <div style={{ width: '100%', border: '1px solid black', display: 'flex', backgroundColor: '#fff8dc', marginBottom: '20px', fontSize: '12px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>
                         <div style={{ flex: 1, padding: '8px', textAlign: 'center', textTransform: 'uppercase', borderRight: '1px solid black' }}>
                             {student.info.name}
@@ -559,24 +547,22 @@ const ErrorReport = () => {
                         </div>
                     </div>
 
-                    {/* Tests Loop */}
                     {student.tests.map((test, tIdx) => (
                         <div key={tIdx} style={{ marginBottom: '30px' }}>
-                            {/* Score Table */}
                             <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '15px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }}>
                                 <colgroup>
-                                    <col style={{ width: '13.15%' }} /> {/* Test - 25mm */}
-                                    <col style={{ width: '13.15%' }} /> {/* Date - 25mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* TOT - 14mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* AIR - 14mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* BOT - 14mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* Rank - 14mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* ZOO - 14mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* Rank - 14mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* PHY - 14mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* Rank - 14mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* CHEM - 14mm */}
-                                    <col style={{ width: '7.36%' }} /> {/* Rank - 14mm */}
+                                    <col style={{ width: '13.15%' }} />
+                                    <col style={{ width: '13.15%' }} />
+                                    <col style={{ width: '7.36%' }} />
+                                    <col style={{ width: '7.36%' }} />
+                                    <col style={{ width: '7.36%' }} />
+                                    <col style={{ width: '7.36%' }} />
+                                    <col style={{ width: '7.36%' }} />
+                                    <col style={{ width: '7.36%' }} />
+                                    <col style={{ width: '7.36%' }} />
+                                    <col style={{ width: '7.36%' }} />
+                                    <col style={{ width: '7.36%' }} />
+                                    <col style={{ width: '7.36%' }} />
                                 </colgroup>
                                 <thead>
                                     <tr style={{ height: '24px' }}>
@@ -612,28 +598,25 @@ const ErrorReport = () => {
                                 </tbody>
                             </table>
 
-                            {/* Questions */}
                             {test.questions.map((q, qIdx) => (
                                 <table key={qIdx} style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '10px', backgroundColor: 'white' }}>
                                     <colgroup>
-                                        <col style={{ width: '18mm' }} /> {/* Match PDF wStat */}
-                                        <col style={{ width: '12mm' }} /> {/* Match PDF wQ */}
+                                        <col style={{ width: '18mm' }} />
+                                        <col style={{ width: '12mm' }} />
                                         <col style={{ width: 'auto' }} />
                                         <col style={{ width: 'auto' }} />
-                                        <col style={{ width: '25mm' }} /> {/* Match PDF wKey */}
+                                        <col style={{ width: '18mm' }} />
                                     </colgroup>
-                                    {/* Header Row */}
                                     <thead>
-                                        <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold', height: '28px' }}>
-                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.W_U}</td>
+                                        <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
+                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
                                             <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.Q_No}</td>
 
-                                            {/* Topic & SubTopic with Rich Colors */}
-                                            <td style={{ border: '1px solid black', borderRight: 'none', padding: '0 5px' }}>
+                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
                                                 <span>Topic: </span>
                                                 <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Topic}</span>
                                             </td>
-                                            <td style={{ border: '1px solid black', borderLeft: 'none', borderRight: '1px solid white', padding: '0 5px' }}>
+                                            <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
                                                 <span>Sub Topic: </span>
                                                 <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Sub_Topic}</span>
                                             </td>
@@ -644,20 +627,16 @@ const ErrorReport = () => {
                                             </td>
                                         </tr>
                                     </thead>
-                                    {/* Body Row */}
                                     <tbody>
                                         <tr>
-                                            {/* Subject Horizontal Strip */}
                                             <td style={{ backgroundColor: '#4F81BD', border: '1px solid black', verticalAlign: 'middle', textAlign: 'center', padding: '0 5px', color: 'white', fontWeight: 'bold', fontSize: '12px' }}>
                                                 {q.Subject}
                                             </td>
 
-                                            {/* Images Area Spanning 4 cols */}
                                             <td colSpan="4" style={{ padding: 0, border: '1px solid black' }}>
                                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                     <tbody>
                                                         <tr>
-                                                            {/* Q Image */}
                                                             <td style={{ width: '50%', borderRight: '1px solid black', verticalAlign: 'top', padding: 0 }}>
                                                                 <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
                                                                 <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
@@ -669,7 +648,6 @@ const ErrorReport = () => {
                                                                 </div>
                                                             </td>
 
-                                                            {/* S Image */}
                                                             <td style={{ width: '50%', verticalAlign: 'top', padding: 0 }}>
                                                                 <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Sol</div>
                                                                 <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
