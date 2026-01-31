@@ -4,6 +4,7 @@ import { API_URL, buildQueryParams, formatDate } from '../utils/apiHelper';
 import { useAuth } from './auth/AuthProvider';
 import jsPDF from 'jspdf';
 import { saveAs } from 'file-saver';
+import JSZip from 'jszip';
 
 // Subject Sorting Order
 const SUBJECT_ORDER = {
@@ -86,13 +87,24 @@ const ErrorReport = () => {
                     grouped[studKey].tests[testKey].questions.push(row);
                 });
 
-                // Sort Questions by Subject
+                // Process & Sort
                 const processed = Object.values(grouped).map(student => {
-                    // Convert tests object to array
-                    const testsArr = Object.values(student.tests).map(t => {
+                    // 1. Convert tests object to array
+                    let testsArr = Object.values(student.tests);
+
+                    // 2. Sort Tests by Date (Latest First)
+                    testsArr.sort((a, b) => {
+                        const d1 = new Date(a.meta.date);
+                        const d2 = new Date(b.meta.date);
+                        return d2 - d1; // Descending
+                    });
+
+                    // 3. Sort Questions by Subject within each test
+                    testsArr = testsArr.map(t => {
                         t.questions.sort((a, b) => getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject));
                         return t;
                     });
+
                     return { ...student, tests: testsArr };
                 });
 
@@ -140,371 +152,363 @@ const ErrorReport = () => {
         }
     };
 
-    // PDF Generator
+    // --- PDF GENERATION CORE (Single Student) ---
+    const createStudentPDF = async (student, fonts) => {
+        const { impactFont, bookmanFont, bookmanBoldFont } = fonts;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const margin = 10;
+        const contentWidth = pageWidth - (margin * 2);
+
+        // Register Fonts
+        if (impactFont) {
+            doc.addFileToVFS("unicode.impact.ttf", impactFont);
+            doc.addFont("unicode.impact.ttf", "Impact", "normal");
+        }
+        if (bookmanFont) {
+            doc.addFileToVFS("bookman-old-style.ttf", bookmanFont);
+            doc.addFont("bookman-old-style.ttf", "Bookman", "normal");
+        }
+        if (bookmanBoldFont) {
+            doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont);
+            doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
+        }
+
+        // --- Helper: Draw Main Header ---
+        const drawMainHeader = (doc) => {
+            let y = 15;
+
+            const part1 = "Sri Chaitanya";
+            const part2 = " Educational Institutions";
+
+            doc.setFontSize(26);
+            if (impactFont) doc.setFont("Impact", "normal");
+            else doc.setFont("helvetica", "bold");
+            const w1 = doc.getTextWidth(part1);
+
+            if (bookmanFont) doc.setFont("Bookman", "normal");
+            else doc.setFont("helvetica", "normal");
+            const w2 = doc.getTextWidth(part2);
+
+            const startX = (pageWidth - (w1 + w2)) / 2;
+
+            if (impactFont) doc.setFont("Impact", "normal");
+            else doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 112, 192);
+            doc.text(part1, startX, y);
+
+            if (bookmanFont) doc.setFont("Bookman", "normal");
+            else doc.setFont("helvetica", "normal");
+            doc.setTextColor(0, 112, 192);
+            doc.text(part2, startX + w1, y);
+
+            y += 6;
+
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            doc.text("A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi", pageWidth / 2, y, { align: 'center' });
+            y += 5;
+
+            doc.setFont("times", "italic");
+            doc.setFontSize(14);
+            doc.text("A Right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
+            y += 5;
+
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
+            doc.text("CENTRAL OFFICE, BANGALORE", pageWidth / 2, y, { align: 'center' });
+
+            return y + 2;
+        };
+
+        // --- START PAGE 1 ---
+        // Header
+        const headerBottom = drawMainHeader(doc);
+        let yPos = headerBottom + 1;
+
+        // Student Info
+        doc.setLineWidth(0.3);
+        doc.setDrawColor(0);
+        doc.setFillColor(255, 248, 220);
+        doc.rect(margin, yPos, contentWidth, 8, 'FD');
+
+        if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+        else doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(0);
+
+        const leftCenter = margin + (contentWidth / 4);
+        doc.text(student.info.name || '', leftCenter, yPos + 5.5, { align: 'center' });
+
+        const rightCenter = margin + (contentWidth * 0.75);
+        doc.text(student.info.branch || '', rightCenter, yPos + 5.5, { align: 'center' });
+
+        doc.line(pageWidth / 2, yPos, pageWidth / 2, yPos + 8);
+        yPos += 8;
+
+        // Iterate Tests
+        for (const test of student.tests) {
+            // Check space for Score Table (approx 20mm needed)
+            if (yPos + 30 > pageHeight - margin) {
+                doc.addPage();
+                yPos = 15;
+            }
+
+            // Score Table
+            const colDefs = [
+                { name: "Test", w: 25, bg: [255, 255, 255] },
+                { name: "Date", w: 25, bg: [255, 255, 255] },
+                { name: "TOT", w: 14, bg: [255, 255, 204] },
+                { name: "AIR", w: 14, bg: [255, 255, 255] },
+                { name: "BOT", w: 14, bg: [253, 233, 217] },
+                { name: "Rank", w: 14, bg: [253, 233, 217] },
+                { name: "ZOO", w: 14, bg: [218, 238, 243] },
+                { name: "Rank", w: 14, bg: [218, 238, 243] },
+                { name: "PHY", w: 14, bg: [235, 241, 222] },
+                { name: "Rank", w: 14, bg: [235, 241, 222] },
+                { name: "CHEM", w: 14, bg: [242, 220, 219] },
+                { name: "Rank", w: 14, bg: [242, 220, 219] }
+            ];
+
+            const values = [
+                test.meta.testName, test.meta.date,
+                test.meta.tot, test.meta.air,
+                test.meta.bot, test.meta.b_rank,
+                test.meta.zoo, test.meta.z_rank,
+                test.meta.phy, test.meta.p_rank,
+                test.meta.chem, test.meta.c_rank
+            ];
+
+            let currentX = margin;
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+
+            // Header Row
+            colDefs.forEach((col) => {
+                doc.setFillColor(...col.bg);
+                doc.rect(currentX, yPos, col.w, 6, 'FD');
+                doc.text(col.name, currentX + (col.w / 2), yPos + 4, { align: 'center' });
+                currentX += col.w;
+            });
+            yPos += 6;
+
+            // Value Row
+            currentX = margin;
+            doc.setFontSize(10);
+            doc.setTextColor(128, 0, 0); // Maroon
+
+            colDefs.forEach((col, i) => {
+                doc.setFillColor(...col.bg);
+                doc.rect(currentX, yPos, col.w, 6, 'FD');
+                doc.text(String(values[i] || '-'), currentX + (col.w / 2), yPos + 4, { align: 'center' });
+                currentX += col.w;
+            });
+            yPos += 8;
+
+            // Questions Loop
+            for (let i = 0; i < test.questions.length; i++) {
+                const q = test.questions[i];
+                const qImg = await loadImage(q.Q_URL);
+                const sImg = await loadImage(q.S_URL);
+
+                // Layout Calc
+                const wStat = 18;
+                const wQ = 12;
+                const wKey = 18;
+                const imgAreaW = contentWidth - wStat;
+                const halfImgW = imgAreaW / 2;
+
+                const wTopic = halfImgW - wQ;
+                const wSub = halfImgW - 18;
+
+                // Font
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+
+                // Wrapping
+                const topicLabel = "Topic: ";
+                const topicVal = q.Topic || '';
+                const topicMaxW = wTopic - doc.getTextWidth(topicLabel) - 2;
+                const topicLines = doc.splitTextToSize(topicVal, topicMaxW);
+
+                const subLabel = "Sub Topic: ";
+                const subVal = q.Sub_Topic || '';
+                const subMaxW = wSub - doc.getTextWidth(subLabel) - 2;
+                const subLines = doc.splitTextToSize(subVal, subMaxW);
+
+                const maxHeaderLines = Math.max(1, topicLines.length, subLines.length);
+                const lineHeight = 4;
+                const headerH = Math.max(7, (maxHeaderLines * lineHeight) + 2.5);
+
+                const imgTargetW = 85;
+                let qH = 0; if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
+                let sH = 0; if (sImg) sH = (sImg.height / sImg.width) * imgTargetW;
+                const maxContentH = Math.max(qH, sH, 20);
+                const blockH = headerH + maxContentH + 2;
+
+                // Page Break
+                if (yPos + blockH > pageHeight - margin) {
+                    doc.addPage();
+                    yPos = 15;
+                } else if (i > 0) {
+                    yPos += 2;
+                }
+
+                // Render Block
+                doc.setFillColor(128, 0, 0);
+                doc.rect(margin, yPos, contentWidth, headerH, 'F');
+                doc.setTextColor(255);
+
+                let cx = margin;
+                const ty = yPos + 4.5;
+
+                // W/U
+                doc.text(String(q.W_U || ''), cx + (wStat / 2), ty, { align: 'center' });
+                doc.setDrawColor(255);
+                doc.line(cx + wStat, yPos, cx + wStat, yPos + headerH);
+                cx += wStat;
+
+                // Q No
+                doc.text(String(q.Q_No), cx + (wQ / 2), ty, { align: 'center' });
+                doc.line(cx + wQ, yPos, cx + wQ, yPos + headerH);
+                cx += wQ;
+
+                // Topic
+                doc.setTextColor(255, 255, 255);
+                doc.text(topicLabel, cx + 1, ty);
+                doc.setTextColor(240, 230, 140);
+                doc.text(topicLines, cx + doc.getTextWidth(topicLabel) + 1, ty);
+                doc.setDrawColor(255);
+                doc.line(cx + wTopic, yPos, cx + wTopic, yPos + headerH);
+                cx += wTopic;
+
+                // Sub Topic
+                doc.setTextColor(255, 255, 255);
+                doc.text(subLabel, cx + 1, ty);
+                doc.setTextColor(240, 230, 140);
+                doc.text(subLines, cx + doc.getTextWidth(subLabel) + 1, ty);
+                doc.setDrawColor(255);
+                doc.line(cx + wSub, yPos, cx + wSub, yPos + headerH);
+                cx += wSub;
+
+                // Key
+                const keyLabel = "Key: ";
+                const keyVal = q.Key_Value || '';
+                const kW = doc.getTextWidth(keyLabel + keyVal);
+                const kStart = (cx + (wKey / 2)) - (kW / 2);
+
+                doc.setTextColor(255, 255, 255);
+                doc.text(keyLabel, kStart, ty);
+                doc.setTextColor(240, 230, 140);
+                doc.text(keyVal, kStart + doc.getTextWidth(keyLabel), ty);
+
+                // Content Box
+                doc.setDrawColor(0);
+                doc.rect(margin, yPos, contentWidth, blockH);
+
+                // Subject Strip
+                doc.setFillColor(79, 129, 189);
+                doc.rect(margin, yPos + headerH, wStat, blockH - headerH, 'F');
+
+                doc.setTextColor(255);
+                const subTxt = String(q.Subject || '');
+                let fs = 9; doc.setFontSize(fs);
+                const maxSW = wStat - 2;
+                while (doc.getTextWidth(subTxt) > maxSW && fs > 4) {
+                    fs -= 0.5; doc.setFontSize(fs);
+                }
+                const scy = yPos + headerH + ((blockH - headerH) / 2);
+                doc.text(subTxt, margin + (wStat / 2), scy + (fs / 3), { align: 'center' });
+
+                // Images
+                const ibx = margin + wStat;
+                const iby = yPos + headerH;
+                doc.setDrawColor(0);
+                doc.line(ibx + halfImgW, iby, ibx + halfImgW, yPos + blockH);
+
+                const drwImg = (img, x, y, h) => {
+                    if (!img) return;
+                    const asp = img.width / img.height;
+                    let w = h * asp;
+                    const offX = (halfImgW - w) / 2;
+                    try { doc.addImage(img, 'PNG', x + offX, y + 1, w, h); } catch (e) { }
+                };
+
+                if (qImg) drwImg(qImg, ibx, iby, qH);
+                else {
+                    doc.setTextColor(150); doc.setFontSize(8);
+                    doc.text("No Q Image", ibx + 5, iby + 5);
+                }
+
+                if (sImg) drwImg(sImg, ibx + halfImgW, iby, sH);
+
+                yPos += blockH;
+            }
+        }
+
+        // Pagination
+        const totalPages = doc.internal.getNumberOfPages();
+        doc.setFontSize(9);
+        doc.setTextColor(0);
+        if (bookmanFont) doc.setFont("Bookman", "normal");
+
+        for (let p = 1; p <= totalPages; p++) {
+            doc.setPage(p);
+            doc.text(`Page ${p} of ${totalPages}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+        }
+
+        return doc;
+    };
+
+    // --- MAIN GENERATE HANDLER ---
     const generatePDF = async () => {
         if (reportData.length === 0) return;
         setGeneratingPdf(true);
         setPdfProgress('Loading Resources...');
 
         try {
-            // Load Fonts & Resources
+            // Load Fonts Once
             const [impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
                 loadFont('/fonts/unicode.impact.ttf'),
                 loadFont('/fonts/bookman-old-style.ttf'),
                 loadFont('/fonts/BOOKOSB.TTF')
             ]);
 
-            const doc = new jsPDF('p', 'mm', 'a4');
-            const pageWidth = 210;
-            const pageHeight = 297;
-            const margin = 10;
-            const contentWidth = pageWidth - (margin * 2);
-
-            // Register Fonts
-            if (impactFont) {
-                doc.addFileToVFS("unicode.impact.ttf", impactFont);
-                doc.addFont("unicode.impact.ttf", "Impact", "normal");
-            }
-            if (bookmanFont) {
-                doc.addFileToVFS("bookman-old-style.ttf", bookmanFont);
-                doc.addFont("bookman-old-style.ttf", "Bookman", "normal");
-            }
-            if (bookmanBoldFont) {
-                doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont);
-                doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
-            }
-
-            // Function to draw the "Sri Chaitanya" Header
-            const drawMainHeader = (doc) => {
-                let y = 15;
-
-                // 1. Title
-                const part1 = "Sri Chaitanya";
-                const part2 = " Educational Institutions";
-
-                doc.setFontSize(26);
-                if (impactFont) doc.setFont("Impact", "normal");
-                else doc.setFont("helvetica", "bold");
-                const w1 = doc.getTextWidth(part1);
-
-                if (bookmanFont) doc.setFont("Bookman", "normal");
-                else doc.setFont("helvetica", "normal");
-                const w2 = doc.getTextWidth(part2);
-
-                const startX = (pageWidth - (w1 + w2)) / 2;
-
-                if (impactFont) doc.setFont("Impact", "normal");
-                else doc.setFont("helvetica", "bold");
-                doc.setTextColor(0, 112, 192);
-                doc.text(part1, startX, y);
-
-                if (bookmanFont) doc.setFont("Bookman", "normal");
-                else doc.setFont("helvetica", "normal");
-                doc.setTextColor(0, 112, 192);
-                doc.text(part2, startX + w1, y);
-
-                y += 6;
-
-                // 2. Subtitles
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setFontSize(9);
-                doc.setTextColor(0, 0, 0);
-                doc.text("A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi", pageWidth / 2, y, { align: 'center' });
-                y += 5;
-
-                doc.setFont("times", "italic");
-                doc.setFontSize(14);
-                doc.text("A Right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
-                y += 5;
-
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setFontSize(10);
-                doc.text("CENTRAL OFFICE, BANGALORE", pageWidth / 2, y, { align: 'center' });
-
-                return y + 2;
-            };
-
-            // Iterate Students
-            for (let sIdx = 0; sIdx < reportData.length; sIdx++) {
-                const student = reportData[sIdx];
-                if (sIdx > 0) doc.addPage(); // Start new student on new page
-
-                const startPageNum = doc.internal.getNumberOfPages();
-
-                // Draw Header ONLY on first page of student
-                let headerBottom = drawMainHeader(doc);
-                let yPos = headerBottom + 1;
-
-                // Student Info Table (Only on First Page)
-                doc.setLineWidth(0.3);
-                doc.setDrawColor(0);
-                doc.setFillColor(255, 248, 220); // Cornsilk
-                doc.rect(margin, yPos, contentWidth, 8, 'FD');
-
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setFontSize(11);
-                doc.setTextColor(0);
-
-                const leftCenter = margin + (contentWidth / 4);
-                doc.text(student.info.name || '', leftCenter, yPos + 5.5, { align: 'center' });
-
-                const rightCenter = margin + (contentWidth * 0.75);
-                doc.text(student.info.branch || '', rightCenter, yPos + 5.5, { align: 'center' });
-
-                doc.line(pageWidth / 2, yPos, pageWidth / 2, yPos + 8);
-                yPos += 8;
-
-                // Iterate Tests
-                for (const test of student.tests) {
-                    // Score Table (Only on First Page of Student/Test combination? 
-                    // Usually Score table is Summary, so keep it at start).
-
-                    // Col Definitions
-                    const colDefs = [
-                        { name: "Test", w: 25, bg: [255, 255, 255] },
-                        { name: "Date", w: 25, bg: [255, 255, 255] },
-                        { name: "TOT", w: 14, bg: [255, 255, 204] },
-                        { name: "AIR", w: 14, bg: [255, 255, 255] },
-                        { name: "BOT", w: 14, bg: [253, 233, 217] },
-                        { name: "Rank", w: 14, bg: [253, 233, 217] },
-                        { name: "ZOO", w: 14, bg: [218, 238, 243] },
-                        { name: "Rank", w: 14, bg: [218, 238, 243] },
-                        { name: "PHY", w: 14, bg: [235, 241, 222] },
-                        { name: "Rank", w: 14, bg: [235, 241, 222] },
-                        { name: "CHEM", w: 14, bg: [242, 220, 219] },
-                        { name: "Rank", w: 14, bg: [242, 220, 219] }
-                    ];
-
-                    const values = [
-                        test.meta.testName, test.meta.date,
-                        test.meta.tot, test.meta.air,
-                        test.meta.bot, test.meta.b_rank,
-                        test.meta.zoo, test.meta.z_rank,
-                        test.meta.phy, test.meta.p_rank,
-                        test.meta.chem, test.meta.c_rank
-                    ];
-
-                    // Draw Headers
-                    let currentX = margin;
-                    doc.setFontSize(9);
-                    doc.setTextColor(0, 0, 0);
-
-                    colDefs.forEach((col) => {
-                        doc.setFillColor(...col.bg);
-                        doc.rect(currentX, yPos, col.w, 6, 'FD');
-                        doc.text(col.name, currentX + (col.w / 2), yPos + 4, { align: 'center' });
-                        currentX += col.w;
-                    });
-
-                    yPos += 6;
-
-                    // Draw Values
-                    currentX = margin;
-                    doc.setFontSize(10);
-                    doc.setTextColor(128, 0, 0);
-
-                    colDefs.forEach((col, i) => {
-                        doc.setFillColor(...col.bg);
-                        doc.rect(currentX, yPos, col.w, 6, 'FD');
-                        doc.text(String(values[i] || '-'), currentX + (col.w / 2), yPos + 4, { align: 'center' });
-                        currentX += col.w;
-                    });
-
-                    yPos += 8;
-
-                    // QUESTIONS Loop
-                    setPdfProgress(`Processing ${student.info.name}...`);
-
-                    for (let i = 0; i < test.questions.length; i++) {
-                        const q = test.questions[i];
-
-                        const qImg = await loadImage(q.Q_URL);
-                        const sImg = await loadImage(q.S_URL);
-
-                        // Layout
-                        const wStat = 18;
-                        const wQ = 12;
-                        const wKey = 18;
-                        const imgAreaW = contentWidth - wStat;
-                        const halfImgW = imgAreaW / 2;
-
-                        // Strict Alignment
-                        const wTopic = halfImgW - wQ;
-                        const wSub = halfImgW - 18; // (Key W is 18)
-
-                        // Font Setup
-                        if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                        else doc.setFont("helvetica", "bold");
-                        doc.setFontSize(9);
-
-                        // Text Wrap
-                        const topicLabel = "Topic: ";
-                        const topicVal = q.Topic || '';
-                        // Calc max width for Value: wTopic - LabelWidth - Padding
-                        const topicValReqW = widthInMM(doc, topicVal);
-                        const topicMaxW = wTopic - doc.getTextWidth(topicLabel) - 2;
-                        const topicLines = doc.splitTextToSize(topicVal, topicMaxW);
-
-                        const subLabel = "Sub Topic: ";
-                        const subVal = q.Sub_Topic || '';
-                        const subMaxW = wSub - doc.getTextWidth(subLabel) - 2;
-                        const subLines = doc.splitTextToSize(subVal, subMaxW);
-
-                        const maxHeaderLines = Math.max(1, topicLines.length, subLines.length);
-                        const lineHeight = 4;
-                        const headerH = Math.max(7, (maxHeaderLines * lineHeight) + 2.5);
-
-                        // Content H
-                        const imgTargetW = 85;
-                        let qH = 0; if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
-                        let sH = 0; if (sImg) sH = (sImg.height / sImg.width) * imgTargetW;
-                        const maxContentH = Math.max(qH, sH, 20);
-                        const blockH = headerH + maxContentH + 2;
-
-                        // Page Break Check
-                        if (yPos + blockH > pageHeight - margin) {
-                            doc.addPage();
-                            // Do NOT add Main Header or Student Info on subsequent pages
-                            // Just reset padding
-                            yPos = 15;
-                        } else if (i > 0) {
-                            yPos += 2;
-                        }
-
-                        // Draw Question Block
-                        // 1. Header Bar
-                        doc.setFillColor(128, 0, 0);
-                        doc.rect(margin, yPos, contentWidth, headerH, 'F');
-                        doc.setTextColor(255);
-
-                        let currentX = margin;
-                        const baseTextY = yPos + 4.5;
-
-                        // W/U
-                        doc.text(String(q.W_U || ''), currentX + (wStat / 2), baseTextY, { align: 'center' });
-                        doc.setDrawColor(255);
-                        doc.line(currentX + wStat, yPos, currentX + wStat, yPos + headerH);
-                        currentX += wStat;
-
-                        // Q No
-                        doc.text(String(q.Q_No), currentX + (wQ / 2), baseTextY, { align: 'center' });
-                        doc.line(currentX + wQ, yPos, currentX + wQ, yPos + headerH);
-                        currentX += wQ;
-
-                        // Topic
-                        doc.setTextColor(255, 255, 255);
-                        doc.text(topicLabel, currentX + 1, baseTextY);
-
-                        doc.setTextColor(240, 230, 140); // Khaki
-                        doc.text(topicLines, currentX + doc.getTextWidth(topicLabel) + 1, baseTextY);
-
-                        doc.setDrawColor(255);
-                        doc.line(currentX + wTopic, yPos, currentX + wTopic, yPos + headerH);
-                        currentX += wTopic;
-
-                        // Sub Topic
-                        doc.setTextColor(255, 255, 255);
-                        doc.text(subLabel, currentX + 1, baseTextY);
-
-                        doc.setTextColor(240, 230, 140);
-                        doc.text(subLines, currentX + doc.getTextWidth(subLabel) + 1, baseTextY);
-
-                        doc.setDrawColor(255);
-                        doc.line(currentX + wSub, yPos, currentX + wSub, yPos + headerH);
-                        currentX += wSub;
-
-                        // Key
-                        const keyLabel = "Key: ";
-                        const keyVal = q.Key_Value || '';
-                        const kTotalW = doc.getTextWidth(keyLabel + keyVal);
-                        const kStart = (currentX + (wKey / 2)) - (kTotalW / 2);
-
-                        doc.setTextColor(255, 255, 255);
-                        doc.text(keyLabel, kStart, baseTextY);
-                        doc.setTextColor(240, 230, 140);
-                        doc.text(keyVal, kStart + doc.getTextWidth(keyLabel), baseTextY);
-                        // Reset Align/Color etc implicit
-
-                        // 2. Content Border
-                        doc.setDrawColor(0);
-                        doc.rect(margin, yPos, contentWidth, blockH);
-
-                        // 3. Subject Strip (Auto-fit Font)
-                        doc.setFillColor(79, 129, 189);
-                        doc.rect(margin, yPos + headerH, wStat, blockH - headerH, 'F');
-
-                        doc.setTextColor(255);
-                        const subjectText = String(q.Subject || '');
-                        let subjFontSize = 9;
-                        doc.setFontSize(subjFontSize);
-                        const maxSubjW = wStat - 2;
-                        while (doc.getTextWidth(subjectText) > maxSubjW && subjFontSize > 4) {
-                            subjFontSize -= 0.5;
-                            doc.setFontSize(subjFontSize);
-                        }
-                        const stripCenterY = yPos + headerH + ((blockH - headerH) / 2);
-                        const stripCenterX = margin + (wStat / 2);
-                        doc.text(subjectText, stripCenterX, stripCenterY + (subjFontSize / 3), { align: 'center' });
-
-                        // 4. Images
-                        const imgBaseX = margin + wStat;
-                        const imgContentY = yPos + headerH;
-
-                        doc.setDrawColor(0);
-                        doc.line(imgBaseX + halfImgW, imgContentY, imgBaseX + halfImgW, yPos + blockH);
-
-                        const drawImage = (img, x, y, drawnH) => {
-                            if (!img) return;
-                            const aspect = img.width / img.height;
-                            let w = drawnH * aspect;
-                            const colWidth = halfImgW;
-                            const offX = (colWidth - w) / 2;
-                            try { doc.addImage(img, 'PNG', x + offX, y + 1, w, drawnH); } catch (e) { }
-                        };
-
-                        if (qImg) drawImage(qImg, imgBaseX, imgContentY, qH);
-                        else {
-                            doc.setTextColor(150); doc.setFontSize(8);
-                            doc.text("No Q Image", imgBaseX + 5, imgContentY + 5);
-                        }
-
-                        if (sImg) drawImage(sImg, imgBaseX + halfImgW, imgContentY, sH);
-
-                        yPos += blockH;
-                    } // End Questions Match
-                } // End Tests
-
-                // Add Page Numbers for this student
-                const endPageNum = doc.internal.getNumberOfPages();
-                doc.setFontSize(9);
-                doc.setTextColor(0);
-                if (bookmanFont) doc.setFont("Bookman", "normal");
-
-                for (let p = startPageNum; p <= endPageNum; p++) {
-                    doc.setPage(p);
-                    const pageText = `Page ${p - startPageNum + 1} of ${endPageNum - startPageNum + 1}`;
-                    doc.text(pageText, pageWidth / 2, pageHeight - 5, { align: 'center' });
+            const fonts = { impactFont, bookmanFont, bookmanBoldFont };
+
+            if (reportData.length === 1) {
+                // Single PDF
+                const doc = await createStudentPDF(reportData[0], fonts);
+                doc.save(`Error_Report_${reportData[0].info.name}.pdf`);
+            } else {
+                // ZIP Download
+                const zip = new JSZip();
+
+                for (let i = 0; i < reportData.length; i++) {
+                    const student = reportData[i];
+                    setPdfProgress(`Generating PDF for ${student.info.name} (${i + 1}/${reportData.length})...`);
+                    const doc = await createStudentPDF(student, fonts);
+                    const blob = doc.output('blob');
+                    zip.file(`Error_Report_${student.info.name}.pdf`, blob);
                 }
 
-            } // End Students
-
-            doc.save(`Error_Report_${reportData[0].info.name}.pdf`);
+                setPdfProgress('Compressing...');
+                const zipContent = await zip.generateAsync({ type: 'blob' });
+                saveAs(zipContent, `Error_Reports_Batch.zip`);
+            }
 
         } catch (err) {
-            console.error("PDF Fail", err);
-            alert("PDF Error: " + err.message);
+            console.error("PDF/ZIP Error", err);
+            alert("Error: " + err.message);
         } finally {
             setGeneratingPdf(false);
             setPdfProgress('');
         }
-    };
-
-    // Helper to calc MM width roughly if needed, but jspdf handles it
-    const widthInMM = (doc, text) => {
-        return doc.getTextWidth(text);
     };
 
     return (
@@ -523,7 +527,7 @@ const ErrorReport = () => {
                         disabled={reportData.length === 0 || generatingPdf}
                         style={{ backgroundColor: '#0070c0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                     >
-                        {generatingPdf ? 'Generating PDF...' : '⬇ Download PDF File'}
+                        {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download ${reportData.length > 1 ? 'All (ZIP)' : 'PDF'}`}
                     </button>
                 </div>
             </div>
