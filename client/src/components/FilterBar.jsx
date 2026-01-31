@@ -162,7 +162,13 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
         if (!inputValue || inputValue.length < 1) return []; // Search from 1 character
 
         try {
-            const res = await fetch(`${API_URL}/api/studentsByCampus?quickSearch=${encodeURIComponent(inputValue)}`);
+            let url = `${API_URL}/api/studentsByCampus?quickSearch=${encodeURIComponent(inputValue)}`;
+            // Enforce restricted campus in search
+            if (restrictedCampus) {
+                url += `&campus=${encodeURIComponent(restrictedCampus)}`;
+            }
+
+            const res = await fetch(url);
             const data = await res.json();
             console.log("[loadStudentOptions] Data received:", data);
             return data.map(s => ({
@@ -308,8 +314,8 @@ const FilterBar = ({ filters, setFilters, restrictedCampus }) => {
                                     ...prev,
                                     studentSearch: [opt.value],
                                     quickSearch: opt.label, // Keep the label for display
-                                    // Auto-select Campus and Stream
-                                    campus: opt.campus ? [opt.campus] : [],
+                                    // Auto-select Campus and Stream IF NOT RESTRICTED
+                                    campus: restrictedCampus ? [restrictedCampus] : (opt.campus ? [opt.campus] : []),
                                     stream: opt.stream ? [opt.stream] : [],
                                     testType: [], test: [], topAll: []
                                 }));
