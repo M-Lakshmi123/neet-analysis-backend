@@ -15,10 +15,13 @@ const ErrorReport = () => {
     });
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
+    const reportRef = useRef(null);
 
     // Fetch Report Data
     useEffect(() => {
         const fetchData = async () => {
+            // Require at least one filter that limits scope significantly
+            // However, allow fetch if Student Search is active even without Test
             if (filters.test.length === 0 && filters.studentSearch.length === 0) {
                 setReportData([]);
                 return;
@@ -71,10 +74,9 @@ const ErrorReport = () => {
                     grouped[studKey].tests[testKey].questions.push(row);
                 });
 
-                // Convert to array for rendering
                 const processed = Object.values(grouped).map(student => ({
                     ...student,
-                    tests: Object.values(student.tests) // Sort? API already sorted by date usually, but could sort here
+                    tests: Object.values(student.tests)
                 }));
 
                 setReportData(processed);
@@ -90,7 +92,8 @@ const ErrorReport = () => {
         return () => clearTimeout(timeout);
     }, [filters]);
 
-    const handlePrint = () => {
+    // PDF Download Handler (using robust window.print for layout fidelity)
+    const handleDownload = () => {
         window.print();
     };
 
@@ -107,182 +110,207 @@ const ErrorReport = () => {
                     }}
                 />
 
-                <div className="controls" style={{ padding: '10px 20px', textAlign: 'right' }}>
-                    <button onClick={handlePrint} className="btn-primary">
-                        🖨️ Print / Save PDF
+                <div className="controls flex justify-between items-center bg-white p-4 rounded-lg shadow-sm mb-4 border border-gray-200">
+                    <div className="text-sm text-gray-600 font-bold">
+                        PDF PREVIEW (Data Loaded: {reportData.length > 0 ? 'Yes' : 'No'})
+                    </div>
+                    <button
+                        onClick={handleDownload}
+                        disabled={reportData.length === 0}
+                        className={`btn-primary ${reportData.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        ⬇ Download PDF
                     </button>
                 </div>
             </div>
 
-            <div className="report-content">
-                {loading && <div className="loading p-4">Loading Report data...</div>}
-
-                {!loading && reportData.length === 0 && (
-                    <div className="empty-state p-4 text-center text-gray-500">
-                        Please select a Test or Student to view the Error Report.
+            {/* PDF Preview Area */}
+            <div className="pdf-viewer-container" style={{ background: '#525659', padding: '40px', minHeight: '600px', overflowX: 'auto' }}>
+                {loading && (
+                    <div className="bg-white p-8 rounded shadow text-center mx-auto max-w-lg">
+                        <div className="animate-spin text-4xl mb-4">↻</div>
+                        <div>Generating Report Data...</div>
                     </div>
                 )}
 
-                {reportData.map((student, sIdx) => (
-                    <div key={sIdx} className="student-block">
-                        {student.tests.map((test, tIdx) => (
-                            <div key={tIdx} className="report-page print-break">
-                                {/* HEADER */}
-                                <div className="brand-header text-center mb-2">
-                                    <h1 style={{
-                                        fontFamily: 'Impact, sans-serif',
-                                        color: '#000080', // Navy
-                                        fontSize: '23px',
-                                        letterSpacing: '1px',
-                                        margin: '0',
-                                        textTransform: 'uppercase'
-                                    }}>
-                                        Sri Chaitanya Educational Institutions
-                                    </h1>
-                                    <div className="logo-placeholder" style={{ margin: '5px auto', width: '60px', height: '60px', background: 'transparent' }}>
-                                        {/* Logo would go here - using text for now or empty div if image logic added later */}
-                                        <img src="/logo.png" alt="Logo" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} onError={(e) => e.target.style.display = 'none'} />
+                {!loading && reportData.length === 0 && (
+                    <div className="bg-white p-12 rounded shadow text-center mx-auto max-w-xl">
+                        <h2 className="text-xl font-bold text-gray-700 mb-2">No Data To Display</h2>
+                        <p className="text-gray-500 mb-6">
+                            To generate the Error Report, please:
+                        </p>
+                        <div className="text-left bg-blue-50 p-4 rounded border border-blue-100 mx-auto inline-block">
+                            <ul className="list-disc pl-5 space-y-2 text-sm text-blue-800">
+                                <li>Select a specific <b>Test</b> from the filters, OR</li>
+                                <li>Search for a specific <b>Student</b> by Name or ID</li>
+                            </ul>
+                        </div>
+                    </div>
+                )}
+
+                {/* Actual Report Content */}
+                <div ref={reportRef} className="report-content">
+                    {reportData.map((student, sIdx) => (
+                        <div key={sIdx} className="student-group">
+                            {student.tests.map((test, tIdx) => (
+                                <div key={tIdx} className="report-page print-break shadow-lg mx-auto">
+                                    {/* HEADER */}
+                                    <div className="brand-header text-center mb-2">
+                                        <h1 style={{
+                                            fontFamily: 'Impact, sans-serif',
+                                            color: '#000080',
+                                            fontSize: '23px',
+                                            letterSpacing: '1px',
+                                            margin: '0',
+                                            textTransform: 'uppercase'
+                                        }}>
+                                            Sri Chaitanya Educational Institutions
+                                        </h1>
+                                        <div className="text-center text-xs font-bold uppercase tracking-wide mb-1">
+                                            A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
+                                        </div>
+                                        <div className="font-serif italic text-lg mb-1">
+                                            A Right Choice for the Real Aspirant
+                                        </div>
+                                        <div className="font-bold text-sm uppercase">
+                                            Central Office, Bangalore
+                                        </div>
+                                    </div>
+
+                                    {/* STUDENT & TEST INFO TABLE */}
+                                    <table className="info-table w-full mb-4 border-collapse border border-black text-xs">
+                                        <tbody>
+                                            <tr className="bg-[#fff8dc]">
+                                                <td colSpan="6" className="border border-black p-1 text-center font-bold text-base uppercase">
+                                                    {student.info.name}
+                                                </td>
+                                                <td colSpan="6" className="border border-black p-1 text-center font-bold text-base uppercase">
+                                                    {student.info.branch}
+                                                </td>
+                                            </tr>
+                                            <tr className="text-center font-bold bg-gray-50">
+                                                <td className="border border-black p-1">Test</td>
+                                                <td className="border border-black p-1">Date</td>
+                                                <td className="border border-black p-1 text-red-600">TOT</td>
+                                                <td className="border border-black p-1 text-red-600">AIR</td>
+                                                <td className="border border-black p-1">BOT</td>
+                                                <td className="border border-black p-1">Rank</td>
+                                                <td className="border border-black p-1">ZOO</td>
+                                                <td className="border border-black p-1">Rank</td>
+                                                <td className="border border-black p-1">PHY</td>
+                                                <td className="border border-black p-1">Rank</td>
+                                                <td className="border border-black p-1">CHEM</td>
+                                                <td className="border border-black p-1">Rank</td>
+                                            </tr>
+                                            <tr className="text-center font-bold">
+                                                <td className="border border-black p-1 text-red-700">{test.meta.testName}</td>
+                                                <td className="border border-black p-1 text-red-700">{test.meta.date}</td>
+                                                <td className="border border-black p-1 text-red-700">{test.meta.tot}</td>
+                                                <td className="border border-black p-1 text-red-700">{test.meta.air}</td>
+                                                <td className="border border-black p-1 text-red-800">{test.meta.bot}</td>
+                                                <td className="border border-black p-1 text-red-800">{test.meta.b_rank}</td>
+                                                <td className="border border-black p-1 text-red-800">{test.meta.zoo}</td>
+                                                <td className="border border-black p-1 text-red-800">{test.meta.z_rank}</td>
+                                                <td className="border border-black p-1 text-red-800">{test.meta.phy}</td>
+                                                <td className="border border-black p-1 text-red-800">{test.meta.p_rank}</td>
+                                                <td className="border border-black p-1 text-red-800">{test.meta.chem}</td>
+                                                <td className="border border-black p-1 text-red-800">{test.meta.c_rank}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+
+                                    {/* QUESTIONS LIST */}
+                                    <div className="questions-container">
+                                        {test.questions.map((q, qIdx) => (
+                                            <div key={qIdx} className="question-block mb-2 border border-black break-inside-avoid">
+                                                {/* Red Header Bar */}
+                                                <div className="q-header bg-[#800000] text-white flex text-xs font-bold items-center">
+                                                    <div className="w-[40px] p-1 text-center border-r border-white">{q.W_U}</div>
+                                                    <div className="w-[40px] p-1 text-center border-r border-white">{q.Q_No}</div>
+                                                    <div className="flex-1 p-1 pl-2 border-r border-white truncate">
+                                                        Topic: <span className="text-yellow-200">{q.Topic}</span>
+                                                    </div>
+                                                    <div className="flex-1 p-1 pl-2 border-r border-white truncate">
+                                                        Sub Topic: <span className="text-yellow-200">{q.Sub_Topic}</span>
+                                                    </div>
+                                                    <div className="w-[80px] p-1 text-center">
+                                                        Key: {q.Key_Value}
+                                                    </div>
+                                                </div>
+
+                                                {/* Content Area */}
+                                                <div className="q-content flex min-h-[120px]">
+                                                    {/* Left Subject Strip */}
+                                                    <div className="subject-strip w-[30px] bg-[#4682b4] text-white flex items-center justify-center p-1 border-r border-black">
+                                                        <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 'bold', fontSize: '10px', letterSpacing: '1px' }}>
+                                                            {q.Subject}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Right Image Area */}
+                                                    <div className="images-area flex-1 p-1 bg-white flex flex-col">
+                                                        <div className="q-row flex gap-2 h-full">
+                                                            {/* Question Image */}
+                                                            <div className="q-img-col flex-1 flex items-center justify-center p-1">
+                                                                {q.Q_URL ? (
+                                                                    <img
+                                                                        src={q.Q_URL}
+                                                                        alt={`Q${q.Q_No}`}
+                                                                        className="max-w-full max-h-[250px] object-contain"
+                                                                    />
+                                                                ) : (
+                                                                    <span className="text-gray-300 text-xs">No Question Image</span>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Solution Image - Only if exists */}
+                                                            {q.S_URL && (
+                                                                <div className="s-img-col flex-1 flex items-center justify-center p-1 border-l border-gray-300">
+                                                                    <img
+                                                                        src={q.S_URL}
+                                                                        alt={`Sol${q.Q_No}`}
+                                                                        className="max-w-full max-h-[250px] object-contain"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-
-                                {/* STUDENT & TEST INFO TABLE */}
-                                <table className="info-table w-full mb-4 border-collapse border border-black">
-                                    <tbody>
-                                        <tr className="bg-yellow-100 font-bold">
-                                            <td colSpan="6" className="border border-black p-1 text-center bg-[#fff8dc] text-lg uppercase">
-                                                {student.info.name}
-                                            </td>
-                                            <td colSpan="6" className="border border-black p-1 text-center bg-[#fff8dc] text-lg uppercase">
-                                                {student.info.branch}
-                                            </td>
-                                        </tr>
-                                        <tr className="text-center font-bold bg-gray-50 text-sm">
-                                            <td className="border border-black p-1">Test</td>
-                                            <td className="border border-black p-1">Date</td>
-                                            <td className="border border-black p-1 text-red-600">TOT</td>
-                                            <td className="border border-black p-1 text-red-600">AIR</td>
-                                            <td className="border border-black p-1">BOT</td>
-                                            <td className="border border-black p-1">Rank</td>
-                                            <td className="border border-black p-1">ZOO</td>
-                                            <td className="border border-black p-1">Rank</td>
-                                            <td className="border border-black p-1">PHY</td>
-                                            <td className="border border-black p-1">Rank</td>
-                                            <td className="border border-black p-1">CHEM</td>
-                                            <td className="border border-black p-1">Rank</td>
-                                        </tr>
-                                        <tr className="text-center font-bold text-sm">
-                                            <td className="border border-black p-1">{test.meta.testName}</td>
-                                            <td className="border border-black p-1 text-red-600">{test.meta.date}</td>
-                                            <td className="border border-black p-1 text-red-600">{test.meta.tot}</td>
-                                            <td className="border border-black p-1 text-red-600">{test.meta.air}</td>
-                                            <td className="border border-black p-1 text-red-800">{test.meta.bot}</td>
-                                            <td className="border border-black p-1 text-red-800">{test.meta.b_rank}</td>
-                                            <td className="border border-black p-1 text-red-800">{test.meta.zoo}</td>
-                                            <td className="border border-black p-1 text-red-800">{test.meta.z_rank}</td>
-                                            <td className="border border-black p-1 text-red-800">{test.meta.phy}</td>
-                                            <td className="border border-black p-1 text-red-800">{test.meta.p_rank}</td>
-                                            <td className="border border-black p-1 text-red-800">{test.meta.chem}</td>
-                                            <td className="border border-black p-1 text-red-800">{test.meta.c_rank}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-
-                                {/* QUESTIONS LIST */}
-                                <div className="questions-container">
-                                    {test.questions.map((q, qIdx) => (
-                                        <div key={qIdx} className="question-block mb-4 border border-black break-inside-avoid">
-                                            {/* Red Header Bar */}
-                                            <div className="q-header bg-[#800000] text-white flex text-sm font-bold">
-                                                <div className="w-[8%] p-1 text-center border-r border-white">{q.W_U}</div>
-                                                <div className="w-[8%] p-1 text-center border-r border-white">{q.Q_No}</div>
-                                                <div className="flex-1 p-1 pl-2 border-r border-white">
-                                                    Topic: <span className="text-yellow-200">{q.Topic}</span>
-                                                </div>
-                                                <div className="flex-1 p-1 pl-2 border-r border-white">
-                                                    Sub Topic: <span className="text-yellow-200">{q.Sub_Topic}</span>
-                                                </div>
-                                                <div className="w-[12%] p-1 text-center">
-                                                    Key: {q.Key_Value}
-                                                </div>
-                                            </div>
-
-                                            {/* Content Area */}
-                                            <div className="q-content flex min-h-[150px]">
-                                                {/* Left Subject Strip */}
-                                                <div className="subject-strip w-[10%] bg-[#4682b4] text-white flex items-center justify-center p-2">
-                                                    <span style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 'bold', letterSpacing: '2px' }}>
-                                                        {q.Subject}
-                                                    </span>
-                                                </div>
-
-                                                {/* Right Image Area */}
-                                                <div className="images-area flex-1 p-2 bg-white flex flex-col gap-2">
-                                                    {q.Q_URL && (
-                                                        <div className="q-img-wrapper">
-                                                            <img
-                                                                src={q.Q_URL}
-                                                                alt={`Q${q.Q_No}`}
-                                                                className="max-w-full object-contain"
-                                                                style={{ maxHeight: '300px' }}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                    {q.S_URL && (
-                                                        <div className="s-img-wrapper border-t border-dashed border-gray-300 pt-2 mt-2">
-                                                            <div className="text-xs text-gray-500 mb-1">Solution:</div>
-                                                            <img
-                                                                src={q.S_URL}
-                                                                alt={`Sol${q.Q_No}`}
-                                                                className="max-w-full object-contain"
-                                                                style={{ maxHeight: '300px' }}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                    {!q.Q_URL && !q.S_URL && (
-                                                        <div className="text-center text-gray-400 py-10">
-                                                            No Image Available for Question {q.Q_No}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ))}
+                            ))}
+                        </div>
+                    ))}
+                </div>
             </div>
 
             <style>{`
                 @media print {
                     .no-print { display: none !important; }
+                    .pdf-viewer-container { padding: 0 !important; background: white !important; height: auto !important; overflow: visible !important; }
                     .dashboard-root { height: auto !important; overflow: visible !important; }
                     .dashboard-main-content { margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; }
-                    .report-page { 
-                        width: 100%; 
-                        padding: 20px;
-                        print-color-adjust: exact; 
-                        -webkit-print-color-adjust: exact; 
+                    .sidebar { display: none !important; }
+                    .report-page {
+                        margin: 0 !important;
+                        box-shadow: none !important;
+                        border: none !important;
+                        padding: 0 !important;
+                        page-break-after: always;
                     }
-                    .print-break { page-break-after: always; }
-                    .student-block { page-break-after: always; }
-                    body { background: white; -webkit-print-color-adjust: exact; }
+                    body { -webkit-print-color-adjust: exact; margin: 0; padding: 0; }
+                    @page { margin: 10mm; size: A4; }
                 }
-                /* Print Preview Visuals on Screen */
-                .report-content {
-                    max-width: 1100px;
-                    margin: 0 auto;
-                    background: #f0f0f0;
-                    padding: 20px;
-                }
+                
                 .report-page {
                     background: white;
-                    border: 1px solid #ddd;
-                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                    margin-bottom: 30px;
-                    padding: 30px; /* A4 padding roughly */
+                    width: 210mm; /* A4 Width */
                     min-height: 297mm; /* A4 Height */
+                    padding: 15mm;
+                    margin: 0 auto 30px auto;
+                    position: relative;
                 }
             `}</style>
         </div>

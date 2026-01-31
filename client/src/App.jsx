@@ -164,7 +164,8 @@ const Dashboard = () => {
                     activePage === 'analysis' ? 'Analysis Report' :
                         activePage === 'averages' ? 'Average Marks Report' :
                             activePage === 'progress' ? 'Progress Report' :
-                                activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
+                                activePage === 'errors' ? 'Error Report' :
+                                    activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
                     {renderPageContent()}

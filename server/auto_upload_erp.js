@@ -6,11 +6,12 @@ const path = require('path');
 
 // --- CONFIGURATION ---
 const WATCH_FOLDER = 'F:/Project files';
-const FILES_TO_WATCH = ['MEDICAL_RESULT.csv', 'ERP_REPORT.csv', 'Error report.csv'];
+// STRICTLY WATCH ONLY ERP REPORT
+const FILES_TO_WATCH = ['Error report.csv'];
 const WATCH_PATHS = FILES_TO_WATCH.map(f => path.join(WATCH_FOLDER, f));
 
 console.log("-----------------------------------------");
-console.log("   NEET DATA AUTO-UPLOADER (TiDB Cloud)  ");
+console.log("      ERP REPORT AUTO-UPLOADER           ");
 console.log("-----------------------------------------");
 console.log(`Watching folder: ${WATCH_FOLDER}`);
 console.log(`Files: ${FILES_TO_WATCH.join(', ')}`);
@@ -39,15 +40,15 @@ async function processFile(filePath) {
     // Determine Table Name from Filename
     const filename = require('path').basename(filePath);
 
-    let tableName = 'MEDICAL_RESULT';
+    // STRICTLY ERP REPORT
+    let tableName = 'ERP_REPORT';
     const upperName = filename.toUpperCase();
 
-    if (upperName.includes('ERP_REPORT') || upperName.includes('ERROR REPORT')) {
+    if (upperName.includes('Error report') || upperName.includes('ERROR REPORT') || upperName.includes('ERP_REPORT')) {
         tableName = 'ERP_REPORT';
-    } else if (upperName.includes('MEDICAL_RESULT')) {
-        tableName = 'MEDICAL_RESULT';
     } else {
-        console.log(`Skipping file: ${filename}`);
+        // Fallback or ignore
+        console.log(`Skipping unknown file: ${filename}`);
         isProcessing = false;
         return;
     }
@@ -139,31 +140,23 @@ async function uploadToDB(rows, tableName) {
         let successCount = 0;
         let failCount = 0;
 
-        // BATCH INSERT? Slow but safer to do individually or small batches for errors
-        // For speed, let's do individual but async parallel limit? 
-        // Or simple loop for reliability first.
-
-        // Let's verify columns first from the first row
+        // Basic Validation
         const firstRow = rows[0];
         const columns = Object.keys(firstRow).map(c => c.trim());
 
-        // Basic Validation
         if (!columns.includes('STUD_ID')) {
             console.error("❌ ERROR: CSV missing 'STUD_ID' column. Check header names!");
             return;
         }
 
-        // Prepare INSERT statement dynamically based on CSV headers matching DB columns
-        // Note: This assumes CSV headers MATCH Database columns exactly (or close enough)
-
         for (const row of rows) {
             const keys = Object.keys(row);
-            // Wrap keys in backticks to handle spaces in column names
             const safeKeys = keys.map(k => `\`${k.trim()}\``).join(',');
-
-            // Helper for finding index of key case-insensitively
             const findKeyIndex = (name) => keys.findIndex(k => k.trim().toUpperCase() === name);
             const studIdIndex = findKeyIndex('STUD_ID');
+            // Check for Q_No for duplicates in ERP Report instead of Test? 
+            // Or maybe combine STUD_ID + Q_No + Test
+            const qNoIndex = findKeyIndex('Q_NO');
             const testIndex = findKeyIndex('TEST');
 
             const values = Object.values(row).map((v, index) => {
@@ -172,19 +165,14 @@ async function uploadToDB(rows, tableName) {
                 let s = String(v).trim();
                 const upperKey = key.toUpperCase().trim();
 
-                // --- 1. Fix STUD_ID Scientific Notation ---
                 if (upperKey === 'STUD_ID') {
-                    // Check for scientific notation like 1.23E+10
                     if (/[eE][+-]?\d+$/.test(s) || /^\d+\.\d+$/.test(s)) {
-                        // Note: plain floats also caught here to ensure integer string
                         try {
                             const n = Number(s);
                             if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false });
                         } catch (e) { }
                     }
                 }
-
-                // --- 2. Fix Date Formats (Excel Serial, DD/MM/YYYY, DD-MM-YYYY) ---
                 if (upperKey === 'DATE' || upperKey === 'EXAM_DATE') {
                     // Case A: Excel Serial Number (e.g. 45831)
                     if (/^\d{5}(\.\d+)?$/.test(s)) {
@@ -219,18 +207,18 @@ async function uploadToDB(rows, tableName) {
                 return `'${s}'`;
             });
 
-            // --- 3. Duplicate Check ---
+            // Duplicate Check (Specific for ERP Report)
+            // STUD_ID + Test + Q_No should probably be unique for a specific error report entry?
             let isDuplicate = false;
-
-            // Need safely formatted values (they already contain single quotes)
             const studIdVal = studIdIndex !== -1 ? values[studIdIndex] : null;
             const testVal = testIndex !== -1 ? values[testIndex] : null;
+            const qNoVal = qNoIndex !== -1 ? values[qNoIndex] : null;
 
             if (studIdVal) {
                 let checkSql = `SELECT 1 FROM ${tableName} WHERE STUD_ID = ${studIdVal}`;
-                if (testVal) {
-                    checkSql += ` AND Test = ${testVal}`;
-                }
+                if (testVal) checkSql += ` AND Test = ${testVal}`;
+                if (qNoVal) checkSql += ` AND Q_No = ${qNoVal}`;
+
                 checkSql += ` LIMIT 1`;
 
                 try {
@@ -238,18 +226,14 @@ async function uploadToDB(rows, tableName) {
                     if (existing.recordset && existing.recordset.length > 0) {
                         isDuplicate = true;
                     }
-                } catch (checkErr) {
-                    // Warning: Table might not have columns yet if empty?
-                }
+                } catch (checkErr) { }
             }
 
             if (isDuplicate) {
-                // Count as failed/skipped
                 failCount++;
                 continue;
             }
 
-            // Construct INSERT (without Update)
             const sql = `INSERT INTO ${tableName} (${safeKeys}) VALUES (${values.join(',')})`;
 
             try {

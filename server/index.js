@@ -477,6 +477,166 @@ app.get('/api/analysis-report', async (req, res) => {
     }
 });
 
+// --- ERP REPORT API ENDPOINTS ---
+
+// Get ERP Filter Options
+app.get('/api/erp/filters', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const { branch, stream, testType, test } = req.query;
+        console.log(`[ERP Filters] Request: branch=${branch}, stream=${stream}, testType=${testType}, test=${test}`);
+
+        const buildOptionClause = (column, values) => {
+            if (!values || values === 'All' || values === '__ALL__') return null;
+            const valArray = Array.isArray(values) ? values : [values];
+            const cleanValues = valArray
+                .map(v => v ? v.toString().trim() : '')
+                .filter(v => v !== '' && v !== '__ALL__')
+                .map(v => v.replace(/'/g, "''"));
+
+            if (cleanValues.length === 0) return null;
+            const list = cleanValues.map(v => `'${v}'`).join(',');
+            return `${column} IN (${list})`;
+        };
+
+        // Note: Frontend sends 'branch' (mapped to campus filter), we query 'Branch' column
+        const branchClause = buildOptionClause('Branch', branch);
+        const streamClause = buildOptionClause('Stream', stream);
+        const testTypeClause = buildOptionClause('Test_Type', testType);
+        const testClause = buildOptionClause('Test', test);
+
+        const branchesQuery = 'SELECT DISTINCT TRIM(Branch) as Branch FROM ERP_REPORT WHERE Branch IS NOT NULL AND Branch != \'\' ORDER BY Branch';
+
+        const sWhere = branchClause ? `WHERE ${branchClause}` : 'WHERE 1=1';
+        const streamsQuery = `SELECT DISTINCT TRIM(Stream) as Stream FROM ERP_REPORT ${sWhere} AND Stream IS NOT NULL AND Stream != '' ORDER BY Stream`;
+
+        let ttClauses = [];
+        if (branchClause) ttClauses.push(branchClause);
+        if (streamClause) ttClauses.push(streamClause);
+        const ttWhere = ttClauses.length > 0 ? `WHERE ${ttClauses.join(' AND ')}` : 'WHERE 1=1';
+        const testTypesQuery = `SELECT DISTINCT TRIM(Test_Type) as Test_Type FROM ERP_REPORT ${ttWhere} AND Test_Type IS NOT NULL AND Test_Type != '' ORDER BY Test_Type`;
+
+        let tClauses = [...ttClauses];
+        if (testTypeClause) tClauses.push(testTypeClause);
+        const tWhere = tClauses.length > 0 ? `WHERE ${tClauses.join(' AND ')}` : 'WHERE 1=1';
+        const testsQuery = `SELECT DISTINCT TRIM(Test) as Test FROM ERP_REPORT ${tWhere} AND Test IS NOT NULL AND Test != '' ORDER BY Test`;
+
+        let topClauses = [...tClauses];
+        if (testClause) topClauses.push(testClause);
+        const topWhere = topClauses.length > 0 ? `WHERE ${topClauses.join(' AND ')}` : 'WHERE 1=1';
+        const topQuery = `SELECT DISTINCT TRIM(Top_ALL) as Top_ALL FROM ERP_REPORT ${topWhere} AND Top_ALL IS NOT NULL AND Top_ALL != '' ORDER BY Top_ALL`;
+
+        const [branchesRes, streamsRes, testTypesRes, testsRes, topRes] = await Promise.all([
+            pool.request().query(branchesQuery),
+            pool.request().query(streamsQuery),
+            pool.request().query(testTypesQuery),
+            pool.request().query(testsQuery),
+            pool.request().query(topQuery)
+        ]);
+
+        res.json({
+            campuses: (branchesRes.recordset || []).map(r => r.Branch).filter(Boolean),
+            streams: (streamsRes.recordset || []).map(r => r.Stream).filter(Boolean),
+            testTypes: (testTypesRes.recordset || []).map(r => r.Test_Type).filter(Boolean),
+            tests: (testsRes.recordset || []).map(r => r.Test).filter(Boolean),
+            topAll: (topRes.recordset || []).map(r => r.Top_ALL).filter(Boolean)
+        });
+    } catch (err) {
+        console.error("[ERP Filters] ERROR:", err);
+        res.status(500).json({ error: "Server Error", details: err.message });
+    }
+});
+
+// Get ERP Data Report
+app.get('/api/erp/report', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
+
+        let clauses = [];
+        const addClause = (field, value) => {
+            if (!value || value === 'All' || value === '__ALL__') return;
+            const valArray = Array.isArray(value) ? value : [value];
+            const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+            if (cleanValues.length === 0) return;
+            clauses.push(`UPPER(TRIM(${field})) IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
+        };
+
+        // Map filters to ERP columns
+        addClause('Branch', campus);
+        addClause('Stream', stream);
+        addClause('Test', test);
+        addClause('Test_Type', testType);
+        addClause('Top_ALL', topAll);
+
+        const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
+        const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+
+        if (cleanIds.length > 0) {
+            clauses.push(`UPPER(TRIM(STUD_ID)) IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
+        } else if (quickSearch && quickSearch.trim() !== '') {
+            const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
+            clauses.push(`(UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
+        }
+
+        // Filter for W and U only
+        clauses.push(`(UPPER(TRIM(W_U)) = 'W' OR UPPER(TRIM(W_U)) = 'U')`);
+
+        const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+
+        const query = `
+            SELECT * FROM ERP_REPORT 
+            ${where}
+            ORDER BY 
+                Student_Name, 
+                STR_TO_DATE(Exam_Date, '%d-%m-%Y') DESC,
+                Subject, 
+                Q_No ASC
+        `;
+
+        logQuery(query, req.query);
+        const result = await pool.request().query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("[ERP Report] ERROR:", err);
+        res.status(500).send(err.message);
+    }
+});
+
+// Get ERP Students for Search
+app.get('/api/erp/students', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const { quickSearch, campus } = req.query; // 'campus' param comes from FilterBar (mapped to Branch)
+
+        let whereClause = "WHERE 1=1";
+        if (campus) whereClause += ` AND UPPER(TRIM(Branch)) = '${campus.toUpperCase().replace(/'/g, "''")}'`;
+
+        if (quickSearch && quickSearch.trim() !== '') {
+            const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
+            whereClause += ` AND (UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`;
+        }
+
+        const query = `
+            SELECT 
+                TRIM(STUD_ID) as id, 
+                MAX(TRIM(Student_Name)) as name,
+                MAX(TRIM(Branch)) as campus,
+                MAX(TRIM(Stream)) as stream
+            FROM ERP_REPORT 
+            ${whereClause} 
+            GROUP BY STUD_ID
+            ORDER BY name
+            LIMIT 50`;
+
+        const result = await pool.request().query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("[ERP Students] ERROR:", err);
+        res.status(500).send(err.message);
+    }
+});
+
 // SERVE REACT APP FOR ANY OTHER ROUTE
 // app.get('*', (req, res) => {
 //     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
