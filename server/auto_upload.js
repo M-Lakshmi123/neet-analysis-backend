@@ -111,37 +111,45 @@ async function uploadToDB(rows, tableName) {
                 const key = keys[index];
                 if (v === null || v === undefined) return "NULL";
                 let s = String(v).trim();
+                const upperKey = key.toUpperCase();
 
-                // Fix STUD_ID Scientific Notation (e.g. 1.23E+10 -> 12300000000)
-                if (key.toUpperCase() === 'STUD_ID') {
-                    // Check if it looks like scientific notation
+                // --- 1. Fix STUD_ID Scientific Notation ---
+                if (upperKey === 'STUD_ID') {
                     if (/[eE][+-]?\d+$/.test(s)) {
                         try {
-                            // Use BigInt or toLocaleString to verify
                             const n = Number(s);
-                            if (!isNaN(n)) {
-                                s = n.toLocaleString('fullwide', { useGrouping: false });
-                            }
-                        } catch (e) { /* ignore */ }
+                            if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false });
+                        } catch (e) { }
                     }
                 }
 
-                // Format Date to DD-MM-YYYY (User requested format in DB)
-                // Appy to 'DATE' or 'Exam_Date'
-                const upperKey = key.toUpperCase();
-                if ((upperKey === 'DATE' || upperKey === 'EXAM_DATE') && s.includes('-')) {
-                    const parts = s.split('-');
-                    if (parts.length === 3) {
-                        let d = parseInt(parts[0]);
-                        let m = parseInt(parts[1]);
-                        let y = parseInt(parts[2]);
-
-                        // Handle 2 digit year (e.g., 25 -> 2025)
-                        if (y < 100) y += 2000;
-
-                        if (m <= 12 && d <= 31) {
-                            // Storing as DD-MM-YYYY per user request
+                // --- 2. Fix Date Formats (Excel Serial, DD/MM/YYYY, DD-MM-YYYY) ---
+                if (upperKey === 'DATE' || upperKey === 'EXAM_DATE') {
+                    // Case A: Excel Serial Number (e.g. 45831)
+                    if (/^\d{5}(\.\d+)?$/.test(s)) {
+                        try {
+                            const serial = parseFloat(s);
+                            // Excel base date: Dec 30, 1899
+                            const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+                            const d = date.getDate();
+                            const m = date.getMonth() + 1;
+                            const y = date.getFullYear();
                             s = `${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}-${y}`;
+                        } catch (e) { console.error("Date Parse Error:", e); }
+                    }
+                    // Case B: Slash Separated (DD/MM/YYYY)
+                    else if (s.includes('/')) {
+                        const parts = s.split('/');
+                        if (parts.length === 3) {
+                            // Assuming DD/MM/YYYY
+                            s = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
+                        }
+                    }
+                    // Case C: Hyphen Separated (DD-MM-YYYY) - Formatting Check
+                    else if (s.includes('-')) {
+                        const parts = s.split('-');
+                        if (parts.length === 3) {
+                            s = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
                         }
                     }
                 }
@@ -150,16 +158,22 @@ async function uploadToDB(rows, tableName) {
                 return `'${s}'`;
             });
 
-            const sql = `INSERT INTO ${tableName} (${safeKeys}) VALUES (${values.join(',')})`;
+            // Construct Dynamic UPSERT (Insert or Update)
+            const updateClause = keys.map(k => {
+                const safeK = `\`${k.trim()}\``;
+                return `${safeK} = VALUES(${safeK})`;
+            }).join(', ');
+
+            const sql = `INSERT INTO ${tableName} (${safeKeys}) VALUES (${values.join(',')}) 
+                         ON DUPLICATE KEY UPDATE ${updateClause}`;
 
             try {
                 await pool.request().query(sql);
                 successCount++;
-                process.stdout.write("."); // Progress dot
+                process.stdout.write(".");
             } catch (err) {
                 failCount++;
-                // process.stdout.write("x");
-                // console.error("\nFailed Row:", row['STUD_ID'], err.message);
+                console.error(`\n[Row Error] STUD_ID: ${row['STUD_ID'] || '?'} - ${err.message}`);
             }
         }
 
