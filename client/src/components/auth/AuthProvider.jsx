@@ -20,18 +20,18 @@ export const AuthProvider = ({ children }) => {
 
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Check if this is a valid session
-                // If the user closes the window, sessionStorage is cleared.
-                // When they reopen, 'NEET_SESSION_ACTIVE' will be missing.
-                // We force logout in that case.
+                // Check for session flag
                 const isSessionActive = sessionStorage.getItem('NEET_SESSION_ACTIVE');
 
+                // If flag is missing, it means this is a new window/tab or restored session without our flag.
+                // We treat this as "Logged Out" security enforcement.
                 if (!isSessionActive) {
-                    // Valid logic to prevent race condition on initial login:
-                    // If the user just logged in via LoginPage, the flag is set there.
-                    // If the user is reopening a closed tab, the flag is missing -> Logout.
-                    console.log("No active session flag found. Logging out...");
+                    console.warn("Security: No active session flag found. Forcing logout.");
+
+                    // Force clearing of any potential persistence
+                    await setPersistence(auth, browserSessionPersistence);
                     await auth.signOut();
+
                     setUserData(null);
                     setCurrentUser(null);
                     setLoading(false);
@@ -51,7 +51,6 @@ export const AuthProvider = ({ children }) => {
                     if (user.email === "yenjarappa.s@varsitymgmt.com") {
                         setUserData({ role: 'admin', campus: 'All', isApproved: true, email: user.email });
                     } else {
-
                         setUserData(null);
                     }
                 }
@@ -64,6 +63,8 @@ export const AuthProvider = ({ children }) => {
 
         return unsubscribe;
     }, []);
+
+
 
     const value = {
         currentUser,
