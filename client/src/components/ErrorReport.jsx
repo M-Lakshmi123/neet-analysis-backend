@@ -299,13 +299,29 @@ const ErrorReport = () => {
                         const qImg = await loadImage(q.Q_URL);
                         const sImg = await loadImage(q.S_URL);
 
-                        // Layout Constants
+                        // Layout Constants - Alignment Logic
                         const wStat = 18; // W/U
                         const wQ = 12;    // Q No
                         const wKey = 18;  // Key
-                        const wMiddle = contentWidth - (wStat + wQ + wKey);
-                        const wTopic = wMiddle / 2;
-                        const wSub = wMiddle / 2;
+
+                        // Image Area is the remaining width after the vertical strip (18mm)
+                        const imgAreaW = contentWidth - wStat; // approx 172mm
+                        const halfImgW = imgAreaW / 2;         // approx 86mm
+
+                        // We want the Topic / SubTopic divider to align with the image divider
+                        // Image divider is at: margin + wStat + halfImgW
+                        // Heading Columns: [State (18)] [Q (12)] [Topic] | [SubTopic] [Key (18)]
+                        // Topic Limit = (wStat + halfImgW) - (wStat + wQ) = halfImgW - wQ
+                        const wTopic = halfImgW - wQ;
+
+                        // SubTopic Limit = (contentWidth) - (wStat + wQ + wTopic + wKey)
+                        // Should technically match halfImgW if wKey == wStat?
+                        // Let's calc: SubTopic Start = margin + 18 + 12 + wTopic = margin + 18 + halfImgW (Correct Alignment)
+                        // SubTopic End = margin + contentWidth - wKey
+                        // So wSub = (contentWidth - wKey) - (18 + halfImgW)
+                        // Since contentWidth = 18 + halfImgW * 2
+                        // wSub = (18 + 2*halfImgW - 18) - (18 + halfImgW) = 2*halfImgW - 18 - halfImgW = halfImgW - 18.
+                        const wSub = halfImgW - 18; // (approx 68mm)
 
                         // Header Text Wrapping Calc
                         if (bookmanBoldFont) doc.setFont("Bookman", "bold");
@@ -315,22 +331,18 @@ const ErrorReport = () => {
                         // Topic Wrapped
                         const topicLabel = "Topic: ";
                         const topicVal = q.Topic || '';
-                        const topicFull = topicLabel + topicVal;
-                        // For width calc, we'll assume approx chars or use splitText
-                        const topicLines = doc.splitTextToSize(topicFull, wTopic - 2);
+                        const topicLines = doc.splitTextToSize(topicVal, wTopic - doc.getTextWidth(topicLabel) - 2);
 
                         // SubTopic Wrapped
                         const subLabel = "Sub Topic: ";
                         const subVal = q.Sub_Topic || '';
-                        const subFull = subLabel + subVal;
-                        const subLines = doc.splitTextToSize(subFull, wSub - 2);
+                        const subLines = doc.splitTextToSize(subVal, wSub - doc.getTextWidth(subLabel) - 2);
 
                         const maxHeaderLines = Math.max(1, topicLines.length, subLines.length);
                         const lineHeight = 4; // mm
-                        const headerH = Math.max(7, (maxHeaderLines * lineHeight) + 3); // Min 7mm, plus padding
+                        const headerH = Math.max(7, (maxHeaderLines * lineHeight) + 3); // Min 7mm
 
                         // Image Area
-                        const imgAreaW = contentWidth - wStat; // Images to right of Subject
                         const imgTargetW = 85;
 
                         let qH = 0;
@@ -356,7 +368,6 @@ const ErrorReport = () => {
                         doc.rect(margin, yPos, contentWidth, headerH, 'F');
 
                         doc.setTextColor(255);
-                        // Font already set above
 
                         let currentX = margin;
                         const textYStart = yPos + 4.5;
@@ -373,27 +384,12 @@ const ErrorReport = () => {
                         currentX += wQ;
 
                         // [Col 3] Topic
-                        // Draw Label then Value... simplified to drawing specific colored words is hard with wrap
-                        // Simplification: Print "Topic: <Val>" all white, or try separate logic?
-                        // Multi-color wrapped text is very hard in jsPDF. 
-                        // STICK TO: White Label, Khaki Value?
-                        // If it wraps, we need precise coord control.
-                        // Simple approach: Print whole string in White for now to ensure wrapping works safely.
-                        // Or: Print "Topic:" then "Value" if it fits. 
-                        // Given complexity, let's print "Topic:" (White) and if Value is long, wrap it.
-
-                        // Let's rely on splitting. 
-                        // We will print the lines. If line starts with "Topic:", color that part white?
-                        // Easier: Just print all White/Khaki based on line index? No.
-                        // Let's print Topic Label, then wrap Value.
-
                         const tLabelW = doc.getTextWidth(topicLabel);
                         doc.setTextColor(255, 255, 255);
                         doc.text(topicLabel, currentX + 1, textYStart);
 
                         doc.setTextColor(240, 230, 140); // Khaki
-                        const tValLines = doc.splitTextToSize(topicVal, wTopic - tLabelW - 2);
-                        doc.text(tValLines, currentX + tLabelW + 1, textYStart);
+                        doc.text(topicLines, currentX + tLabelW + 1, textYStart);
 
                         doc.setDrawColor(255);
                         doc.line(currentX + wTopic, yPos, currentX + wTopic, yPos + headerH);
@@ -405,8 +401,7 @@ const ErrorReport = () => {
                         doc.text(subLabel, currentX + 1, textYStart);
 
                         doc.setTextColor(240, 230, 140);
-                        const sValLines = doc.splitTextToSize(subVal, wSub - sLabelW - 2);
-                        doc.text(sValLines, currentX + sLabelW + 1, textYStart);
+                        doc.text(subLines, currentX + sLabelW + 1, textYStart);
 
                         doc.setDrawColor(255);
                         doc.line(currentX + wSub, yPos, currentX + wSub, yPos + headerH);
@@ -415,7 +410,6 @@ const ErrorReport = () => {
                         // [Col 5] Key
                         const keyLabel = "Key: ";
                         const keyVal = q.Key_Value || '';
-                        // Center Logic
                         const kLabelW = doc.getTextWidth(keyLabel);
                         const kValW = doc.getTextWidth(keyVal);
                         const kTotalW = kLabelW + kValW;
@@ -435,27 +429,38 @@ const ErrorReport = () => {
                         doc.rect(margin, yPos + headerH, wStat, blockH - headerH, 'F');
 
                         doc.setTextColor(255);
-                        doc.setFontSize(9);
 
                         const subjectText = String(q.Subject || '');
+
+                        // Auto-fit font size
+                        let subjFontSize = 9;
+                        doc.setFontSize(subjFontSize);
+                        const maxSubjW = wStat - 2; // 1mm padding each side
+
+                        // Reduce size until it fits
+                        while (doc.getTextWidth(subjectText) > maxSubjW && subjFontSize > 4) {
+                            subjFontSize -= 0.5;
+                            doc.setFontSize(subjFontSize);
+                        }
+
                         const stripCenterY = yPos + headerH + ((blockH - headerH) / 2);
                         const stripCenterX = margin + (wStat / 2);
 
-                        doc.text(subjectText, stripCenterX, stripCenterY + 1.5, { align: 'center' });
+                        doc.text(subjectText, stripCenterX, stripCenterY + (subjFontSize / 3), { align: 'center' });
 
                         // 4. Images
                         const imgBaseX = margin + wStat;
                         const imgContentY = yPos + headerH;
 
                         doc.setDrawColor(0);
-                        const halfW = imgAreaW / 2;
-                        doc.line(imgBaseX + halfW, imgContentY, imgBaseX + halfW, yPos + blockH);
+                        doc.line(imgBaseX + halfImgW, imgContentY, imgBaseX + halfImgW, yPos + blockH); // Vertical Split
 
                         const drawImage = (img, x, y, drawnH) => {
                             if (!img) return;
                             const aspect = img.width / img.height;
                             let w = drawnH * aspect;
-                            const colWidth = halfW;
+                            // Center in column
+                            const colWidth = halfImgW;
                             const offX = (colWidth - w) / 2;
                             try {
                                 doc.addImage(img, 'PNG', x + offX, y + 1, w, drawnH);
@@ -468,7 +473,7 @@ const ErrorReport = () => {
                             doc.text("No Q Image", imgBaseX + 5, imgContentY + 5);
                         }
 
-                        if (sImg) drawImage(sImg, imgBaseX + halfW, imgContentY, sH);
+                        if (sImg) drawImage(sImg, imgBaseX + halfImgW, imgContentY, sH);
 
                         yPos += blockH;
                     }
@@ -603,8 +608,8 @@ const ErrorReport = () => {
                                     <colgroup>
                                         <col style={{ width: '18mm' }} />
                                         <col style={{ width: '12mm' }} />
-                                        <col style={{ width: 'auto' }} />
-                                        <col style={{ width: 'auto' }} />
+                                        <col style={{ width: '74mm' }} /> {/* Topic calculated to align (86 - 12) */}
+                                        <col style={{ width: '68mm' }} /> {/* Sub calculated to align (86 - 18) */}
                                         <col style={{ width: '18mm' }} />
                                     </colgroup>
                                     <thead>
