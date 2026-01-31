@@ -210,7 +210,7 @@ const ErrorReport = () => {
                 doc.setFontSize(10);
                 doc.text("CENTRAL OFFICE, BANGALORE", pageWidth / 2, y, { align: 'center' });
 
-                return y + 5; // Return text bottom Y
+                return y + 2; // Reduced bottom margin (was 5)
             };
 
             for (const student of reportData) {
@@ -219,7 +219,7 @@ const ErrorReport = () => {
                     const headerBottom = addHeader(doc);
                     isFirstPage = false;
 
-                    let yPos = headerBottom + 2;
+                    let yPos = headerBottom + 1; // Start immediately after header (reduced gap)
 
                     // Student & Test Info Table
                     // Row 1: Name and Campus
@@ -351,7 +351,9 @@ const ErrorReport = () => {
                         doc.setFontSize(8);
 
                         // Vertical Text Helper
-                        doc.text(String(q.Subject || ''), margin + 5, yPos + headerH + 30, { angle: 90 });
+                        // Calculate center Y for vertical text
+                        const stripCenterY = yPos + headerH + ((blockH - headerH) / 2);
+                        doc.text(String(q.Subject || ''), margin + 5, stripCenterY + 5, { angle: 90, align: 'center' });
 
                         // 4. Images Area
                         const imgAreaX = margin + 8;
@@ -369,10 +371,13 @@ const ErrorReport = () => {
                         const fitImage = (img, x, y, w, h) => {
                             if (!img) return;
                             const aspect = img.width / img.height;
-                            let drawW = w - 4; // padding
+                            // Target width 321px approx 85mm
+                            let drawW = 85;
+                            if (drawW > w - 2) drawW = w - 2; // Constrain to column if smaller than target
+
                             let drawH = drawW / aspect;
-                            if (drawH > h - 4) {
-                                drawH = h - 4;
+                            if (drawH > h - 2) {
+                                drawH = h - 2;
                                 drawW = drawH * aspect;
                             }
                             const offX = (w - drawW) / 2;
@@ -543,12 +548,12 @@ const ErrorReport = () => {
                                                         </div>
                                                         {/* Images */}
                                                         <div className="flex flex-1">
-                                                            <div className="w-1/2 border-r border-black p-1 flex items-center justify-center relative">
-                                                                <span className="absolute top-1 left-1 text-xs font-bold">{q.Q_No}</span>
-                                                                {q.Q_URL ? <img src={q.Q_URL} style={{ maxWidth: '321px', maxHeight: '100%' }} alt="Q" /> : <span className="text-xs text-gray-300">No Image</span>}
+                                                            <div className="w-1/2 border-r border-black flex relative">
+                                                                <span className="absolute top-1 left-1 text-xs font-bold z-10">{q.Q_No}</span>
+                                                                {q.Q_URL ? <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" /> : <span className="text-xs text-gray-300 m-auto">No Image</span>}
                                                             </div>
-                                                            <div className="w-1/2 p-1 flex items-center justify-center">
-                                                                {q.S_URL ? <img src={q.S_URL} style={{ maxWidth: '321px', maxHeight: '100%' }} alt="Sol" /> : <span className="text-xs text-gray-300">No Solution</span>}
+                                                            <div className="w-1/2 flex">
+                                                                {q.S_URL ? <img src={q.S_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Sol" /> : <span className="text-xs text-gray-300 m-auto">No Solution</span>}
                                                             </div>
                                                         </div>
                                                     </div>
