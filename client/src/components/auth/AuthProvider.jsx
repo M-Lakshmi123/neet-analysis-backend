@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../../firebase';
-import { onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { onAuthStateChanged, setPersistence, browserSessionPersistence, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
@@ -19,27 +19,36 @@ export const AuthProvider = ({ children }) => {
         });
 
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            // IMMEDIATE SECURITY CHECK for existing sessions being restored
             if (user) {
-                // Check for session flag
                 const isSessionActive = sessionStorage.getItem('NEET_SESSION_ACTIVE');
 
-                // If flag is missing, it means this is a new window/tab or restored session without our flag.
-                // We treat this as "Logged Out" security enforcement.
                 if (!isSessionActive) {
-                    console.warn("Security: No active session flag found. Forcing logout.");
+                    console.error("⛔ SECURITY: Session flag missing. Forcing logout sequence.");
 
-                    // Force clearing of any potential persistence
-                    await setPersistence(auth, browserSessionPersistence);
-                    await auth.signOut();
-
+                    // 1. Immediately nullify local state to prevent UI rendering
                     setUserData(null);
                     setCurrentUser(null);
-                    setLoading(false);
-                    return;
-                }
 
+                    // 2. Force Firebase SignOut
+                    try {
+                        await signOut(auth);
+                        // Double tap: Set persistence to none to clear any indexedDB tokens
+                        // await setPersistence(auth, inMemoryPersistence); 
+                    } catch (e) {
+                        console.error("SignOut failed", e);
+                    }
+
+                    setLoading(false);
+                    return; // STOP EXECUTION HERE
+                }
+            }
+
+            if (user) {
+                // Happy path: User is logged in AND has the session flag
                 setLoading(true);
                 setCurrentUser(user);
+
 
                 // Fetch extra user data from Firestore (campus, role, isApproved)
                 const userDoc = await getDoc(doc(db, "users", user.uid));
