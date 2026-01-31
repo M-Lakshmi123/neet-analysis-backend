@@ -343,14 +343,10 @@ app.get('/api/history', async (req, res) => {
 app.get('/api/studentsByCampus', async (req, res) => {
     try {
         const pool = await connectToDb();
-        // Ignore other filters for global student search
-        const where = buildWhereClause(req, {
-            ignoreCampus: true,
-            ignoreStream: true,
-            ignoreTestType: true,
-            ignoreTest: true,
-            ignoreTopAll: true
-        });
+        // Allow filters to apply (especially Campus for security context)
+        // If frontend sends specific filters (like restricted campus), we must respect them.
+        const where = buildWhereClause(req);
+        console.log(`[studentsByCampus] Generated WHERE: "${where}"`);
         console.log(`[studentsByCampus] Global Search - Generated WHERE: "${where}"`);
 
         const query = `
