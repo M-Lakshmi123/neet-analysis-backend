@@ -191,53 +191,54 @@ const AnalysisReport = ({ filters }) => {
             const pageWidth = doc.internal.pageSize.getWidth();
             let currentY = 15; // Set Top Margin
 
-            // --- HEADER LAYOUT: LOGO + TITLE SIDE-BY-SIDE ---
-
-            const part1 = "Sri Chaitanya";
-            const part2 = " Educational Institutions";
-            doc.setFontSize(36); // Increased Font size for title
-
-            // Calculate Title Width
-            doc.setFont("helvetica", "bold");
-            const w1 = doc.getTextWidth(part1);
-            doc.setFont("helvetica", "normal");
-            const w2 = doc.getTextWidth(part2);
-            const totalTitleWidth = w1 + w2;
+            // --- HEADER LAYOUT: VERTICAL STACK (Logo -> Title -> Subtitle) ---
 
             // Logo Dimensions
-            const logoH = 24; // Slightly larger logo
-            let logoW = 24; // default placeholder
-            let logoGap = 8; // Increased Gap between logo and text
-
+            const logoH = 24;
+            let logoW = 24;
             if (logoImg) {
                 const aspect = logoImg.width / logoImg.height;
                 logoW = logoH * aspect;
-            } else {
-                logoW = 0;
-                logoGap = 0;
             }
 
-            // Calculate Center Position for [Logo + Gap + Title]
-            const totalContentWidth = logoW + logoGap + totalTitleWidth;
-            const startX = (pageWidth - totalContentWidth) / 2;
-
-            // 1. Draw Logo
+            // 1. Draw Logo (Centered)
             if (logoImg) {
-                // Adjust Y to center logo with text roughly
-                doc.addImage(logoImg, 'PNG', startX, currentY - (logoH * 0.6), logoW, logoH, undefined, 'FAST');
+                const logoX = (pageWidth - logoW) / 2;
+                doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
+                currentY += logoH + 5; // Gap below logo
             }
+
+            // Title Text Parts
+            const part1 = "Sri Chaitanya";
+            const part2 = " Educational Institutions";
+            doc.setFontSize(36); // Large Title
+
+            // Calculate Title Widths to Center the Combined Line
+            doc.setFont("helvetica", "bold");
+            if (doc.setCharSpace) doc.setCharSpace(-0.75); // Apply "Impact" simulation for measurement
+            const w1 = doc.getTextWidth(part1);
+            if (doc.setCharSpace) doc.setCharSpace(0); // Reset for Part 2 measurement
+
+            doc.setFont("helvetica", "normal");
+            const w2 = doc.getTextWidth(part2);
+            const totalTitleWidth = w1 + w2;
+            const titleStartX = (pageWidth - totalTitleWidth) / 2;
 
             // 2. Draw Title Text (Part 1)
             doc.setFont("helvetica", "bold");
             doc.setTextColor(0, 112, 192); // #0070C0
-            doc.text(part1, startX + logoW + logoGap, currentY + 2); // Shift down for baseline alignment with larger font
+
+            // Simulate "Impact" style (Bold + Condensed)
+            if (doc.setCharSpace) doc.setCharSpace(-0.75);
+            doc.text(part1, titleStartX, currentY + 8); // Shift down for baseline
 
             // 3. Draw Title Text (Part 2)
+            if (doc.setCharSpace) doc.setCharSpace(0); // Reset for standard text
             doc.setFont("helvetica", "normal");
             doc.setTextColor(0, 102, 204); // #0066CC
-            doc.text(part2, startX + logoW + logoGap + w1, currentY + 2);
+            doc.text(part2, titleStartX + w1, currentY + 8);
 
-            currentY += 15; // Increased gap before subtitle (was 8)
+            currentY += 20; // Gap below title
 
             // 4. Custom Subtitle Pattern
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
@@ -250,7 +251,7 @@ const AnalysisReport = ({ filters }) => {
             doc.setTextColor(128, 0, 64); // Maroon
             doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center' });
 
-            currentY += 15; // Increased gap below subtitle to push table down
+            currentY += 15; // Gap below subtitle before table
 
             // 4. Data Tables
             const tableColumn = [
