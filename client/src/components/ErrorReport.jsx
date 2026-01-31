@@ -19,6 +19,7 @@ const ErrorReport = () => {
     const [loading, setLoading] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
     const [pdfProgress, setPdfProgress] = useState('');
+    const reportRef = useRef(null);
 
     // Fetch Report Data
     useEffect(() => {
@@ -98,67 +99,148 @@ const ErrorReport = () => {
             img.src = src;
             img.onload = () => resolve(img);
             img.onerror = () => {
-                console.warn("Failed to load image:", src);
+                // console.warn("Failed to load image:", src);
                 resolve(null);
             };
         });
+    };
+
+    // Helper: Load Font
+    const loadFont = async (url) => {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Failed to load font: ${url}`);
+            const blob = await res.blob();
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.readAsDataURL(blob);
+            });
+        } catch (err) {
+            console.error("Font load error:", err);
+            return null;
+        }
     };
 
     // PDF Generator
     const generatePDF = async () => {
         if (reportData.length === 0) return;
         setGeneratingPdf(true);
-        setPdfProgress('Initializing...');
+        setPdfProgress('Loading Resources...');
 
         try {
+            // Load Fonts & Resources
+            const [impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
+                loadFont('/fonts/unicode.impact.ttf'),
+                loadFont('/fonts/bookman-old-style.ttf'),
+                loadFont('/fonts/BOOKOSB.TTF')
+            ]);
+
             const doc = new jsPDF('p', 'mm', 'a4');
             const pageWidth = 210;
             const pageHeight = 297;
             const margin = 10;
             const contentWidth = pageWidth - (margin * 2);
 
+            // Register Fonts
+            if (impactFont) {
+                doc.addFileToVFS("unicode.impact.ttf", impactFont);
+                doc.addFont("unicode.impact.ttf", "Impact", "normal");
+            }
+            if (bookmanFont) {
+                doc.addFileToVFS("bookman-old-style.ttf", bookmanFont);
+                doc.addFont("bookman-old-style.ttf", "Bookman", "normal");
+            }
+            if (bookmanBoldFont) {
+                doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont);
+                doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
+            }
+
             let isFirstPage = true;
 
             const addHeader = (doc) => {
-                // Title
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(22);
-                doc.setTextColor(0, 0, 128); // Navy Blue
-                doc.text("SRI CHAITANYA EDUCATIONAL INSTITUTIONS", pageWidth / 2, 15, { align: 'center' });
+                let y = 15;
 
-                // Subtitles
+                // 1. Title: "Sri Chaitanya" (Impact) + " Educational Institutions" (Bookman)
+                const part1 = "Sri Chaitanya";
+                const part2 = " Educational Institutions";
+
+                doc.setFontSize(26);
+
+                // Measure
+                if (impactFont) doc.setFont("Impact", "normal");
+                else doc.setFont("helvetica", "bold");
+                const w1 = doc.getTextWidth(part1);
+
+                if (bookmanFont) doc.setFont("Bookman", "normal");
+                else doc.setFont("helvetica", "normal");
+                const w2 = doc.getTextWidth(part2);
+
+                const startX = (pageWidth - (w1 + w2)) / 2;
+
+                // Draw Part 1
+                if (impactFont) doc.setFont("Impact", "normal");
+                else doc.setFont("helvetica", "bold");
+                doc.setTextColor(0, 112, 192); // #0070C0
+                doc.text(part1, startX, y);
+
+                // Draw Part 2
+                if (bookmanFont) doc.setFont("Bookman", "normal");
+                else doc.setFont("helvetica", "normal");
+                doc.setTextColor(0, 112, 192); // Same Blue
+                doc.text(part2, startX + w1, y);
+
+                y += 6;
+
+                // 2. Subtitles
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
                 doc.setFontSize(9);
                 doc.setTextColor(0, 0, 0);
-                doc.text("A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi", pageWidth / 2, 20, { align: 'center' });
+                doc.text("A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi", pageWidth / 2, y, { align: 'center' });
+                y += 5;
 
                 doc.setFont("times", "italic"); // Serif italic
                 doc.setFontSize(14);
-                doc.text("A Right Choice for the Real Aspirant", pageWidth / 2, 26, { align: 'center' });
+                doc.text("A Right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
+                y += 5;
 
-                doc.setFont("helvetica", "bold");
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
                 doc.setFontSize(10);
-                doc.text("CENTRAL OFFICE, BANGALORE", pageWidth / 2, 31, { align: 'center' });
+                doc.text("CENTRAL OFFICE, BANGALORE", pageWidth / 2, y, { align: 'center' });
+
+                return y + 5; // Return text bottom Y
             };
 
             for (const student of reportData) {
                 for (const test of student.tests) {
                     if (!isFirstPage) doc.addPage();
-                    addHeader(doc);
+                    const headerBottom = addHeader(doc);
                     isFirstPage = false;
 
-                    let yPos = 35;
+                    let yPos = headerBottom + 2;
 
                     // Student & Test Info Table
                     // Row 1: Name and Campus
+                    // Centered Text in each half
                     doc.setLineWidth(0.3);
                     doc.setDrawColor(0);
                     doc.setFillColor(255, 248, 220); // Cornsilk
                     doc.rect(margin, yPos, contentWidth, 8, 'FD'); // Name Row BG
 
+                    if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                    else doc.setFont("helvetica", "bold");
                     doc.setFontSize(11);
                     doc.setTextColor(0);
-                    doc.text(student.info.name || '', margin + 2, yPos + 5.5);
-                    doc.text(student.info.branch || '', pageWidth - margin - 2, yPos + 5.5, { align: 'right' });
+
+                    // Left Half Center
+                    const leftCenter = margin + (contentWidth / 4);
+                    doc.text(student.info.name || '', leftCenter, yPos + 5.5, { align: 'center' });
+
+                    // Right Half Center
+                    const rightCenter = margin + (contentWidth * 0.75);
+                    doc.text(student.info.branch || '', rightCenter, yPos + 5.5, { align: 'center' });
 
                     doc.line(pageWidth / 2, yPos, pageWidth / 2, yPos + 8); // Split Name/Branch
                     yPos += 8;
@@ -201,7 +283,7 @@ const ErrorReport = () => {
 
                     // Outer border for table
                     doc.rect(margin, yPos - 12, contentWidth, 18);
-                    yPos += 10; // Spacing after table
+                    yPos += 8; // Small gap
 
                     // QUESTIONS Loop
                     setPdfProgress(`Processing ${student.info.name}...`);
@@ -210,11 +292,11 @@ const ErrorReport = () => {
                         const q = test.questions[i];
 
                         // Check Page Break
-                        // Need approx 45mm for a question block + gap
-                        if (yPos + 45 > pageHeight - margin) {
+                        // Need approx 50mm for a question block
+                        if (yPos + 55 > pageHeight - margin) {
                             doc.addPage();
                             addHeader(doc);
-                            yPos = 35; // Reset Y
+                            yPos = 35; // Reset Y (approx) or calculate dynamic
                         } else if (i > 0) {
                             yPos += 2; // Gap between questions
                         }
@@ -227,9 +309,10 @@ const ErrorReport = () => {
                         doc.setFillColor(128, 0, 0); // Maroon
                         doc.rect(margin, yPos, contentWidth, headerH, 'F');
 
-                        doc.setTextColor(255, 255, 255);
+                        doc.setTextColor(255);
+                        if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                        else doc.setFont("helvetica", "bold");
                         doc.setFontSize(9);
-                        doc.setFont("helvetica", "bold");
 
                         // Header Content
                         // W/U | Q No | Topic | Sub Topic | Key
@@ -300,13 +383,11 @@ const ErrorReport = () => {
                         };
 
                         // Draw Q Image
-                        // doc.setTextColor(0);
-                        // doc.text(`${q.Q_No}`, imgAreaX + 2, yPos + headerH + 5); // Q No inside
                         if (qImg) {
                             fitImage(qImg, imgAreaX, yPos + headerH, imgAreaW / 2, imgAreaH);
                         } else {
                             doc.setTextColor(150);
-                            doc.text("No Q Image", imgAreaX + 20, yPos + headerH + 20);
+                            doc.text("No Q Image", imgAreaX + 10, yPos + headerH + 10);
                         }
 
                         // Draw S Image
@@ -329,7 +410,6 @@ const ErrorReport = () => {
             setPdfProgress('');
         }
     };
-
 
     return (
         <div className="error-report-page">
@@ -365,7 +445,14 @@ const ErrorReport = () => {
             </div>
 
             {/* Preview Section */}
-            <div className="pdf-viewer-container" style={{ background: '#525659', padding: '20px', minHeight: '400px', overflowX: 'auto' }}>
+            <div className="pdf-viewer-container" style={{ background: '#525659', padding: '20px', minHeight: '600px', overflowX: 'auto' }}>
+                {loading && (
+                    <div className="bg-white p-8 rounded shadow text-center mx-auto max-w-lg">
+                        <div className="animate-spin text-4xl mb-4">↻</div>
+                        <div>Loading Report Data...</div>
+                    </div>
+                )}
+
                 {!loading && reportData.length === 0 && (
                     <div className="bg-white p-12 rounded shadow text-center mx-auto max-w-xl">
                         <h2 className="text-xl font-bold text-gray-700 mb-2">No Report Data</h2>
@@ -374,22 +461,104 @@ const ErrorReport = () => {
                 )}
 
                 {reportData.length > 0 && (
-                    <div className="bg-white p-4 mx-auto max-w-4xl text-center shadow">
-                        <h3 className="text-lg font-bold text-gray-700">Report Ready</h3>
-                        <p className="text-sm text-gray-500 mb-4">
-                            The report covers {reportData.length} student(s).<br />
-                            Click <b>Download PDF File</b> above to generate the high-quality PDF.
-                        </p>
-                        <div className="preview-list text-left border p-4 max-h-[300px] overflow-y-auto bg-gray-50">
-                            <h4 className="font-bold border-b mb-2 pb-1">Students Found:</h4>
-                            <ul className="list-disc pl-5">
-                                {reportData.map((s, i) => (
-                                    <li key={i} className="text-sm py-1">
-                                        <b>{s.info.name}</b> - {s.tests.length} Test(s)
-                                    </li>
+                    <div ref={reportRef} className="report-content">
+                        {reportData.map((student, sIdx) => (
+                            <div key={sIdx} className="student-group">
+                                {student.tests.map((test, tIdx) => (
+                                    <div key={tIdx} className="report-page shadow-lg mx-auto bg-white mb-8" style={{ width: '210mm', minHeight: '297mm', padding: '10mm', position: 'relative' }}>
+
+                                        {/* SCREEN PREVIEW HEADER */}
+                                        <div className="brand-header text-center mb-4">
+                                            <div className="flex justify-center items-end" style={{ color: '#0070c0' }}>
+                                                <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
+                                                <span style={{ fontFamily: 'Bookman, serif', fontSize: '26px', marginLeft: '5px' }}> Educational Institutions</span>
+                                            </div>
+                                            <div className="text-center font-bold text-[10px] uppercase mb-1">
+                                                A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
+                                            </div>
+                                            <div className="font-serif italic text-lg mb-1">
+                                                A Right Choice for the Real Aspirant
+                                            </div>
+                                            <div className="font-bold text-sm uppercase">
+                                                Central Office, Bangalore
+                                            </div>
+                                        </div>
+
+                                        {/* INFO TABLE */}
+                                        <div className="info-section border border-black mb-4 text-xs font-bold">
+                                            <div className="flex border-b border-black bg-[#fff8dc]">
+                                                <div className="flex-1 p-2 border-r border-black uppercase text-center">{student.info.name}</div>
+                                                <div className="flex-1 p-2 uppercase text-center">{student.info.branch}</div>
+                                            </div>
+                                            <div className="flex text-center bg-[#fce4d6] border-b border-black">
+                                                <div className="flex-1 border-r border-black p-1">Test</div>
+                                                <div className="flex-1 border-r border-black p-1">Date</div>
+                                                <div className="flex-1 border-r border-black p-1">TOT</div>
+                                                <div className="flex-1 border-r border-black p-1">AIR</div>
+                                                <div className="flex-1 border-r border-black p-1">BOT</div>
+                                                <div className="flex-1 border-r border-black p-1">Rank</div>
+                                                <div className="flex-1 border-r border-black p-1">ZOO</div>
+                                                <div className="flex-1 border-r border-black p-1">Rank</div>
+                                                <div className="flex-1 border-r border-black p-1">PHY</div>
+                                                <div className="flex-1 border-r border-black p-1">Rank</div>
+                                                <div className="flex-1 border-r border-black p-1">CHEM</div>
+                                                <div className="flex-1 p-1">Rank</div>
+                                            </div>
+                                            <div className="flex text-center bg-white text-red-700">
+                                                <div className="flex-1 border-r border-black p-1">{test.meta.testName}</div>
+                                                <div className="flex-1 border-r border-black p-1">{test.meta.date}</div>
+                                                <div className="flex-1 border-r border-black p-1">{test.meta.tot}</div>
+                                                <div className="flex-1 border-r border-black p-1">{test.meta.air}</div>
+                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.bot}</div>
+                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.b_rank}</div>
+                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.zoo}</div>
+                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.z_rank}</div>
+                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.phy}</div>
+                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.p_rank}</div>
+                                                <div className="flex-1 border-r border-black p-1 text-red-800">{test.meta.chem}</div>
+                                                <div className="flex-1 p-1 text-red-800">{test.meta.c_rank}</div>
+                                            </div>
+                                        </div>
+
+                                        {/* QUESTIONS */}
+                                        <div className="questions-list">
+                                            {test.questions.map((q, idx) => (
+                                                <div key={idx} className="question-block mb-2 border border-black break-inside-avoid">
+                                                    {/* Q Header */}
+                                                    <div className="flex items-center bg-[#800000] text-white text-xs font-bold h-6 border-b border-black">
+                                                        <div className="w-10 text-center border-r border-white">{q.W_U}</div>
+                                                        <div className="w-10 text-center border-r border-white">{q.Q_No}</div>
+                                                        <div className="flex-1 pl-2 truncate border-r border-white">Topic: <span className="text-yellow-200">{q.Topic}</span></div>
+                                                        <div className="flex-1 pl-2 truncate border-r border-white">Sub: <span className="text-yellow-200">{q.Sub_Topic}</span></div>
+                                                        <div className="w-20 text-center">Key: {q.Key_Value}</div>
+                                                    </div>
+
+                                                    {/* Q Content */}
+                                                    <div className="flex h-[180px]">
+                                                        {/* Side Strip */}
+                                                        <div className="w-8 bg-[#4682b4] text-white flex items-center justify-center border-r border-black">
+                                                            <div style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontSize: '10px', fontWeight: 'bold', letterSpacing: '1px' }}>
+                                                                {q.Subject}
+                                                            </div>
+                                                        </div>
+                                                        {/* Images */}
+                                                        <div className="flex flex-1">
+                                                            <div className="w-1/2 border-r border-black p-1 flex items-center justify-center relative">
+                                                                <span className="absolute top-1 left-1 text-xs font-bold">{q.Q_No}</span>
+                                                                {q.Q_URL ? <img src={q.Q_URL} style={{ maxWidth: '321px', maxHeight: '100%' }} alt="Q" /> : <span className="text-xs text-gray-300">No Image</span>}
+                                                            </div>
+                                                            <div className="w-1/2 p-1 flex items-center justify-center">
+                                                                {q.S_URL ? <img src={q.S_URL} style={{ maxWidth: '321px', maxHeight: '100%' }} alt="Sol" /> : <span className="text-xs text-gray-300">No Solution</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 ))}
-                            </ul>
-                        </div>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>
