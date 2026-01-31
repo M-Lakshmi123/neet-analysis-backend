@@ -195,7 +195,7 @@ const AnalysisReport = ({ filters }) => {
 
             const part1 = "Sri Chaitanya";
             const part2 = " Educational Institutions";
-            doc.setFontSize(28); // Font size for title
+            doc.setFontSize(36); // Increased Font size for title
 
             // Calculate Title Width
             doc.setFont("helvetica", "bold");
@@ -205,9 +205,9 @@ const AnalysisReport = ({ filters }) => {
             const totalTitleWidth = w1 + w2;
 
             // Logo Dimensions
-            const logoH = 20;
-            let logoW = 20; // default placeholder
-            let logoGap = 5; // Gap between logo and text
+            const logoH = 24; // Slightly larger logo
+            let logoW = 24; // default placeholder
+            let logoGap = 8; // Increased Gap between logo and text
 
             if (logoImg) {
                 const aspect = logoImg.width / logoImg.height;
@@ -224,20 +224,20 @@ const AnalysisReport = ({ filters }) => {
             // 1. Draw Logo
             if (logoImg) {
                 // Adjust Y to center logo with text roughly
-                doc.addImage(logoImg, 'PNG', startX, currentY - (logoH * 0.65), logoW, logoH, undefined, 'FAST');
+                doc.addImage(logoImg, 'PNG', startX, currentY - (logoH * 0.6), logoW, logoH, undefined, 'FAST');
             }
 
             // 2. Draw Title Text (Part 1)
             doc.setFont("helvetica", "bold");
             doc.setTextColor(0, 112, 192); // #0070C0
-            doc.text(part1, startX + logoW + logoGap, currentY);
+            doc.text(part1, startX + logoW + logoGap, currentY + 2); // Shift down for baseline alignment with larger font
 
             // 3. Draw Title Text (Part 2)
             doc.setFont("helvetica", "normal");
             doc.setTextColor(0, 102, 204); // #0066CC
-            doc.text(part2, startX + logoW + logoGap + w1, currentY);
+            doc.text(part2, startX + logoW + logoGap + w1, currentY + 2);
 
-            currentY += 8; // Small gap before subtitle
+            currentY += 15; // Increased gap before subtitle (was 8)
 
             // 4. Custom Subtitle Pattern
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
@@ -250,7 +250,7 @@ const AnalysisReport = ({ filters }) => {
             doc.setTextColor(128, 0, 64); // Maroon
             doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center' });
 
-            currentY += 6; // Reduced gap below subtitle
+            currentY += 15; // Increased gap below subtitle to push table down
 
             // 4. Data Tables
             const tableColumn = [

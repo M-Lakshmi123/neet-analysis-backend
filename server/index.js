@@ -376,7 +376,14 @@ app.get('/api/studentsByCampus', async (req, res) => {
 app.get('/api/exam-stats', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const where = buildWhereClause(req);
+        let where = buildWhereClause(req);
+        // Filter out empty/invalid metadata rows
+        const isValid = "Test IS NOT NULL AND Test != '' AND DATE IS NOT NULL AND DATE != ''";
+        if (where) {
+            where += ` AND ${isValid}`;
+        } else {
+            where = `WHERE ${isValid}`;
+        }
 
         const query = `
             SELECT 

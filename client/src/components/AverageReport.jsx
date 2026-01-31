@@ -108,10 +108,10 @@ const AverageReport = ({ filters }) => {
 
             // Draw Title 1
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(30); // Increased size
+            doc.setFontSize(36); // Increased size from 30
             doc.setTextColor(0, 112, 192);
             doc.text(title1, 105, currentY, { align: 'center' });
-            currentY += 8;
+            currentY += 12; // Adjusted for larger font
 
             currentY += 8;
 
@@ -122,10 +122,10 @@ const AverageReport = ({ filters }) => {
         } else {
             // Draw Title 1
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(30); // Increased size
+            doc.setFontSize(36); // Increased size from 30
             doc.setTextColor(0, 112, 192);
             doc.text(title1, 105, currentY, { align: 'center' });
-            currentY += 8;
+            currentY += 12; // Adjusted for larger font
 
             // Draw Title 2
             doc.setFontSize(18); // Slightly larger
@@ -140,13 +140,13 @@ const AverageReport = ({ filters }) => {
         doc.setTextColor(0, 0, 0); // Pure Black
         const subTitle = "P R O G R E S S   R E P O R T";
         doc.text(subTitle, 105, currentY, { align: 'center' });
-        currentY += 4; // Reduced gap below subtitle
+        currentY += 6; // Slightly increased gap below subtitle
 
         // 4. Line
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.4);
         doc.line(15, currentY, 195, currentY);
-        currentY += 5; // Reduced gap below line
+        currentY += 15; // Increased gap below line to push table down
 
         // 5. Details Header - Pastel Background
         if (studentData.length > 0) {
@@ -213,7 +213,7 @@ const AverageReport = ({ filters }) => {
         autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
-            startY: currentY + 5, // Start closer to detail header
+            startY: currentY + 10, // Start closer to detail header
             theme: 'grid',
             headStyles: {
                 fillColor: [0, 0, 0], // Pure Black headers

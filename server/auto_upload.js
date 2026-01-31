@@ -107,15 +107,22 @@ async function uploadToDB(rows, tableName) {
             // Wrap keys in backticks to handle spaces in column names
             const safeKeys = keys.map(k => `\`${k.trim()}\``).join(',');
 
+            // Helper for finding index of key case-insensitively
+            const findKeyIndex = (name) => keys.findIndex(k => k.trim().toUpperCase() === name);
+            const studIdIndex = findKeyIndex('STUD_ID');
+            const testIndex = findKeyIndex('TEST');
+
             const values = Object.values(row).map((v, index) => {
                 const key = keys[index];
                 if (v === null || v === undefined) return "NULL";
                 let s = String(v).trim();
-                const upperKey = key.toUpperCase();
+                const upperKey = key.toUpperCase().trim();
 
                 // --- 1. Fix STUD_ID Scientific Notation ---
                 if (upperKey === 'STUD_ID') {
-                    if (/[eE][+-]?\d+$/.test(s)) {
+                    // Check for scientific notation like 1.23E+10
+                    if (/[eE][+-]?\d+$/.test(s) || /^\d+\.\d+$/.test(s)) {
+                        // Note: plain floats also caught here to ensure integer string
                         try {
                             const n = Number(s);
                             if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false });
@@ -145,7 +152,7 @@ async function uploadToDB(rows, tableName) {
                             s = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
                         }
                     }
-                    // Case C: Hyphen Separated (DD-MM-YYYY) - Formatting Check
+                    // Case C: Hyphen Separated (DD-MM-YYYY) - already correct usually, but ensure padding
                     else if (s.includes('-')) {
                         const parts = s.split('-');
                         if (parts.length === 3) {
@@ -158,14 +165,38 @@ async function uploadToDB(rows, tableName) {
                 return `'${s}'`;
             });
 
-            // Construct Dynamic UPSERT (Insert or Update)
-            const updateClause = keys.map(k => {
-                const safeK = `\`${k.trim()}\``;
-                return `${safeK} = VALUES(${safeK})`;
-            }).join(', ');
+            // --- 3. Duplicate Check ---
+            let isDuplicate = false;
 
-            const sql = `INSERT INTO ${tableName} (${safeKeys}) VALUES (${values.join(',')}) 
-                         ON DUPLICATE KEY UPDATE ${updateClause}`;
+            // Need safely formatted values (they already contain single quotes)
+            const studIdVal = studIdIndex !== -1 ? values[studIdIndex] : null;
+            const testVal = testIndex !== -1 ? values[testIndex] : null;
+
+            if (studIdVal) {
+                let checkSql = `SELECT 1 FROM ${tableName} WHERE STUD_ID = ${studIdVal}`;
+                if (testVal) {
+                    checkSql += ` AND Test = ${testVal}`;
+                }
+                checkSql += ` LIMIT 1`;
+
+                try {
+                    const existing = await pool.request().query(checkSql);
+                    if (existing.recordset && existing.recordset.length > 0) {
+                        isDuplicate = true;
+                    }
+                } catch (checkErr) {
+                    // Warning: Table might not have columns yet if empty?
+                }
+            }
+
+            if (isDuplicate) {
+                // Count as failed/skipped
+                failCount++;
+                continue;
+            }
+
+            // Construct INSERT (without Update)
+            const sql = `INSERT INTO ${tableName} (${safeKeys}) VALUES (${values.join(',')})`;
 
             try {
                 await pool.request().query(sql);
