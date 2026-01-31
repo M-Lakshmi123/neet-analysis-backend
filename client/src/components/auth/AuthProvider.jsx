@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../../firebase';
-import { onAuthStateChanged, setPersistence, browserSessionPersistence, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
@@ -13,43 +13,10 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Enforce session persistence (logout on window close)
-        setPersistence(auth, browserSessionPersistence).catch(error => {
-            console.error("Failed to set auth persistence:", error);
-        });
-
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            // IMMEDIATE SECURITY CHECK for existing sessions being restored
+            setLoading(true);
+            setCurrentUser(user);
             if (user) {
-                const isSessionActive = sessionStorage.getItem('NEET_SESSION_ACTIVE');
-
-                if (!isSessionActive) {
-                    console.error("⛔ SECURITY: Session flag missing. Forcing logout sequence.");
-
-                    // 1. Immediately nullify local state to prevent UI rendering
-                    setUserData(null);
-                    setCurrentUser(null);
-
-                    // 2. Force Firebase SignOut
-                    try {
-                        await signOut(auth);
-                        // Double tap: Set persistence to none to clear any indexedDB tokens
-                        // await setPersistence(auth, inMemoryPersistence); 
-                    } catch (e) {
-                        console.error("SignOut failed", e);
-                    }
-
-                    setLoading(false);
-                    return; // STOP EXECUTION HERE
-                }
-            }
-
-            if (user) {
-                // Happy path: User is logged in AND has the session flag
-                setLoading(true);
-                setCurrentUser(user);
-
-
                 // Fetch extra user data from Firestore (campus, role, isApproved)
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
@@ -60,20 +27,18 @@ export const AuthProvider = ({ children }) => {
                     if (user.email === "yenjarappa.s@varsitymgmt.com") {
                         setUserData({ role: 'admin', campus: 'All', isApproved: true, email: user.email });
                     } else {
+
                         setUserData(null);
                     }
                 }
             } else {
                 setUserData(null);
-                setCurrentUser(null);
             }
             setLoading(false);
         });
 
         return unsubscribe;
     }, []);
-
-
 
     const value = {
         currentUser,
