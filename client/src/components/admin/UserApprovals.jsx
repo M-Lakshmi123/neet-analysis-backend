@@ -3,7 +3,8 @@ import { API_URL, ADMIN_WHATSAPP } from '../../utils/apiHelper';
 import Modal from '../Modal';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
-import { Users, Mail, School, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react';
+import { Users, Mail, School, CheckCircle, XCircle, Clock, MessageSquare, Edit } from 'lucide-react';
+import Select from 'react-select'; // Import Select for campus choosing
 
 const UserApprovals = () => {
     const [pendingUsers, setPendingUsers] = useState([]);
@@ -11,9 +12,25 @@ const UserApprovals = () => {
     const [loading, setLoading] = useState(true);
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '', onConfirm: null });
 
+    const [allCampuses, setAllCampuses] = useState([]);
+    const [approvalModal, setApprovalModal] = useState({ isOpen: false, user: null, selectedCampuses: [] });
+
     useEffect(() => {
         fetchUsers();
+        fetchCampuses();
     }, []);
+
+    const fetchCampuses = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/filters`);
+            const data = await res.json();
+            if (data.campuses) {
+                setAllCampuses(data.campuses.map(c => ({ value: c, label: c })));
+            }
+        } catch (err) {
+            console.error("Error fetching campuses:", err);
+        }
+    };
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -31,39 +48,58 @@ const UserApprovals = () => {
         }
     };
 
-    const handleApprove = async (user) => {
+
+
+    const initiationApproval = (user) => {
+        // Default to the requested campus as pre-selected
+        const defaultSelection = user.campus && user.campus !== 'All'
+            ? [{ value: user.campus, label: user.campus }]
+            : []; // Or select all if 'All'? Better to let Admin choose.
+
+        setApprovalModal({
+            isOpen: true,
+            user: user,
+            selectedCampuses: defaultSelection
+        });
+    };
+
+    const confirmApproval = async () => {
+        if (!approvalModal.user) return;
+
+        const user = approvalModal.user;
+        const allowedCampuses = approvalModal.selectedCampuses.map(c => c.value);
+
+        setApprovalModal({ isOpen: false, user: null, selectedCampuses: [] });
+
         // Optimistic Update: Move user immediately in UI
-        const approvedUser = { ...user, isApproved: true, approvedAt: new Date().toISOString() };
+        // We update the local object to reflect the new allowedCampuses
+        const approvedUser = {
+            ...user,
+            isApproved: true,
+            approvedAt: new Date().toISOString(),
+            allowedCampuses: allowedCampuses
+        };
 
         setPendingUsers(prev => prev.filter(u => u.id !== user.id));
         setApprovedUsers(prev => [approvedUser, ...prev]);
 
         try {
-            // 1. Approve in Firestore
+            // 1. Approve in Firestore with allowedCampuses
             await updateDoc(doc(db, "users", user.id), {
                 isApproved: true,
-                approvedAt: new Date().toISOString()
+                approvedAt: new Date().toISOString(),
+                allowedCampuses: allowedCampuses
             });
 
             // 2. Open WhatsApp Web for notification
             if (user.phone) {
-                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2025-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                const campusText = allowedCampuses.length > 5 ? `${allowedCampuses.length} Campuses` : allowedCampuses.join(', ');
+                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the dashboard has been *APPROVED*.\n\nAccess granted for: *${campusText || "All Campuses"}*\n\nLogin now: https://medical-2025-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
                 const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
                 window.open(whatsappUrl, '_blank');
-            } else {
-                setModal({
-                    isOpen: true,
-                    type: 'info',
-                    title: 'Approved',
-                    message: `User ${user.name} approved successfully, but no WhatsApp number was found to send a notification.`,
-                    onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
-                });
             }
-
-            // No need to re-fetch immediately as we did optimistic update
-            // fetchUsers(); 
         } catch (err) {
-            // Revert optimistic update on error
+            // Revert optimistic update
             setPendingUsers(prev => [...prev, user].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
             setApprovedUsers(prev => prev.filter(u => u.id !== user.id));
 
@@ -129,7 +165,7 @@ const UserApprovals = () => {
                                             {user.phone && <span className="info-sub"><MessageSquare size={12} /> +91 {user.phone}</span>}
                                         </div>
                                         <div className="item-btns">
-                                            <button className="approve-small" onClick={() => handleApprove(user)}>Approve</button>
+                                            <button className="approve-small" onClick={() => initiationApproval(user)}>Approve ...</button>
                                             <button className="reject-small" onClick={() => confirmReject(user.id)}>Reject</button>
                                         </div>
                                     </div>
@@ -160,7 +196,13 @@ const UserApprovals = () => {
                                     <tr key={user.id}>
                                         <td>{user.name}</td>
                                         <td>{user.email}</td>
-                                        <td><span className="campus-tag">{user.campus}</span></td>
+                                        <td>
+                                            <span className="campus-tag">
+                                                {user.allowedCampuses && user.allowedCampuses.length > 0
+                                                    ? (user.allowedCampuses.length > 3 ? `${user.allowedCampuses.length} Campuses` : user.allowedCampuses.join(', '))
+                                                    : user.campus}
+                                            </span>
+                                        </td>
                                         <td>{new Date(user.approvedAt).toLocaleDateString()}</td>
                                         <td>
                                             <div className="flex-actions" style={{ display: 'flex', gap: '10px' }}>
@@ -177,6 +219,13 @@ const UserApprovals = () => {
                                                         <MessageSquare size={14} /> Notify
                                                     </button>
                                                 )}
+                                                <button
+                                                    className="edit-btn"
+                                                    style={{ color: '#2563eb', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                    onClick={() => initiationApproval(user)}
+                                                >
+                                                    <Edit size={14} /> Edit
+                                                </button>
                                                 <button
                                                     className="text-danger"
                                                     onClick={() => confirmReject(user.id)}
@@ -202,6 +251,51 @@ const UserApprovals = () => {
                 confirmText={modal.confirmText}
                 loading={modal.loading}
             />
+
+            {/* Approval Modal with Campus Selection */}
+            {approvalModal.isOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-container" style={{ maxWidth: '500px', width: '90%' }}>
+                        <h3>Approve Access for {approvalModal.user?.name}</h3>
+                        <p style={{ marginBottom: '1rem', color: '#666' }}>
+                            Requested Campus: <strong>{approvalModal.user?.campus}</strong>
+                        </p>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Grant Access To Campuses:</label>
+                            <Select
+                                isMulti
+                                options={[{ value: 'All', label: 'All Campuses' }, ...allCampuses]}
+                                value={approvalModal.selectedCampuses}
+                                onChange={(selected) => setApprovalModal(prev => ({ ...prev, selectedCampuses: selected || [] }))}
+                                placeholder="Select campuses..."
+                                styles={{
+                                    control: (base) => ({ ...base, minHeight: '45px' }),
+                                    menu: (base) => ({ ...base, zIndex: 9999 })
+                                }}
+                            />
+                            <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '5px' }}>
+                                Leave empty or select "All Campuses" to grant full access based on role.
+                            </p>
+                        </div>
+
+                        <div className="modal-actions">
+                            <button
+                                className="btn-secondary"
+                                onClick={() => setApprovalModal({ isOpen: false, user: null, selectedCampuses: [] })}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="btn-primary"
+                                onClick={confirmApproval}
+                            >
+                                Confirm & Approve
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

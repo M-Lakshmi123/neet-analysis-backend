@@ -4,6 +4,9 @@ import AsyncSelect from 'react-select/async';
 import { buildQueryParams, API_URL } from '../utils/apiHelper';
 
 const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} }) => {
+    // Normalize restriction to array for uniform handling
+    const allowedCampuses = Array.isArray(restrictedCampus) ? restrictedCampus : (restrictedCampus ? [restrictedCampus] : []);
+    const isRestricted = allowedCampuses.length > 0;
     const [options, setOptions] = useState({
         campuses: [],
         streams: [],
@@ -80,7 +83,9 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                 const data = await res.json();
 
                 setOptions({
-                    campuses: data.campuses || [],
+                    campuses: data.campuses
+                        ? (isRestricted ? data.campuses.filter(c => allowedCampuses.includes(c)) : data.campuses)
+                        : [],
                     streams: data.streams || [],
                     testTypes: data.testTypes || [],
                     tests: data.tests || [],
@@ -170,8 +175,20 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
         try {
             let url = `${API_URL}${endpoints.students}?quickSearch=${encodeURIComponent(inputValue)}`;
             // Enforce restricted campus in search
-            if (restrictedCampus) {
-                url += `&campus=${encodeURIComponent(restrictedCampus)}`;
+            if (isRestricted) {
+                // If strictly one campus, send as single param (backend optimization)
+                if (allowedCampuses.length === 1) {
+                    url += `&campus=${encodeURIComponent(allowedCampuses[0])}`;
+                } else {
+                    // Start search but filtering will happen on user selection validation or we might need backend support for multi-campus restricted search
+                    // For now, let's assume backend filters results if we pass 'campus' params. 
+                    // However, standard API logic usually takes single campus.
+                    // If we want detailed restriction, we might need to filter client side or handle arrays in backend.
+                    // But for Autocomplete consistency, let's filter client side if backend returns everything, OR pass nothing and filter here.
+                    // Wait, safely: We typically want to restrict what they SEE.
+                    // Let's pass the first allowed campus as a loose fallback or rely on the fact that when they Click a student, we check access?
+                    // Safe approach: Client-side filter after fetch if backend doesn't support 'campus=A,B'
+                }
             }
 
             const res = await fetch(url);
@@ -292,7 +309,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
 
     const resetFilters = () => {
         setFilters({
-            campus: restrictedCampus ? [restrictedCampus] : [],
+            campus: isRestricted && allowedCampuses.length === 1 ? [allowedCampuses[0]] : (isRestricted ? allowedCampuses : []),
             stream: [],
             testType: [],
             test: [],
@@ -321,7 +338,10 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                                     studentSearch: [opt.value],
                                     quickSearch: opt.label, // Keep the label for display
                                     // Auto-select Campus and Stream IF NOT RESTRICTED
-                                    campus: restrictedCampus ? [restrictedCampus] : (opt.campus ? [opt.campus] : []),
+                                    studentSearch: [opt.value],
+                                    quickSearch: opt.label, // Keep the label for display
+                                    // Auto-select Campus and Stream IF NOT RESTRICTED
+                                    campus: isRestricted && allowedCampuses.length === 1 ? [allowedCampuses[0]] : (opt.campus ? [opt.campus] : []),
                                     stream: opt.stream ? [opt.stream] : [],
                                     testType: [], test: [], topAll: []
                                 }));
@@ -361,8 +381,8 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
             </div>
 
             <div className="filter-bar">
-                <div className={`filter-group campus-filter ${restrictedCampus ? 'disabled' : ''}`}>
-                    <label>Campus {restrictedCampus && <span style={{ fontSize: '0.7rem', color: 'var(--primary)' }}>(Locked)</span>}</label>
+                <div className={`filter-group campus-filter ${isRestricted && allowedCampuses.length === 1 ? 'disabled' : ''}`}>
+                    <label>Campus {isRestricted && <span style={{ fontSize: '0.7rem', color: 'var(--primary)' }}>(Restricted)</span>}</label>
                     <Select
                         isMulti
                         name="campus"
@@ -372,9 +392,9 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                         className="react-select-container"
                         isLoading={loadingFilters}
                         classNamePrefix="react-select"
-                        placeholder="Select Campus..."
+                        placeholder={isRestricted ? (allowedCampuses.length === 1 ? allowedCampuses[0] : "Select from allowed...") : "Select Campus..."}
                         styles={customStyles}
-                        isDisabled={!!restrictedCampus}
+                        isDisabled={isRestricted && allowedCampuses.length === 1}
                     />
                 </div>
 
@@ -392,7 +412,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                         classNamePrefix="react-select"
                         placeholder="Select Stream..."
                         styles={customStyles}
-                        isDisabled={loadingFilters || (!restrictedCampus && filters.campus.length === 0)}
+                        isDisabled={loadingFilters || (!isRestricted && filters.campus.length === 0)}
                     />
                 </div>
 

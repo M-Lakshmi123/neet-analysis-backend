@@ -59,8 +59,11 @@ const Dashboard = () => {
         sessionStorage.setItem('dashboard_active_page', activePage);
     }, [activePage]);
 
+    const userAllowedCampuses = userData?.allowedCampuses || (userData?.campus && userData.campus !== 'All' ? [userData.campus] : []);
+    const isRestricted = !isAdmin && userAllowedCampuses.length > 0 && !userAllowedCampuses.includes('All');
+
     const initialFilters = {
-        campus: userData?.campus !== 'All' && !isAdmin ? [userData.campus] : [],
+        campus: isRestricted ? userAllowedCampuses : [],
         stream: [],
         testType: [],
         test: [],
@@ -112,7 +115,7 @@ const Dashboard = () => {
                         <FilterBar
                             filters={analysisFilters}
                             setFilters={setAnalysisFilters}
-                            restrictedCampus={!isAdmin ? userData?.campus : null}
+                            restrictedCampus={isRestricted ? userAllowedCampuses : null}
                         />
                         <div className="report-sections">
                             <AnalysisReport filters={analysisFilters} />
@@ -125,7 +128,7 @@ const Dashboard = () => {
                         <FilterBar
                             filters={averagesFilters}
                             setFilters={setAveragesFilters}
-                            restrictedCampus={!isAdmin ? userData?.campus : null}
+                            restrictedCampus={isRestricted ? userAllowedCampuses : null}
                         />
                         <div className="report-sections">
                             <AverageMarksReport filters={averagesFilters} />
@@ -138,7 +141,7 @@ const Dashboard = () => {
                         <FilterBar
                             filters={progressFilters}
                             setFilters={setProgressFilters}
-                            restrictedCampus={!isAdmin ? userData?.campus : null}
+                            restrictedCampus={isRestricted ? userAllowedCampuses : null}
                         />
                         <div className="report-sections">
                             <AverageReport filters={progressFilters} />

@@ -3,16 +3,16 @@ const fs = require('fs');
 const csv = require('csv-parser');
 const { connectToDb } = require('./db');
 const path = require('path');
-const CHECKPOINT_FILE = path.join(__dirname, 'upload_checkpoint.json');
+const CHECKPOINT_FILE = path.join(__dirname, 'upload_checkpoint_medical.json');
 
 // --- CONFIGURATION ---
 const WATCH_FOLDER = 'F:/Project files';
-// STRICTLY WATCH ONLY ERP REPORT
-const FILES_TO_WATCH = ['Error report.csv'];
+// STRICTLY WATCH ONLY MEDICAL RESULTS
+const FILES_TO_WATCH = ['MEDICAL_RESULT.csv', 'Medical Result.csv'];
 const WATCH_PATHS = FILES_TO_WATCH.map(f => path.join(WATCH_FOLDER, f));
 
 console.log("-----------------------------------------");
-console.log("      ERP REPORT AUTO-UPLOADER           ");
+console.log("   MEDICAL RESULT AUTO-UPLOADER          ");
 console.log("-----------------------------------------");
 console.log(`Watching folder: ${WATCH_FOLDER}`);
 console.log(`Files: ${FILES_TO_WATCH.join(', ')}`);
@@ -41,12 +41,13 @@ async function processFile(filePath) {
     // Determine Table Name from Filename
     const filename = require('path').basename(filePath);
 
-    // STRICTLY ERP REPORT
-    let tableName = 'ERP_REPORT';
+    // STRICTLY MEDICAL RESULT
+    let tableName = 'MEDICAL_RESULT';
     const upperName = filename.toUpperCase();
 
-    if (upperName.includes('Error report') || upperName.includes('ERROR REPORT') || upperName.includes('ERP_REPORT')) {
-        tableName = 'ERP_REPORT';
+    // Just to be safe, though pattern matching above handles it
+    if (upperName.includes('MEDICAL') || upperName.includes('RESULT')) {
+        tableName = 'MEDICAL_RESULT';
     } else {
         // Fallback or ignore
         console.log(`Skipping unknown file: ${filename}`);
@@ -56,52 +57,46 @@ async function processFile(filePath) {
 
     console.log(`\n📄 Change detected! File: ${filename} -> Table: ${tableName}`);
 
-    // --- Ensure Table Exists for ERP_REPORT ---
-    if (tableName === 'ERP_REPORT') {
+    // --- Ensure Table Exists for MEDICAL_RESULT ---
+    if (tableName === 'MEDICAL_RESULT') {
         try {
             const pool = await connectToDb();
             // Check if table exists
-            const checkTableSql = `SHOW TABLES LIKE 'ERP_REPORT'`;
+            const checkTableSql = `SHOW TABLES LIKE 'MEDICAL_RESULT'`;
             const tableExists = await pool.request().query(checkTableSql);
 
             if (!tableExists.recordset || tableExists.recordset.length === 0) {
-                console.log("⚠️ Table 'ERP_REPORT' not found. Creating it...");
+                console.log("⚠️ Table 'MEDICAL_RESULT' not found. Creating it...");
                 const createTableSql = `
-                    CREATE TABLE IF NOT EXISTS ERP_REPORT (
-                        STUD_ID BIGINT,
-                        Student_Name VARCHAR(255),
-                        Branch VARCHAR(255),
-                        Exam_Date VARCHAR(50),
+                    CREATE TABLE IF NOT EXISTS MEDICAL_RESULT (
                         Test_Type VARCHAR(50),
-                        Test VARCHAR(100),
-                        Tot_720 INT,
-                        AIR INT,
-                        Botany INT,
-                        B_Rank INT,
-                        Zoology INT,
-                        Z_Rank INT,
-                        Physics INT,
-                        P_Rank INT,
-                        Chemistry INT,
-                        C_Rank INT,
-                        Q_No INT,
-                        W_U VARCHAR(50),
-                        National_Wide_Error FLOAT,
-                        Q_URL TEXT,
-                        S_URL TEXT,
-                        Key_Value INT,
-                        Subject VARCHAR(100),
-                        Topic VARCHAR(255),
-                        Sub_Topic VARCHAR(255),
-                        Question_Type VARCHAR(50),
-                        Statement TEXT,
-                        Year INT,
+                        Test VARCHAR(255),
+                        DATE VARCHAR(50),
+                        STUD_ID VARCHAR(255),
+                        NAME_OF_THE_STUDENT VARCHAR(255),
+                        CAMPUS_NAME VARCHAR(255),
+                        Tot_720 VARCHAR(50),
+                        AIR VARCHAR(50),
+                        Botany VARCHAR(50),
+                        B_Rank VARCHAR(50),
+                        Zoology VARCHAR(50),
+                        Z_Rank VARCHAR(50),
+                        Biology VARCHAR(50),
+                        Physics VARCHAR(50),
+                        P_Rank VARCHAR(50),
+                        Chemistry VARCHAR(50),
+                        C_Rank VARCHAR(50),
+                        Stream VARCHAR(100),
+                        Year VARCHAR(50),
                         Top_ALL VARCHAR(50),
-                        Stream VARCHAR(100)
-                    )
+                        \`Errors In Botany\` TEXT,
+                        \`Errors In Zoology\` TEXT,
+                        \`Errors In Physics\` TEXT,
+                        \`Errors In Chemistry\` TEXT
+                    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
                 `;
                 await pool.request().query(createTableSql);
-                console.log("✅ Table 'ERP_REPORT' created successfully.");
+                console.log("✅ Table 'MEDICAL_RESULT' created successfully.");
             }
         } catch (err) {
             console.error("❌ Error ensuring table existence:", err.message);
@@ -109,7 +104,6 @@ async function processFile(filePath) {
             return;
         }
     }
-
 
     const results = [];
 
@@ -175,8 +169,8 @@ async function uploadToDB(rows, tableName, filename) {
 
                 const findKeyIndex = (name) => keys.findIndex(k => k.trim().toUpperCase() === name);
                 const studIdIndex = findKeyIndex('STUD_ID');
-                const qNoIndex = findKeyIndex('Q_NO');
                 const testIndex = findKeyIndex('TEST');
+                // No Q_No in Medical Result usually, just Test based
 
                 const values = Object.values(row).map((v, index) => {
                     const key = keys[index];
@@ -229,12 +223,11 @@ async function uploadToDB(rows, tableName, filename) {
                 // Duplicate Logic Preparation
                 const studIdVal = studIdIndex !== -1 ? values[studIdIndex] : null;
                 const testVal = testIndex !== -1 ? values[testIndex] : null;
-                const qNoVal = qNoIndex !== -1 ? values[qNoIndex] : null;
 
                 if (studIdVal) {
                     let clause = `(STUD_ID = ${studIdVal}`;
                     if (testVal) clause += ` AND Test = ${testVal}`;
-                    if (qNoVal) clause += ` AND Q_No = ${qNoVal}`;
+                    // Unique Logic: STUD_ID + Test is unique for Medical Result
                     clause += `)`;
                     checkConditions.push(clause);
                 }
@@ -243,83 +236,10 @@ async function uploadToDB(rows, tableName, filename) {
             }
 
             // 2. Batch Bulk Check
-            let dbDuplicates = new Set();
-            if (checkConditions.length > 0) {
-                const batchCheckSql = `SELECT STUD_ID, Test, Q_No FROM ${tableName} WHERE ${checkConditions.join(' OR ')}`;
-                try {
-                    const existing = await pool.request().query(batchCheckSql);
-                    if (existing.recordset) {
-                        existing.recordset.forEach(r => {
-                            // Create normalization key from DB results to match logic
-                            // DB result: INT/STRING.
-                            // CSV Values: Quoted Strings e.g. '123' or 'Test A'.
-                            const dbStudId = `'${r.STUD_ID}'`;
-                            const dbTest = r.Test ? `'${r.Test.replace(/'/g, "''")}'` : 'NULL'; // Basic approx
-                            const dbQ = r.Q_No ? `'${r.Q_No}'` : 'NULL';
-
-                            // We only need to match accurately enough to exclude duplicates.
-                            // Since we built the WHERE clause ourselves, the returned rows DEFINITELY match one of our inputs.
-                            // But WHICH one?
-                            // Optimization: Since we constructed (A=1 AND B=1) OR (A=2 AND B=2)...
-                            // The simple return of (1, 1), (2, 2) confirms they exist.
-                            // However, matching them back to the specific batch index is hard without a unique ID.
-                            // SIMPLIFIED APPROACH:
-                            // If we found ANY match, we must filter carefully. To avoid complex local filtering:
-                            // If batchCheckSql returns > 0 rows, we fallback to checking manually? NO, that defeats the purpose.
-
-                            // Better signature key:
-                            const key = `${r.STUD_ID}|${r.Test}|${r.Q_No}`;
-                            dbDuplicates.add(key);
-                        });
-                    }
-                } catch (checkErr) {
-                    // If error (e.g. query too long), we might want to log it but proceed (risking duplicates) or break.
-                    console.error("Batch Check Warning:", checkErr.message);
-                }
-            }
-
-            // 3. Filter Duplicates Locally
-            const validInserts = [];
-            for (let b = 0; b < batchRows.length; b++) {
-                // Re-extract key to check against dbDuplicates
-                const row = batchRows[b];
-                // Note: we need normalized values (not quoted) to match DB results loosely?
-                // Or better: Re-run the normalization? 
-                // It is cleaner to do: if we found duplicates, just iterate the 'batchCheckSql' results again in a simpler way.
-                // Actually, let's look at the problem:
-                // DB returns: 101, 'Test A', 5
-                // CSV has: 101, 'Test A', 5
-
-                // Let's rely on string matching the raw values from CSV vs DB? Weak.
-                // Let's just trust implicit validInserts if we didn't find them?
-                // Or actually:
-                // If `dbDuplicates.size === 0`, insert all.
-                // If `dbDuplicates.size > 0`, we have to be careful.
-
-                // HACK: To ensure perfect matching without complex logic, if dups found, we switch to slow mode for this batch?
-                // 50 RUs is better than 50 queries.
-                // If `existing.recordset.length > 0`, it means some exist.
-                // We can just filter out based on `checkConditions[b]`? No.
-
-                // Let's use the 'Fall back to slow' strategy if batch check finds ANY result.
-                // It generates 51 queries in worst case (1 big check + 50 individual checks), 
-                // but 1 query in best case (0 dups).
-                // Since most data is NEW, this is highly optimal.
-            }
-
-            // Clean Strategy:
-            let finalSql = "";
-            let currentBatchCount = 0;
-
-            // New Plan: "Check-All-Or-Nothing"
-            // If check returns 0 rows, insert all.
-            // If check returns >0 rows, we don't know WHICH ones without complex matching.
-            // So we just iterate the batch individually for safety.
-
+            // "Check-All-Or-Nothing" Strategy (Optimized)
             let useFastPath = true;
             if (checkConditions.length > 0) {
                 const batchCheckSql = `SELECT 1 FROM ${tableName} WHERE ${checkConditions.join(' OR ')} LIMIT 1`;
-                // LIMIT 1 because if ANY exist, we must be careful.
                 try {
                     const existing = await pool.request().query(batchCheckSql);
                     if (existing.recordset && existing.recordset.length > 0) {
@@ -343,11 +263,9 @@ async function uploadToDB(rows, tableName, filename) {
             }
 
             if (!useFastPath) {
-                // Slow Fallback (Copy of original single-row logic logic)
+                // Slow Fallback (Individual Checks)
                 for (let b = 0; b < batchRows.length; b++) {
                     const oneRowSql = `INSERT INTO ${tableName} (${safeKeysStr}) VALUES ${batchInserts[b]}`;
-                    // We can skip the 'Select 1' check if we trust the DB to reject? No constraints.
-                    // We must do the single check again.
                     const checkSql = `SELECT 1 FROM ${tableName} WHERE ${checkConditions[b]} LIMIT 1`;
                     let isDup = false;
                     try {
