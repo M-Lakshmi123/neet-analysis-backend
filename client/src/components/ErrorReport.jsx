@@ -333,11 +333,12 @@ const ErrorReport = () => {
                 const wStat = 18;
                 const wQ = 12;
                 const wKey = 18;
+                const wPerc = 12;
                 const imgAreaW = contentWidth - wStat;
                 const halfImgW = imgAreaW / 2;
 
                 const wTopic = halfImgW - wQ;
-                const wSub = halfImgW - 18;
+                const wSub = halfImgW - wKey - wPerc;
 
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                 else doc.setFont("helvetica", "bold");
@@ -416,6 +417,45 @@ const ErrorReport = () => {
                 doc.text(keyLabel, kStart, ty);
                 doc.setTextColor(240, 230, 140);
                 doc.text(keyVal, kStart + doc.getTextWidth(keyLabel), ty);
+                doc.setDrawColor(255);
+                doc.line(cx + wKey, yPos, cx + wKey, yPos + headerH);
+                cx += wKey;
+
+                // % (National Error)
+                const percLabel = "%"; // Title only %
+                const percRaw = q.National_Wide_Error;
+                let percVal = "";
+                if (percRaw !== undefined && percRaw !== null && percRaw !== '') {
+                    const num = parseFloat(percRaw);
+                    if (!isNaN(num)) percVal = Math.round(num * 100) + "%";
+                }
+
+                doc.setTextColor(240, 230, 140);
+                doc.text(percVal, cx + (wPerc / 2), ty, { align: 'center' });
+
+                // No final line needed as block border covers right side, but for consistency if we want separators
+                // But the image divider line (Lines 439) does the work? Actually line 439 draws the middle line.
+                // We might want a line after Key?
+                // doc.line(cx + wKey + wPerc... wait cx is at key start)
+                // Let's rely on standard block styling for now, user didn't ask for lines explicitly.
+                // But standard table has lines?
+                // The headers have lines (383, 388, 397, 406).
+                // I need to update line 406 (after Sub) and add line after Key?
+                // Line 406 (after Sub) uses `wSub`.
+                // `cx` at line 407 is `start_of_sub`. `cx + wSub` is end of sub.
+                // Line 406: `doc.line(cx + wSub, yPos, cx + wSub, yPos + headerH);`
+                // My `wSub` now ends *before* Key. So yes, this line is correct (After Sub, Before Key).
+
+                // I should add a line after Key?
+                // `doc.line(cx + wKey, yPos, cx + wKey, yPos + headerH);` (In my code above I added this!)
+                // Wait, check above code.
+                // ...
+                // doc.line(cx + wKey, yPos, cx + wKey, yPos + headerH);
+                // cx += wKey;
+                // ...
+                // Then draw %. 
+                // Line after %? The right border of the rect covers it.
+
 
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, blockH);
@@ -487,7 +527,7 @@ const ErrorReport = () => {
 
             if (reportData.length === 1) {
                 const doc = await createStudentPDF(reportData[0], fonts);
-                doc.save(`Error_Report_${reportData[0].info.name}_${subjectFilter.value}.pdf`);
+                doc.save(`${reportData[0].info.name}_${reportData[0].info.branch}.pdf`);
             } else {
                 const zip = new JSZip();
 
@@ -496,7 +536,7 @@ const ErrorReport = () => {
                     setPdfProgress(`Generating PDF for ${student.info.name} (${i + 1}/${reportData.length})...`);
                     const doc = await createStudentPDF(student, fonts);
                     const blob = doc.output('blob');
-                    zip.file(`Error_Report_${student.info.name}.pdf`, blob);
+                    zip.file(`${student.info.name}_${student.info.branch}.pdf`, blob);
                 }
 
                 setPdfProgress('Compressing...');
@@ -647,8 +687,9 @@ const ErrorReport = () => {
                                                 <col style={{ width: '18mm' }} />
                                                 <col style={{ width: '12mm' }} />
                                                 <col style={{ width: '74mm' }} />
-                                                <col style={{ width: '68mm' }} />
+                                                <col style={{ width: '56mm' }} />
                                                 <col style={{ width: '18mm' }} />
+                                                <col style={{ width: '12mm' }} />
                                             </colgroup>
                                             <thead>
                                                 <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
@@ -664,9 +705,18 @@ const ErrorReport = () => {
                                                         <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Sub_Topic}</span>
                                                     </td>
 
-                                                    <td style={{ border: '1px solid black', textAlign: 'center' }}>
+                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>
                                                         <span>Key: </span>
                                                         <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Key_Value}</span>
+                                                    </td>
+
+                                                    <td style={{ border: '1px solid black', textAlign: 'center' }}>
+                                                        <span>%</span>
+                                                        <div style={{ color: '#F0E68C', fontSize: '11px' }}>
+                                                            {q.National_Wide_Error && !isNaN(parseFloat(q.National_Wide_Error))
+                                                                ? Math.round(parseFloat(q.National_Wide_Error) * 100) + '%'
+                                                                : ''}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             </thead>
@@ -676,7 +726,7 @@ const ErrorReport = () => {
                                                         {q.Subject}
                                                     </td>
 
-                                                    <td colSpan="4" style={{ padding: 0, border: '1px solid black' }}>
+                                                    <td colSpan="5" style={{ padding: 0, border: '1px solid black' }}>
                                                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                             <tbody>
                                                                 <tr>
