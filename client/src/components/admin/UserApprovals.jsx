@@ -206,6 +206,13 @@ const UserApprovals = () => {
                                         <td>{new Date(user.approvedAt).toLocaleDateString()}</td>
                                         <td>
                                             <div className="flex-actions" style={{ display: 'flex', gap: '10px' }}>
+                                                <button
+                                                    className="edit-btn"
+                                                    style={{ color: '#2563eb', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                    onClick={() => initiationApproval(user)}
+                                                >
+                                                    <Edit size={14} /> Edit
+                                                </button>
                                                 {user.phone && (
                                                     <button
                                                         className="btn-whatsapp"
@@ -219,13 +226,6 @@ const UserApprovals = () => {
                                                         <MessageSquare size={14} /> Notify
                                                     </button>
                                                 )}
-                                                <button
-                                                    className="edit-btn"
-                                                    style={{ color: '#2563eb', border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                                                    onClick={() => initiationApproval(user)}
-                                                >
-                                                    <Edit size={14} /> Edit
-                                                </button>
                                                 <button
                                                     className="text-danger"
                                                     onClick={() => confirmReject(user.id)}
