@@ -80,8 +80,17 @@ const UserApprovals = () => {
             allowedCampuses: allowedCampuses
         };
 
+        // Update Pending List (Remove if present)
         setPendingUsers(prev => prev.filter(u => u.id !== user.id));
-        setApprovedUsers(prev => [approvedUser, ...prev]);
+
+        // Update Approved List (Replace if exists, else add to top)
+        setApprovedUsers(prev => {
+            const exists = prev.some(u => u.id === user.id);
+            if (exists) {
+                return prev.map(u => u.id === user.id ? approvedUser : u);
+            }
+            return [approvedUser, ...prev];
+        });
 
         try {
             // 1. Approve in Firestore with allowedCampuses
