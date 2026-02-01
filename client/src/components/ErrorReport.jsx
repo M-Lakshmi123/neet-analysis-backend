@@ -241,6 +241,47 @@ const ErrorReport = () => {
             return y + 2;
         };
 
+        // --- Helper: Smart Wrap Text ---
+        // Wraps text such that the first line starts at 'indent' and fills 'width - indent',
+        // and subsequent lines start at 0 and fill 'width'.
+        const getSmartWrappedLines = (doc, text, width, firstLineIndent) => {
+            if (!text) return [];
+            const words = text.split(' ');
+            const lines = [];
+            let currentLine = "";
+            let isFirstLine = true;
+
+            // Helper to get available width for current line
+            const getAvailWidth = () => isFirstLine ? (width - firstLineIndent) : width;
+
+            for (let i = 0; i < words.length; i++) {
+                const word = words[i];
+                const widthIfAdded = doc.getTextWidth(currentLine + (currentLine ? " " : "") + word);
+
+                if (widthIfAdded <= getAvailWidth()) {
+                    currentLine += (currentLine ? " " : "") + word;
+                } else {
+                    // Current line is full
+                    if (currentLine) {
+                        lines.push({ text: currentLine, xOffset: isFirstLine ? firstLineIndent : 0 });
+                    }
+                    // Start next line
+                    isFirstLine = false;
+                    currentLine = word;
+
+                    // If the single word is longer than the FULL width (rare, but possible)
+                    // we might need to split it, but standard splitTextToSize handles that better.
+                    // For simplicity, let's assume words fit in 'width'. 
+                    // If not, we could force break, but let's stick to word wrap.
+                }
+            }
+            if (currentLine) {
+                lines.push({ text: currentLine, xOffset: isFirstLine ? firstLineIndent : 0 });
+            }
+
+            return lines;
+        };
+
         // --- START PAGE 1 ---
         const headerBottom = drawMainHeader(doc);
         let yPos = headerBottom + 1;
@@ -330,29 +371,32 @@ const ErrorReport = () => {
                 const qImg = await loadImage(q.Q_URL);
                 const sImg = await loadImage(q.S_URL);
 
+                // Adjusted Widths
                 const wStat = 18;
                 const wQ = 12;
                 const wKey = 18;
-                const wPerc = 12;
+                const wPerc = 22; // Increased to fit "Top%: 100%"
                 const imgAreaW = contentWidth - wStat;
                 const halfImgW = imgAreaW / 2;
 
                 const wTopic = halfImgW - wQ;
-                const wSub = halfImgW - wKey - wPerc;
+                const wSub = halfImgW - wKey - wPerc; // Remaining space for Sub
 
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                 else doc.setFont("helvetica", "bold");
                 doc.setFontSize(9);
 
+                // --- Calculate Heights with Smart Wrap ---
                 const topicLabel = "Topic: ";
                 const topicVal = q.Topic || '';
-                const topicMaxW = wTopic - doc.getTextWidth(topicLabel) - 2;
-                const topicLines = doc.splitTextToSize(topicVal, topicMaxW);
+                const topicLabelW = doc.getTextWidth(topicLabel);
+                // Smart wrap: Line 1 starts after label, Line 2+ starts at 0
+                const topicLines = getSmartWrappedLines(doc, topicVal, wTopic - 2, topicLabelW);
 
                 const subLabel = "Sub Topic: ";
                 const subVal = q.Sub_Topic || '';
-                const subMaxW = wSub - doc.getTextWidth(subLabel) - 2;
-                const subLines = doc.splitTextToSize(subVal, subMaxW);
+                const subLabelW = doc.getTextWidth(subLabel);
+                const subLines = getSmartWrappedLines(doc, subVal, wSub - 2, subLabelW);
 
                 const maxHeaderLines = Math.max(1, topicLines.length, subLines.length);
                 const lineHeight = 4;
@@ -389,20 +433,27 @@ const ErrorReport = () => {
                 doc.line(cx + wQ, yPos, cx + wQ, yPos + headerH);
                 cx += wQ;
 
-                // Topic
+                // Topic Renderer
                 doc.setTextColor(255, 255, 255);
-                doc.text(topicLabel, cx + 1, ty);
+                doc.text(topicLabel, cx + 1, ty); // Label
                 doc.setTextColor(240, 230, 140);
-                doc.text(topicLines, cx + doc.getTextWidth(topicLabel) + 1, ty);
+                // Render lines
+                topicLines.forEach((line, idx) => {
+                    const ly = ty + (idx * lineHeight);
+                    doc.text(line.text, cx + 1 + line.xOffset, ly);
+                });
                 doc.setDrawColor(255);
                 doc.line(cx + wTopic, yPos, cx + wTopic, yPos + headerH);
                 cx += wTopic;
 
-                // Sub Topic
+                // Sub Topic Renderer
                 doc.setTextColor(255, 255, 255);
-                doc.text(subLabel, cx + 1, ty);
+                doc.text(subLabel, cx + 1, ty); // Label
                 doc.setTextColor(240, 230, 140);
-                doc.text(subLines, cx + doc.getTextWidth(subLabel) + 1, ty);
+                subLines.forEach((line, idx) => {
+                    const ly = ty + (idx * lineHeight);
+                    doc.text(line.text, cx + 1 + line.xOffset, ly);
+                });
                 doc.setDrawColor(255);
                 doc.line(cx + wSub, yPos, cx + wSub, yPos + headerH);
                 cx += wSub;
@@ -410,19 +461,17 @@ const ErrorReport = () => {
                 // Key
                 const keyLabel = "Key: ";
                 const keyVal = q.Key_Value || '';
-                const kW = doc.getTextWidth(keyLabel + keyVal);
-                const kStart = (cx + (wKey / 2)) - (kW / 2);
 
                 doc.setTextColor(255, 255, 255);
-                doc.text(keyLabel, kStart, ty);
+                doc.text(keyLabel, cx + 2, ty);
                 doc.setTextColor(240, 230, 140);
-                doc.text(keyVal, kStart + doc.getTextWidth(keyLabel), ty);
+                doc.text(keyVal, cx + 2 + doc.getTextWidth(keyLabel), ty);
                 doc.setDrawColor(255);
                 doc.line(cx + wKey, yPos, cx + wKey, yPos + headerH);
                 cx += wKey;
 
-                // % (National Error)
-                const percLabel = "%"; // Title only %
+                // Top%: value
+                const percLabel = "Top%: ";
                 const percRaw = q.National_Wide_Error;
                 let percVal = "";
                 if (percRaw !== undefined && percRaw !== null && percRaw !== '') {
@@ -430,32 +479,10 @@ const ErrorReport = () => {
                     if (!isNaN(num)) percVal = Math.round(num * 100) + "%";
                 }
 
+                doc.setTextColor(255, 255, 255);
+                doc.text(percLabel, cx + 2, ty);
                 doc.setTextColor(240, 230, 140);
-                doc.text(percVal, cx + (wPerc / 2), ty, { align: 'center' });
-
-                // No final line needed as block border covers right side, but for consistency if we want separators
-                // But the image divider line (Lines 439) does the work? Actually line 439 draws the middle line.
-                // We might want a line after Key?
-                // doc.line(cx + wKey + wPerc... wait cx is at key start)
-                // Let's rely on standard block styling for now, user didn't ask for lines explicitly.
-                // But standard table has lines?
-                // The headers have lines (383, 388, 397, 406).
-                // I need to update line 406 (after Sub) and add line after Key?
-                // Line 406 (after Sub) uses `wSub`.
-                // `cx` at line 407 is `start_of_sub`. `cx + wSub` is end of sub.
-                // Line 406: `doc.line(cx + wSub, yPos, cx + wSub, yPos + headerH);`
-                // My `wSub` now ends *before* Key. So yes, this line is correct (After Sub, Before Key).
-
-                // I should add a line after Key?
-                // `doc.line(cx + wKey, yPos, cx + wKey, yPos + headerH);` (In my code above I added this!)
-                // Wait, check above code.
-                // ...
-                // doc.line(cx + wKey, yPos, cx + wKey, yPos + headerH);
-                // cx += wKey;
-                // ...
-                // Then draw %. 
-                // Line after %? The right border of the rect covers it.
-
+                doc.text(percVal, cx + 2 + doc.getTextWidth(percLabel), ty);
 
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, blockH);
@@ -687,9 +714,9 @@ const ErrorReport = () => {
                                                 <col style={{ width: '18mm' }} />
                                                 <col style={{ width: '12mm' }} />
                                                 <col style={{ width: '74mm' }} />
-                                                <col style={{ width: '56mm' }} />
+                                                <col style={{ width: '46mm' }} />
                                                 <col style={{ width: '18mm' }} />
-                                                <col style={{ width: '12mm' }} />
+                                                <col style={{ width: '22mm' }} />
                                             </colgroup>
                                             <thead>
                                                 <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
@@ -711,12 +738,12 @@ const ErrorReport = () => {
                                                     </td>
 
                                                     <td style={{ border: '1px solid black', textAlign: 'center' }}>
-                                                        <span>%</span>
-                                                        <div style={{ color: '#F0E68C', fontSize: '11px' }}>
+                                                        <span>Top%: </span>
+                                                        <span style={{ color: '#F0E68C', marginLeft: '5px' }}>
                                                             {q.National_Wide_Error && !isNaN(parseFloat(q.National_Wide_Error))
                                                                 ? Math.round(parseFloat(q.National_Wide_Error) * 100) + '%'
                                                                 : ''}
-                                                        </div>
+                                                        </span>
                                                     </td>
                                                 </tr>
                                             </thead>
