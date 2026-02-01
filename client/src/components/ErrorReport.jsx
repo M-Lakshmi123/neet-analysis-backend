@@ -422,14 +422,47 @@ const ErrorReport = () => {
                 const imgTargetW = 85;
                 let qH = 0; if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
                 let sH = 0; if (sImg) sH = (sImg.height / sImg.width) * imgTargetW;
-                const maxContentH = Math.max(qH, sH, 20);
-                const blockH = headerH + maxContentH + 2;
+                let maxContentH = Math.max(qH, sH, 20);
+                let blockH = headerH + maxContentH + 2;
 
-                if (yPos + blockH > pageHeight - margin) {
-                    doc.addPage();
-                    yPos = 15;
-                } else if (i > 0) {
-                    yPos += 2;
+                // --- Intelligent Page Break & Image Sizing ---
+                const spacing = (i > 0) ? 2 : 0;
+
+                if (yPos + spacing + blockH > pageHeight - margin) {
+                    // Check size of the remaining gap. If huge, try to squeeze instead of break.
+                    const remainingSpace = (pageHeight - margin) - (yPos + spacing);
+                    const LARGE_GAP_THRESHOLD = 60; // 60mm
+
+                    let fitted = false;
+
+                    if (remainingSpace > LARGE_GAP_THRESHOLD) {
+                        const availImgH = remainingSpace - headerH - 2;
+                        const scale = availImgH / maxContentH;
+
+                        // Only squeeze if we have decent space (>35mm) and don't shrink too aggressively (>60% of original)
+                        if (availImgH > 35 && scale > 0.6) {
+                            if (qH > availImgH) qH = availImgH;
+                            if (sH > availImgH) sH = availImgH;
+
+                            maxContentH = Math.max(qH, sH, 20);
+                            blockH = headerH + maxContentH + 2;
+                            fitted = true;
+                        }
+                    }
+
+                    if (fitted) {
+                        yPos += spacing;
+                    } else {
+                        doc.addPage();
+                        yPos = 15;
+                        // Reset to original heights?
+                        // Actually, since we only modified qH/sH inside the `fitted` block, 
+                        // if we are NOT fitted, qH/sH are still their original calculated values above.
+                        // However, we need to recalculate blockH because `fitted` block might not have run but blockH assumes original.
+                        // blockH is 'let', it was initialized to original size. So it's fine.
+                    }
+                } else {
+                    yPos += spacing;
                 }
 
                 doc.setFillColor(128, 0, 0);
