@@ -262,17 +262,20 @@ const ErrorReport = () => {
                     currentLine += (currentLine ? " " : "") + word;
                 } else {
                     // Current line is full
-                    if (currentLine) {
-                        lines.push({ text: currentLine, xOffset: isFirstLine ? firstLineIndent : 0 });
+                    // Check if the first line was empty (meaning the first word didn't even fit the indent space)
+                    if (currentLine === "" && isFirstLine) {
+                        // Push empty line placeholder to occupy the visual "Label" line
+                        lines.push({ text: "", xOffset: firstLineIndent });
+                        isFirstLine = false;
+                        currentLine = word; // Start word on next line
+                    } else {
+                        // Regular wrap
+                        if (currentLine) {
+                            lines.push({ text: currentLine, xOffset: isFirstLine ? firstLineIndent : 0 });
+                        }
+                        isFirstLine = false;
+                        currentLine = word;
                     }
-                    // Start next line
-                    isFirstLine = false;
-                    currentLine = word;
-
-                    // If the single word is longer than the FULL width (rare, but possible)
-                    // we might need to split it, but standard splitTextToSize handles that better.
-                    // For simplicity, let's assume words fit in 'width'. 
-                    // If not, we could force break, but let's stick to word wrap.
                 }
             }
             if (currentLine) {
@@ -371,16 +374,17 @@ const ErrorReport = () => {
                 const qImg = await loadImage(q.Q_URL);
                 const sImg = await loadImage(q.S_URL);
 
-                // Adjusted Widths
-                const wStat = 18;
-                const wQ = 12;
-                const wKey = 18;
-                const wPerc = 22; // Increased to fit "Top%: 100%"
+                // Adjusted Widths - Merged Key/Perc, More space for Subs
+                const wStat = 15; // W/U reduced
+                const wQ = 11;    // Q No reduced
+                const wDetails = 22; // Merged Key & Top%
+
+                const remainingW = contentWidth - wStat - wQ - wDetails;
+                const wTopic = remainingW / 2; // Equal split
+                const wSub = remainingW / 2;
+
                 const imgAreaW = contentWidth - wStat;
                 const halfImgW = imgAreaW / 2;
-
-                const wTopic = halfImgW - wQ;
-                const wSub = halfImgW - wKey - wPerc; // Remaining space for Sub
 
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                 else doc.setFont("helvetica", "bold");
@@ -390,7 +394,6 @@ const ErrorReport = () => {
                 const topicLabel = "Topic: ";
                 const topicVal = q.Topic || '';
                 const topicLabelW = doc.getTextWidth(topicLabel);
-                // Smart wrap: Line 1 starts after label, Line 2+ starts at 0
                 const topicLines = getSmartWrappedLines(doc, topicVal, wTopic - 2, topicLabelW);
 
                 const subLabel = "Sub Topic: ";
@@ -398,9 +401,23 @@ const ErrorReport = () => {
                 const subLabelW = doc.getTextWidth(subLabel);
                 const subLines = getSmartWrappedLines(doc, subVal, wSub - 2, subLabelW);
 
-                const maxHeaderLines = Math.max(1, topicLines.length, subLines.length);
+                // Key and Perc Calcs
+                const keyLabel = "Key: ";
+                const keyVal = q.Key_Value || '';
+                const percLabel = "Top%: ";
+                const percRaw = q.National_Wide_Error;
+                let percVal = "";
+                if (percRaw !== undefined && percRaw !== null && percRaw !== '') {
+                    const num = parseFloat(percRaw);
+                    if (!isNaN(num)) percVal = Math.round(num * 100) + "%";
+                }
+
+                // Details Height: Stacked 2 lines minimum
+                const detailsLines = 2; // Key line + % line
+
+                const maxHeaderLines = Math.max(2, topicLines.length, subLines.length);
                 const lineHeight = 4;
-                const headerH = Math.max(7, (maxHeaderLines * lineHeight) + 2.5);
+                const headerH = Math.max(9, (maxHeaderLines * lineHeight) + 3);
 
                 const imgTargetW = 85;
                 let qH = 0; if (qImg) qH = (qImg.height / qImg.width) * imgTargetW;
@@ -435,9 +452,8 @@ const ErrorReport = () => {
 
                 // Topic Renderer
                 doc.setTextColor(255, 255, 255);
-                doc.text(topicLabel, cx + 1, ty); // Label
+                doc.text(topicLabel, cx + 1, ty);
                 doc.setTextColor(240, 230, 140);
-                // Render lines
                 topicLines.forEach((line, idx) => {
                     const ly = ty + (idx * lineHeight);
                     doc.text(line.text, cx + 1 + line.xOffset, ly);
@@ -448,7 +464,7 @@ const ErrorReport = () => {
 
                 // Sub Topic Renderer
                 doc.setTextColor(255, 255, 255);
-                doc.text(subLabel, cx + 1, ty); // Label
+                doc.text(subLabel, cx + 1, ty);
                 doc.setTextColor(240, 230, 140);
                 subLines.forEach((line, idx) => {
                     const ly = ty + (idx * lineHeight);
@@ -458,31 +474,19 @@ const ErrorReport = () => {
                 doc.line(cx + wSub, yPos, cx + wSub, yPos + headerH);
                 cx += wSub;
 
-                // Key
-                const keyLabel = "Key: ";
-                const keyVal = q.Key_Value || '';
-
+                // Details Column (Key + Top%)
+                // Line 1: Key
                 doc.setTextColor(255, 255, 255);
                 doc.text(keyLabel, cx + 2, ty);
                 doc.setTextColor(240, 230, 140);
                 doc.text(keyVal, cx + 2 + doc.getTextWidth(keyLabel), ty);
-                doc.setDrawColor(255);
-                doc.line(cx + wKey, yPos, cx + wKey, yPos + headerH);
-                cx += wKey;
 
-                // Top%: value
-                const percLabel = "Top%: ";
-                const percRaw = q.National_Wide_Error;
-                let percVal = "";
-                if (percRaw !== undefined && percRaw !== null && percRaw !== '') {
-                    const num = parseFloat(percRaw);
-                    if (!isNaN(num)) percVal = Math.round(num * 100) + "%";
-                }
-
+                // Line 2: Top%
+                const ty2 = ty + lineHeight;
                 doc.setTextColor(255, 255, 255);
-                doc.text(percLabel, cx + 2, ty);
+                doc.text(percLabel, cx + 2, ty2);
                 doc.setTextColor(240, 230, 140);
-                doc.text(percVal, cx + 2 + doc.getTextWidth(percLabel), ty);
+                doc.text(percVal, cx + 2 + doc.getTextWidth(percLabel), ty2);
 
                 doc.setDrawColor(0);
                 doc.rect(margin, yPos, contentWidth, blockH);
@@ -711,11 +715,10 @@ const ErrorReport = () => {
                                     {renderQs.map((q, qIdx) => (
                                         <table key={qIdx} style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '10px', backgroundColor: 'white' }}>
                                             <colgroup>
-                                                <col style={{ width: '18mm' }} />
-                                                <col style={{ width: '12mm' }} />
-                                                <col style={{ width: '74mm' }} />
-                                                <col style={{ width: '46mm' }} />
-                                                <col style={{ width: '18mm' }} />
+                                                <col style={{ width: '15mm' }} />
+                                                <col style={{ width: '11mm' }} />
+                                                <col style={{ width: '72mm' }} />
+                                                <col style={{ width: '72mm' }} />
                                                 <col style={{ width: '22mm' }} />
                                             </colgroup>
                                             <thead>
@@ -732,18 +735,19 @@ const ErrorReport = () => {
                                                         <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Sub_Topic}</span>
                                                     </td>
 
-                                                    <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>
-                                                        <span>Key: </span>
-                                                        <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Key_Value}</span>
-                                                    </td>
-
-                                                    <td style={{ border: '1px solid black', textAlign: 'center' }}>
-                                                        <span>Top%: </span>
-                                                        <span style={{ color: '#F0E68C', marginLeft: '5px' }}>
-                                                            {q.National_Wide_Error && !isNaN(parseFloat(q.National_Wide_Error))
-                                                                ? Math.round(parseFloat(q.National_Wide_Error) * 100) + '%'
-                                                                : ''}
-                                                        </span>
+                                                    <td style={{ border: '1px solid black', textAlign: 'left', padding: '2px 4px', verticalAlign: 'top' }}>
+                                                        <div>
+                                                            <span>Key: </span>
+                                                            <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Key_Value}</span>
+                                                        </div>
+                                                        <div style={{ marginTop: '2px' }}>
+                                                            <span>Top%: </span>
+                                                            <span style={{ color: '#F0E68C', marginLeft: '5px' }}>
+                                                                {q.National_Wide_Error && !isNaN(parseFloat(q.National_Wide_Error))
+                                                                    ? Math.round(parseFloat(q.National_Wide_Error) * 100) + '%'
+                                                                    : ''}
+                                                            </span>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             </thead>
@@ -753,7 +757,7 @@ const ErrorReport = () => {
                                                         {q.Subject}
                                                     </td>
 
-                                                    <td colSpan="5" style={{ padding: 0, border: '1px solid black' }}>
+                                                    <td colSpan="4" style={{ padding: 0, border: '1px solid black' }}>
                                                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                             <tbody>
                                                                 <tr>
