@@ -109,9 +109,18 @@ const ErrorReport = () => {
                         return d2 - d1;
                     });
 
-                    // Sort Questions by Subject
+                    // Sort Questions by Subject then by Question Number
                     testsArr = testsArr.map(t => {
-                        t.questions.sort((a, b) => getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject));
+                        t.questions.sort((a, b) => {
+                            // Primary Sort: Subject
+                            const subOrder = getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject);
+                            if (subOrder !== 0) return subOrder;
+
+                            // Secondary Sort: Question Number (numeric)
+                            const qNoA = parseInt(a.Q_No) || 0;
+                            const qNoB = parseInt(b.Q_No) || 0;
+                            return qNoA - qNoB;
+                        });
                         return t;
                     });
 
@@ -455,11 +464,6 @@ const ErrorReport = () => {
                     } else {
                         doc.addPage();
                         yPos = 15;
-                        // Reset to original heights?
-                        // Actually, since we only modified qH/sH inside the `fitted` block, 
-                        // if we are NOT fitted, qH/sH are still their original calculated values above.
-                        // However, we need to recalculate blockH because `fitted` block might not have run but blockH assumes original.
-                        // blockH is 'let', it was initialized to original size. So it's fine.
                     }
                 } else {
                     yPos += spacing;
