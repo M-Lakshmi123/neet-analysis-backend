@@ -100,8 +100,8 @@ const UserApprovals = () => {
                 allowedCampuses: allowedCampuses
             });
 
-            // 2. Open WhatsApp Web for notification
-            if (user.phone) {
+            // 2. Open WhatsApp Web for notification (Only for new approvals)
+            if (!user.isApproved && user.phone) {
                 const campusText = allowedCampuses.length > 5 ? `${allowedCampuses.length} Campuses` : allowedCampuses.join(', ');
                 const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the dashboard has been *APPROVED*.\n\nAccess granted for: *${campusText || "All Campuses"}*\n\nLogin now: https://medical-2025-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
                 const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
