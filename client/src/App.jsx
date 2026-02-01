@@ -51,8 +51,20 @@ const Dashboard = () => {
     const { userData, isAdmin } = useAuth();
     // Initialize from sessionStorage or default to 'analysis'
     const [activePage, setActivePage] = useState(() => {
-        return sessionStorage.getItem('dashboard_active_page') || 'analysis';
+        const stored = sessionStorage.getItem('dashboard_active_page');
+        // Security check: If stored page is admin-only but user is not admin, default to analysis
+        if (stored && ['approvals', 'logs'].includes(stored) && !isAdmin) {
+            return 'analysis';
+        }
+        return stored || 'analysis';
     });
+
+    // Ensure non-admins are redirected from admin pages if state changes
+    useEffect(() => {
+        if (!isAdmin && ['approvals', 'logs'].includes(activePage)) {
+            setActivePage('analysis');
+        }
+    }, [isAdmin, activePage]);
 
     // Update sessionStorage whenever activePage changes
     useEffect(() => {
@@ -151,9 +163,9 @@ const Dashboard = () => {
             case 'errors':
                 return <ErrorReport />;
             case 'approvals':
-                return <UserApprovals />;
+                return isAdmin ? <UserApprovals /> : <div className="p-4">Access Denied</div>;
             case 'logs':
-                return <ActivityLogs />;
+                return isAdmin ? <ActivityLogs /> : <div className="p-4">Access Denied</div>;
             default:
                 return <div>Select a page from the sidebar</div>;
         }

@@ -180,14 +180,10 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                 if (allowedCampuses.length === 1) {
                     url += `&campus=${encodeURIComponent(allowedCampuses[0])}`;
                 } else {
-                    // Start search but filtering will happen on user selection validation or we might need backend support for multi-campus restricted search
-                    // For now, let's assume backend filters results if we pass 'campus' params. 
-                    // However, standard API logic usually takes single campus.
-                    // If we want detailed restriction, we might need to filter client side or handle arrays in backend.
-                    // But for Autocomplete consistency, let's filter client side if backend returns everything, OR pass nothing and filter here.
-                    // Wait, safely: We typically want to restrict what they SEE.
-                    // Let's pass the first allowed campus as a loose fallback or rely on the fact that when they Click a student, we check access?
-                    // Safe approach: Client-side filter after fetch if backend doesn't support 'campus=A,B'
+                    // Send ALL allowed campuses as filters so backend restricts search results
+                    allowedCampuses.forEach(c => {
+                        url += `&campus=${encodeURIComponent(c)}`;
+                    });
                 }
             }
 
@@ -399,7 +395,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                 </div>
 
                 {/* Stream Select */}
-                <div className={`filter-group ${loadingFilters || (!restrictedCampus && filters.campus.length === 0) ? 'disabled-logic' : ''}`}>
+                <div className={`filter-group ${loadingFilters || (!isRestricted && filters.campus.length === 0) ? 'disabled-logic' : ''}`}>
                     <label>Stream</label>
                     <Select
                         isMulti

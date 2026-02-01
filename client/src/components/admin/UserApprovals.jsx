@@ -252,45 +252,134 @@ const UserApprovals = () => {
                 loading={modal.loading}
             />
 
-            {/* Approval Modal with Campus Selection */}
+            {/* Modern Approval Modal */}
             {approvalModal.isOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-container" style={{ maxWidth: '500px', width: '90%' }}>
-                        <h3>Approve Access for {approvalModal.user?.name}</h3>
-                        <p style={{ marginBottom: '1rem', color: '#666' }}>
-                            Requested Campus: <strong>{approvalModal.user?.campus}</strong>
-                        </p>
-
-                        <div style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Grant Access To Campuses:</label>
-                            <Select
-                                isMulti
-                                options={[{ value: 'All', label: 'All Campuses' }, ...allCampuses]}
-                                value={approvalModal.selectedCampuses}
-                                onChange={(selected) => setApprovalModal(prev => ({ ...prev, selectedCampuses: selected || [] }))}
-                                placeholder="Select campuses..."
-                                styles={{
-                                    control: (base) => ({ ...base, minHeight: '45px' }),
-                                    menu: (base) => ({ ...base, zIndex: 9999 })
-                                }}
-                            />
-                            <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '5px' }}>
-                                Leave empty or select "All Campuses" to grant full access based on role.
-                            </p>
+                <div style={{
+                    position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1.5rem'
+                }}>
+                    <div style={{
+                        backgroundColor: '#ffffff', borderRadius: '16px',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0,0,0,0.05)',
+                        width: '100%', maxWidth: '520px',
+                        display: 'flex', flexDirection: 'column', overflow: 'visible',
+                        opacity: 1, transform: 'scale(1)', transition: 'all 0.2s'
+                    }}>
+                        {/* Header */}
+                        <div style={{
+                            padding: '1.5rem', borderBottom: '1px solid #f1f5f9',
+                            display: 'flex', alignItems: 'center', gap: '1rem',
+                            background: 'white', borderTopLeftRadius: '16px', borderTopRightRadius: '16px'
+                        }}>
+                            <div style={{
+                                width: '48px', height: '48px', borderRadius: '12px',
+                                backgroundColor: '#eff6ff', color: '#3b82f6',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                boxShadow: '0 2px 4px rgba(59, 130, 246, 0.1)'
+                            }}>
+                                <School size={24} strokeWidth={2.5} />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.02em' }}>
+                                    Approve Access
+                                </h3>
+                                <p style={{ margin: '2px 0 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                                    Grant access permissions for <span style={{ fontWeight: '700', color: '#0f172a' }}>{approvalModal.user?.name}</span>
+                                </p>
+                            </div>
                         </div>
 
-                        <div className="modal-actions">
+                        {/* Body */}
+                        <div style={{ padding: '1.5rem' }}>
+                            {/* Summary Card */}
+                            <div style={{
+                                marginBottom: '1.5rem', padding: '1rem 1.25rem',
+                                backgroundColor: '#f8fafc', borderRadius: '10px',
+                                border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.25rem'
+                            }}>
+                                <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    REQUESTED CAMPUS
+                                </span>
+                                <span style={{ fontSize: '1rem', fontWeight: '700', color: '#334155' }}>
+                                    {approvalModal.user?.campus || "N/A"}
+                                </span>
+                            </div>
+
+                            <div style={{ marginBottom: '0.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b' }}>
+                                    Grant Access To Campuses
+                                </label>
+                                <Select
+                                    isMulti
+                                    options={[{ value: 'All', label: 'All Campuses' }, ...allCampuses]}
+                                    value={approvalModal.selectedCampuses}
+                                    onChange={(selected) => setApprovalModal(prev => ({ ...prev, selectedCampuses: selected || [] }))}
+                                    placeholder="Select campuses..."
+                                    styles={{
+                                        control: (base, state) => ({
+                                            ...base, minHeight: '50px', borderRadius: '10px',
+                                            backgroundColor: state.isFocused ? 'white' : 'white',
+                                            borderColor: state.isFocused ? '#3b82f6' : '#cbd5e1',
+                                            boxShadow: state.isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.1)' : 'none',
+                                            transition: 'all 0.2s',
+                                            ':hover': { borderColor: '#94a3b8' }
+                                        }),
+                                        menu: (base) => ({ ...base, borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', overflow: 'hidden', border: '1px solid #e2e8f0', padding: '4px' }),
+                                        option: (base, state) => ({
+                                            ...base,
+                                            backgroundColor: state.isSelected ? '#eff6ff' : state.isFocused ? '#f1f5f9' : 'transparent',
+                                            color: state.isSelected ? '#1d4ed8' : '#334155',
+                                            fontWeight: state.isSelected ? 600 : 500,
+                                            borderRadius: '8px',
+                                            marginBottom: '2px',
+                                            cursor: 'pointer'
+                                        }),
+                                        multiValue: (base) => ({ ...base, backgroundColor: '#eff6ff', borderRadius: '6px', border: '1px solid #dbeafe' }),
+                                        multiValueLabel: (base) => ({ ...base, color: '#1e40af', fontWeight: 700, fontSize: '0.75rem' }),
+                                        multiValueRemove: (base) => ({ ...base, color: '#60a5fa', ':hover': { backgroundColor: '#dbeafe', color: '#1e40af' } })
+                                    }}
+                                />
+                                <div style={{ display: 'flex', gap: '6px', marginTop: '0.75rem', alignItems: 'center' }}>
+                                    <Clock size={14} className="text-gray-400" style={{ color: '#94a3b8' }} />
+                                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                        Leave empty to grant <b>Single Campus</b> access (or full if Admin).
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div style={{
+                            padding: '1.25rem 1.5rem', borderTop: '1px solid #f1f5f9',
+                            display: 'flex', justifyContent: 'flex-end', gap: '0.75rem'
+                        }}>
                             <button
-                                className="btn-secondary"
                                 onClick={() => setApprovalModal({ isOpen: false, user: null, selectedCampuses: [] })}
+                                style={{
+                                    padding: '0.75rem 1.25rem', borderRadius: '10px',
+                                    backgroundColor: 'white', border: '1px solid #e2e8f0',
+                                    fontWeight: '700', fontSize: '0.85rem', color: '#64748b', cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => { e.target.style.backgroundColor = '#f8fafc'; e.target.style.borderColor = '#cbd5e1'; }}
+                                onMouseLeave={(e) => { e.target.style.backgroundColor = 'white'; e.target.style.borderColor = '#e2e8f0'; }}
                             >
                                 Cancel
                             </button>
                             <button
-                                className="btn-primary"
                                 onClick={confirmApproval}
+                                style={{
+                                    padding: '0.75rem 1.5rem', borderRadius: '10px',
+                                    backgroundColor: '#0f172a', border: 'none',
+                                    fontWeight: '700', fontSize: '0.85rem', color: 'white', cursor: 'pointer',
+                                    boxShadow: '0 4px 6px -1px rgba(15, 23, 42, 0.2)',
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    transition: 'all 0.2s', letterSpacing: '0.02em'
+                                }}
+                                onMouseEnter={(e) => { e.target.style.backgroundColor = '#1e293b'; e.target.style.transform = 'translateY(-1px)'; }}
+                                onMouseLeave={(e) => { e.target.style.backgroundColor = '#0f172a'; e.target.style.transform = 'none'; }}
                             >
-                                Confirm & Approve
+                                <CheckCircle size={16} strokeWidth={2.5} /> Confirm Approval
                             </button>
                         </div>
                     </div>
