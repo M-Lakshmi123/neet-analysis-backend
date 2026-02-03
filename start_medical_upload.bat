@@ -2,7 +2,7 @@
 title NEET Medical Result Uploader
 
 :: Change to the correct project directory
-cd /d "f:\NEET Analysis"
+cd /d "f:\Projects\NEET Analysis"
 
 echo Starting Medical Result Auto-Uploader...
 echo Watching: F:\Project files\MEDICAL_RESULT.csv
@@ -16,7 +16,7 @@ if exist "server\auto_upload_medical.js" (
     echo ---------------------------------------------------------------------
     echo ERROR: 'server\auto_upload_medical.js' not found!
     echo Current Directory is: %CD%
-    echo Expected to find the script at: f:\NEET Analysis\server\auto_upload_medical.js
+    echo Expected to find the script at: f:\Projects\NEET Analysis\server\auto_upload_medical.js
     echo ---------------------------------------------------------------------
     echo.
 )

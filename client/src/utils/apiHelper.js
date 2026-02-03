@@ -36,16 +36,21 @@ export const buildQueryParams = (filters) => {
 export const formatDate = (dateStr, format = 'dd/mm/yyyy') => {
     if (!dateStr) return '';
 
-    // Handle DD-MM-YYYY or DD/MM/YYYY manually
-    // Regex matches starts with 1 or 2 digits, separator, 1 or 2 digits, separator, 4 digits
-    const dmyPattern = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/;
+    // Handle DD-MM-YYYY or DD/MM/YYYY or DD-MM-YY manually
+    // Regex matches starts with 1 or 2 digits, separator, 1 or 2 digits, separator, 2 to 4 digits
+    const dmyPattern = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/;
     const match = String(dateStr).match(dmyPattern);
 
     let date;
     if (match) {
+        let yearStr = match[3];
+        if (yearStr.length === 2) {
+            // Assume 20xx for 2-digit years
+            yearStr = '20' + yearStr;
+        }
         // match[1] = day, match[2] = month, match[3] = year
         // Month is 0-indexed in JS Date
-        date = new Date(match[3], match[2] - 1, match[1]);
+        date = new Date(parseInt(yearStr, 10), parseInt(match[2], 10) - 1, parseInt(match[1], 10));
     } else {
         date = new Date(dateStr);
     }

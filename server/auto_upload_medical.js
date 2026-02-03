@@ -109,7 +109,13 @@ async function processFile(filePath) {
 
     fs.createReadStream(filePath)
         .pipe(csv())
-        .on('data', (data) => results.push(data))
+        .on('data', (data) => {
+            // Filter out empty rows (Excel sometimes exports thousands of empty rows with delimiters)
+            const hasData = Object.values(data).some(val => val && String(val).trim().length > 0);
+            if (hasData) {
+                results.push(data);
+            }
+        })
         .on('end', async () => {
             console.log(`Parsed ${results.length} rows from CSV.`);
             if (results.length > 0) {

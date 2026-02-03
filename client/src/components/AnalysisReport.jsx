@@ -13,7 +13,7 @@ const AnalysisReport = ({ filters }) => {
     const [studentMarks, setStudentMarks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [meritSortConfig, setMeritSortConfig] = useState({ key: 'tot', direction: 'desc' });
-    const [statsSortConfig, setStatsSortConfig] = useState({ key: 'DATE', direction: 'asc' });
+    const [statsSortConfig, setStatsSortConfig] = useState({ key: 'DATE', direction: 'desc' });
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
     useEffect(() => {
@@ -121,10 +121,12 @@ const AnalysisReport = ({ filters }) => {
             const parseDateVal = (dateStr) => {
                 if (!dateStr) return new Date(0);
                 if (dateStr instanceof Date) return dateStr;
-                const dmyPattern = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/;
+                const dmyPattern = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/;
                 const match = String(dateStr).match(dmyPattern);
                 if (match) {
-                    return new Date(match[3], match[2] - 1, match[1]);
+                    let yearStr = match[3];
+                    if (yearStr.length === 2) yearStr = '20' + yearStr;
+                    return new Date(yearStr, match[2] - 1, match[1]);
                 }
                 const d = new Date(dateStr);
                 return isNaN(d.getTime()) ? new Date(0) : d;
@@ -290,9 +292,9 @@ const AnalysisReport = ({ filters }) => {
             const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
 
             doc.setFont("helvetica", "bolditalic");
-            doc.setFontSize(18); // Increased font size (+2 more -> 18)
+            doc.setFontSize(11); // Reduced from 18 to 11 to fit content
             doc.setTextColor(128, 0, 64); // Maroon
-            doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center' });
+            doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center', maxWidth: pageWidth - 20 });
 
             currentY += 8; // Reduced gap before table
 
