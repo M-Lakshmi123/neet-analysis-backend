@@ -624,11 +624,11 @@ app.post('/api/notify-registration', async (req, res) => {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
         },
-        debug: true,      // Log SMTP communication to console
-        logger: true,     // Log to console
-        connectionTimeout: 30000,
-        greetingTimeout: 30000,
-        socketTimeout: 30000
+        debug: true,
+        logger: true,
+        connectionTimeout: 60000,
+        greetingTimeout: 60000,
+        socketTimeout: 60000
     });
 
     try {
