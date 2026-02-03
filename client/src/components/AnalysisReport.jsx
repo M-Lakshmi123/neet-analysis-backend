@@ -225,13 +225,13 @@ const AnalysisReport = ({ filters }) => {
             }
 
             const pageWidth = doc.internal.pageSize.getWidth();
-            let currentY = 20; // Top Margin
+            let currentY = 10; // Top Margin Reduced to move up
 
             // --- HEADER LAYOUT: VERTICAL STACK (Logo -> Title -> Subtitle) ---
 
             // Logo Dimensions
-            const logoH = 25;
-            let logoW = 25;
+            const logoH = 23; // Reduced size
+            let logoW = 23;
             if (logoImg) {
                 const aspect = logoImg.width / logoImg.height;
                 logoW = logoH * aspect;
@@ -249,7 +249,7 @@ const AnalysisReport = ({ filters }) => {
             // Title Configuration
             const part1 = "Sri Chaitanya";
             const part2 = " Educational Institutions";
-            doc.setFontSize(36);
+            doc.setFontSize(35); // Reduced from 36
 
             // Calculate Widths
             // Part 1: Impact (User provided font)
