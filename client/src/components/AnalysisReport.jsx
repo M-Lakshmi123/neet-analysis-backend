@@ -37,7 +37,18 @@ const AnalysisReport = ({ filters }) => {
                 const marksData = await marksRes.json();
 
                 if (!controller.signal.aborted) {
-                    setStudentMarks(marksData && marksData.students ? marksData.students : []);
+                    let marks = marksData && marksData.students ? marksData.students : [];
+
+                    // RECALCULATE AIR BASED ON AVERAGE TOTAL (Highest Total = Rank 1)
+                    // The user wants the displayed AIR to reflect the standing in THIS averaged list
+                    marks.sort((a, b) => (Number(b.tot) || 0) - (Number(a.tot) || 0));
+
+                    const recalculatedMarks = marks.map((student, index) => ({
+                        ...student,
+                        air: index + 1 // Assign new rank based on sorted order
+                    }));
+
+                    setStudentMarks(recalculatedMarks);
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {

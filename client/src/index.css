@@ -316,11 +316,17 @@ body {
     padding: 1.5rem;
     border-radius: 16px;
     border: 1px solid rgba(23, 37, 84, 0.1);
-    align-items: flex-end;
+    align-items: flex-start;
     margin-bottom: 2rem;
     box-shadow: 0 4px 20px rgba(0, 50, 150, 0.05);
     flex-wrap: wrap;
     /* Prevent items from pushing outside */
+}
+
+.disabled-logic {
+    opacity: 0.7;
+    pointer-events: none;
+    cursor: not-allowed;
 }
 
 .filter-group {
