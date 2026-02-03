@@ -18,3 +18,4 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_MEDICAL_2025_SRICHAITANYA }}'
           channelId: live
           projectId: medical-2025-srichaitanya
+          entryPoint: ./client
