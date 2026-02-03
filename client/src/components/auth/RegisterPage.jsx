@@ -143,24 +143,17 @@ const RegisterPage = () => {
                 createdAt: new Date().toISOString()
             });
 
-            // Notify Admin via Email
-            try {
-                await fetch(`${API_URL}/api/notify-registration`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, campus, phone, role: 'principal' })
-                });
-            } catch (emailErr) {
-                console.error("Failed to notify admin:", emailErr);
-            }
+            // Notify Admin via Email (Non-blocking background request)
+            fetch(`${API_URL}/api/notify-registration`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, campus, phone, role: 'principal' })
+            }).catch(err => console.error("Failed to notify admin:", err));
 
             // Mark session as active since they are now logged in
             sessionStorage.setItem('NEET_SESSION_ACTIVE', 'true');
 
-            // Do NOT sign out immediately, wait for user to click OK in modal
-            // await signOut(auth); 
-
-            // Show Success Modal instead of just Toast
+            // Show Success Modal immediately
             setModal({
                 isOpen: true,
                 type: 'success',
