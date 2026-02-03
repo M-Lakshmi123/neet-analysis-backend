@@ -76,6 +76,11 @@ const AnalysisReport = ({ filters }) => {
         // or we could take average. Looking at the user request "same way if we select multiple exams... take the count of that T>700... want to display at bottom"
         // This implies the threshold columns should be counts of students in the CURRENT selection.
 
+        // CORRECTION: If only one exam is selected, the "Average" row should exactly match that single exam's stats.
+        if (examStats.length === 1) {
+            return examStats[0];
+        }
+
         return {
             Attn: studentMarks.length,
             Max_T: Math.max(...examStats.map(s => Number(s.Max_T) || 0)),
