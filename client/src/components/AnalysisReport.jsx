@@ -17,35 +17,52 @@ const AnalysisReport = ({ filters }) => {
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
     useEffect(() => {
+        const controller = new AbortController();
         const fetchData = async () => {
             setLoading(true);
+            setExamStats([]); // Clear old data immediately
+            setStudentMarks([]); // Clear old data immediately
+
             try {
                 const queryParams = buildQueryParams(filters).toString();
                 // Fetch Table 1: Exam Stats
-                const statsRes = await fetch(`${API_URL}/api/exam-stats?${queryParams}`);
+                const statsRes = await fetch(`${API_URL}/api/exam-stats?${queryParams}`, { signal: controller.signal });
                 const statsData = await statsRes.json();
-                setExamStats(statsData && Array.isArray(statsData) ? statsData : []);
+                if (!controller.signal.aborted) {
+                    setExamStats(statsData && Array.isArray(statsData) ? statsData : []);
+                }
 
                 // Fetch Table 2: Student Marks
-                const marksRes = await fetch(`${API_URL}/api/analysis-report?${queryParams}`);
+                const marksRes = await fetch(`${API_URL}/api/analysis-report?${queryParams}`, { signal: controller.signal });
                 const marksData = await marksRes.json();
-                // backend returns { students: [], exams: [], t_cnt: X }
-                setStudentMarks(marksData && marksData.students ? marksData.students : []);
 
+                if (!controller.signal.aborted) {
+                    setStudentMarks(marksData && marksData.students ? marksData.students : []);
+                }
             } catch (error) {
-                console.error("Failed to fetch reports:", error);
-                setExamStats([]);
-                setStudentMarks([]);
+                if (error.name !== 'AbortError') {
+                    console.error("Failed to fetch reports:", error);
+                    setExamStats([]);
+                    setStudentMarks([]);
+                }
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                }
             }
         };
 
+        // Debounce only the network call, but show loading immediately?
+        // User wants "till full data loading only show the table from the database". 
+        // Showing loading immediately is safer to avoid confusion.
         const timeoutId = setTimeout(() => {
             fetchData();
-        }, 500); // 500ms debounce for heavy reports
+        }, 500);
 
-        return () => clearTimeout(timeoutId);
+        return () => {
+            controller.abort();
+            clearTimeout(timeoutId);
+        };
     }, [filters]);
 
     const calculateTotals = () => {
