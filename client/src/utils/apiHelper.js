@@ -2,7 +2,7 @@ export const API_URL = 'https://neet-backend-3oxu.onrender.com';
 // export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 
-export const ADMIN_WHATSAPP = '7204408619';
+export const ADMIN_WHATSAPP = '9281425210';
 
 export const buildQueryParams = (filters) => {
     const params = new URLSearchParams();
