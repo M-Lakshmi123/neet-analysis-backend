@@ -37,18 +37,7 @@ const AnalysisReport = ({ filters }) => {
                 const marksData = await marksRes.json();
 
                 if (!controller.signal.aborted) {
-                    let marks = marksData && marksData.students ? marksData.students : [];
-
-                    // RECALCULATE AIR BASED ON AVERAGE TOTAL (Highest Total = Rank 1)
-                    // The user wants the displayed AIR to reflect the standing in THIS averaged list
-                    marks.sort((a, b) => (Number(b.tot) || 0) - (Number(a.tot) || 0));
-
-                    const recalculatedMarks = marks.map((student, index) => ({
-                        ...student,
-                        air: index + 1 // Assign new rank based on sorted order
-                    }));
-
-                    setStudentMarks(recalculatedMarks);
+                    setStudentMarks(marksData && marksData.students ? marksData.students : []);
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -595,10 +584,7 @@ const AnalysisReport = ({ filters }) => {
         }
     };
 
-    if (loading) return <LoadingTimer isLoading={true} initialDuration={50} />;
-
-    const noData = examStats.length === 0 && studentMarks.length === 0;
-
+    const noData = !loading && examStats.length === 0 && studentMarks.length === 0;
 
     return (
         <div className="analysis-report-container">
@@ -614,7 +600,7 @@ const AnalysisReport = ({ filters }) => {
                 </div>
             </div>
 
-            {noData && !loading ? (
+            {noData ? (
                 <div className="report-section" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                     No data found for the selected filters. Please try adjusting your selection.
                 </div>
@@ -653,32 +639,36 @@ const AnalysisReport = ({ filters }) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {sortedExamStats.map((row, i) => (
-                                        <tr key={i}>
-                                            <td className="text-left">{formatDate(row.DATE)}</td>
-                                            <td className="text-left" style={{ whiteSpace: 'nowrap' }}>{row.Test}</td>
-                                            <td style={{ fontWeight: '700' }}>{row.Attn}</td>
-                                            <td>{row.Max_T}</td>
-                                            <td>{row.T_700}</td>
-                                            <td>{row.T_680}</td>
-                                            <td>{row.T_650}</td>
-                                            <td>{row.T_600}</td>
-                                            <td>{row.T_550}</td>
-                                            <td>{row.T_530}</td>
-                                            <td>{row.T_450}</td>
-                                            <td>{row.Max_B}</td>
-                                            <td>{row.B_160}</td>
-                                            <td>{row.Max_Z}</td>
-                                            <td>{row.Z_160}</td>
-                                            <td>{row.Max_P}</td>
-                                            <td>{row.P_120}</td>
-                                            <td>{row.P_100}</td>
-                                            <td>{row.Max_C}</td>
-                                            <td>{row.C_130}</td>
-                                            <td>{row.C_100}</td>
-                                        </tr>
-                                    ))}
-                                    {statsSummary && (
+                                    {loading ? (
+                                        <tr><td colSpan="21" className="text-center py-4" style={{ color: '#64748b' }}>Loading statistics...</td></tr>
+                                    ) : (
+                                        sortedExamStats.map((row, i) => (
+                                            <tr key={i}>
+                                                <td className="text-left">{formatDate(row.DATE)}</td>
+                                                <td className="text-left" style={{ whiteSpace: 'nowrap' }}>{row.Test}</td>
+                                                <td style={{ fontWeight: '700' }}>{row.Attn}</td>
+                                                <td>{row.Max_T}</td>
+                                                <td>{row.T_700}</td>
+                                                <td>{row.T_680}</td>
+                                                <td>{row.T_650}</td>
+                                                <td>{row.T_600}</td>
+                                                <td>{row.T_550}</td>
+                                                <td>{row.T_530}</td>
+                                                <td>{row.T_450}</td>
+                                                <td>{row.Max_B}</td>
+                                                <td>{row.B_160}</td>
+                                                <td>{row.Max_Z}</td>
+                                                <td>{row.Z_160}</td>
+                                                <td>{row.Max_P}</td>
+                                                <td>{row.P_120}</td>
+                                                <td>{row.P_100}</td>
+                                                <td>{row.Max_C}</td>
+                                                <td>{row.C_130}</td>
+                                                <td>{row.C_100}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                    {!loading && statsSummary && (
                                         <tr className="total-row" style={{ backgroundColor: '#FFF2CC', color: 'black', fontWeight: 'bold' }}>
                                             <td colSpan="2" className="text-left">Average Count</td>
                                             <td style={{ fontWeight: '700' }}>{statsSummary.Attn}</td>
@@ -734,28 +724,32 @@ const AnalysisReport = ({ filters }) => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {sortedStudentMarks.map((student, i) => (
-                                        <tr key={i}>
-                                            <td style={{ color: 'black' }}>{student.STUD_ID}</td>
-                                            <td className="text-left" style={{ fontWeight: '700', color: 'black' }}>
-                                                {student.name}
-                                            </td>
-                                            <td className="text-left" style={{ color: 'black' }}>{student.campus}</td>
-                                            <td className="col-yellow" style={{ fontWeight: '800', color: 'black' }}>{Number(student.tot || 0).toFixed(1)}</td>
-                                            <td className="col-white" style={{ fontWeight: '700', color: '#6c361e' }}>{Math.round(student.air) || '-'}</td>
-                                            <td className="col-green" style={{ color: 'black' }}>{Number(student.bot || 0).toFixed(1)}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{Number(student.b_rank || 0).toFixed(1)}</td>
-                                            <td className="col-blue-light" style={{ color: 'black' }}>{Number(student.zoo || 0).toFixed(1)}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{Number(student.z_rank || 0).toFixed(1)}</td>
-                                            <td className="col-blue-med" style={{ fontWeight: '800', color: '#1e4a80' }}>{((Number(student.bot) || 0) + (Number(student.zoo) || 0)).toFixed(1)}</td>
-                                            <td className="col-green-pale" style={{ color: 'black' }}>{Number(student.phy || 0).toFixed(1)}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{Number(student.p_rank || 0).toFixed(1)}</td>
-                                            <td className="col-pink-pale" style={{ color: 'black' }}>{Number(student.che || 0).toFixed(1)}</td>
-                                            <td className="col-white" style={{ color: 'black' }}>{Number(student.c_rank || 0).toFixed(1)}</td>
-                                            <td className="col-exams" style={{ fontWeight: '700', color: 'black' }}>{student.t_app}</td>
-                                        </tr>
-                                    ))}
-                                    {totals && (
+                                    {loading ? (
+                                        <tr><td colSpan="15" className="text-center py-4" style={{ color: '#64748b' }}>Loading merit list...</td></tr>
+                                    ) : (
+                                        sortedStudentMarks.map((student, i) => (
+                                            <tr key={i}>
+                                                <td style={{ color: 'black' }}>{student.STUD_ID}</td>
+                                                <td className="text-left" style={{ fontWeight: '700', color: 'black' }}>
+                                                    {student.name}
+                                                </td>
+                                                <td className="text-left" style={{ color: 'black' }}>{student.campus}</td>
+                                                <td className="col-yellow" style={{ fontWeight: '800', color: 'black' }}>{Number(student.tot || 0).toFixed(1)}</td>
+                                                <td className="col-white" style={{ fontWeight: '700', color: '#6c361e' }}>{Math.round(student.air) || '-'}</td>
+                                                <td className="col-green" style={{ color: 'black' }}>{Number(student.bot || 0).toFixed(1)}</td>
+                                                <td className="col-white" style={{ color: 'black' }}>{Number(student.b_rank || 0).toFixed(1)}</td>
+                                                <td className="col-blue-light" style={{ color: 'black' }}>{Number(student.zoo || 0).toFixed(1)}</td>
+                                                <td className="col-white" style={{ color: 'black' }}>{Number(student.z_rank || 0).toFixed(1)}</td>
+                                                <td className="col-blue-med" style={{ fontWeight: '800', color: '#1e4a80' }}>{((Number(student.bot) || 0) + (Number(student.zoo) || 0)).toFixed(1)}</td>
+                                                <td className="col-green-pale" style={{ color: 'black' }}>{Number(student.phy || 0).toFixed(1)}</td>
+                                                <td className="col-white" style={{ color: 'black' }}>{Number(student.p_rank || 0).toFixed(1)}</td>
+                                                <td className="col-pink-pale" style={{ color: 'black' }}>{Number(student.che || 0).toFixed(1)}</td>
+                                                <td className="col-white" style={{ color: 'black' }}>{Number(student.c_rank || 0).toFixed(1)}</td>
+                                                <td className="col-exams" style={{ fontWeight: '700', color: 'black' }}>{student.t_app}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                    {!loading && totals && (
                                         <tr className="total-row">
                                             <td colSpan="3" className="text-left" style={{ color: 'black' }}>Campus Selection Average</td>
                                             <td className="col-yellow" style={{ color: 'black' }}>{Number(totals.tot || 0).toFixed(1)}</td>
@@ -778,6 +772,7 @@ const AnalysisReport = ({ filters }) => {
                     </div>
                 </>
             )}
+
             <style>{`
                 .analysis-report-container {
                     width: 100%;
@@ -818,6 +813,7 @@ const AnalysisReport = ({ filters }) => {
                     font-weight: bold !important;
                 }
             `}</style>
+
             <Modal
                 isOpen={modal.isOpen}
                 onClose={() => setModal({ ...modal, isOpen: false })}
@@ -825,8 +821,6 @@ const AnalysisReport = ({ filters }) => {
                 message={modal.message}
                 type={modal.type}
             />
-
-
         </div>
     );
 };
