@@ -292,7 +292,7 @@ const AnalysisReport = ({ filters }) => {
             const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
 
             doc.setFont("helvetica", "bolditalic");
-            doc.setFontSize(11); // Reduced from 18 to 11 to fit content
+            doc.setFontSize(14); // Increased from 11 to 14
             doc.setTextColor(128, 0, 64); // Maroon
             doc.text(fullPattern, pageWidth / 2, currentY, { align: 'center', maxWidth: pageWidth - 20 });
 
