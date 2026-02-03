@@ -116,6 +116,12 @@ const RegisterPage = () => {
             return;
         }
 
+        // Restrict Gmail addresses
+        if (email.toLowerCase().endsWith('@gmail.com')) {
+            showToast("Registration with Gmail is not allowed. Please use your official college email ID.", "error");
+            return;
+        }
+
         if (!campus) {
             showToast("Please select your campus", "error");
             return;
