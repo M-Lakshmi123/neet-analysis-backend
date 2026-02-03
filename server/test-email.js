@@ -10,16 +10,10 @@ async function testEmail() {
     console.log('EMAIL_PASS last char:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS[process.env.EMAIL_PASS.length - 1] : 'N/A');
 
     const transporter = nodemailer.createTransport({
-        host: 'smtp.office365.com',
-        port: 587,
-        secure: false,
+        service: 'gmail',
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
-        },
-        tls: {
-            ciphers: 'SSLv3',
-            rejectUnauthorized: false
         }
     });
 

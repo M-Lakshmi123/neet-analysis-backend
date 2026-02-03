@@ -3,7 +3,7 @@ title NEET ERP Uploader
 
 :: Change to the correct project directory
 :: Note: Updated path to match the actual location of the server code
-cd /d "f:\NEET Analysis"
+cd /d "f:\Projects\NEET Analysis"
 
 echo Starting ERP Auto-Uploader...
 echo Watching: F:\Project files\Error report.csv
@@ -17,7 +17,7 @@ if exist "server\auto_upload_erp.js" (
     echo ---------------------------------------------------------------------
     echo ERROR: 'server\auto_upload_erp.js' not found!
     echo Current Directory is: %CD%
-    echo Expected to find the script at: f:\NEET Analysis\server\auto_upload_erp.js
+    echo Expected to find the script at: f:\Projects\NEET Analysis\server\auto_upload_erp.js
     echo ---------------------------------------------------------------------
     echo.
 )

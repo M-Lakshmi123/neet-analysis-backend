@@ -143,6 +143,17 @@ const RegisterPage = () => {
                 createdAt: new Date().toISOString()
             });
 
+            // Notify Admin via Email
+            try {
+                await fetch(`${API_URL}/api/notify-registration`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, campus, phone, role: 'principal' })
+                });
+            } catch (emailErr) {
+                console.error("Failed to notify admin:", emailErr);
+            }
+
             // Mark session as active since they are now logged in
             sessionStorage.setItem('NEET_SESSION_ACTIVE', 'true');
 

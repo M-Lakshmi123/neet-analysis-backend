@@ -603,6 +603,82 @@ app.get('/api/erp/report', async (req, res) => {
     }
 });
 
+
+// --- ADMIN NOTIFICATION SYSTEM ---
+const nodemailer = require('nodemailer');
+
+app.post('/api/notify-registration', async (req, res) => {
+    const { name, email, campus, phone, role } = req.body;
+    console.log(`[Email] Sending registration notification for ${name} (${email})...`);
+
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+        console.error("[Email] Missing credentials in .env");
+        return res.status(500).json({ error: "Server email configuration missing" });
+    }
+
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        }
+    });
+
+    try {
+        const mailOptions = {
+            from: `"NEET Analysis Portal" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER, // Send to Admin (Self)
+            subject: `⚡ New Principal Registration: ${name}`,
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 600px;">
+                    <h2 style="color: #1e40af; margin-top: 0;">New User Pending Approval</h2>
+                    <p style="color: #475569;">A new principal has registered on the NEET Analysis Dashboard and is awaiting approval.</p>
+                    
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold; width: 30%;">Name:</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${name}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Campus:</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; color: #0284c7; font-weight: 600;">${campus}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Email:</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><a href="mailto:${email}">${email}</a></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Phone:</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${phone || 'N/A'}</td>
+                        </tr>
+                         <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Role:</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${role || 'Principal'}</td>
+                        </tr>
+                    </table>
+
+                    <div style="margin-top: 25px; text-align: center;">
+                        <a href="https://neet-analysis.web.app/admin" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                            Go to Admin Dashboard to Approve
+                        </a>
+                    </div>
+                     <p style="color: #94a3b8; font-size: 12px; margin-top: 20px; text-align: center;">
+                        This is an automated message from your NEET Analysis System.
+                    </p>
+                </div>
+            `
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[Email] Notification sent: ${info.messageId}`);
+        res.json({ success: true, message: "Admin notified" });
+
+    } catch (error) {
+        console.error("[Email] Failed to send notification:", error);
+        res.status(500).json({ error: "Failed to send email", details: error.message });
+    }
+});
+
 // Get ERP Students for Search
 app.get('/api/erp/students', async (req, res) => {
     try {

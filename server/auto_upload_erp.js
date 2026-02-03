@@ -242,130 +242,101 @@ async function uploadToDB(rows, tableName, filename) {
                 batchInserts.push(`(${values.join(',')})`);
             }
 
-            // 2. Batch Bulk Check
+            // 2. Optimized Duplicate Check & Insert
             let dbDuplicates = new Set();
             if (checkConditions.length > 0) {
+                // Fetch all matching records for this batch in one go
                 const batchCheckSql = `SELECT STUD_ID, Test, Q_No FROM ${tableName} WHERE ${checkConditions.join(' OR ')}`;
                 try {
                     const existing = await pool.request().query(batchCheckSql);
                     if (existing.recordset) {
                         existing.recordset.forEach(r => {
-                            // Create normalization key from DB results to match logic
-                            // DB result: INT/STRING.
-                            // CSV Values: Quoted Strings e.g. '123' or 'Test A'.
-                            const dbStudId = `'${r.STUD_ID}'`;
-                            const dbTest = r.Test ? `'${r.Test.replace(/'/g, "''")}'` : 'NULL'; // Basic approx
-                            const dbQ = r.Q_No ? `'${r.Q_No}'` : 'NULL';
-
-                            // We only need to match accurately enough to exclude duplicates.
-                            // Since we built the WHERE clause ourselves, the returned rows DEFINITELY match one of our inputs.
-                            // But WHICH one?
-                            // Optimization: Since we constructed (A=1 AND B=1) OR (A=2 AND B=2)...
-                            // The simple return of (1, 1), (2, 2) confirms they exist.
-                            // However, matching them back to the specific batch index is hard without a unique ID.
-                            // SIMPLIFIED APPROACH:
-                            // If we found ANY match, we must filter carefully. To avoid complex local filtering:
-                            // If batchCheckSql returns > 0 rows, we fallback to checking manually? NO, that defeats the purpose.
-
-                            // Better signature key:
-                            const key = `${r.STUD_ID}|${r.Test}|${r.Q_No}`;
+                            // Normalize keys for comparison
+                            const sId = String(r.STUD_ID).trim();
+                            const test = r.Test ? String(r.Test).trim() : 'NULL';
+                            const qNo = r.Q_No ? String(r.Q_No).trim() : 'NULL';
+                            const key = `${sId}|${test}|${qNo}`.toUpperCase();
                             dbDuplicates.add(key);
                         });
                     }
                 } catch (checkErr) {
-                    // If error (e.g. query too long), we might want to log it but proceed (risking duplicates) or break.
                     console.error("Batch Check Warning:", checkErr.message);
                 }
             }
 
-            // 3. Filter Duplicates Locally
-            const validInserts = [];
+            // 3. Filter and Insert
+            let validBatchInserts = [];
+            let duplicatesInBatch = 0;
+
             for (let b = 0; b < batchRows.length; b++) {
-                // Re-extract key to check against dbDuplicates
                 const row = batchRows[b];
-                // Note: we need normalized values (not quoted) to match DB results loosely?
-                // Or better: Re-run the normalization? 
-                // It is cleaner to do: if we found duplicates, just iterate the 'batchCheckSql' results again in a simpler way.
-                // Actually, let's look at the problem:
-                // DB returns: 101, 'Test A', 5
-                // CSV has: 101, 'Test A', 5
 
-                // Let's rely on string matching the raw values from CSV vs DB? Weak.
-                // Let's just trust implicit validInserts if we didn't find them?
-                // Or actually:
-                // If `dbDuplicates.size === 0`, insert all.
-                // If `dbDuplicates.size > 0`, we have to be careful.
+                // Construct the key from the CSV row using the same logic as above
+                // Note: We need the raw values, not the SQL-escaped ones in 'values' array.
+                // But we already calculated indices: studIdIndex, etc.
+                // However, 'values' array (line 181) has cleaned/parsed dates/numbers. 
+                // We should rely on the cleaned 'values' but strip quotes?
+                // Actually, 'values' has '123' (quoted).
 
-                // HACK: To ensure perfect matching without complex logic, if dups found, we switch to slow mode for this batch?
-                // 50 RUs is better than 50 queries.
-                // If `existing.recordset.length > 0`, it means some exist.
-                // We can just filter out based on `checkConditions[b]`? No.
+                // Let's re-extract raw normalized values from the row object for safety
+                // matching the indices logic we used before.
 
-                // Let's use the 'Fall back to slow' strategy if batch check finds ANY result.
-                // It generates 51 queries in worst case (1 big check + 50 individual checks), 
-                // but 1 query in best case (0 dups).
-                // Since most data is NEW, this is highly optimal.
+                const keys = Object.keys(row); // These match the order in 'values' if iterated same way
+                // But simpler: just retrieve by name
+
+                const getVal = (name) => {
+                    const k = keys.find(key => key.trim().toUpperCase() === name);
+                    return k ? row[k] : null;
+                };
+
+                // Helper to clean raw CSV value to match DB string
+                const clean = (v) => {
+                    if (v === null || v === undefined) return 'NULL';
+                    let s = String(v).trim();
+                    // Apply the same number normalization if needed? 
+                    // DB usually returns normalized numbers. CSV might have "1.00".
+                    // The numeric cleaning logic was applied in 'values' loop (Line 188). 
+                    // We should replicate minimal cleaning for matching.
+                    if (/[eE][+-]?\d+$/.test(s) || /^\d+\.\d+$/.test(s)) {
+                        try { const n = Number(s); if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false }); } catch (e) { }
+                    }
+                    return s;
+                };
+
+                const sIdRaw = clean(getVal('STUD_ID'));
+                const testRaw = clean(getVal('TEST'));
+                const qNoRaw = clean(getVal('Q_NO'));
+
+                const key = `${sIdRaw}|${testRaw}|${qNoRaw}`.toUpperCase();
+
+                if (dbDuplicates.has(key)) {
+                    duplicatesInBatch++;
+                    failCount++; // Count duplicates as "skipped/failed"
+                } else {
+                    validBatchInserts.push(batchInserts[b]);
+                }
             }
 
-            // Clean Strategy:
-            let finalSql = "";
-            let currentBatchCount = 0;
-
-            // New Plan: "Check-All-Or-Nothing"
-            // If check returns 0 rows, insert all.
-            // If check returns >0 rows, we don't know WHICH ones without complex matching.
-            // So we just iterate the batch individually for safety.
-
-            let useFastPath = true;
-            if (checkConditions.length > 0) {
-                const batchCheckSql = `SELECT 1 FROM ${tableName} WHERE ${checkConditions.join(' OR ')} LIMIT 1`;
-                // LIMIT 1 because if ANY exist, we must be careful.
+            if (validBatchInserts.length > 0) {
+                const sql = `INSERT INTO ${tableName} (${safeKeysStr}) VALUES ${validBatchInserts.join(',')}`;
                 try {
-                    const existing = await pool.request().query(batchCheckSql);
-                    if (existing.recordset && existing.recordset.length > 0) {
-                        useFastPath = false;
-                    }
-                } catch (e) { useFastPath = false; }
-            }
-
-            if (useFastPath) {
-                if (batchInserts.length > 0) {
-                    const sql = `INSERT INTO ${tableName} (${safeKeysStr}) VALUES ${batchInserts.join(',')}`;
-                    try {
-                        await pool.request().query(sql);
-                        successCount += batchInserts.length;
-                        console.log(`📦 Batch of ${batchInserts.length} uploaded. Total: ${successCount}`);
-                    } catch (e) {
-                        console.error(`\nBatch Insert Failed, retrying individually: ${e.message}`);
-                        useFastPath = false;
-                    }
+                    await pool.request().query(sql);
+                    successCount += validBatchInserts.length;
+                    process.stdout.write(`B(${successCount}) `); // Batch indicator with running total
+                } catch (e) {
+                    console.error(`\nBatch Insert Failed: ${e.message}`);
+                    // If bulk fail, maybe fallback? or just log error. 
+                    // Usually bulk fail is rare if duplicates are filtered.
                 }
             }
 
-            if (!useFastPath) {
-                // Slow Fallback (Copy of original single-row logic logic)
-                for (let b = 0; b < batchRows.length; b++) {
-                    const oneRowSql = `INSERT INTO ${tableName} (${safeKeysStr}) VALUES ${batchInserts[b]}`;
-                    // We can skip the 'Select 1' check if we trust the DB to reject? No constraints.
-                    // We must do the single check again.
-                    const checkSql = `SELECT 1 FROM ${tableName} WHERE ${checkConditions[b]} LIMIT 1`;
-                    let isDup = false;
-                    try {
-                        const ex = await pool.request().query(checkSql);
-                        if (ex.recordset && ex.recordset.length > 0) isDup = true;
-                    } catch (e) { }
-
-                    if (!isDup) {
-                        try {
-                            await pool.request().query(oneRowSql);
-                            successCount++;
-                            process.stdout.write(".");
-                        } catch (e) { failCount++; }
-                    } else {
-                        failCount++;
-                    }
-                }
-                console.log(` (Slow Batch Done). Total: ${successCount}`);
+            // Log concise batch status instead of spam
+            if (duplicatesInBatch > 0 && validBatchInserts.length === 0) {
+                // If pure duplicate batch, do nothing (or print tiny char) to indicate skipping
+                // process.stdout.write("s"); 
+            } else if (duplicatesInBatch > 0) {
+                // Mixed batch
+                // process.stdout.write("m");
             }
 
             // Save Checkpoint after every batch

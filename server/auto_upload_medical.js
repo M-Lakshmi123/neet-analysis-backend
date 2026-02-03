@@ -241,55 +241,72 @@ async function uploadToDB(rows, tableName, filename) {
                 batchInserts.push(`(${values.join(',')})`);
             }
 
-            // 2. Batch Bulk Check
-            // "Check-All-Or-Nothing" Strategy (Optimized)
-            let useFastPath = true;
+            // 2. Optimized Duplicate Check & Insert
+            let dbDuplicates = new Set();
             if (checkConditions.length > 0) {
-                const batchCheckSql = `SELECT 1 FROM ${tableName} WHERE ${checkConditions.join(' OR ')} LIMIT 1`;
+                // Fetch all matching records for this batch in one go
+                const batchCheckSql = `SELECT STUD_ID, Test FROM ${tableName} WHERE ${checkConditions.join(' OR ')}`;
                 try {
                     const existing = await pool.request().query(batchCheckSql);
-                    if (existing.recordset && existing.recordset.length > 0) {
-                        useFastPath = false;
+                    if (existing.recordset) {
+                        existing.recordset.forEach(r => {
+                            // Normalize keys for comparison
+                            const sId = String(r.STUD_ID).trim();
+                            const test = r.Test ? String(r.Test).trim() : 'NULL';
+                            const key = `${sId}|${test}`.toUpperCase();
+                            dbDuplicates.add(key);
+                        });
                     }
-                } catch (e) { useFastPath = false; }
-            }
-
-            if (useFastPath) {
-                if (batchInserts.length > 0) {
-                    const sql = `INSERT INTO ${tableName} (${safeKeysStr}) VALUES ${batchInserts.join(',')}`;
-                    try {
-                        await pool.request().query(sql);
-                        successCount += batchInserts.length;
-                        console.log(`📦 Batch of ${batchInserts.length} uploaded. Total: ${successCount}`);
-                    } catch (e) {
-                        console.error(`\nBatch Insert Failed, retrying individually: ${e.message}`);
-                        useFastPath = false;
-                    }
+                } catch (checkErr) {
+                    console.error("Batch Check Warning:", checkErr.message);
                 }
             }
 
-            if (!useFastPath) {
-                // Slow Fallback (Individual Checks)
-                for (let b = 0; b < batchRows.length; b++) {
-                    const oneRowSql = `INSERT INTO ${tableName} (${safeKeysStr}) VALUES ${batchInserts[b]}`;
-                    const checkSql = `SELECT 1 FROM ${tableName} WHERE ${checkConditions[b]} LIMIT 1`;
-                    let isDup = false;
-                    try {
-                        const ex = await pool.request().query(checkSql);
-                        if (ex.recordset && ex.recordset.length > 0) isDup = true;
-                    } catch (e) { }
+            // 3. Filter and Insert
+            let validBatchInserts = [];
+            let duplicatesInBatch = 0;
 
-                    if (!isDup) {
-                        try {
-                            await pool.request().query(oneRowSql);
-                            successCount++;
-                            process.stdout.write(".");
-                        } catch (e) { failCount++; }
-                    } else {
-                        failCount++;
+            for (let b = 0; b < batchRows.length; b++) {
+                const row = batchRows[b];
+                const keys = Object.keys(row);
+
+                const getVal = (name) => {
+                    const k = keys.find(key => key.trim().toUpperCase() === name);
+                    return k ? row[k] : null;
+                };
+
+                const clean = (v) => {
+                    if (v === null || v === undefined) return 'NULL';
+                    let s = String(v).trim();
+                    if (/[eE][+-]?\d+$/.test(s) || /^\d+\.\d+$/.test(s)) {
+                        try { const n = Number(s); if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false }); } catch (e) { }
                     }
+                    return s;
+                };
+
+                const sIdRaw = clean(getVal('STUD_ID'));
+                const testRaw = clean(getVal('TEST'));
+                // Medical Table uses STUD_ID + TEST combination for uniqueness
+
+                const key = `${sIdRaw}|${testRaw}`.toUpperCase();
+
+                if (dbDuplicates.has(key)) {
+                    duplicatesInBatch++;
+                    failCount++;
+                } else {
+                    validBatchInserts.push(batchInserts[b]);
                 }
-                console.log(` (Slow Batch Done). Total: ${successCount}`);
+            }
+
+            if (validBatchInserts.length > 0) {
+                const sql = `INSERT INTO ${tableName} (${safeKeysStr}) VALUES ${validBatchInserts.join(',')}`;
+                try {
+                    await pool.request().query(sql);
+                    successCount += validBatchInserts.length;
+                    process.stdout.write(`B(${successCount}) `); // Batch indicator with running total
+                } catch (e) {
+                    console.error(`\nBatch Insert Failed: ${e.message}`);
+                }
             }
 
             // Save Checkpoint after every batch
