@@ -609,79 +609,58 @@ const nodemailer = require('nodemailer');
 
 app.post('/api/notify-registration', async (req, res) => {
     const { name, email, campus, phone, role } = req.body;
-    console.log(`[Email] Sending registration notification for ${name} (${email})...`);
+    console.log(`[Email] Sending registration notification via Brevo API for ${name}...`);
 
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.error("[Email] Missing credentials in .env");
-        return res.status(500).json({ error: "Server email configuration missing" });
+    const API_KEY = process.env.BREVO_API_KEY;
+    const ADMIN_EMAIL = process.env.EMAIL_USER; // Use your Gmail as the receiver
+
+    if (!API_KEY) {
+        console.error("[Email] Missing BREVO_API_KEY in environment");
+        return res.status(500).json({ error: "Email API Key missing" });
     }
 
-    const transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false, // Use STARTTLS
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        },
-        debug: true,
-        logger: true,
-        connectionTimeout: 60000,
-        greetingTimeout: 60000,
-        socketTimeout: 60000
-    });
-
     try {
-        const mailOptions = {
-            from: `"NEET Analysis Portal" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER, // Send to Admin (Self)
-            subject: `⚡ New Principal Registration: ${name}`,
-            html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 600px;">
-                    <h2 style="color: #1e40af; margin-top: 0;">New User Pending Approval</h2>
-                    <p style="color: #475569;">A new principal has registered on the NEET Analysis Dashboard and is awaiting approval.</p>
-                    
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-                        <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold; width: 30%;">Name:</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${name}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Campus:</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee; color: #0284c7; font-weight: 600;">${campus}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Email:</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><a href="mailto:${email}">${email}</a></td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Phone:</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${phone || 'N/A'}</td>
-                        </tr>
-                         <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Role:</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${role || 'Principal'}</td>
-                        </tr>
-                    </table>
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': API_KEY,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: "NEET Analysis System", email: ADMIN_EMAIL },
+                to: [{ email: ADMIN_EMAIL, name: "Admin" }],
+                subject: `⚡ New Principal Registration: ${name}`,
+                htmlContent: `
+                    <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; max-width: 600px;">
+                        <h2 style="color: #1e40af; margin-top: 0;">New User Pending Approval</h2>
+                        <p style="color: #475569;">A new principal has registered on the NEET Analysis Dashboard and is awaiting approval.</p>
+                        
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold; width: 30%;">Name:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${name}</td></tr>
+                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Campus:</td><td style="padding: 8px; border-bottom: 1px solid #eee; color: #0284c7; font-weight: 600;">${campus}</td></tr>
+                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Email:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${email}</td></tr>
+                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Phone:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${phone || 'N/A'}</td></tr>
+                        </table>
 
-                    <div style="margin-top: 25px; text-align: center;">
-                        <a href="https://neet-analysis.web.app/admin" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-                            Go to Admin Dashboard to Approve
-                        </a>
+                        <div style="margin-top: 25px; text-align: center;">
+                            <a href="https://neet-analysis.web.app/admin" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Go to Admin Dashboard to Approve</a>
+                        </div>
                     </div>
-                     <p style="color: #94a3b8; font-size: 12px; margin-top: 20px; text-align: center;">
-                        This is an automated message from your NEET Analysis System.
-                    </p>
-                </div>
-            `
-        };
+                `
+            })
+        });
 
-        const info = await transporter.sendMail(mailOptions);
-        console.log(`[Email] Notification sent: ${info.messageId}`);
-        res.json({ success: true, message: "Admin notified" });
+        const result = await response.json();
+        if (response.ok) {
+            console.log(`[Email] Notification sent via Brevo! ID: ${result.messageId}`);
+            res.json({ success: true, message: "Admin notified" });
+        } else {
+            throw new Error(result.message || "Failed to send via Brevo");
+        }
 
     } catch (error) {
-        console.error("[Email] Failed to send notification:", error);
+        console.error("[Email] Brevo API Error:", error.message);
         res.status(500).json({ error: "Failed to send email", details: error.message });
     }
 });
