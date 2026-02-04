@@ -83,6 +83,7 @@ const ErrorTop100 = () => {
                         testsGrouped[testKey] = {
                             testName: row.Test,
                             date: row.Exam_Date,
+                            stream: row.Stream,
                             questions: {}
                         };
                     }
@@ -207,7 +208,7 @@ const ErrorTop100 = () => {
             if (bookmanFont) { doc.addFileToVFS("bookman-old-style.ttf", bookmanFont); doc.addFont("bookman-old-style.ttf", "Bookman", "normal"); }
             if (bookmanBoldFont) { doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont); doc.addFont("BOOKOSB.TTF", "Bookman", "bold"); }
 
-            const drawHeader = (testName) => {
+            const drawHeader = (test) => {
                 let y = 15;
                 doc.setFontSize(26);
                 doc.setTextColor(0, 112, 192);
@@ -227,18 +228,19 @@ const ErrorTop100 = () => {
                 doc.setFontSize(9);
                 doc.setTextColor(0);
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
-                doc.text("A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi", pageWidth / 2, y, { align: 'center' });
+                doc.text("A.P, TELANGANA, KARNATAKA, TAMILNADU, MAHARASHTRA, DELHI, RANCHI", pageWidth / 2, y, { align: 'center' });
                 y += 5;
                 doc.setFont("times", "italic");
                 doc.setFontSize(14);
-                doc.text("A Right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
+                doc.text("A right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
                 y += 5;
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
                 doc.setFontSize(10);
-                doc.text("CENTRAL OFFICE, BANGALORE", pageWidth / 2, y, { align: 'center' });
-                y += 6;
-                doc.setFontSize(12);
-                doc.text(`${testName}_Error Analysis`, pageWidth / 2, y, { align: 'center' });
+                doc.text("Central Office, Bangalore", pageWidth / 2, y, { align: 'center' });
+                y += 7;
+                doc.setFontSize(14);
+                const testTitle = `${test.date}_${test.stream}_${test.testName}_Error Analysis`;
+                doc.text(testTitle, pageWidth / 2, y, { align: 'center' });
                 return y + 5;
             };
 
@@ -246,7 +248,7 @@ const ErrorTop100 = () => {
                 const filteredQs = getFilteredQuestions(test.questions);
                 if (filteredQs.length === 0) continue;
 
-                let yPos = drawHeader(test.testName);
+                let yPos = drawHeader(test);
 
                 // Table Header
                 doc.setFillColor(255, 248, 220);
@@ -256,12 +258,12 @@ const ErrorTop100 = () => {
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
 
                 const cols = [
-                    { name: 'Q.No', w: 15 },
-                    { name: 'W', w: 15 },
-                    { name: '%', w: 20 },
-                    { name: 'Question', w: 100 },
+                    { name: 'Q.No', w: 12 },
+                    { name: 'W', w: 12 },
+                    { name: '%', w: 18 },
+                    { name: 'Question', w: 98 },
                     { name: 'Subject', w: 20 },
-                    { name: 'Student List', w: 20 }
+                    { name: 'Student List', w: 30 }
                 ];
 
                 let cx = margin;
@@ -274,8 +276,9 @@ const ErrorTop100 = () => {
 
                 for (const q of filteredQs) {
                     const qImg = await loadImage(q.qUrl);
+                    let imgWidth = 85; // Fixed width (~321px)
                     let qH = 20;
-                    if (qImg) qH = (qImg.height / qImg.width) * 90;
+                    if (qImg) qH = (qImg.height / qImg.width) * imgWidth;
 
                     let studH = 10;
                     Object.entries(q.byCampus).forEach(([campus, names]) => {
@@ -283,38 +286,76 @@ const ErrorTop100 = () => {
                     });
 
                     const rowH = Math.max(qH + 10, studH + 10, 30);
+                    const maroonH = 7;
 
-                    if (yPos + rowH > pageHeight - 20) {
+                    if (yPos + rowH + maroonH > pageHeight - 20) {
                         doc.addPage();
-                        yPos = drawHeader(test.testName);
+                        yPos = drawHeader(test);
+                        // Redraw Table Header on new page
+                        doc.setFillColor(255, 248, 220);
+                        doc.rect(margin, yPos, contentWidth, 8, 'FD');
+                        let tcx = margin;
+                        cols.forEach(c => {
+                            doc.rect(tcx, yPos, c.w, 8);
+                            doc.text(c.name, tcx + c.w / 2, yPos + 5.5, { align: 'center' });
+                            tcx += c.w;
+                        });
+                        yPos += 8;
                     }
 
+                    // Maroon Topic/Key Bar
+                    doc.setFillColor(128, 0, 0);
+                    doc.rect(margin, yPos, contentWidth, maroonH, 'F');
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "bold");
+
+                    // Topic
+                    doc.setTextColor(255, 255, 0);
+                    doc.text("Topic : ", margin + 2, yPos + 5);
+                    doc.setTextColor(255, 255, 255);
+                    doc.text(String(q.topic), margin + 2 + doc.getTextWidth("Topic : "), yPos + 5);
+
+                    // Key
+                    const keyLabel = "Key : ";
+                    const keyVal = String(q.keyValue);
+                    doc.setTextColor(255, 255, 0);
+                    const keyX = margin + 140; // Align to right-side sections
+                    doc.text(keyLabel, keyX, yPos + 5);
+                    doc.setTextColor(255, 255, 255);
+                    doc.text(keyVal, keyX + doc.getTextWidth(keyLabel), yPos + 5);
+
+                    yPos += maroonH;
+
+                    doc.setDrawColor(0);
                     doc.rect(margin, yPos, contentWidth, rowH);
 
                     let currX = margin;
-                    doc.text(String(q.qNo), currX + 7.5, yPos + rowH / 2, { align: 'center' });
-                    currX += 15;
-                    doc.setTextColor(255, 0, 0);
-                    doc.text(`${q.wrongCount}/${q.totalCount}`, currX + 7.5, yPos + rowH / 2, { align: 'center' });
-                    doc.setTextColor(0);
-                    currX += 15;
-                    doc.setFontSize(8);
-                    doc.setTextColor(0, 0, 150);
-                    doc.text("Top 100", currX + 10, yPos + rowH / 2 - 4, { align: 'center' });
-                    doc.text("(%):", currX + 10, yPos + rowH / 2, { align: 'center' });
-                    doc.setTextColor(255, 0, 0);
                     doc.setFontSize(10);
-                    const perc = q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%';
-                    doc.text(perc, currX + 10, yPos + rowH / 2 + 5, { align: 'center' });
                     doc.setTextColor(0);
-                    currX += 20;
+                    doc.text(String(q.qNo), currX + 6, yPos + rowH / 2, { align: 'center' });
+                    currX += 12;
+                    doc.setTextColor(255, 0, 0);
+                    doc.text(`${q.wrongCount}/${q.totalCount}`, currX + 6, yPos + rowH / 2, { align: 'center' });
+                    doc.setTextColor(0);
+                    currX += 12;
+                    doc.setFontSize(7);
+                    doc.setTextColor(0, 0, 150);
+                    doc.text("Top 100", currX + 9, yPos + rowH / 2 - 3, { align: 'center' });
+                    doc.text("(%):", currX + 9, yPos + rowH / 2 + 1, { align: 'center' });
+                    doc.setTextColor(255, 0, 0);
+                    doc.setFontSize(9);
+                    const perc = q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%';
+                    doc.text(perc, currX + 9, yPos + rowH / 2 + 6, { align: 'center' });
+                    doc.setTextColor(0);
+                    currX += 18;
 
                     if (qImg) {
-                        try { doc.addImage(qImg, 'PNG', currX + 5, yPos + 5, 90, qH); } catch (e) { }
+                        try { doc.addImage(qImg, 'PNG', currX + (98 - imgWidth) / 2, yPos + 5, imgWidth, qH); } catch (e) { }
                     }
-                    currX += 100;
+                    currX += 98;
 
                     doc.setFontSize(8);
+                    doc.setFont("helvetica", "bold");
                     doc.text(String(q.subject), currX + 10, yPos + rowH / 2, { align: 'center' });
                     currX += 20;
 
@@ -327,12 +368,12 @@ const ErrorTop100 = () => {
                         doc.setTextColor(150, 150, 0);
                         doc.setFont("helvetica", "bold");
                         doc.text(campus, currX + 2, sy);
-                        sy += 3.5;
+                        sy += 3;
                         doc.setTextColor(100);
                         doc.setFont("helvetica", "normal");
                         names.forEach(name => {
                             doc.text(name, currX + 2, sy);
-                            sy += 3.5;
+                            sy += 3;
                         });
                         sy += 1;
                     });
@@ -392,7 +433,9 @@ const ErrorTop100 = () => {
 
                 return (
                     <div key={tIdx} style={{ maxWidth: '1200px', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
-                        <h2 style={{ textAlign: 'center', color: '#0070c0' }}>{test.testName}_Error Analysis</h2>
+                        <h2 style={{ textAlign: 'center', color: '#000', fontSize: '24px', fontWeight: 'bold' }}>
+                            {test.date}_{test.stream}_{test.testName}_Error Analysis
+                        </h2>
 
                         <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginTop: '20px' }}>
                             <thead>
@@ -407,34 +450,45 @@ const ErrorTop100 = () => {
                             </thead>
                             <tbody>
                                 {renderQs.map((q, qIdx) => (
-                                    <tr key={qIdx}>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.qNo}</td>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold', color: 'red' }}>{q.wrongCount}/{q.totalCount}</td>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                                            <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>Top 100(%):</div>
-                                            <div style={{ color: 'red', fontSize: '14px', fontWeight: 'bold' }}>
-                                                {q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%'}
-                                            </div>
-                                        </td>
-                                        <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-                                            {q.qUrl && <img src={q.qUrl} alt="Question" style={{ maxWidth: '100%', maxHeight: '400px' }} />}
-                                            <div style={{ marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '5px', fontSize: '11px', color: '#666', textAlign: 'left' }}>
-                                                <strong>Topic:</strong> {q.topic} | <strong>Key:</strong> {q.keyValue}
-                                            </div>
-                                        </td>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.subject}</td>
-                                        <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top', backgroundColor: '#4F81BD', color: 'white' }}>
-                                            <div style={{ fontSize: '12px', color: 'white', textDecoration: 'underline', marginBottom: '8px', fontWeight: 'bold' }}>Wrong Attempts -Students</div>
-                                            {Object.entries(q.byCampus).map(([campus, names]) => (
-                                                <div key={campus} style={{ marginBottom: '12px' }}>
-                                                    <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#FFFF00', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: '2px' }}>{campus}</div>
-                                                    {names.map(name => (
-                                                        <div key={name} style={{ fontSize: '11px', color: 'white', marginLeft: '2px', lineHeight: '1.2' }}>{name}</div>
-                                                    ))}
+                                    <React.Fragment key={qIdx}>
+                                        {/* Maroon Header Row for each question */}
+                                        <tr style={{ backgroundColor: '#800000', color: 'white', fontWeight: 'bold', fontSize: '13px' }}>
+                                            <td colSpan="4" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                                                <span style={{ color: '#FFFF00' }}>Topic : </span>
+                                                <span style={{ color: 'white' }}>{q.topic}</span>
+                                            </td>
+                                            <td colSpan="2" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                                                <span style={{ color: '#FFFF00' }}>Key : </span>
+                                                <span style={{ color: 'white' }}>{q.keyValue}</span>
+                                            </td>
+                                        </tr>
+                                        {/* Main Data Row */}
+                                        <tr>
+                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.qNo}</td>
+                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold', color: 'red' }}>{q.wrongCount}/{q.totalCount}</td>
+                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                                                <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>Top 100(%):</div>
+                                                <div style={{ color: 'red', fontSize: '14px', fontWeight: 'bold' }}>
+                                                    {q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%'}
                                                 </div>
-                                            ))}
-                                        </td>
-                                    </tr>
+                                            </td>
+                                            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+                                                {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} />}
+                                            </td>
+                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.subject}</td>
+                                            <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top', backgroundColor: '#4F81BD', color: 'white' }}>
+                                                <div style={{ fontSize: '12px', color: 'white', textDecoration: 'underline', marginBottom: '8px', fontWeight: 'bold', textAlign: 'center' }}>Wrong Attempts -Students</div>
+                                                {Object.entries(q.byCampus).map(([campus, names]) => (
+                                                    <div key={campus} style={{ marginBottom: '12px' }}>
+                                                        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#FFFF00', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: '2px' }}>{campus}</div>
+                                                        {names.map(name => (
+                                                            <div key={name} style={{ fontSize: '11px', color: 'white', marginLeft: '2px', lineHeight: '1.2' }}>{name}</div>
+                                                        ))}
+                                                    </div>
+                                                ))}
+                                            </td>
+                                        </tr>
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>
