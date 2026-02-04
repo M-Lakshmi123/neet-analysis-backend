@@ -287,7 +287,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     const keyLabel = "Key : ";
                     const keyVal = String(q.keyValue);
                     doc.setTextColor(255, 255, 0);
-                    const keyX = margin + 140; // Align to right-side sections
+                    const topicW = 8 + 10 + 15 + 98;
+                    const keyX = margin + topicW + 2; // Start after image area
                     doc.text(keyLabel, keyX, yPos + 5);
                     doc.setTextColor(255, 255, 255);
                     doc.text(keyVal, keyX + doc.getTextWidth(keyLabel), yPos + 5);
@@ -297,64 +298,73 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     doc.setDrawColor(0);
                     doc.rect(margin, yPos, contentWidth, rowH);
 
+                    // ... existing code ...
                     let currX = margin;
                     doc.setFontSize(10);
                     doc.setTextColor(0);
-                    doc.text(String(q.qNo), currX + 6, yPos + rowH / 2, { align: 'center' });
+                    doc.text(String(q.qNo), currX + 4, yPos + rowH / 2, { align: 'center' });
 
-                    currX += 12;
+                    currX += 8; // Reduced from 12
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setTextColor(255, 0, 0);
-                    doc.text(`${q.wrongCount}/${q.totalCount}`, currX + 6, yPos + rowH / 2, { align: 'center' });
+                    doc.text(`${q.wrongCount}/${q.totalCount}`, currX + 5, yPos + rowH / 2, { align: 'center' });
                     doc.setTextColor(0);
 
-                    currX += 12;
+                    currX += 10; // Reduced from 12
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setFontSize(7);
                     doc.setTextColor(0, 0, 150);
-                    doc.text("Top 100", currX + 9, yPos + rowH / 2 - 3, { align: 'center' });
-                    doc.text("(%):", currX + 9, yPos + rowH / 2 + 1, { align: 'center' });
+                    doc.text("Top 100", currX + 7.5, yPos + rowH / 2 - 3, { align: 'center' });
+                    doc.text("(%):", currX + 7.5, yPos + rowH / 2 + 1, { align: 'center' });
                     doc.setTextColor(255, 0, 0);
                     doc.setFontSize(9);
                     const perc = q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%';
-                    doc.text(perc, currX + 9, yPos + rowH / 2 + 6, { align: 'center' });
+                    doc.text(perc, currX + 7.5, yPos + rowH / 2 + 6, { align: 'center' });
                     doc.setTextColor(0);
 
-                    currX += 18;
+                    currX += 15; // Reduced from 18
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     if (qImg) {
                         try { doc.addImage(qImg, 'PNG', currX + (98 - imgWidth) / 2, yPos + 5, imgWidth, qH); } catch (e) { }
                     }
-                    currX += 98;
+                    currX += 98; // Stay 98
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setFontSize(8);
                     doc.setFont("helvetica", "bold");
                     doc.text(String(q.subject), currX + 10, yPos + rowH / 2, { align: 'center' });
 
-                    currX += 20;
+                    currX += 20; // Stay 20
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     let sy = yPos + 5;
-                    doc.setFontSize(7);
-                    doc.setTextColor(0, 0, 150);
+                    doc.setFontSize(10); // Increased from 7
+                    doc.setTextColor(255, 255, 255); // Changed to white to match UI? Wait PDF background is blue.
+                    // Let's check background color in PDF for this cell
+                    doc.setFillColor(79, 129, 189);
+                    doc.rect(currX, yPos, contentWidth - (currX - margin), rowH, 'F');
+
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFont("helvetica", "bold");
                     doc.text("Wrong Attempts -Students", currX + 2, sy);
-                    sy += 4;
+                    sy += 5;
+
+                    doc.setFontSize(9); // Increased from 7
                     Object.entries(q.byCampus).forEach(([campus, names]) => {
-                        doc.setTextColor(150, 150, 0);
+                        doc.setTextColor(255, 255, 0); // Yellow for campus
                         doc.setFont("helvetica", "bold");
                         doc.text(campus, currX + 2, sy);
-                        sy += 3;
-                        doc.setTextColor(100);
+                        sy += 4;
+                        doc.setTextColor(255, 255, 255); // White for names
                         doc.setFont("helvetica", "normal");
                         names.forEach(name => {
                             doc.text(name, currX + 2, sy);
-                            sy += 3;
+                            sy += 3.5;
                         });
-                        sy += 1;
+                        sy += 1.5;
                     });
 
                     yPos += rowH;
@@ -422,8 +432,15 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                             {test.date}_{test.stream}_{test.testName}_Error Analysis
                         </h2>
 
-                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black' }}>
-                            {/* Removed Table Header row */}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', tableLayout: 'fixed' }}>
+                            <colgroup>
+                                <col style={{ width: '40px' }} />
+                                <col style={{ width: '60px' }} />
+                                <col style={{ width: '80px' }} />
+                                <col style={{ width: '341px' }} />
+                                <col style={{ width: '100px' }} />
+                                <col style={{ width: 'auto' }} />
+                            </colgroup>
                             <tbody>
                                 {renderQs.map((q, qIdx) => (
                                     <React.Fragment key={qIdx}>
@@ -446,17 +463,17 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                                                     {q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%'}
                                                 </div>
                                             </td>
-                                            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center', width: '341px' }}>
+                                            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
                                                 {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} />}
                                             </td>
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.subject}</td>
                                             <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top', backgroundColor: '#4F81BD', color: 'white' }}>
-                                                <div style={{ fontSize: '12px', color: 'white', textDecoration: 'underline', marginBottom: '8px', fontWeight: 'bold', textAlign: 'center' }}>Wrong Attempts -Students</div>
+                                                <div style={{ fontSize: '14px', color: 'white', textDecoration: 'underline', marginBottom: '8px', fontWeight: 'bold', textAlign: 'center' }}>Wrong Attempts -Students</div>
                                                 {Object.entries(q.byCampus).map(([campus, names]) => (
                                                     <div key={campus} style={{ marginBottom: '12px' }}>
-                                                        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#FFFF00', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: '2px' }}>{campus}</div>
+                                                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#FFFF00', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: '2px' }}>{campus}</div>
                                                         {names.map(name => (
-                                                            <div key={name} style={{ fontSize: '11px', color: 'white', marginLeft: '2px', lineHeight: '1.2' }}>{name}</div>
+                                                            <div key={name} style={{ fontSize: '13px', color: 'white', marginLeft: '2px', lineHeight: '1.2' }}>{name}</div>
                                                         ))}
                                                     </div>
                                                 ))}
