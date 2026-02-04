@@ -109,14 +109,17 @@ const ErrorReport = () => {
                         return d2 - d1;
                     });
 
-                    // Sort Questions by Subject then by Question Number
+                    // Sort Questions by National Error Descending (Largest to Smallest)
                     testsArr = testsArr.map(t => {
                         t.questions.sort((a, b) => {
-                            // Primary Sort: Subject
+                            const valA = parseFloat(a.National_Wide_Error) || 0;
+                            const valB = parseFloat(b.National_Wide_Error) || 0;
+                            if (valB !== valA) return valB - valA;
+
+                            // Fallback to Subject then QNo
                             const subOrder = getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject);
                             if (subOrder !== 0) return subOrder;
 
-                            // Secondary Sort: Question Number (numeric)
                             const qNoA = parseInt(a.Q_No) || 0;
                             const qNoB = parseInt(b.Q_No) || 0;
                             return qNoA - qNoB;
@@ -228,24 +231,22 @@ const ErrorReport = () => {
             doc.setTextColor(0, 112, 192);
             doc.text(part2, startX + w1, y);
 
-            y += 6;
-
-            if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
             doc.setFontSize(9);
             doc.setTextColor(0, 0, 0);
-            doc.text("A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi", pageWidth / 2, y, { align: 'center' });
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
+            doc.text("A.P, TELANGANA, KARNATAKA, TAMILNADU, MAHARASHTRA, DELHI, RANCHI", pageWidth / 2, y, { align: 'center' });
             y += 5;
 
             doc.setFont("times", "italic");
             doc.setFontSize(14);
-            doc.text("A Right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
+            doc.text("A right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
             y += 5;
 
             if (bookmanBoldFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
-            doc.setFontSize(10);
-            doc.text("CENTRAL OFFICE, BANGALORE", pageWidth / 2, y, { align: 'center' });
+            doc.setFontSize(11);
+            doc.text("Central Office, Bangalore", pageWidth / 2, y, { align: 'center' });
 
             return y + 2;
         };
@@ -321,12 +322,24 @@ const ErrorReport = () => {
         // Iterate Tests
         for (const test of student.tests) {
             // Check space
-            if (yPos + 30 > pageHeight - margin) {
+            // Test Title Header
+            if (yPos + 15 > pageHeight - margin) {
                 doc.addPage();
                 yPos = 15;
             }
+            doc.setFontSize(14);
+            doc.setTextColor(0);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
+            const testTitle = `${test.meta.date}_${student.info.stream}_${test.meta.testName}_Error Analysis`;
+            doc.text(testTitle, pageWidth / 2, yPos + 6, { align: 'center' });
+            yPos += 12;
 
             // Score Table
+            if (yPos + 20 > pageHeight - margin) {
+                doc.addPage();
+                yPos = 15;
+            }
             const colDefs = [
                 { name: "Test", w: 25, bg: [255, 255, 255] },
                 { name: "Date", w: 25, bg: [255, 255, 255] },
@@ -488,9 +501,9 @@ const ErrorReport = () => {
                 cx += wQ;
 
                 // Topic Renderer
-                doc.setTextColor(255, 255, 255);
+                doc.setTextColor(255, 255, 0); // Yellow
                 doc.text(topicLabel, cx + 1, ty);
-                doc.setTextColor(240, 230, 140);
+                doc.setTextColor(255, 255, 255); // White
                 topicLines.forEach((line, idx) => {
                     const ly = ty + (idx * lineHeight);
                     doc.text(line.text, cx + 1 + line.xOffset, ly);
@@ -500,9 +513,9 @@ const ErrorReport = () => {
                 cx += wTopic;
 
                 // Sub Topic Renderer
-                doc.setTextColor(255, 255, 255);
+                doc.setTextColor(255, 255, 0); // Yellow
                 doc.text(subLabel, cx + 1, ty);
-                doc.setTextColor(240, 230, 140);
+                doc.setTextColor(255, 255, 255); // White
                 subLines.forEach((line, idx) => {
                     const ly = ty + (idx * lineHeight);
                     doc.text(line.text, cx + 1 + line.xOffset, ly);
@@ -513,16 +526,16 @@ const ErrorReport = () => {
 
                 // Details Column (Key + Top%)
                 // Line 1: Key
-                doc.setTextColor(255, 255, 255);
+                doc.setTextColor(255, 255, 0); // Yellow
                 doc.text(keyLabel, cx + 2, ty);
-                doc.setTextColor(240, 230, 140);
+                doc.setTextColor(255, 255, 255); // White
                 doc.text(keyVal, cx + 2 + doc.getTextWidth(keyLabel), ty);
 
                 // Line 2: Top%
                 const ty2 = ty + lineHeight;
-                doc.setTextColor(255, 255, 255);
+                doc.setTextColor(255, 255, 0); // Yellow
                 doc.text(percLabel, cx + 2, ty2);
-                doc.setTextColor(240, 230, 140);
+                doc.setTextColor(255, 255, 255); // White
                 doc.text(percVal, cx + 2 + doc.getTextWidth(percLabel), ty2);
 
                 doc.setDrawColor(0);
@@ -669,14 +682,14 @@ const ErrorReport = () => {
                                 <span style={{ fontFamily: 'Impact, sans-serif', fontSize: '26px' }}>Sri Chaitanya</span>
                                 <span style={{ fontFamily: '"Bookman Old Style", serif', fontSize: '26px', marginLeft: '5px' }}> Educational Institutions</span>
                             </div>
-                            <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '4px', fontFamily: '"Bookman Old Style", serif' }}>
-                                A.P, Telangana, Karnataka, Tamilnadu, Maharashtra, Delhi, Ranchi
+                            <div style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '4px', fontFamily: '"Bookman Old Style", serif' }}>
+                                A.P, TELANGANA, KARNATAKA, TAMILNADU, MAHARASHTRA, DELHI, RANCHI
                             </div>
                             <div style={{ fontFamily: '"Bookman Old Style", serif', fontStyle: 'italic', fontSize: '18px', margin: '2px 0' }}>
-                                A Right Choice for the Real Aspirant
+                                A right Choice for the Real Aspirant
                             </div>
                             <div style={{ fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '2px', fontFamily: '"Bookman Old Style", serif' }}>
-                                CENTRAL OFFICE, BANGALORE
+                                Central Office, Bangalore
                             </div>
                         </div>
 
@@ -696,6 +709,9 @@ const ErrorReport = () => {
 
                             return (
                                 <div key={tIdx} style={{ marginBottom: '30px' }}>
+                                    <h2 style={{ textAlign: 'center', color: '#000', fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>
+                                        {test.meta.date}_{student.info.stream}_{test.meta.testName}_Error Analysis
+                                    </h2>
                                     {/* Score Table */}
                                     <div style={{ overflowX: 'auto' }}>
                                         <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '15px', fontSize: '12px', textAlign: 'center', fontWeight: 'bold' }}>
@@ -764,22 +780,22 @@ const ErrorReport = () => {
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.Q_No}</td>
 
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
-                                                        <span>Topic: </span>
-                                                        <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Topic}</span>
+                                                        <span style={{ color: '#FFFF00' }}>Topic: </span>
+                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Topic}</span>
                                                     </td>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid white', padding: '4px', verticalAlign: 'top', wordWrap: 'break-word' }}>
-                                                        <span>Sub Topic: </span>
-                                                        <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Sub_Topic}</span>
+                                                        <span style={{ color: '#FFFF00' }}>Sub Topic: </span>
+                                                        <span style={{ color: 'white', marginLeft: '5px' }}>{q.Sub_Topic}</span>
                                                     </td>
 
                                                     <td style={{ border: '1px solid black', textAlign: 'left', padding: '2px 4px', verticalAlign: 'top' }}>
                                                         <div>
-                                                            <span>Key: </span>
-                                                            <span style={{ color: '#F0E68C', marginLeft: '5px' }}>{q.Key_Value}</span>
+                                                            <span style={{ color: '#FFFF00' }}>Key: </span>
+                                                            <span style={{ color: 'white', marginLeft: '5px' }}>{q.Key_Value}</span>
                                                         </div>
                                                         <div style={{ marginTop: '2px' }}>
-                                                            <span>Top%: </span>
-                                                            <span style={{ color: '#F0E68C', marginLeft: '5px' }}>
+                                                            <span style={{ color: '#FFFF00' }}>Top%: </span>
+                                                            <span style={{ color: 'white', marginLeft: '5px' }}>
                                                                 {q.National_Wide_Error && !isNaN(parseFloat(q.National_Wide_Error))
                                                                     ? Math.round(parseFloat(q.National_Wide_Error) * 100) + '%'
                                                                     : ''}
@@ -802,7 +818,7 @@ const ErrorReport = () => {
                                                                         <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
                                                                         <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
                                                                             {q.Q_URL ? (
-                                                                                <img src={q.Q_URL} style={{ width: '320px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
+                                                                                <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
                                                                             ) : (
                                                                                 <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Image</div>
                                                                             )}
@@ -813,7 +829,7 @@ const ErrorReport = () => {
                                                                         <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Sol</div>
                                                                         <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
                                                                             {q.S_URL ? (
-                                                                                <img src={q.S_URL} style={{ width: '320px', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
+                                                                                <img src={q.S_URL} style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0 auto' }} alt="S" />
                                                                             ) : (
                                                                                 <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Solution</div>
                                                                             )}
