@@ -117,7 +117,7 @@ async function processFile(filePath) {
         .on('end', async () => {
             console.log(`Parsed ${results.length} rows from CSV.`);
             if (results.length > 0) {
-                await uploadToDB(results, tableName);
+                await uploadToDB(results, tableName, filename);
             } else {
                 console.log("⚠️ File is empty. Skipping.");
             }
@@ -129,144 +129,189 @@ async function processFile(filePath) {
         });
 }
 
-async function uploadToDB(rows, tableName) {
+const CHECKPOINT_FILE = path.join(__dirname, 'upload_checkpoint.json');
+
+async function uploadToDB(rows, tableName, filename) {
     let pool;
     try {
         console.log("Connecting to TiDB...");
         pool = await connectToDb();
 
-        console.log(`Starting upload of ${rows.length} records...`);
+        const checkpoints = loadCheckpoint();
+        let startIndex = 0;
+
+        // --- RESUME LOGIC ---
+        if (process.env.SKIP_RECORDS) {
+            startIndex = parseInt(process.env.SKIP_RECORDS);
+            console.log(`\n⏭️  Manual Skip: Starting from record ${startIndex} (via env SKIP_RECORDS)...`);
+        } else if (checkpoints[filename]) {
+            if (checkpoints[filename].totalRows !== rows.length) {
+                console.log(`⚠️ Note: CSV row count changed (${checkpoints[filename].totalRows} -> ${rows.length}).`);
+            }
+            startIndex = checkpoints[filename].lastIndex + 1;
+            console.log(`\n🔄 Resuming upload for '${filename}' from row ${startIndex + 1} (skipping ${startIndex} rows)...`);
+        } else {
+            console.log(`Starting upload of ${rows.length} records...`);
+        }
+
         let successCount = 0;
         let failCount = 0;
 
-        // BATCH INSERT? Slow but safer to do individually or small batches for errors
-        // For speed, let's do individual but async parallel limit? 
-        // Or simple loop for reliability first.
+        const BATCH_SIZE = 50;
 
-        // Let's verify columns first from the first row
-        const firstRow = rows[0];
-        const columns = Object.keys(firstRow).map(c => c.trim());
+        for (let i = startIndex; i < rows.length; i += BATCH_SIZE) {
+            const batchRows = rows.slice(i, i + BATCH_SIZE);
+            const batchInserts = [];
+            const checkConditions = [];
+            let safeKeysStr = "";
 
-        // Basic Validation
-        if (!columns.includes('STUD_ID')) {
-            console.error("❌ ERROR: CSV missing 'STUD_ID' column. Check header names!");
-            return;
-        }
+            // 1. Process Data & Prepare Checks
+            for (const row of batchRows) {
+                const keys = Object.keys(row);
+                if (!safeKeysStr) safeKeysStr = keys.map(k => `\`${k.trim()}\``).join(',');
 
-        // Prepare INSERT statement dynamically based on CSV headers matching DB columns
-        // Note: This assumes CSV headers MATCH Database columns exactly (or close enough)
+                const findKeyIndex = (name) => keys.findIndex(k => k.trim().toUpperCase() === name);
+                const studIdIndex = findKeyIndex('STUD_ID');
+                const qNoIndex = findKeyIndex('Q_NO');
+                const testIndex = findKeyIndex('TEST');
 
-        for (const row of rows) {
-            const keys = Object.keys(row);
-            // Wrap keys in backticks to handle spaces in column names
-            const safeKeys = keys.map(k => `\`${k.trim()}\``).join(',');
+                const values = Object.values(row).map((v, index) => {
+                    const key = keys[index];
+                    if (v === null || v === undefined) return "NULL";
+                    let s = String(v).trim();
+                    const upperKey = key.toUpperCase().trim();
 
-            // Helper for finding index of key case-insensitively
-            const findKeyIndex = (name) => keys.findIndex(k => k.trim().toUpperCase() === name);
-            const studIdIndex = findKeyIndex('STUD_ID');
-            const testIndex = findKeyIndex('TEST');
-
-            const values = Object.values(row).map((v, index) => {
-                const key = keys[index];
-                if (v === null || v === undefined) return "NULL";
-                let s = String(v).trim();
-                const upperKey = key.toUpperCase().trim();
-
-                // --- 1. Fix STUD_ID Scientific Notation ---
-                if (upperKey === 'STUD_ID') {
-                    // Check for scientific notation like 1.23E+10
-                    if (/[eE][+-]?\d+$/.test(s) || /^\d+\.\d+$/.test(s)) {
-                        // Note: plain floats also caught here to ensure integer string
-                        try {
-                            const n = Number(s);
-                            if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false });
-                        } catch (e) { }
-                    }
-                }
-
-                // --- 2. Fix Date Formats (Excel Serial, DD/MM/YYYY, DD-MM-YYYY) ---
-                if (upperKey === 'DATE' || upperKey === 'EXAM_DATE') {
-                    // Case A: Excel Serial Number (e.g. 45831)
-                    if (/^\d{5}(\.\d+)?$/.test(s)) {
-                        try {
-                            const serial = parseFloat(s);
-                            // Excel base date: Dec 30, 1899
-                            const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
-                            const d = date.getDate();
-                            const m = date.getMonth() + 1;
-                            const y = date.getFullYear();
-                            s = `${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}-${y}`;
-                        } catch (e) { console.error("Date Parse Error:", e); }
-                    }
-                    // Case B: Slash Separated (DD/MM/YYYY)
-                    else if (s.includes('/')) {
-                        const parts = s.split('/');
-                        if (parts.length === 3) {
-                            // Assuming DD/MM/YYYY
-                            s = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
+                    if (upperKey === 'STUD_ID') {
+                        if (/[eE][+-]?\d+$/.test(s) || /^\d+\.\d+$/.test(s)) {
+                            try {
+                                const n = Number(s);
+                                if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false });
+                            } catch (e) { }
                         }
                     }
-                    // Case C: Hyphen Separated (DD-MM-YYYY) - already correct usually, but ensure padding
-                    else if (s.includes('-')) {
-                        const parts = s.split('-');
-                        if (parts.length === 3) {
-                            s = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
+                    if (upperKey === 'DATE' || upperKey === 'EXAM_DATE') {
+                        if (/^\d{5}(\.\d+)?$/.test(s)) {
+                            try {
+                                const serial = parseFloat(s);
+                                const date = new Date(Math.round((serial - 25569) * 86400 * 1000));
+                                const d = date.getDate();
+                                const m = date.getMonth() + 1;
+                                const y = date.getFullYear();
+                                s = `${String(d).padStart(2, '0')}-${String(m).padStart(2, '0')}-${y}`;
+                            } catch (e) { }
+                        } else if (s.includes('/')) {
+                            const parts = s.split('/');
+                            if (parts.length === 3) s = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
+                        } else if (s.includes('-')) {
+                            const parts = s.split('-');
+                            if (parts.length === 3) s = `${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}-${parts[2]}`;
                         }
                     }
+
+                    s = s.replace(/'/g, "''");
+                    return `'${s}'`;
+                });
+
+                const studIdVal = studIdIndex !== -1 ? values[studIdIndex] : null;
+                const testVal = testIndex !== -1 ? values[testIndex] : null;
+                const qNoVal = qNoIndex !== -1 ? values[qNoIndex] : null;
+
+                if (studIdVal) {
+                    let clause = `(STUD_ID = ${studIdVal}`;
+                    if (testVal) clause += ` AND Test = ${testVal}`;
+                    if (tableName === 'ERP_REPORT' && qNoVal) clause += ` AND Q_No = ${qNoVal}`;
+                    clause += `)`;
+                    checkConditions.push(clause);
                 }
 
-                s = s.replace(/'/g, "''"); // SQL Escape
-                return `'${s}'`;
-            });
+                batchInserts.push(`(${values.join(',')})`);
+            }
 
-            // --- 3. Duplicate Check ---
-            let isDuplicate = false;
-
-            // Need safely formatted values (they already contain single quotes)
-            const studIdVal = studIdIndex !== -1 ? values[studIdIndex] : null;
-            const testVal = testIndex !== -1 ? values[testIndex] : null;
-
-            if (studIdVal) {
-                let checkSql = `SELECT 1 FROM ${tableName} WHERE STUD_ID = ${studIdVal}`;
-                if (testVal) {
-                    checkSql += ` AND Test = ${testVal}`;
-                }
-                checkSql += ` LIMIT 1`;
-
+            // 2. Duplicate Check
+            let dbDuplicates = new Set();
+            if (checkConditions.length > 0) {
+                const checkCols = tableName === 'ERP_REPORT' ? 'STUD_ID, Test, Q_No' : 'STUD_ID, Test';
+                const batchCheckSql = `SELECT ${checkCols} FROM ${tableName} WHERE ${checkConditions.join(' OR ')}`;
                 try {
-                    const existing = await pool.request().query(checkSql);
-                    if (existing.recordset && existing.recordset.length > 0) {
-                        isDuplicate = true;
+                    const existing = await pool.request().query(batchCheckSql);
+                    if (existing.recordset) {
+                        existing.recordset.forEach(r => {
+                            const sId = String(r.STUD_ID).trim();
+                            const test = r.Test ? String(r.Test).trim() : 'NULL';
+                            const qNo = r.Q_No ? String(r.Q_No).trim() : 'NULL';
+                            const key = tableName === 'ERP_REPORT' ? `${sId}|${test}|${qNo}` : `${sId}|${test}`;
+                            dbDuplicates.add(key.toUpperCase());
+                        });
                     }
-                } catch (checkErr) {
-                    // Warning: Table might not have columns yet if empty?
+                } catch (checkErr) { }
+            }
+
+            // 3. Filter and Insert
+            let validBatchInserts = [];
+            for (let b = 0; b < batchRows.length; b++) {
+                const row = batchRows[b];
+                const keys = Object.keys(row);
+                const getVal = (name) => {
+                    const k = keys.find(key => key.trim().toUpperCase() === name);
+                    const v = k ? row[k] : null;
+                    if (v === null || v === undefined) return 'NULL';
+                    let s = String(v).trim();
+                    if (/[eE][+-]?\d+$/.test(s) || /^\d+\.\d+$/.test(s)) {
+                        try { const n = Number(s); if (!isNaN(n)) s = n.toLocaleString('fullwide', { useGrouping: false }); } catch (e) { }
+                    }
+                    return s;
+                };
+
+                const sId = getVal('STUD_ID');
+                const test = getVal('TEST');
+                const qNo = getVal('Q_NO');
+                const key = tableName === 'ERP_REPORT' ? `${sId}|${test}|${qNo}` : `${sId}|${test}`;
+
+                if (dbDuplicates.has(key.toUpperCase())) {
+                    failCount++;
+                } else {
+                    validBatchInserts.push(batchInserts[b]);
                 }
             }
 
-            if (isDuplicate) {
-                // Count as failed/skipped
-                failCount++;
-                continue;
+            if (validBatchInserts.length > 0) {
+                const sql = `INSERT INTO ${tableName} (${safeKeysStr}) VALUES ${validBatchInserts.join(',')}`;
+                try {
+                    await pool.request().query(sql);
+                    successCount += validBatchInserts.length;
+                    process.stdout.write(`B(${successCount}) `);
+                } catch (e) {
+                    console.error(`\nBatch Insert Failed: ${e.message}`);
+                }
             }
 
-            // Construct INSERT (without Update)
-            const sql = `INSERT INTO ${tableName} (${safeKeys}) VALUES (${values.join(',')})`;
-
-            try {
-                await pool.request().query(sql);
-                successCount++;
-                process.stdout.write(".");
-            } catch (err) {
-                failCount++;
-                console.error(`\n[Row Error] STUD_ID: ${row['STUD_ID'] || '?'} - ${err.message}`);
-            }
+            checkpoints[filename] = { lastIndex: (i + batchRows.length - 1), totalRows: rows.length };
+            saveCheckpoint(checkpoints);
         }
 
         console.log(`\n\n✅ Upload Complete!`);
         console.log(`Success: ${successCount}`);
-        console.log(`Failed:  ${failCount} (Likely duplicates or data errors)`);
+        console.log(`Failed:  ${failCount} (Duplicates or Errors)`);
+
+        if (checkpoints[filename]) {
+            delete checkpoints[filename];
+            saveCheckpoint(checkpoints);
+        }
 
     } catch (err) {
         console.error("❌ Database Error:", err.message);
     }
+}
+
+function loadCheckpoint() {
+    try {
+        if (fs.existsSync(CHECKPOINT_FILE)) return JSON.parse(fs.readFileSync(CHECKPOINT_FILE, 'utf8'));
+    } catch (e) { }
+    return {};
+}
+
+function saveCheckpoint(data) {
+    try {
+        fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify(data, null, 2));
+    } catch (e) { }
 }

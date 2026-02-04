@@ -35,7 +35,7 @@ const UserApprovals = () => {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, "users"), where("role", "==", "principal"));
+            const q = query(collection(db, "users"), where("role", "in", ["principal", "co_admin"]));
             const querySnapshot = await getDocs(q);
             const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
@@ -59,7 +59,8 @@ const UserApprovals = () => {
         setApprovalModal({
             isOpen: true,
             user: user,
-            selectedCampuses: defaultSelection
+            selectedCampuses: defaultSelection,
+            role: user.role || 'principal'
         });
     };
 
@@ -68,8 +69,9 @@ const UserApprovals = () => {
 
         const user = approvalModal.user;
         const allowedCampuses = approvalModal.selectedCampuses.map(c => c.value);
+        const role = approvalModal.role;
 
-        setApprovalModal({ isOpen: false, user: null, selectedCampuses: [] });
+        setApprovalModal({ isOpen: false, user: null, selectedCampuses: [], role: 'principal' });
 
         // Optimistic Update: Move user immediately in UI
         // We update the local object to reflect the new allowedCampuses
@@ -77,7 +79,8 @@ const UserApprovals = () => {
             ...user,
             isApproved: true,
             approvedAt: new Date().toISOString(),
-            allowedCampuses: allowedCampuses
+            allowedCampuses: allowedCampuses,
+            role: role
         };
 
         // Update Pending List (Remove if present)
@@ -97,7 +100,8 @@ const UserApprovals = () => {
             await updateDoc(doc(db, "users", user.id), {
                 isApproved: true,
                 approvedAt: new Date().toISOString(),
-                allowedCampuses: allowedCampuses
+                allowedCampuses: allowedCampuses,
+                role: role
             });
 
             // 2. Open WhatsApp Web for notification (Only for new approvals)
@@ -187,7 +191,7 @@ const UserApprovals = () => {
                 <section className="admin-card full-width">
                     <div className="card-header">
                         <CheckCircle size={18} />
-                        <h4>Approved Principals</h4>
+                        <h4>Approved Users</h4>
                     </div>
                     <div className="table-wrapper">
                         <table className="modern-table">
@@ -195,6 +199,7 @@ const UserApprovals = () => {
                                 <tr>
                                     <th>Name</th>
                                     <th>Email</th>
+                                    <th>Role</th>
                                     <th>Campus Assigned</th>
                                     <th>Approved Date</th>
                                     <th>Action</th>
@@ -205,6 +210,19 @@ const UserApprovals = () => {
                                     <tr key={user.id}>
                                         <td>{user.name}</td>
                                         <td>{user.email}</td>
+                                        <td>
+                                            <span style={{
+                                                fontSize: '0.75rem',
+                                                fontWeight: 'bold',
+                                                padding: '2px 8px',
+                                                borderRadius: '12px',
+                                                backgroundColor: user.role === 'co_admin' ? '#f0fdf4' : '#f8fafc',
+                                                color: user.role === 'co_admin' ? '#166534' : '#64748b',
+                                                border: `1px solid ${user.role === 'co_admin' ? '#bcf0da' : '#e2e8f0'}`
+                                            }}>
+                                                {user.role === 'co_admin' ? 'Co-Admin' : 'Principal'}
+                                            </span>
+                                        </td>
                                         <td>
                                             <span className="campus-tag">
                                                 {user.allowedCampuses && user.allowedCampuses.length > 0
@@ -354,6 +372,41 @@ const UserApprovals = () => {
                                         Leave empty to grant <b>Single Campus</b> access (or full if Admin).
                                     </span>
                                 </div>
+                            </div>
+
+                            <div style={{ marginTop: '1.5rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b' }}>
+                                    User Role
+                                </label>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        onClick={() => setApprovalModal(prev => ({ ...prev, role: 'principal' }))}
+                                        style={{
+                                            flex: 1, padding: '10px', borderRadius: '8px', border: '2px solid',
+                                            borderColor: approvalModal.role === 'principal' ? '#0f172a' : '#e2e8f0',
+                                            backgroundColor: approvalModal.role === 'principal' ? '#f8fafc' : 'white',
+                                            fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        Principal
+                                    </button>
+                                    <button
+                                        onClick={() => setApprovalModal(prev => ({ ...prev, role: 'co_admin' }))}
+                                        style={{
+                                            flex: 1, padding: '10px', borderRadius: '8px', border: '2px solid',
+                                            borderColor: approvalModal.role === 'co_admin' ? '#0f172a' : '#e2e8f0',
+                                            backgroundColor: approvalModal.role === 'co_admin' ? '#f8fafc' : 'white',
+                                            fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s', fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        Co-Admin
+                                    </button>
+                                </div>
+                                <p style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '8px' }}>
+                                    {approvalModal.role === 'co_admin'
+                                        ? 'Co-Admins have access to the Top 100% Error Report.'
+                                        : 'Principals have regular access to dashboard reports.'}
+                                </p>
                             </div>
                         </div>
 

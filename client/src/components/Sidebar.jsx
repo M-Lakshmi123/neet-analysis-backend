@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 
 const Sidebar = ({ activePage, setActivePage }) => {
-    const { isAdmin } = useAuth();
+    const { isAdmin, isCoAdmin } = useAuth();
+    const canSeeErrorTop = isAdmin || isCoAdmin;
 
     const menuItems = [
         { id: 'analysis', label: 'Analysis Report', icon: <BarChart3 size={18} />, roles: ['principal', 'admin'] },
@@ -19,11 +20,12 @@ const Sidebar = ({ activePage, setActivePage }) => {
     ];
 
     const adminItems = [
+        { id: 'error_top', label: 'Error Top 100%', icon: <FileWarning size={18} />, roles: ['admin', 'co_admin'] },
         { id: 'approvals', label: 'User Approvals', icon: <Users size={18} />, roles: ['admin'] },
         { id: 'logs', label: 'Activity Logs', icon: <Activity size={18} />, roles: ['admin'] }
     ];
 
-    const currentItems = [...menuItems, ...(isAdmin ? adminItems : [])];
+    const currentItems = [...menuItems, ...(canSeeErrorTop ? adminItems.filter(item => item.roles.includes(isCoAdmin ? 'co_admin' : 'admin')) : [])];
 
     return (
         <aside className="sidebar">

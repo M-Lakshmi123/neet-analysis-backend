@@ -45,6 +45,7 @@ export const AuthProvider = ({ children }) => {
         userData,
         loading,
         isAdmin: userData?.role === 'admin',
+        isCoAdmin: userData?.role === 'co_admin',
         isPrincipal: userData?.role === 'principal',
         isApproved: userData?.isApproved
     };

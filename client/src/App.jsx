@@ -10,6 +10,7 @@ import AnalysisReport from './components/AnalysisReport';
 import AverageReport from './components/AverageReport';
 import AverageMarksReport from './components/AverageMarksReport';
 import ErrorReport from './components/ErrorReport';
+import ErrorTop100 from './components/ErrorTop100';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -162,6 +163,8 @@ const Dashboard = () => {
                 );
             case 'errors':
                 return <ErrorReport />;
+            case 'error_top':
+                return (isAdmin || isCoAdmin) ? <ErrorTop100 /> : <div className="p-4">Access Denied</div>;
             case 'approvals':
                 return isAdmin ? <UserApprovals /> : <div className="p-4">Access Denied</div>;
             case 'logs':
@@ -180,7 +183,8 @@ const Dashboard = () => {
                         activePage === 'averages' ? 'Average Marks Report' :
                             activePage === 'progress' ? 'Progress Report' :
                                 activePage === 'errors' ? 'Error Report' :
-                                    activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
+                                    activePage === 'error_top' ? 'Error Top 100%' :
+                                        activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
                     {renderPageContent()}

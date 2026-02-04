@@ -286,7 +286,7 @@ const RegisterPage = () => {
                                         <Lock size={16} className="icon" />
                                         <input
                                             type="password"
-                                            placeholder="••••••••"
+                                            placeholder=""
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             required
@@ -300,7 +300,7 @@ const RegisterPage = () => {
                                         <Lock size={16} className="icon" />
                                         <input
                                             type="password"
-                                            placeholder="••••••••"
+                                            placeholder=""
                                             value={confirmPassword}
                                             onChange={(e) => setConfirmPassword(e.target.value)}
                                             required

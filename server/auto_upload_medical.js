@@ -140,8 +140,17 @@ async function uploadToDB(rows, tableName, filename) {
         const checkpoints = loadCheckpoint();
         let startIndex = 0;
 
-        // Resume capability
-        if (checkpoints[filename] && checkpoints[filename].totalRows === rows.length) {
+        // --- RESUME LOGIC ---
+        // 1. Manual override via Environment Variable
+        if (process.env.SKIP_RECORDS) {
+            startIndex = parseInt(process.env.SKIP_RECORDS);
+            console.log(`\n⏭️  Manual Skip: Starting from record ${startIndex} (via env SKIP_RECORDS)...`);
+        }
+        // 2. Checkpoint Resume
+        else if (checkpoints[filename]) {
+            if (checkpoints[filename].totalRows !== rows.length) {
+                console.log(`⚠️ Note: CSV row count changed (${checkpoints[filename].totalRows} -> ${rows.length}).`);
+            }
             startIndex = checkpoints[filename].lastIndex + 1;
             console.log(`\n🔄 Resuming upload for '${filename}' from row ${startIndex + 1} (skipping ${startIndex} rows)...`);
         } else {

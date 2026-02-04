@@ -572,8 +572,13 @@ app.get('/api/erp/report', async (req, res) => {
         const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
         const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
 
+        const sNames = Array.isArray(req.query.studentNames) ? req.query.studentNames : [];
+        const cleanNames = sNames.map(n => n ? n.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+
         if (cleanIds.length > 0) {
             clauses.push(`UPPER(TRIM(STUD_ID)) IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
+        } else if (cleanNames.length > 0) {
+            clauses.push(`UPPER(TRIM(Student_Name)) IN (${cleanNames.map(v => `'${v}'`).join(',')})`);
         } else if (quickSearch && quickSearch.trim() !== '') {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
             clauses.push(`(UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
@@ -599,6 +604,39 @@ app.get('/api/erp/report', async (req, res) => {
         res.json(result.recordset);
     } catch (err) {
         console.error("[ERP Report] ERROR:", err);
+        res.status(500).send(err.message);
+    }
+});
+
+
+app.get('/api/erp/participants', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const { test, studentNames } = req.query;
+
+        const sNames = Array.isArray(studentNames) ? studentNames : [];
+        if (sNames.length === 0 || !test) return res.json({});
+
+        const cleanNames = sNames.map(n => `'${n.toString().trim().toUpperCase().replace(/'/g, "''")}'`).join(',');
+        const testList = (Array.isArray(test) ? test : [test]).map(t => `'${t.toString().trim().toUpperCase().replace(/'/g, "''")}'`).join(',');
+
+        // Query MEDICAL_RESULT to see who actually took these tests
+        const query = `
+            SELECT Test, COUNT(DISTINCT NAME_OF_THE_STUDENT) as count
+            FROM MEDICAL_RESULT
+            WHERE UPPER(TRIM(NAME_OF_THE_STUDENT)) IN (${cleanNames})
+            AND UPPER(TRIM(Test)) IN (${testList})
+            GROUP BY Test
+        `;
+
+        const result = await pool.request().query(query);
+        const counts = {};
+        result.recordset.forEach(r => {
+            counts[r.Test] = r.count;
+        });
+        res.json(counts);
+    } catch (err) {
+        console.error("[ERP Participants] ERROR:", err);
         res.status(500).send(err.message);
     }
 });
