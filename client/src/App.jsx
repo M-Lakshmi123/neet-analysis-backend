@@ -84,9 +84,7 @@ const Dashboard = () => {
         studentSearch: []
     };
 
-    const [analysisFilters, setAnalysisFilters] = useState({ ...initialFilters });
-    const [averagesFilters, setAveragesFilters] = useState({ ...initialFilters });
-    const [progressFilters, setProgressFilters] = useState({ ...initialFilters });
+    const [globalFilters, setGlobalFilters] = useState({ ...initialFilters });
 
     const hasLoggedSession = React.useRef(false);
 
@@ -124,47 +122,26 @@ const Dashboard = () => {
         switch (activePage) {
             case 'analysis':
                 return (
-                    <>
-                        <FilterBar
-                            filters={analysisFilters}
-                            setFilters={setAnalysisFilters}
-                            restrictedCampus={isRestricted ? userAllowedCampuses : null}
-                        />
-                        <div className="report-sections">
-                            <AnalysisReport filters={analysisFilters} />
-                        </div>
-                    </>
+                    <div className="report-sections">
+                        <AnalysisReport filters={globalFilters} />
+                    </div>
                 );
             case 'averages':
                 return (
-                    <>
-                        <FilterBar
-                            filters={averagesFilters}
-                            setFilters={setAveragesFilters}
-                            restrictedCampus={isRestricted ? userAllowedCampuses : null}
-                        />
-                        <div className="report-sections">
-                            <AverageMarksReport filters={averagesFilters} />
-                        </div>
-                    </>
+                    <div className="report-sections">
+                        <AverageMarksReport filters={globalFilters} />
+                    </div>
                 );
             case 'progress':
                 return (
-                    <>
-                        <FilterBar
-                            filters={progressFilters}
-                            setFilters={setProgressFilters}
-                            restrictedCampus={isRestricted ? userAllowedCampuses : null}
-                        />
-                        <div className="report-sections">
-                            <AverageReport filters={progressFilters} />
-                        </div>
-                    </>
+                    <div className="report-sections">
+                        <AverageReport filters={globalFilters} />
+                    </div>
                 );
             case 'errors':
-                return <ErrorReport />;
+                return <ErrorReport filters={globalFilters} setFilters={setGlobalFilters} />;
             case 'error_top':
-                return (isAdmin || isCoAdmin) ? <ErrorTop100 /> : <div className="p-4">Access Denied</div>;
+                return (isAdmin || isCoAdmin) ? <ErrorTop100 filters={globalFilters} setFilters={setGlobalFilters} /> : <div className="p-4">Access Denied</div>;
             case 'approvals':
                 return isAdmin ? <UserApprovals /> : <div className="p-4">Access Denied</div>;
             case 'logs':
@@ -173,6 +150,8 @@ const Dashboard = () => {
                 return <div>Select a page from the sidebar</div>;
         }
     };
+
+    const showFilterBar = ['analysis', 'averages', 'progress', 'errors', 'error_top'].includes(activePage);
 
     return (
         <div className="dashboard-root">
@@ -187,6 +166,18 @@ const Dashboard = () => {
                                         activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
+                    {showFilterBar && (
+                        <FilterBar
+                            filters={globalFilters}
+                            setFilters={setGlobalFilters}
+                            restrictedCampus={isRestricted ? userAllowedCampuses : null}
+                            apiEndpoints={
+                                ['errors', 'error_top'].includes(activePage)
+                                    ? { filters: '/api/erp/filters', students: '/api/erp/students' }
+                                    : { filters: '/api/filters', students: '/api/studentsByCampus' }
+                            }
+                        />
+                    )}
                     {renderPageContent()}
                 </div>
             </main>

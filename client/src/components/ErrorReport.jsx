@@ -20,16 +20,9 @@ const getSubjectOrder = (subject) => {
     return SUBJECT_ORDER[s] || 99;
 };
 
-const ErrorReport = () => {
+const ErrorReport = ({ filters, setFilters }) => {
     const { userData, isAdmin } = useAuth();
-    const [filters, setFilters] = useState({
-        campus: [],
-        stream: [],
-        testType: [],
-        test: [],
-        topAll: [],
-        studentSearch: []
-    });
+    // Use props filters
     const [subjectFilter, setSubjectFilter] = useState({ value: 'ALL', label: 'All Subjects' });
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -637,12 +630,7 @@ const ErrorReport = () => {
     return (
         <div style={{ padding: '20px', backgroundColor: '#808080', fontFamily: '"Bookman Old Style", "Times New Roman", serif', minHeight: '100vh', boxSizing: 'border-box', overflow: 'auto' }}>
             <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', fontFamily: 'Arial, sans-serif' }}>
-                <FilterBar
-                    filters={filters}
-                    setFilters={setFilters}
-                    restrictedCampus={!isAdmin ? userData?.campus : null}
-                    apiEndpoints={{ filters: '/api/erp/filters', students: '/api/erp/students' }}
-                />
+                {/* Removed FilterBar from here as it is now in App.jsx */}
 
                 {/* SUBJECT FILTER */}
                 <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center' }}>

@@ -27,16 +27,9 @@ const TOP_STUDENTS = [
     'B R DHYAN', 'SURYA S'
 ];
 
-const ErrorTop100 = () => {
+const ErrorTop100 = ({ filters, setFilters }) => {
     const { isAdmin, isCoAdmin } = useAuth();
-    const [filters, setFilters] = useState({
-        campus: [],
-        stream: [],
-        testType: [],
-        test: [],
-        topAll: [],
-        studentSearch: []
-    });
+    // Use props filters instead of local state
     const [subjectFilter, setSubjectFilter] = useState({ value: 'ALL', label: 'All Subjects' });
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -255,29 +248,9 @@ const ErrorTop100 = () => {
 
                 let yPos = drawHeader(test);
 
-                // Table Header
-                doc.setFillColor(255, 248, 220);
-                doc.rect(margin, yPos, contentWidth, 8, 'FD');
-                doc.setFontSize(10);
-                doc.setTextColor(0);
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-
-                const cols = [
-                    { name: 'Q.No', w: 12 },
-                    { name: 'W', w: 12 },
-                    { name: '%', w: 18 },
-                    { name: 'Question', w: 98 },
-                    { name: 'Subject', w: 20 },
-                    { name: 'Student List', w: 30 }
-                ];
-
                 let cx = margin;
-                cols.forEach(c => {
-                    doc.rect(cx, yPos, c.w, 8);
-                    doc.text(c.name, cx + c.w / 2, yPos + 5.5, { align: 'center' });
-                    cx += c.w;
-                });
-                yPos += 8;
+                // cx += 8; // Offset for questions? No, just start.
+                // Removed Table Header
 
                 for (const q of filteredQs) {
                     const qImg = await loadImage(q.qUrl);
@@ -296,16 +269,6 @@ const ErrorTop100 = () => {
                     if (yPos + rowH + maroonH > pageHeight - 20) {
                         doc.addPage();
                         yPos = drawHeader(test);
-                        // Redraw Table Header on new page
-                        doc.setFillColor(255, 248, 220);
-                        doc.rect(margin, yPos, contentWidth, 8, 'FD');
-                        let tcx = margin;
-                        cols.forEach(c => {
-                            doc.rect(tcx, yPos, c.w, 8);
-                            doc.text(c.name, tcx + c.w / 2, yPos + 5.5, { align: 'center' });
-                            tcx += c.w;
-                        });
-                        yPos += 8;
                     }
 
                     // Maroon Topic/Key Bar
@@ -338,11 +301,17 @@ const ErrorTop100 = () => {
                     doc.setFontSize(10);
                     doc.setTextColor(0);
                     doc.text(String(q.qNo), currX + 6, yPos + rowH / 2, { align: 'center' });
+
                     currX += 12;
+                    doc.line(currX, yPos, currX, yPos + rowH);
+
                     doc.setTextColor(255, 0, 0);
                     doc.text(`${q.wrongCount}/${q.totalCount}`, currX + 6, yPos + rowH / 2, { align: 'center' });
                     doc.setTextColor(0);
+
                     currX += 12;
+                    doc.line(currX, yPos, currX, yPos + rowH);
+
                     doc.setFontSize(7);
                     doc.setTextColor(0, 0, 150);
                     doc.text("Top 100", currX + 9, yPos + rowH / 2 - 3, { align: 'center' });
@@ -352,17 +321,22 @@ const ErrorTop100 = () => {
                     const perc = q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%';
                     doc.text(perc, currX + 9, yPos + rowH / 2 + 6, { align: 'center' });
                     doc.setTextColor(0);
+
                     currX += 18;
+                    doc.line(currX, yPos, currX, yPos + rowH);
 
                     if (qImg) {
                         try { doc.addImage(qImg, 'PNG', currX + (98 - imgWidth) / 2, yPos + 5, imgWidth, qH); } catch (e) { }
                     }
                     currX += 98;
+                    doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setFontSize(8);
                     doc.setFont("helvetica", "bold");
                     doc.text(String(q.subject), currX + 10, yPos + rowH / 2, { align: 'center' });
+
                     currX += 20;
+                    doc.line(currX, yPos, currX, yPos + rowH);
 
                     let sy = yPos + 5;
                     doc.setFontSize(7);
@@ -389,7 +363,10 @@ const ErrorTop100 = () => {
                 if (test !== reportData[reportData.length - 1]) doc.addPage();
             }
 
-            doc.save(`Top_100_Error_Report.pdf`);
+            const filename = (reportData.length === 1)
+                ? `${reportData[0].date}_${reportData[0].stream}_${reportData[0].testName}_Error Analysis.pdf`
+                : `Top_100_Error_Report.pdf`;
+            doc.save(filename);
 
         } catch (err) {
             console.error(err);
@@ -404,11 +381,7 @@ const ErrorTop100 = () => {
     return (
         <div style={{ padding: '20px', backgroundColor: '#808080', minHeight: '100vh', boxSizing: 'border-box' }}>
             <div className="no-print" style={{ maxWidth: '1200px', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px' }}>
-                <FilterBar
-                    filters={filters}
-                    setFilters={setFilters}
-                    apiEndpoints={{ filters: '/api/erp/filters', students: '/api/erp/students' }}
-                />
+                {/* Removed FilterBar from here as it is now in App.jsx */}
 
                 <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center', gap: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -433,85 +406,68 @@ const ErrorTop100 = () => {
             {loading && <div style={{ textAlign: 'center', color: 'white', fontSize: '20px' }}>Loading Top 100% Error Data...</div>}
 
             {!loading && reportData.map((test, tIdx) => {
-                const renderQs = getFilteredQuestions(test.questions);
+                // Sort questions for current display
+                const sortedQs = [...test.questions].sort((a, b) => {
+                    const valA = parseFloat(a.nationalError) || 0;
+                    const valB = parseFloat(b.nationalError) || 0;
+                    return valB - valA; // Descending
+                });
+
+                const renderQs = getFilteredQuestions(sortedQs);
                 if (renderQs.length === 0) return null;
 
-                // Sort current data for display too
-                const displayTests = reportData.map(test => {
-                    const sortedQs = [...test.questions].sort((a, b) => {
-                        const valA = parseFloat(a.nationalError) || 0;
-                        const valB = parseFloat(b.nationalError) || 0;
-                        return valB - valA; // Descending
-                    });
-                    return { ...test, questions: sortedQs };
-                });
+                return (
+                    <div key={tIdx} style={{ maxWidth: '1200px', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
+                        <h2 style={{ textAlign: 'center', color: '#000', fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
+                            {test.date}_{test.stream}_{test.testName}_Error Analysis
+                        </h2>
 
-                return displayTests.map((test, tIdx) => {
-                    const renderQs = getFilteredQuestions(test.questions);
-                    if (renderQs.length === 0) return null;
-
-                    return (
-                        <div key={tIdx} style={{ maxWidth: '1200px', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
-                            <h2 style={{ textAlign: 'center', color: '#000', fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
-                                {test.date}_{test.stream}_{test.testName}_Error Analysis
-                            </h2>
-
-                            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black' }}>
-                                <thead>
-                                    <tr style={{ backgroundColor: '#fff8dc', fontSize: '14px', fontWeight: 'bold' }}>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '60px' }}>Q.No</td>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '60px' }}>W</td>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '100px' }}>%</td>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Question</td>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '120px' }}>Subject</td>
-                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '250px' }}>Student List</td>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {renderQs.map((q, qIdx) => (
-                                        <React.Fragment key={qIdx}>
-                                            <tr style={{ backgroundColor: '#800000', color: 'white', fontWeight: 'bold', fontSize: '13px' }}>
-                                                <td colSpan="4" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                                                    <span style={{ color: '#FFFF00' }}>Topic : </span>
-                                                    <span style={{ color: 'white' }}>{q.topic}</span>
-                                                </td>
-                                                <td colSpan="2" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                                                    <span style={{ color: '#FFFF00' }}>Key : </span>
-                                                    <span style={{ color: 'white' }}>{q.keyValue}</span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.qNo}</td>
-                                                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold', color: 'red' }}>{q.wrongCount}/{q.totalCount}</td>
-                                                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                                                    <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>Top 100(%):</div>
-                                                    <div style={{ color: 'red', fontSize: '14px', fontWeight: 'bold' }}>
-                                                        {q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%'}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black' }}>
+                            {/* Removed Table Header row */}
+                            <tbody>
+                                {renderQs.map((q, qIdx) => (
+                                    <React.Fragment key={qIdx}>
+                                        <tr style={{ backgroundColor: '#800000', color: 'white', fontWeight: 'bold', fontSize: '13px' }}>
+                                            <td colSpan="4" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                                                <span style={{ color: '#FFFF00' }}>Topic : </span>
+                                                <span style={{ color: 'white' }}>{q.topic}</span>
+                                            </td>
+                                            <td colSpan="2" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                                                <span style={{ color: '#FFFF00' }}>Key : </span>
+                                                <span style={{ color: 'white' }}>{q.keyValue}</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.qNo}</td>
+                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold', color: 'red' }}>{q.wrongCount}/{q.totalCount}</td>
+                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                                                <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>Top 100(%):</div>
+                                                <div style={{ color: 'red', fontSize: '14px', fontWeight: 'bold' }}>
+                                                    {q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%'}
+                                                </div>
+                                            </td>
+                                            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center', width: '341px' }}>
+                                                {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} />}
+                                            </td>
+                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.subject}</td>
+                                            <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top', backgroundColor: '#4F81BD', color: 'white' }}>
+                                                <div style={{ fontSize: '12px', color: 'white', textDecoration: 'underline', marginBottom: '8px', fontWeight: 'bold', textAlign: 'center' }}>Wrong Attempts -Students</div>
+                                                {Object.entries(q.byCampus).map(([campus, names]) => (
+                                                    <div key={campus} style={{ marginBottom: '12px' }}>
+                                                        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#FFFF00', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: '2px' }}>{campus}</div>
+                                                        {names.map(name => (
+                                                            <div key={name} style={{ fontSize: '11px', color: 'white', marginLeft: '2px', lineHeight: '1.2' }}>{name}</div>
+                                                        ))}
                                                     </div>
-                                                </td>
-                                                <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-                                                    {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} />}
-                                                </td>
-                                                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.subject}</td>
-                                                <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top', backgroundColor: '#4F81BD', color: 'white' }}>
-                                                    <div style={{ fontSize: '12px', color: 'white', textDecoration: 'underline', marginBottom: '8px', fontWeight: 'bold', textAlign: 'center' }}>Wrong Attempts -Students</div>
-                                                    {Object.entries(q.byCampus).map(([campus, names]) => (
-                                                        <div key={campus} style={{ marginBottom: '12px' }}>
-                                                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#FFFF00', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: '2px' }}>{campus}</div>
-                                                            {names.map(name => (
-                                                                <div key={name} style={{ fontSize: '11px', color: 'white', marginLeft: '2px', lineHeight: '1.2' }}>{name}</div>
-                                                            ))}
-                                                        </div>
-                                                    ))}
-                                                </td>
-                                            </tr>
-                                        </React.Fragment>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    );
-                });
+                                                ))}
+                                            </td>
+                                        </tr>
+                                    </React.Fragment>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                );
             })}
         </div>
     );
