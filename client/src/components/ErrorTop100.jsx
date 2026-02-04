@@ -129,8 +129,13 @@ const ErrorTop100 = () => {
                         };
                     });
 
-                    // Sort Questions
+                    // Sort Questions: Largest to Smallest (Descending)
                     questionsArr.sort((a, b) => {
+                        const valA = parseFloat(a.nationalError) || 0;
+                        const valB = parseFloat(b.nationalError) || 0;
+                        if (valB !== valA) return valB - valA;
+
+                        // Fallback to Subject then QNo
                         const subOrder = getSubjectOrder(a.subject) - getSubjectOrder(b.subject);
                         if (subOrder !== 0) return subOrder;
                         return (parseInt(a.qNo) || 0) - (parseInt(b.qNo) || 0);
@@ -235,7 +240,7 @@ const ErrorTop100 = () => {
                 doc.text("A right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
                 y += 5;
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
-                doc.setFontSize(10);
+                doc.setFontSize(11); // Changed from 10 to 11
                 doc.text("Central Office, Bangalore", pageWidth / 2, y, { align: 'center' });
                 y += 7;
                 doc.setFontSize(14);
@@ -431,69 +436,82 @@ const ErrorTop100 = () => {
                 const renderQs = getFilteredQuestions(test.questions);
                 if (renderQs.length === 0) return null;
 
-                return (
-                    <div key={tIdx} style={{ maxWidth: '1200px', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
-                        <h2 style={{ textAlign: 'center', color: '#000', fontSize: '24px', fontWeight: 'bold' }}>
-                            {test.date}_{test.stream}_{test.testName}_Error Analysis
-                        </h2>
+                // Sort current data for display too
+                const displayTests = reportData.map(test => {
+                    const sortedQs = [...test.questions].sort((a, b) => {
+                        const valA = parseFloat(a.nationalError) || 0;
+                        const valB = parseFloat(b.nationalError) || 0;
+                        return valB - valA; // Descending
+                    });
+                    return { ...test, questions: sortedQs };
+                });
 
-                        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginTop: '20px' }}>
-                            <thead>
-                                <tr style={{ backgroundColor: '#fff8dc', fontSize: '14px', fontWeight: 'bold' }}>
-                                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '60px' }}>Q.No</td>
-                                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '60px' }}>W</td>
-                                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '100px' }}>%</td>
-                                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Question</td>
-                                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '120px' }}>Subject</td>
-                                    <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '250px' }}>Student List</td>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {renderQs.map((q, qIdx) => (
-                                    <React.Fragment key={qIdx}>
-                                        {/* Maroon Header Row for each question */}
-                                        <tr style={{ backgroundColor: '#800000', color: 'white', fontWeight: 'bold', fontSize: '13px' }}>
-                                            <td colSpan="4" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                                                <span style={{ color: '#FFFF00' }}>Topic : </span>
-                                                <span style={{ color: 'white' }}>{q.topic}</span>
-                                            </td>
-                                            <td colSpan="2" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                                                <span style={{ color: '#FFFF00' }}>Key : </span>
-                                                <span style={{ color: 'white' }}>{q.keyValue}</span>
-                                            </td>
-                                        </tr>
-                                        {/* Main Data Row */}
-                                        <tr>
-                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.qNo}</td>
-                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold', color: 'red' }}>{q.wrongCount}/{q.totalCount}</td>
-                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                                                <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>Top 100(%):</div>
-                                                <div style={{ color: 'red', fontSize: '14px', fontWeight: 'bold' }}>
-                                                    {q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%'}
-                                                </div>
-                                            </td>
-                                            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-                                                {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} />}
-                                            </td>
-                                            <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.subject}</td>
-                                            <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top', backgroundColor: '#4F81BD', color: 'white' }}>
-                                                <div style={{ fontSize: '12px', color: 'white', textDecoration: 'underline', marginBottom: '8px', fontWeight: 'bold', textAlign: 'center' }}>Wrong Attempts -Students</div>
-                                                {Object.entries(q.byCampus).map(([campus, names]) => (
-                                                    <div key={campus} style={{ marginBottom: '12px' }}>
-                                                        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#FFFF00', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: '2px' }}>{campus}</div>
-                                                        {names.map(name => (
-                                                            <div key={name} style={{ fontSize: '11px', color: 'white', marginLeft: '2px', lineHeight: '1.2' }}>{name}</div>
-                                                        ))}
+                return displayTests.map((test, tIdx) => {
+                    const renderQs = getFilteredQuestions(test.questions);
+                    if (renderQs.length === 0) return null;
+
+                    return (
+                        <div key={tIdx} style={{ maxWidth: '1200px', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
+                            <h2 style={{ textAlign: 'center', color: '#000', fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
+                                {test.date}_{test.stream}_{test.testName}_Error Analysis
+                            </h2>
+
+                            <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#fff8dc', fontSize: '14px', fontWeight: 'bold' }}>
+                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '60px' }}>Q.No</td>
+                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '60px' }}>W</td>
+                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '100px' }}>%</td>
+                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>Question</td>
+                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '120px' }}>Subject</td>
+                                        <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', width: '250px' }}>Student List</td>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {renderQs.map((q, qIdx) => (
+                                        <React.Fragment key={qIdx}>
+                                            <tr style={{ backgroundColor: '#800000', color: 'white', fontWeight: 'bold', fontSize: '13px' }}>
+                                                <td colSpan="4" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                                                    <span style={{ color: '#FFFF00' }}>Topic : </span>
+                                                    <span style={{ color: 'white' }}>{q.topic}</span>
+                                                </td>
+                                                <td colSpan="2" style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                                                    <span style={{ color: '#FFFF00' }}>Key : </span>
+                                                    <span style={{ color: 'white' }}>{q.keyValue}</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.qNo}</td>
+                                                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold', color: 'red' }}>{q.wrongCount}/{q.totalCount}</td>
+                                                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
+                                                    <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>Top 100(%):</div>
+                                                    <div style={{ color: 'red', fontSize: '14px', fontWeight: 'bold' }}>
+                                                        {q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%'}
                                                     </div>
-                                                ))}
-                                            </td>
-                                        </tr>
-                                    </React.Fragment>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                );
+                                                </td>
+                                                <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+                                                    {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} />}
+                                                </td>
+                                                <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.subject}</td>
+                                                <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top', backgroundColor: '#4F81BD', color: 'white' }}>
+                                                    <div style={{ fontSize: '12px', color: 'white', textDecoration: 'underline', marginBottom: '8px', fontWeight: 'bold', textAlign: 'center' }}>Wrong Attempts -Students</div>
+                                                    {Object.entries(q.byCampus).map(([campus, names]) => (
+                                                        <div key={campus} style={{ marginBottom: '12px' }}>
+                                                            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#FFFF00', textTransform: 'uppercase', textDecoration: 'underline', marginBottom: '2px' }}>{campus}</div>
+                                                            {names.map(name => (
+                                                                <div key={name} style={{ fontSize: '11px', color: 'white', marginLeft: '2px', lineHeight: '1.2' }}>{name}</div>
+                                                            ))}
+                                                        </div>
+                                                    ))}
+                                                </td>
+                                            </tr>
+                                        </React.Fragment>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    );
+                });
             })}
         </div>
     );
