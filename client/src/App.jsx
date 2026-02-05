@@ -49,7 +49,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 };
 
 const Dashboard = () => {
-    const { userData, isAdmin } = useAuth();
+    const { userData, isAdmin, isCoAdmin } = useAuth();
     // Initialize from sessionStorage or default to 'analysis'
     const [activePage, setActivePage] = useState(() => {
         const stored = sessionStorage.getItem('dashboard_active_page');
@@ -84,7 +84,33 @@ const Dashboard = () => {
         studentSearch: []
     };
 
-    const [globalFilters, setGlobalFilters] = useState({ ...initialFilters });
+    // Separate filters for each page to allow independent selections
+    const [pageFilters, setPageFilters] = useState(() => {
+        const stored = sessionStorage.getItem('dashboard_page_filters');
+        if (stored) {
+            try { return JSON.parse(stored); } catch (e) { return {}; }
+        }
+        return {};
+    });
+
+    // Persist page filters to sessionStorage
+    useEffect(() => {
+        sessionStorage.setItem('dashboard_page_filters', JSON.stringify(pageFilters));
+    }, [pageFilters]);
+
+    // Current page's filters with fallback to initial filters
+    const globalFilters = pageFilters[activePage] || initialFilters;
+
+    const setGlobalFilters = (updater) => {
+        setPageFilters(prev => {
+            const current = prev[activePage] || initialFilters;
+            const next = typeof updater === 'function' ? updater(current) : updater;
+            return {
+                ...prev,
+                [activePage]: next
+            };
+        });
+    };
 
     const hasLoggedSession = React.useRef(false);
 
