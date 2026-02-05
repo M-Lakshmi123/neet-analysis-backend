@@ -196,9 +196,9 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 loadFont('/fonts/BOOKOSB.TTF')
             ]);
 
-            const doc = new jsPDF('p', 'mm', 'a4');
-            const pageWidth = 210;
-            const pageHeight = 297;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            const pageWidth = 297;
+            const pageHeight = 210;
             const margin = 10;
             const contentWidth = pageWidth - (margin * 2);
 
@@ -206,7 +206,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
             if (bookmanFont) { doc.addFileToVFS("bookman-old-style.ttf", bookmanFont); doc.addFont("bookman-old-style.ttf", "Bookman", "normal"); }
             if (bookmanBoldFont) { doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont); doc.addFont("BOOKOSB.TTF", "Bookman", "bold"); }
 
-            const drawHeader = (test) => {
+            const drawMainHeader = () => {
                 let y = 15;
                 doc.setFontSize(26);
                 doc.setTextColor(0, 112, 192);
@@ -233,42 +233,57 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 doc.text("A right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
                 y += 5;
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
-                doc.setFontSize(11); // Changed from 10 to 11
+                doc.setFontSize(11);
                 doc.text("Central Office, Bangalore", pageWidth / 2, y, { align: 'center' });
-                y += 7;
-                doc.setFontSize(14);
-                const testTitle = `${test.date}_${test.stream}_${test.testName}_Error Analysis`;
-                doc.text(testTitle, pageWidth / 2, y, { align: 'center' });
-                return y + 5;
+                return y + 3;
             };
+
+            const drawTestTitle = (test, y) => {
+                doc.setFontSize(14);
+                doc.setTextColor(0);
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+                const testTitle = `${test.date}_${test.stream}_${test.testName}_Error Analysis`;
+                doc.text(testTitle, pageWidth / 2, y + 6, { align: 'center' });
+                return y + 12;
+            };
+
+            let isFirstPage = true;
 
             for (const test of reportData) {
                 const filteredQs = getFilteredQuestions(test.questions);
                 if (filteredQs.length === 0) continue;
 
-                let yPos = drawHeader(test);
+                if (!isFirstPage) {
+                    doc.addPage();
+                }
 
-                let cx = margin;
-                // cx += 8; // Offset for questions? No, just start.
-                // Removed Table Header
+                let yPos = isFirstPage ? drawMainHeader() : 10;
+                yPos = drawTestTitle(test, yPos);
+                isFirstPage = false;
 
                 for (const q of filteredQs) {
                     const qImg = await loadImage(q.qUrl);
-                    let imgWidth = 85; // Fixed width (~321px)
+                    let imgWidth = 110;
                     let qH = 20;
                     if (qImg) qH = (qImg.height / qImg.width) * imgWidth;
 
-                    let studH = 10;
+                    // Calculate students height with 2-column layout
+                    const studentColCount = 2;
+                    let totalLines = 0;
+                    totalLines += 2; // Header "Wrong Attempts -Students"
                     Object.entries(q.byCampus).forEach(([campus, names]) => {
-                        studH += 4 + (names.length * 3.5);
+                        totalLines += 1; // Campus header
+                        totalLines += Math.ceil(names.length / studentColCount); // Multi-column names
                     });
+                    let studH = totalLines * 4.5 + 5;
 
-                    const rowH = Math.max(qH + 10, studH + 10, 30);
+                    const rowH = Math.max(qH + 10, studH, 25);
                     const maroonH = 7;
 
-                    if (yPos + rowH + maroonH > pageHeight - 20) {
+                    if (yPos + rowH + maroonH > pageHeight - 15) {
                         doc.addPage();
-                        yPos = drawHeader(test);
+                        yPos = 10;
+                        yPos = drawTestTitle(test, yPos);
                     }
 
                     // Maroon Topic/Key Bar
@@ -277,41 +292,37 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     doc.setFontSize(9);
                     doc.setFont("helvetica", "bold");
 
-                    // Topic
                     doc.setTextColor(255, 255, 0);
                     doc.text("Topic : ", margin + 2, yPos + 5);
                     doc.setTextColor(255, 255, 255);
                     doc.text(String(q.topic), margin + 2 + doc.getTextWidth("Topic : "), yPos + 5);
 
-                    // Key
                     const keyLabel = "Key : ";
-                    const keyVal = String(q.keyValue);
                     doc.setTextColor(255, 255, 0);
-                    const topicW = 8 + 10 + 15 + 98;
-                    const keyX = margin + topicW + 2; // Start after image area
+                    const topicW = 8 + 12 + 15 + 115; // Adjusted sums
+                    const keyX = margin + topicW + 2;
                     doc.text(keyLabel, keyX, yPos + 5);
                     doc.setTextColor(255, 255, 255);
-                    doc.text(keyVal, keyX + doc.getTextWidth(keyLabel), yPos + 5);
+                    doc.text(String(q.keyValue), keyX + doc.getTextWidth(keyLabel), yPos + 5);
 
                     yPos += maroonH;
 
                     doc.setDrawColor(0);
                     doc.rect(margin, yPos, contentWidth, rowH);
 
-                    // ... existing code ...
                     let currX = margin;
                     doc.setFontSize(10);
                     doc.setTextColor(0);
                     doc.text(String(q.qNo), currX + 4, yPos + rowH / 2, { align: 'center' });
 
-                    currX += 8; // Reduced from 12
+                    currX += 8;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setTextColor(255, 0, 0);
-                    doc.text(`${q.wrongCount}/${q.totalCount}`, currX + 5, yPos + rowH / 2, { align: 'center' });
+                    doc.text(`${q.wrongCount}/${q.totalCount}`, currX + 6, yPos + rowH / 2, { align: 'center' });
                     doc.setTextColor(0);
 
-                    currX += 10; // Reduced from 12
+                    currX += 12;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setFontSize(7);
@@ -324,53 +335,61 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     doc.text(perc, currX + 7.5, yPos + rowH / 2 + 6, { align: 'center' });
                     doc.setTextColor(0);
 
-                    currX += 15; // Reduced from 18
+                    currX += 15;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     if (qImg) {
-                        try { doc.addImage(qImg, 'PNG', currX + (98 - imgWidth) / 2, yPos + 5, imgWidth, qH); } catch (e) { }
+                        try { doc.addImage(qImg, 'PNG', currX + (115 - imgWidth) / 2, yPos + 5, imgWidth, qH); } catch (e) { }
                     }
-                    currX += 98; // Stay 98
+                    currX += 115;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setFontSize(8);
                     doc.setFont("helvetica", "bold");
                     doc.text(String(q.subject), currX + 10, yPos + rowH / 2, { align: 'center' });
 
-                    currX += 20; // Stay 20
+                    currX += 20;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
-                    let sy = yPos + 5;
-                    doc.setFontSize(10); // Increased from 7
-                    doc.setTextColor(255, 255, 255); // Changed to white to match UI? Wait PDF background is blue.
-                    // Let's check background color in PDF for this cell
+                    // Wrong Attempts Column - BLUE BACKGROUND
                     doc.setFillColor(79, 129, 189);
                     doc.rect(currX, yPos, contentWidth - (currX - margin), rowH, 'F');
 
+                    let sy = yPos + 5;
                     doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(10);
                     doc.setFont("helvetica", "bold");
                     doc.text("Wrong Attempts -Students", currX + 2, sy);
-                    sy += 5;
+                    sy += 6;
 
-                    doc.setFontSize(9); // Increased from 7
+                    const studentAreaWidth = contentWidth - (currX - margin);
+                    const colWidth = studentAreaWidth / studentColCount;
+
+                    doc.setFontSize(9);
                     Object.entries(q.byCampus).forEach(([campus, names]) => {
-                        doc.setTextColor(255, 255, 0); // Yellow for campus
+                        doc.setTextColor(255, 255, 0);
                         doc.setFont("helvetica", "bold");
                         doc.text(campus, currX + 2, sy);
-                        sy += 4;
-                        doc.setTextColor(255, 255, 255); // White for names
+                        sy += 5;
+
+                        doc.setTextColor(255, 255, 255);
                         doc.setFont("helvetica", "normal");
-                        names.forEach(name => {
-                            doc.text(name, currX + 2, sy);
-                            sy += 3.5;
-                        });
-                        sy += 1.5;
+
+                        // Render names in 2 columns
+                        for (let i = 0; i < names.length; i += studentColCount) {
+                            for (let c = 0; c < studentColCount; c++) {
+                                const nameIdx = i + c;
+                                if (nameIdx < names.length) {
+                                    doc.text(names[nameIdx], currX + 2 + (c * colWidth), sy);
+                                }
+                            }
+                            sy += 4;
+                        }
+                        sy += 1;
                     });
 
                     yPos += rowH;
                 }
-
-                if (test !== reportData[reportData.length - 1]) doc.addPage();
             }
 
             const filename = (reportData.length === 1)
