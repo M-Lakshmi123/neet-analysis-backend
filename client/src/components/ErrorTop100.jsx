@@ -196,9 +196,9 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 loadFont('/fonts/BOOKOSB.TTF')
             ]);
 
-            const doc = new jsPDF('l', 'mm', 'a4');
-            const pageWidth = 297;
-            const pageHeight = 210;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = 210;
+            const pageHeight = 297;
             const margin = 10;
             const contentWidth = pageWidth - (margin * 2);
 
@@ -263,27 +263,44 @@ const ErrorTop100 = ({ filters, setFilters }) => {
 
                 for (const q of filteredQs) {
                     const qImg = await loadImage(q.qUrl);
-                    let imgWidth = 110;
+                    // Portrait widths
+                    const wQNo = 8;
+                    const wErr = 11;
+                    const wTop = 15;
+                    const baseImgWidth = 90; // Reduced from landscape 115
+                    const wSub = 16;
+                    const wStud = contentWidth - (wQNo + wErr + wTop + baseImgWidth + wSub); // ~50mm
+
                     let qH = 20;
-                    if (qImg) qH = (qImg.height / qImg.width) * imgWidth;
+                    if (qImg) qH = (qImg.height / qImg.width) * baseImgWidth;
 
-                    // Calculate students height with 2-column layout
-                    const studentColCount = 2;
+                    // Calculate students height (Single column)
                     let totalLines = 0;
-                    totalLines += 2; // Header "Wrong Attempts -Students"
+                    totalLines += 2; // Header
                     Object.entries(q.byCampus).forEach(([campus, names]) => {
-                        totalLines += 1; // Campus header
-                        totalLines += Math.ceil(names.length / studentColCount); // Multi-column names
+                        totalLines += 1; // Campus
+                        totalLines += names.length;
                     });
-                    let studH = totalLines * 4.5 + 5;
+                    const studH = totalLines * 4.5 + 5;
 
-                    const rowH = Math.max(qH + 10, studH, 25);
                     const maroonH = 7;
+                    const marginBot = 15;
+                    let rowH = Math.max(qH + 10, studH, 25);
 
-                    if (yPos + rowH + maroonH > pageHeight - 15) {
-                        doc.addPage();
-                        yPos = 10;
-                        yPos = drawTestTitle(test, yPos);
+                    // --- Portrait Fitting Logic (Shrinking Image) ---
+                    const availableSpace = pageHeight - marginBot - yPos - maroonH;
+
+                    if (yPos + rowH + maroonH > pageHeight - marginBot) {
+                        const minShrinkH = 30; // Min row height
+                        if (availableSpace >= minShrinkH && studH <= availableSpace) {
+                            rowH = availableSpace;
+                            qH = rowH - 10;
+                        } else {
+                            doc.addPage();
+                            yPos = 10;
+                            yPos = drawTestTitle(test, yPos);
+                            rowH = Math.max(qH + 10, studH, 25);
+                        }
                     }
 
                     // Maroon Topic/Key Bar
@@ -299,8 +316,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
 
                     const keyLabel = "Key : ";
                     doc.setTextColor(255, 255, 0);
-                    const topicW = 8 + 12 + 15 + 115; // Adjusted sums
-                    const keyX = margin + topicW + 2;
+                    const topicWW = wQNo + wErr + wTop + baseImgWidth;
+                    const keyX = margin + topicWW + 2;
                     doc.text(keyLabel, keyX, yPos + 5);
                     doc.setTextColor(255, 255, 255);
                     doc.text(String(q.keyValue), keyX + doc.getTextWidth(keyLabel), yPos + 5);
@@ -313,78 +330,77 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     let currX = margin;
                     doc.setFontSize(10);
                     doc.setTextColor(0);
-                    doc.text(String(q.qNo), currX + 4, yPos + rowH / 2, { align: 'center' });
+                    doc.text(String(q.qNo), currX + wQNo / 2, yPos + rowH / 2, { align: 'center' });
 
-                    currX += 8;
+                    currX += wQNo;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setTextColor(255, 0, 0);
-                    doc.text(`${q.wrongCount}/${q.totalCount}`, currX + 6, yPos + rowH / 2, { align: 'center' });
+                    doc.text(`${q.wrongCount}/${q.totalCount}`, currX + wErr / 2, yPos + rowH / 2, { align: 'center' });
                     doc.setTextColor(0);
 
-                    currX += 12;
+                    currX += wErr;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setFontSize(7);
                     doc.setTextColor(0, 0, 150);
-                    doc.text("Top 100", currX + 7.5, yPos + rowH / 2 - 3, { align: 'center' });
-                    doc.text("(%):", currX + 7.5, yPos + rowH / 2 + 1, { align: 'center' });
+                    doc.text("Top 100", currX + wTop / 2, yPos + rowH / 2 - 3, { align: 'center' });
+                    doc.text("(%):", currX + wTop / 2, yPos + rowH / 2 + 1, { align: 'center' });
                     doc.setTextColor(255, 0, 0);
                     doc.setFontSize(9);
                     const perc = q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%';
-                    doc.text(perc, currX + 7.5, yPos + rowH / 2 + 6, { align: 'center' });
+                    doc.text(perc, currX + wTop / 2, yPos + rowH / 2 + 6, { align: 'center' });
                     doc.setTextColor(0);
 
-                    currX += 15;
+                    currX += wTop;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     if (qImg) {
-                        try { doc.addImage(qImg, 'PNG', currX + (115 - imgWidth) / 2, yPos + 5, imgWidth, qH); } catch (e) { }
+                        try {
+                            const asp = qImg.width / qImg.height;
+                            let finalImgW = baseImgWidth;
+                            let finalImgH = qH;
+                            if (finalImgH * asp < baseImgWidth) {
+                                finalImgW = finalImgH * asp;
+                            }
+                            // Center in the box
+                            doc.addImage(qImg, 'PNG', currX + (baseImgWidth - finalImgW) / 2, yPos + (rowH - finalImgH) / 2, finalImgW, finalImgH);
+                        } catch (e) { }
                     }
-                    currX += 115;
+                    currX += baseImgWidth;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     doc.setFontSize(8);
                     doc.setFont("helvetica", "bold");
-                    doc.text(String(q.subject), currX + 10, yPos + rowH / 2, { align: 'center' });
+                    doc.text(String(q.subject), currX + wSub / 2, yPos + rowH / 2, { align: 'center' });
 
-                    currX += 20;
+                    currX += wSub;
                     doc.line(currX, yPos, currX, yPos + rowH);
 
                     // Wrong Attempts Column - BLUE BACKGROUND
                     doc.setFillColor(79, 129, 189);
-                    doc.rect(currX, yPos, contentWidth - (currX - margin), rowH, 'F');
+                    doc.rect(currX, yPos, wStud, rowH, 'F');
 
                     let sy = yPos + 5;
                     doc.setTextColor(255, 255, 255);
-                    doc.setFontSize(10);
+                    doc.setFontSize(9);
                     doc.setFont("helvetica", "bold");
                     doc.text("Wrong Attempts -Students", currX + 2, sy);
                     sy += 6;
 
-                    const studentAreaWidth = contentWidth - (currX - margin);
-                    const colWidth = studentAreaWidth / studentColCount;
-
-                    doc.setFontSize(9);
+                    doc.setFontSize(8);
                     Object.entries(q.byCampus).forEach(([campus, names]) => {
                         doc.setTextColor(255, 255, 0);
                         doc.setFont("helvetica", "bold");
                         doc.text(campus, currX + 2, sy);
-                        sy += 5;
+                        sy += 4.5;
 
                         doc.setTextColor(255, 255, 255);
                         doc.setFont("helvetica", "normal");
-
-                        // Render names in 2 columns
-                        for (let i = 0; i < names.length; i += studentColCount) {
-                            for (let c = 0; c < studentColCount; c++) {
-                                const nameIdx = i + c;
-                                if (nameIdx < names.length) {
-                                    doc.text(names[nameIdx], currX + 2 + (c * colWidth), sy);
-                                }
-                            }
+                        names.forEach(name => {
+                            doc.text(name, currX + 2, sy);
                             sy += 4;
-                        }
+                        });
                         sy += 1;
                     });
 
