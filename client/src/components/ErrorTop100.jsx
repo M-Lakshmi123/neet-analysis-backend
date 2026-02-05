@@ -263,23 +263,24 @@ const ErrorTop100 = ({ filters, setFilters }) => {
 
                 for (const q of filteredQs) {
                     const qImg = await loadImage(q.qUrl);
-                    // Portrait widths
+
+                    // Specific Portrait column widths relative to contentWidth (190mm)
                     const wQNo = 8;
                     const wErr = 11;
                     const wTop = 15;
-                    const baseImgWidth = 90; // Reduced from landscape 115
-                    const wSub = 16;
-                    const wStud = contentWidth - (wQNo + wErr + wTop + baseImgWidth + wSub); // ~50mm
+                    const baseImgWidth = 85; // This is the "321px" equivalent at 96 DPI
+                    const wSub = 15;
+                    const wStud = contentWidth - (wQNo + wErr + wTop + baseImgWidth + wSub); // ~56mm remaining
 
                     let qH = 20;
                     if (qImg) qH = (qImg.height / qImg.width) * baseImgWidth;
 
-                    // Calculate students height (Single column)
+                    // Calculate student list height (Single column)
                     let totalLines = 0;
-                    totalLines += 2; // Header
+                    totalLines += 2; // Header "Wrong Attempts -Students"
                     Object.entries(q.byCampus).forEach(([campus, names]) => {
-                        totalLines += 1; // Campus
-                        totalLines += names.length;
+                        totalLines += 1; // Campus header
+                        totalLines += names.length; // Student names
                     });
                     const studH = totalLines * 4.5 + 5;
 
@@ -287,15 +288,21 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     const marginBot = 15;
                     let rowH = Math.max(qH + 10, studH, 25);
 
-                    // --- Portrait Fitting Logic (Shrinking Image) ---
-                    const availableSpace = pageHeight - marginBot - yPos - maroonH;
+                    // --- Improved Fitting Logic: Prioritize Visibility ---
+                    const totalNeeded = rowH + maroonH;
+                    const availableSpace = pageHeight - marginBot - yPos;
 
-                    if (yPos + rowH + maroonH > pageHeight - marginBot) {
-                        const minShrinkH = 30; // Min row height
-                        if (availableSpace >= minShrinkH && studH <= availableSpace) {
-                            rowH = availableSpace;
-                            qH = rowH - 10;
+                    if (totalNeeded > availableSpace) {
+                        // Only shrink if we can still maintain a highly visible question (min qH ~40mm)
+                        const possibleRowH = availableSpace - maroonH;
+                        const possibleQH = possibleRowH - 10;
+
+                        // If we have enough space for a decent-sized question and students fit
+                        if (possibleRowH >= 50 && studH <= possibleRowH && possibleQH >= 45) {
+                            rowH = possibleRowH;
+                            qH = possibleQH;
                         } else {
+                            // Otherwise, just move to the next page as requested
                             doc.addPage();
                             yPos = 10;
                             yPos = drawTestTitle(test, yPos);
@@ -316,8 +323,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
 
                     const keyLabel = "Key : ";
                     doc.setTextColor(255, 255, 0);
-                    const topicWW = wQNo + wErr + wTop + baseImgWidth;
-                    const keyX = margin + topicWW + 2;
+                    const topicWidthOffset = wQNo + wErr + wTop + baseImgWidth;
+                    const keyX = margin + topicWidthOffset + 2;
                     doc.text(keyLabel, keyX, yPos + 5);
                     doc.setTextColor(255, 255, 255);
                     doc.text(String(q.keyValue), keyX + doc.getTextWidth(keyLabel), yPos + 5);
@@ -363,7 +370,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                             if (finalImgH * asp < baseImgWidth) {
                                 finalImgW = finalImgH * asp;
                             }
-                            // Center in the box
+                            // Center horizontally and vertically within its box
                             doc.addImage(qImg, 'PNG', currX + (baseImgWidth - finalImgW) / 2, yPos + (rowH - finalImgH) / 2, finalImgW, finalImgH);
                         } catch (e) { }
                     }
@@ -398,7 +405,15 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                         doc.setTextColor(255, 255, 255);
                         doc.setFont("helvetica", "normal");
                         names.forEach(name => {
-                            doc.text(name, currX + 2, sy);
+                            // Trim name if it overflows the ~56mm column
+                            let trimmedName = name;
+                            if (doc.getTextWidth(trimmedName) > wStud - 4) {
+                                while (doc.getTextWidth(trimmedName + "...") > wStud - 4 && trimmedName.length > 0) {
+                                    trimmedName = trimmedName.slice(0, -1);
+                                }
+                                trimmedName += "...";
+                            }
+                            doc.text(trimmedName, currX + 2, sy);
                             sy += 4;
                         });
                         sy += 1;
