@@ -42,7 +42,7 @@ const Header = ({ title }) => {
                         <span className="user-label">
                             {isAdmin ? <Shield size={16} /> : <School size={16} />}
                             <span className="user-name-text">{currentUser?.email || 'User'}</span>
-                            <span className="user-role-badge">({isAdmin ? 'System Admin' : userData?.campus})</span>
+                            <span className="user-role-badge">({isAdmin ? 'System Admin' : (userData?.allowedCampuses?.includes('All') || userData?.campus === 'All' ? 'ALL CAMPUSES' : userData?.campus)})</span>
                         </span>
                     </div>
                     <button className="header-logout-btn" onClick={handleLogout} title="Logout">
