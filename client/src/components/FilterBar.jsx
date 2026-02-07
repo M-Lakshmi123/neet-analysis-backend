@@ -134,6 +134,11 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
             const filtersForStudents = { ...filters };
             delete filtersForStudents.studentSearch;
 
+            // Ensure TOP_ALL is sent as TOP_ALL for backend compatibility
+            if (filtersForStudents.topAll && filtersForStudents.topAll.length > 0) {
+                filtersForStudents.TOP_ALL = filtersForStudents.topAll;
+            }
+
             const paramsStudents = buildQueryParams(filtersForStudents);
             const urlStudents = `${API_URL}${endpoints.students}?${paramsStudents.toString()}`;
 
