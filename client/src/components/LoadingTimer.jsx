@@ -135,7 +135,7 @@ const LoadingTimer = ({ isLoading }) => {
                                     <span>Server Delay... ⏳</span>
                                 </div>
                                 <p style={{ fontSize: '0.8rem', color: '#7c3aed', lineHeight: '1.4', margin: 0, fontWeight: '500' }}>
-                                    Dear Principals, kindly wait for less than 50 seconds due to server loading.
+                                    Dear Principals, please allow up to 50 seconds for the server to finish loading. We appreciate your patience.
                                 </p>
                             </motion.div>
                         )}
