@@ -175,7 +175,7 @@ const ErrorReport = ({ filters, setFilters }) => {
     };
 
     // --- PDF GENERATION CORE (Single Student) ---
-    const createStudentPDF = async (student, fonts) => {
+    const createStudentPDF = async (student, fonts, logoImg) => {
         const { impactFont, bookmanFont, bookmanBoldFont } = fonts;
         const doc = new jsPDF('p', 'mm', 'a4');
         const pageWidth = 210;
@@ -204,6 +204,7 @@ const ErrorReport = ({ filters, setFilters }) => {
             const part1 = "Sri Chaitanya";
             const part2 = " Educational Institutions";
 
+            // Font Prep for Measurements
             doc.setFontSize(26);
             if (impactFont) doc.setFont("Impact", "normal");
             else doc.setFont("helvetica", "bold");
@@ -213,36 +214,52 @@ const ErrorReport = ({ filters, setFilters }) => {
             else doc.setFont("helvetica", "normal");
             const w2 = doc.getTextWidth(part2);
 
-            const startX = (pageWidth - (w1 + w2)) / 2;
+            // LOGO Logic
+            let logoW = 0;
+            const logoH = 12; // 12mm height for logo
+            if (logoImg) {
+                const asp = logoImg.width / logoImg.height;
+                logoW = logoH * asp;
+            }
 
+            const gap = logoImg ? 4 : 0;
+            const totalWidth = logoW + gap + w1 + w2;
+
+            const startX = (pageWidth - totalWidth) / 2;
+            let currentX = startX;
+
+            // Draw Logo
+            if (logoImg) {
+                // Slightly adjust Y to center vertically with text (text baseline is at y, image is top-left)
+                // Text size 26pt is roughly 9mm height. Logo is 12mm.
+                // We draw logo slightly higher to align centers visually
+                try {
+                    doc.addImage(logoImg, 'PNG', currentX, y - 9, logoW, logoH);
+                } catch (e) { }
+                currentX += logoW + gap;
+            }
+
+            // Draw Part 1
             if (impactFont) doc.setFont("Impact", "normal");
             else doc.setFont("helvetica", "bold");
             doc.setTextColor(0, 112, 192);
-            doc.text(part1, startX, y);
+            doc.text(part1, currentX, y);
 
+            // Draw Part 2
             if (bookmanFont) doc.setFont("Bookman", "normal");
             else doc.setFont("helvetica", "normal");
             doc.setTextColor(0, 112, 192);
-            doc.text(part2, startX + w1, y);
+            doc.text(part2, currentX + w1, y);
 
-            doc.setFontSize(9);
-            doc.setTextColor(0, 0, 0);
-            if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
-            doc.text("A.P, TELANGANA, KARNATAKA, TAMILNADU, MAHARASHTRA, DELHI, RANCHI", pageWidth / 2, y, { align: 'center' });
-            y += 5;
-
-            doc.setFont("times", "italic");
-            doc.setFontSize(14);
-            doc.text("A right Choice for the Real Aspirant", pageWidth / 2, y, { align: 'center' });
-            y += 5;
+            y += 8;
 
             if (bookmanBoldFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
             doc.setFontSize(11);
+            doc.setTextColor(0, 0, 0);
             doc.text("Central Office, Bangalore", pageWidth / 2, y, { align: 'center' });
 
-            return y + 2;
+            return y + 8;
         };
 
         // --- Helper: Smart Wrap Text ---
@@ -597,11 +614,12 @@ const ErrorReport = ({ filters, setFilters }) => {
                 loadFont('/fonts/bookman-old-style.ttf'),
                 loadFont('/fonts/BOOKOSB.TTF')
             ]);
+            const logoImg = await loadImage('/logo.png');
 
             const fonts = { impactFont, bookmanFont, bookmanBoldFont };
 
             if (reportData.length === 1) {
-                const doc = await createStudentPDF(reportData[0], fonts);
+                const doc = await createStudentPDF(reportData[0], fonts, logoImg);
                 doc.save(`${reportData[0].info.name}_${reportData[0].info.branch}.pdf`);
             } else {
                 const zip = new JSZip();
@@ -609,7 +627,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                 for (let i = 0; i < reportData.length; i++) {
                     const student = reportData[i];
                     setPdfProgress(`Generating PDF for ${student.info.name} (${i + 1}/${reportData.length})...`);
-                    const doc = await createStudentPDF(student, fonts);
+                    const doc = await createStudentPDF(student, fonts, logoImg);
                     const blob = doc.output('blob');
                     zip.file(`${student.info.name}_${student.info.branch}.pdf`, blob);
                 }
