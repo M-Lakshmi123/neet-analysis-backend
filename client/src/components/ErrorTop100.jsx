@@ -208,17 +208,32 @@ const ErrorTop100 = ({ filters, setFilters }) => {
 
             const drawMainHeader = () => {
                 let y = 15;
-                doc.setFontSize(26);
-                doc.setTextColor(0, 112, 192);
+
                 const p1 = "Sri Chaitanya";
                 const p2 = " Educational Institutions";
+
+                // Calculate total width for centering
+                // Part 1: Sri Chaitanya (Size 28)
+                doc.setFontSize(28);
                 if (impactFont) doc.setFont("Impact", "normal"); else doc.setFont("helvetica", "bold");
                 const w1 = doc.getTextWidth(p1);
+
+                // Part 2: Educational Institutions (Size 26)
+                doc.setFontSize(26);
                 if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
                 const w2 = doc.getTextWidth(p2);
+
                 const startX = (pageWidth - (w1 + w2)) / 2;
+
+                // Draw Part 1
+                doc.setFontSize(28);
+                doc.setTextColor(0, 112, 192);
                 if (impactFont) doc.setFont("Impact", "normal"); else doc.setFont("helvetica", "bold");
                 doc.text(p1, startX, y);
+
+                // Draw Part 2
+                doc.setFontSize(26);
+                doc.setTextColor(0, 112, 192);
                 if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
                 doc.text(p2, startX + w1, y);
 
@@ -268,8 +283,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     const wQNo = 8;
                     const wErr = 11;
                     const wTop = 15;
-                    const baseImgWidth = 85; // This is the "321px" equivalent at 96 DPI
-                    const wSub = 15;
+                    const baseImgWidth = 86; // This is the "321px" equivalent at 96 DPI
+                    const wSub = 17;
                     const wStud = contentWidth - (wQNo + wErr + wTop + baseImgWidth + wSub); // ~56mm remaining
 
                     let qH = 20;
