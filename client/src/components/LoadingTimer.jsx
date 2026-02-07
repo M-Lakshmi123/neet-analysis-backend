@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const LoadingTimer = ({ isLoading }) => {
     const [seconds, setSeconds] = useState(0);
+    const [showTimer, setShowTimer] = useState(false);
 
     // Circle Visualization Constants
     const radius = 80;
@@ -12,15 +13,32 @@ const LoadingTimer = ({ isLoading }) => {
 
     useEffect(() => {
         let interval;
+        let delayTimer;
+
         if (isLoading) {
             setSeconds(0);
+            // Don't show immediately. Wait for 3 seconds of "loading" state.
+            // This prevents the popup from flickering on fast refreshes or navigations.
+            delayTimer = setTimeout(() => {
+                setShowTimer(true);
+            }, 3000);
+
+            // Start counting immediately in background so if it DOES show,
+            // the time reflects the true wait time.
             interval = setInterval(() => {
                 setSeconds(prev => prev + 1);
             }, 1000);
         } else {
+            // Loading finished
             setSeconds(0);
+            setShowTimer(false);
+            clearTimeout(delayTimer);
         }
-        return () => clearInterval(interval);
+
+        return () => {
+            clearInterval(interval);
+            clearTimeout(delayTimer);
+        };
     }, [isLoading]);
 
     // Calculate stroke offset
@@ -29,7 +47,7 @@ const LoadingTimer = ({ isLoading }) => {
 
     return (
         <AnimatePresence>
-            {isLoading && (
+            {isLoading && showTimer && (
                 <div style={{
                     position: 'fixed',
                     top: 0,
@@ -99,8 +117,8 @@ const LoadingTimer = ({ isLoading }) => {
                             Data is loading...
                         </p>
 
-                        {/* Render Delay Info Message */}
-                        {seconds > 3 && (
+                        {/* Render Delay Info Message - Show if > 5s (since we show at 3s, this will appear shortly after) */}
+                        {seconds > 5 && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
