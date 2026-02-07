@@ -283,7 +283,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     const wQNo = 8;
                     const wErr = 11;
                     const wTop = 15;
-                    const baseImgWidth = 91; // This is the "321px" equivalent at 96 DPI
+                    const baseImgWidth = 87; // This is the "321px" equivalent at 96 DPI
                     const wSub = 18;
                     const wStud = contentWidth - (wQNo + wErr + wTop + baseImgWidth + wSub); // ~56mm remaining
 
