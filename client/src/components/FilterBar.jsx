@@ -165,7 +165,9 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
     // prepared initial student options for the normal dropdown
     const studentOptions = [
         { value: "SELECT_ALL", label: "Select All Students" },
-        ...(students || []).map(s => ({ value: s.id, label: `${s.name} (${s.id})` }))
+        ...(students || [])
+            .filter(s => s && s.name && s.id && String(s.name).trim() !== '' && String(s.id).trim() !== '')
+            .map(s => ({ value: s.id, label: `${s.name} (${s.id})` }))
     ];
 
     // Load options for the Async Global Search

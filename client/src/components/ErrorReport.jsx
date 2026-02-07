@@ -659,7 +659,8 @@ const ErrorReport = ({ filters, setFilters }) => {
 
             <LoadingTimer isLoading={loading} />
 
-            {!loading && reportData.map((student, sIdx) => {
+            {!loading && reportData.slice(0, 20).map((student, sIdx) => {
+
                 // Filter questions for rendering
 
                 return (
@@ -838,6 +839,14 @@ const ErrorReport = ({ filters, setFilters }) => {
                     </div>
                 );
             })}
+
+            {!loading && reportData.length > 20 && (
+                <div style={{ textAlign: 'center', margin: '20px auto', maxWidth: '800px', padding: '15px', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '8px', color: '#856404' }}>
+                    <strong>Showing first 20 students only.</strong><br />
+                    {reportData.length - 20} more students are hidden for better performance.<br />
+                    Please use the filters to narrow down your search or download the PDF/ZIP to view all reports.
+                </div>
+            )}
         </div>
     );
 };
