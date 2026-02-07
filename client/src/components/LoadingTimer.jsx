@@ -7,9 +7,7 @@ const LoadingTimer = ({ isLoading }) => {
     // Circle Visualization Constants
     const radius = 80;
     const circumference = 2 * Math.PI * radius;
-    // We map the circle to 50 seconds (typical Render delay)
-    // After 50s, it stays full or resets. Let's make it loop slowly or stay full.
-    // Let's loop 60s for standard clock feel.
+    // We map the circle to 60 seconds loop
     const MAX_TIME = 60;
 
     useEffect(() => {
@@ -26,25 +24,47 @@ const LoadingTimer = ({ isLoading }) => {
     }, [isLoading]);
 
     // Calculate stroke offset
-    // Progress 0 -> 1
     const progress = Math.min((seconds % MAX_TIME) / MAX_TIME, 1);
     const strokeDashoffset = circumference - (progress * circumference);
 
     return (
         <AnimatePresence>
             {isLoading && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    backdropFilter: 'blur(8px)',
+                    zIndex: 99999, /* Extremely high Z-Index */
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
+                        initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
                         transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                        className="bg-white p-8 rounded-[2rem] shadow-2xl flex flex-col items-center max-w-sm w-full mx-4"
+                        style={{
+                            backgroundColor: 'white',
+                            borderRadius: '2rem',
+                            padding: '2.5rem',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            maxWidth: '400px',
+                            width: '90%',
+                            position: 'relative'
+                        }}
                     >
                         {/* Circle Timer Container */}
-                        <div className="relative mb-6 flex items-center justify-center">
+                        <div style={{ position: 'relative', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             {/* SVG Ring */}
-                            <svg width="200" height="200" className="transform -rotate-90">
+                            <svg width="200" height="200" style={{ transform: 'rotate(-90deg)' }}>
                                 {/* Track */}
                                 <circle
                                     cx="100" cy="100" r={radius}
@@ -66,16 +86,16 @@ const LoadingTimer = ({ isLoading }) => {
                             </svg>
 
                             {/* Timer Text Centered */}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-5xl font-bold text-violet-600 font-mono tracking-tighter">
+                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <span style={{ fontSize: '3.5rem', fontWeight: 'bold', color: '#7c3aed', fontFamily: 'monospace', letterSpacing: '-2px' }}>
                                     {String(Math.floor(seconds / 60)).padStart(2, '0')}:
                                     {String(seconds % 60).padStart(2, '0')}
                                 </span>
                             </div>
                         </div>
 
-                        <h3 className="text-2xl font-bold text-slate-800 mb-2">Kindly Wait</h3>
-                        <p className="text-slate-500 text-center font-medium mb-6 px-4">
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1e293b', marginBottom: '0.5rem', margin: 0 }}>Kindly Wait</h3>
+                        <p style={{ color: '#64748b', textAlign: 'center', fontWeight: '500', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
                             Data is loading...
                         </p>
 
@@ -84,12 +104,19 @@ const LoadingTimer = ({ isLoading }) => {
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="bg-violet-50 border border-violet-100 rounded-xl p-4 w-full text-center"
+                                style={{
+                                    backgroundColor: '#f5f3ff', // violet-50
+                                    border: '1px solid #ede9fe', // violet-100
+                                    borderRadius: '1rem',
+                                    padding: '1rem',
+                                    width: '100%',
+                                    textAlign: 'center'
+                                }}
                             >
-                                <div className="flex items-center justify-center gap-2 mb-1 text-violet-700 font-bold">
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.25rem', color: '#6d28d9', fontWeight: 'bold' }}>
                                     <span>Server Waking Up 🚀</span>
                                 </div>
-                                <p className="text-xs text-violet-600 leading-relaxed font-medium">
+                                <p style={{ fontSize: '0.8rem', color: '#7c3aed', lineHeight: '1.4', margin: 0, fontWeight: '500' }}>
                                     Free instance spin-up may delay requests by up to 50 seconds.
                                 </p>
                             </motion.div>
