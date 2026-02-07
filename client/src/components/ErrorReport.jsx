@@ -40,102 +40,103 @@ const ErrorReport = ({ filters, setFilters }) => {
         { value: 'ZOOLOGY', label: 'Zoology' }
     ];
 
-    // Fetch Report Data
+    // Clear Report Data when filters change to avoid mismatch
     useEffect(() => {
-        const fetchData = async () => {
-            if (filters.test.length === 0 && filters.studentSearch.length === 0) {
-                setReportData([]);
-                return;
-            }
-
-            setLoading(true);
-            try {
-                const params = buildQueryParams(filters);
-                const res = await fetch(`${API_URL}/api/erp/report?${params.toString()}`);
-                const data = await res.json();
-
-                // Group Data
-                const grouped = {};
-                data.forEach(row => {
-                    const studKey = `${row.STUD_ID}_${row.Student_Name}`;
-                    if (!grouped[studKey]) {
-                        grouped[studKey] = {
-                            info: {
-                                name: row.Student_Name,
-                                id: row.STUD_ID,
-                                branch: row.Branch,
-                                stream: row.Stream
-                            },
-                            tests: {}
-                        };
-                    }
-                    const testKey = row.Test;
-                    if (!grouped[studKey].tests[testKey]) {
-                        grouped[studKey].tests[testKey] = {
-                            meta: {
-                                testName: row.Test,
-                                date: row.Exam_Date,
-                                tot: row.Tot_720,
-                                air: row.AIR,
-                                bot: row.Botany,
-                                b_rank: row.B_Rank,
-                                zoo: row.Zoology,
-                                z_rank: row.Z_Rank,
-                                phy: row.Physics,
-                                p_rank: row.P_Rank,
-                                chem: row.Chemistry,
-                                c_rank: row.C_Rank
-                            },
-                            questions: []
-                        };
-                    }
-                    grouped[studKey].tests[testKey].questions.push(row);
-                });
-
-                // Process & Sort
-                const processed = Object.values(grouped).map(student => {
-                    let testsArr = Object.values(student.tests);
-
-                    // Sort Tests by Date (Latest First)
-                    testsArr.sort((a, b) => {
-                        const d1 = new Date(a.meta.date);
-                        const d2 = new Date(b.meta.date);
-                        return d2 - d1;
-                    });
-
-                    // Sort Questions by National Error Descending (Largest to Smallest)
-                    testsArr = testsArr.map(t => {
-                        t.questions.sort((a, b) => {
-                            const valA = parseFloat(a.National_Wide_Error) || 0;
-                            const valB = parseFloat(b.National_Wide_Error) || 0;
-                            if (valB !== valA) return valB - valA;
-
-                            // Fallback to Subject then QNo
-                            const subOrder = getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject);
-                            if (subOrder !== 0) return subOrder;
-
-                            const qNoA = parseInt(a.Q_No) || 0;
-                            const qNoB = parseInt(b.Q_No) || 0;
-                            return qNoA - qNoB;
-                        });
-                        return t;
-                    });
-
-                    return { ...student, tests: testsArr };
-                });
-
-                setReportData(processed);
-
-            } catch (err) {
-                console.error("Error fetching report:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const timeout = setTimeout(fetchData, 500);
-        return () => clearTimeout(timeout);
+        setReportData([]);
     }, [filters]);
+
+    // Handle View Report Button Click
+    const handleViewReport = async () => {
+        if (filters.test.length === 0 && filters.studentSearch.length === 0) {
+            alert("Please select at least one Test or Student.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const params = buildQueryParams(filters);
+            const res = await fetch(`${API_URL}/api/erp/report?${params.toString()}`);
+            const data = await res.json();
+
+            // Group Data
+            const grouped = {};
+            data.forEach(row => {
+                const studKey = `${row.STUD_ID}_${row.Student_Name}`;
+                if (!grouped[studKey]) {
+                    grouped[studKey] = {
+                        info: {
+                            name: row.Student_Name,
+                            id: row.STUD_ID,
+                            branch: row.Branch,
+                            stream: row.Stream
+                        },
+                        tests: {}
+                    };
+                }
+                const testKey = row.Test;
+                if (!grouped[studKey].tests[testKey]) {
+                    grouped[studKey].tests[testKey] = {
+                        meta: {
+                            testName: row.Test,
+                            date: row.Exam_Date,
+                            tot: row.Tot_720,
+                            air: row.AIR,
+                            bot: row.Botany,
+                            b_rank: row.B_Rank,
+                            zoo: row.Zoology,
+                            z_rank: row.Z_Rank,
+                            phy: row.Physics,
+                            p_rank: row.P_Rank,
+                            chem: row.Chemistry,
+                            c_rank: row.C_Rank
+                        },
+                        questions: []
+                    };
+                }
+                grouped[studKey].tests[testKey].questions.push(row);
+            });
+
+            // Process & Sort
+            const processed = Object.values(grouped).map(student => {
+                let testsArr = Object.values(student.tests);
+
+                // Sort Tests by Date (Latest First)
+                testsArr.sort((a, b) => {
+                    const d1 = new Date(a.meta.date);
+                    const d2 = new Date(b.meta.date);
+                    return d2 - d1;
+                });
+
+                // Sort Questions by National Error Descending (Largest to Smallest)
+                testsArr = testsArr.map(t => {
+                    t.questions.sort((a, b) => {
+                        const valA = parseFloat(a.National_Wide_Error) || 0;
+                        const valB = parseFloat(b.National_Wide_Error) || 0;
+                        if (valB !== valA) return valB - valA;
+
+                        // Fallback to Subject then QNo
+                        const subOrder = getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject);
+                        if (subOrder !== 0) return subOrder;
+
+                        const qNoA = parseInt(a.Q_No) || 0;
+                        const qNoB = parseInt(b.Q_No) || 0;
+                        return qNoA - qNoB;
+                    });
+                    return t;
+                });
+
+                return { ...student, tests: testsArr };
+            });
+
+            setReportData(processed);
+
+        } catch (err) {
+            console.error("Error fetching report:", err);
+            alert("Failed to fetch report data.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Apply Subject Filter
     const getFilteredQuestions = (questions) => {
@@ -651,27 +652,65 @@ const ErrorReport = ({ filters, setFilters }) => {
             <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', fontFamily: 'Arial, sans-serif' }}>
                 {/* Removed FilterBar from here as it is now in App.jsx */}
 
-                {/* SUBJECT FILTER */}
-                <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center' }}>
-                    <span style={{ marginRight: '10px', fontWeight: 'bold' }}>Subject:</span>
-                    <div style={{ width: '250px' }}>
-                        <Select
-                            options={subjectOptions}
-                            value={subjectFilter}
-                            onChange={setSubjectFilter}
-                        />
+                {/* SUBJECT FILTER & ACTION BUTTONS */}
+                <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ marginRight: '10px', fontWeight: 'bold' }}>Subject:</span>
+                        <div style={{ width: '250px' }}>
+                            <Select
+                                options={subjectOptions}
+                                value={subjectFilter}
+                                onChange={setSubjectFilter}
+                            />
+                        </div>
                     </div>
+
+                    {/* View Report Button */}
+                    <button
+                        onClick={handleViewReport}
+                        disabled={loading}
+                        style={{
+                            backgroundColor: '#28a745',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 20px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px'
+                        }}
+                    >
+                        {loading ? 'Loading...' : 'View Report'}
+                    </button>
+
+                    {/* Download Button - Only visible if data is loaded */}
+                    {reportData.length > 0 && (
+                        <button
+                            onClick={generatePDF}
+                            disabled={generatingPdf}
+                            style={{
+                                backgroundColor: '#0070c0',
+                                color: 'white',
+                                border: 'none',
+                                padding: '10px 20px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold',
+                                marginLeft: 'auto'
+                            }}
+                        >
+                            {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download ${reportData.length > 1 ? 'All (ZIP)' : 'PDF'}`}
+                        </button>
+                    )}
                 </div>
 
                 <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #ccc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 'bold', color: '#333' }}>{reportData.length} Student(s) Loaded</span>
-                    <button
-                        onClick={generatePDF}
-                        disabled={reportData.length === 0 || generatingPdf}
-                        style={{ backgroundColor: '#0070c0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                    >
-                        {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download ${reportData.length > 1 ? 'All (ZIP)' : 'PDF'}`}
-                    </button>
+                    <span style={{ fontWeight: 'bold', color: '#333' }}>
+                        {reportData.length > 0 ? `${reportData.length} Student(s) Loaded` : 'No report loaded. Select filters and click "View Report".'}
+                    </span>
                 </div>
             </div>
 
