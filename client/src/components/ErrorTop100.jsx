@@ -283,12 +283,13 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     const wQNo = 8;
                     const wErr = 11;
                     const wTop = 15;
-                    const baseImgWidth = 87; // This is the "321px" equivalent at 96 DPI
+                    const baseImgWidth = 87; // Column Width
+                    const imgDrawWidth = 86; // Image Width (approx 318px)
                     const wSub = 18;
                     const wStud = contentWidth - (wQNo + wErr + wTop + baseImgWidth + wSub); // ~56mm remaining
 
                     let qH = 20;
-                    if (qImg) qH = (qImg.height / qImg.width) * baseImgWidth;
+                    if (qImg) qH = (qImg.height / qImg.width) * imgDrawWidth;
 
                     // Calculate student list height (Single column)
                     let totalLines = 0;
@@ -380,9 +381,9 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     if (qImg) {
                         try {
                             const asp = qImg.width / qImg.height;
-                            let finalImgW = baseImgWidth;
+                            let finalImgW = imgDrawWidth;
                             let finalImgH = qH;
-                            if (finalImgH * asp < baseImgWidth) {
+                            if (finalImgH * asp < imgDrawWidth) {
                                 finalImgW = finalImgH * asp;
                             }
                             // Center horizontally and vertically within its box
@@ -529,7 +530,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                                                 </div>
                                             </td>
                                             <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-                                                {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} />}
+                                                {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '318px', height: 'auto', display: 'block', margin: '0 auto' }} />}
                                             </td>
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.subject}</td>
                                             <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top', backgroundColor: '#4F81BD', color: 'white' }}>
