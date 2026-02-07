@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import LoadingTimer from './LoadingTimer';
 import FilterBar from './FilterBar';
 import { API_URL, buildQueryParams, formatDate } from '../utils/apiHelper';
 import { useAuth } from './auth/AuthProvider';
@@ -656,7 +657,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                 </div>
             </div>
 
-            {loading && <div style={{ textAlign: 'center', fontSize: '20px', marginTop: '50px', color: 'white', fontFamily: 'Arial' }}>Loading Data...</div>}
+            <LoadingTimer isLoading={loading} />
 
             {!loading && reportData.map((student, sIdx) => {
                 // Filter questions for rendering

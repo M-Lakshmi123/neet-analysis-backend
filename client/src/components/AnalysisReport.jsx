@@ -588,6 +588,7 @@ const AnalysisReport = ({ filters }) => {
 
     return (
         <div className="analysis-report-container">
+            <LoadingTimer isLoading={loading} />
             <div className="report-actions-top">
                 <h3 className="section-title">Report Statistics</h3>
                 <div className="flex gap-3 items-center">
