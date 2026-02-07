@@ -213,8 +213,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 const p2 = " Educational Institutions";
 
                 // Calculate total width for centering
-                // Part 1: Sri Chaitanya (Size 28)
-                doc.setFontSize(28);
+                // Part 1: Sri Chaitanya (Size 31)
+                doc.setFontSize(31);
                 if (impactFont) doc.setFont("Impact", "normal"); else doc.setFont("helvetica", "bold");
                 const w1 = doc.getTextWidth(p1);
 
@@ -226,7 +226,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 const startX = (pageWidth - (w1 + w2)) / 2;
 
                 // Draw Part 1
-                doc.setFontSize(28);
+                doc.setFontSize(31);
                 doc.setTextColor(0, 112, 192);
                 if (impactFont) doc.setFont("Impact", "normal"); else doc.setFont("helvetica", "bold");
                 doc.text(p1, startX, y);
@@ -283,8 +283,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     const wQNo = 8;
                     const wErr = 11;
                     const wTop = 15;
-                    const baseImgWidth = 86; // This is the "321px" equivalent at 96 DPI
-                    const wSub = 17;
+                    const baseImgWidth = 87; // This is the "321px" equivalent at 96 DPI
+                    const wSub = 18;
                     const wStud = contentWidth - (wQNo + wErr + wTop + baseImgWidth + wSub); // ~56mm remaining
 
                     let qH = 20;
