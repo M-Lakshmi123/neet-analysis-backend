@@ -609,6 +609,121 @@ app.get('/api/erp/report', async (req, res) => {
 });
 
 
+// New endpoint: Error Count report (Test wise counts)
+app.get('/api/erp/error-count-report', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
+
+        let clauses = [];
+        const addClause = (field, value) => {
+            if (!value || value === 'All' || value === '__ALL__') return;
+            const valArray = Array.isArray(value) ? value : [value];
+            const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+            if (cleanValues.length === 0) return;
+            clauses.push(`UPPER(TRIM(${field})) IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
+        };
+
+        addClause('Branch', campus);
+        addClause('Stream', stream);
+        addClause('Test', test);
+        addClause('Test_Type', testType);
+        addClause('Top_ALL', topAll);
+
+        const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
+        const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+
+        if (cleanIds.length > 0) {
+            clauses.push(`UPPER(TRIM(STUD_ID)) IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
+        } else if (quickSearch && quickSearch.trim() !== '') {
+            const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
+            clauses.push(`(UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
+        }
+
+        const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+
+        const query = `
+            SELECT 
+                STUD_ID,
+                MAX(Student_Name) as name,
+                MAX(Branch) as campus,
+                Test,
+                MAX(CAST(Tot_720 AS FLOAT)) as tot,
+                MAX(CAST(AIR AS FLOAT)) as air,
+                MAX(CAST(Botany AS FLOAT)) as bot,
+                MAX(CAST(B_Rank AS FLOAT)) as bot_rank,
+                MAX(CAST(Zoology AS FLOAT)) as zoo,
+                MAX(CAST(Z_Rank AS FLOAT)) as zoo_rank,
+                MAX(CAST(Physics AS FLOAT)) as phy,
+                MAX(CAST(P_Rank AS FLOAT)) as phy_rank,
+                MAX(CAST(Chemistry AS FLOAT)) as che,
+                MAX(CAST(C_Rank AS FLOAT)) as che_rank,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as bot_w,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as bot_u,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as zoo_w,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as zoo_u,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as phy_w,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as phy_u,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as che_w,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as che_u
+            FROM ERP_REPORT 
+            ${where}
+            GROUP BY STUD_ID, Test
+            ORDER BY name, Test
+        `;
+
+        logQuery(query, req.query);
+        const result = await pool.request().query(query);
+
+        // Group results by student for easier side-by-side rendering
+        const studentsMap = {};
+        const allTests = new Set();
+
+        result.recordset.forEach(row => {
+            const sId = row.STUD_ID;
+            if (!studentsMap[sId]) {
+                studentsMap[sId] = {
+                    STUD_ID: sId,
+                    name: row.name,
+                    campus: row.campus,
+                    tests: {}
+                };
+            }
+            studentsMap[sId].tests[row.Test] = {
+                tot: row.tot,
+                air: row.air,
+                bot: row.bot,
+                bot_rank: row.bot_rank,
+                bot_w: row.bot_w,
+                bot_u: row.bot_u,
+                zoo: row.zoo,
+                zoo_rank: row.zoo_rank,
+                zoo_w: row.zoo_w,
+                zoo_u: row.zoo_u,
+                phy: row.phy,
+                phy_rank: row.phy_rank,
+                phy_w: row.phy_w,
+                phy_u: row.phy_u,
+                che: row.che,
+                che_rank: row.che_rank,
+                che_w: row.che_w,
+                che_u: row.che_u
+            };
+            allTests.add(row.Test);
+        });
+
+        res.json({
+            students: Object.values(studentsMap),
+            tests: Array.from(allTests).sort()
+        });
+
+    } catch (err) {
+        console.error("[ERP Error Count Report] ERROR:", err);
+        res.status(500).send(err.message);
+    }
+});
+
+
 app.get('/api/erp/participants', async (req, res) => {
     try {
         const pool = await connectToDb();
