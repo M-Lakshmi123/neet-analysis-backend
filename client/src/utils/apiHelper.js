@@ -1,5 +1,5 @@
-export const API_URL = 'https://neet-backend-3oxu.onrender.com';
-// export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+export const API_URL = isLocal ? 'http://localhost:5000' : 'https://neet-backend-3oxu.onrender.com';
 
 
 export const ADMIN_WHATSAPP = '9281425210';

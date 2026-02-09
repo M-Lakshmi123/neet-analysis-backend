@@ -170,7 +170,11 @@ const Dashboard = () => {
             case 'error_top':
                 return (isAdmin || isCoAdmin) ? <ErrorTop100 filters={globalFilters} setFilters={setGlobalFilters} /> : <div className="p-4">Access Denied</div>;
             case 'error_count':
-                return <ErrorCountReport filters={globalFilters} />;
+                return (
+                    <div className="report-sections">
+                        <ErrorCountReport filters={globalFilters} />
+                    </div>
+                );
             case 'approvals':
                 return isAdmin ? <UserApprovals /> : <div className="p-4">Access Denied</div>;
             case 'logs':
