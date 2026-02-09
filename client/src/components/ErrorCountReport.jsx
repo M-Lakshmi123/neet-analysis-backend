@@ -204,91 +204,91 @@ const ErrorCountReport = ({ filters }) => {
                 <div className="report-section" style={{ overflow: 'hidden' }}>
                     <div className="table-responsive" style={{ maxHeight: 'calc(100vh - 350px)', overflow: 'auto' }}>
                         <table className="analysis-table merit-style" style={{ fontSize: '0.7rem' }}>
-                            <thead style={{ position: 'sticky', top: 0, z- index: 10 }}>
-                            <tr style={{ backgroundColor: '#008080', color: 'white' }}>
-                                <th rowSpan="2" style={{ minWidth: '80px', border: '1px solid #ddd' }}>STUD_ID</th>
-                                <th rowSpan="2" style={{ minWidth: '150px', border: '1px solid #ddd' }}>Name</th>
-                                <th rowSpan="2" style={{ minWidth: '120px', border: '1px solid #ddd' }}>Campus</th>
-                                {data.tests.map((test, i) => (
-                                    <th key={i} colSpan="18" style={{ border: '1px solid #ddd', padding: '8px' }}>{test}</th>
-                                ))}
-                            </tr>
-                            <tr style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
-                                {data.tests.map((_, i) => (
-                                    <React.Fragment key={i}>
-                                        <th style={{ border: '1px solid #ddd' }}>TOT</th>
-                                        <th style={{ border: '1px solid #ddd' }}>AIR</th>
-                                        <th style={{ border: '1px solid #ddd' }}>BOT</th>
-                                        <th style={{ border: '1px solid #ddd' }}>B_R</th>
-                                        <th style={{ border: '1px solid #ddd', color: '#b91c1c' }}>W</th>
-                                        <th style={{ border: '1px solid #ddd', color: '#1d4ed8' }}>U</th>
-                                        <th style={{ border: '1px solid #ddd' }}>ZOO</th>
-                                        <th style={{ border: '1px solid #ddd' }}>Z_R</th>
-                                        <th style={{ border: '1px solid #ddd', color: '#b91c1c' }}>W</th>
-                                        <th style={{ border: '1px solid #ddd', color: '#1d4ed8' }}>U</th>
-                                        <th style={{ border: '1px solid #ddd' }}>PHY</th>
-                                        <th style={{ border: '1px solid #ddd' }}>P_R</th>
-                                        <th style={{ border: '1px solid #ddd', color: '#b91c1c' }}>W</th>
-                                        <th style={{ border: '1px solid #ddd', color: '#1d4ed8' }}>U</th>
-                                        <th style={{ border: '1px solid #ddd' }}>CHE</th>
-                                        <th style={{ border: '1px solid #ddd' }}>C_R</th>
-                                        <th style={{ border: '1px solid #ddd', color: '#b91c1c' }}>W</th>
-                                        <th style={{ border: '1px solid #ddd', color: '#1d4ed8' }}>U</th>
-                                    </React.Fragment>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {data.students.map((student, sIdx) => (
-                                <tr key={sIdx}>
-                                    <td style={{ border: '1px solid #eee' }}>{student.STUD_ID}</td>
-                                    <td className="text-left" style={{ border: '1px solid #eee', fontWeight: 'bold' }}>{student.name}</td>
-                                    <td className="text-left" style={{ border: '1px solid #eee' }}>{student.campus}</td>
-                                    {data.tests.map((test, tIdx) => {
-                                        const t = student.tests[test] || {};
-                                        return (
-                                            <React.Fragment key={tIdx}>
-                                                <td style={{ border: '1px solid #eee' }}>{t.tot || '-'}</td>
-                                                <td style={{ border: '1px solid #eee' }}>{t.air || '-'}</td>
-                                                <td style={{ border: '1px solid #eee' }}>{t.bot || '-'}</td>
-                                                <td style={{ border: '1px solid #eee' }}>{t.bot_rank || '-'}</td>
-                                                <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{t.bot_w || 0}</td>
-                                                <td style={{ border: '1px solid #eee', backgroundColor: '#f0f9ff', color: '#1d4ed8', fontWeight: 'bold' }}>{t.bot_u || 0}</td>
-                                                <td style={{ border: '1px solid #eee' }}>{t.zoo || '-'}</td>
-                                                <td style={{ border: '1px solid #eee' }}>{t.zoo_rank || '-'}</td>
-                                                <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{t.zoo_w || 0}</td>
-                                                <td style={{ border: '1px solid #eee', backgroundColor: '#f0f9ff', color: '#1d4ed8', fontWeight: 'bold' }}>{t.zoo_u || 0}</td>
-                                                <td style={{ border: '1px solid #eee' }}>{t.phy || '-'}</td>
-                                                <td style={{ border: '1px solid #eee' }}>{t.phy_rank || '-'}</td>
-                                                <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{t.phy_w || 0}</td>
-                                                <td style={{ border: '1px solid #eee', backgroundColor: '#f0f9ff', color: '#1d4ed8', fontWeight: 'bold' }}>{t.phy_u || 0}</td>
-                                                <td style={{ border: '1px solid #eee' }}>{t.che || '-'}</td>
-                                                <td style={{ border: '1px solid #eee' }}>{t.che_rank || '-'}</td>
-                                                <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{t.che_w || 0}</td>
-                                                <td style={{ border: '1px solid #eee', backgroundColor: '#f0f9ff', color: '#1d4ed8', fontWeight: 'bold' }}>{t.che_u || 0}</td>
-                                            </React.Fragment>
-                                        );
-                                    })}
+                            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                                <tr style={{ backgroundColor: '#008080', color: 'white' }}>
+                                    <th rowSpan="2" style={{ minWidth: '80px', border: '1px solid #ddd' }}>STUD_ID</th>
+                                    <th rowSpan="2" style={{ minWidth: '150px', border: '1px solid #ddd' }}>Name</th>
+                                    <th rowSpan="2" style={{ minWidth: '120px', border: '1px solid #ddd' }}>Campus</th>
+                                    {data.tests.map((test, i) => (
+                                        <th key={i} colSpan="18" style={{ border: '1px solid #ddd', padding: '8px' }}>{test}</th>
+                                    ))}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                <tr style={{ backgroundColor: '#f3f4f6', color: '#374151' }}>
+                                    {data.tests.map((_, i) => (
+                                        <React.Fragment key={i}>
+                                            <th style={{ border: '1px solid #ddd' }}>TOT</th>
+                                            <th style={{ border: '1px solid #ddd' }}>AIR</th>
+                                            <th style={{ border: '1px solid #ddd' }}>BOT</th>
+                                            <th style={{ border: '1px solid #ddd' }}>B_R</th>
+                                            <th style={{ border: '1px solid #ddd', color: '#b91c1c' }}>W</th>
+                                            <th style={{ border: '1px solid #ddd', color: '#1d4ed8' }}>U</th>
+                                            <th style={{ border: '1px solid #ddd' }}>ZOO</th>
+                                            <th style={{ border: '1px solid #ddd' }}>Z_R</th>
+                                            <th style={{ border: '1px solid #ddd', color: '#b91c1c' }}>W</th>
+                                            <th style={{ border: '1px solid #ddd', color: '#1d4ed8' }}>U</th>
+                                            <th style={{ border: '1px solid #ddd' }}>PHY</th>
+                                            <th style={{ border: '1px solid #ddd' }}>P_R</th>
+                                            <th style={{ border: '1px solid #ddd', color: '#b91c1c' }}>W</th>
+                                            <th style={{ border: '1px solid #ddd', color: '#1d4ed8' }}>U</th>
+                                            <th style={{ border: '1px solid #ddd' }}>CHE</th>
+                                            <th style={{ border: '1px solid #ddd' }}>C_R</th>
+                                            <th style={{ border: '1px solid #ddd', color: '#b91c1c' }}>W</th>
+                                            <th style={{ border: '1px solid #ddd', color: '#1d4ed8' }}>U</th>
+                                        </React.Fragment>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.students.map((student, sIdx) => (
+                                    <tr key={sIdx}>
+                                        <td style={{ border: '1px solid #eee' }}>{student.STUD_ID}</td>
+                                        <td className="text-left" style={{ border: '1px solid #eee', fontWeight: 'bold' }}>{student.name}</td>
+                                        <td className="text-left" style={{ border: '1px solid #eee' }}>{student.campus}</td>
+                                        {data.tests.map((test, tIdx) => {
+                                            const t = student.tests[test] || {};
+                                            return (
+                                                <React.Fragment key={tIdx}>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.tot || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.air || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.bot || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.bot_rank || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{t.bot_w || 0}</td>
+                                                    <td style={{ border: '1px solid #eee', backgroundColor: '#f0f9ff', color: '#1d4ed8', fontWeight: 'bold' }}>{t.bot_u || 0}</td>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.zoo || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.zoo_rank || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{t.zoo_w || 0}</td>
+                                                    <td style={{ border: '1px solid #eee', backgroundColor: '#f0f9ff', color: '#1d4ed8', fontWeight: 'bold' }}>{t.zoo_u || 0}</td>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.phy || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.phy_rank || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{t.phy_w || 0}</td>
+                                                    <td style={{ border: '1px solid #eee', backgroundColor: '#f0f9ff', color: '#1d4ed8', fontWeight: 'bold' }}>{t.phy_u || 0}</td>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.che || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee' }}>{t.che_rank || '-'}</td>
+                                                    <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{t.che_w || 0}</td>
+                                                    <td style={{ border: '1px solid #eee', backgroundColor: '#f0f9ff', color: '#1d4ed8', fontWeight: 'bold' }}>{t.che_u || 0}</td>
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+            ) : !loading && (
+                <div className="empty-state">
+                    <p>Select at least one Test and click <strong>View Report</strong> to generate the summary.</p>
                 </div>
-    ) : !loading && (
-        <div className="empty-state">
-            <p>Select at least one Test and click <strong>View Report</strong> to generate the summary.</p>
-        </div>
-    )
-}
+            )
+            }
 
-<Modal
-    isOpen={modal.isOpen}
-    onClose={() => setModal({ ...modal, isOpen: false })}
-    title={modal.title}
-    message={modal.message}
-    type={modal.type}
-/>
+            <Modal
+                isOpen={modal.isOpen}
+                onClose={() => setModal({ ...modal, isOpen: false })}
+                title={modal.title}
+                message={modal.message}
+                type={modal.type}
+            />
         </div >
     );
 };
