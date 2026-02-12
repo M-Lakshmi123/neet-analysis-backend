@@ -75,7 +75,10 @@ const Dashboard = () => {
     }, [activePage]);
 
     const userAllowedCampuses = userData?.allowedCampuses || (userData?.campus && userData.campus !== 'All' ? [userData.campus] : []);
-    const isRestricted = !isAdmin && userAllowedCampuses.length > 0 && !userAllowedCampuses.includes('All');
+
+    // STRICT RULE: Only Admins can see All campuses. 
+    // Everyone else is restricted to their assigned campuses.
+    const isRestricted = !isAdmin && !isCoAdmin && !userAllowedCampuses.includes('All');
 
     const initialFilters = {
         campus: isRestricted ? userAllowedCampuses : [],

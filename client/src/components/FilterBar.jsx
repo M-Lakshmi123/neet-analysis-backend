@@ -52,17 +52,30 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
     // Generic handler for React Select changes with "Select All" support
     const handleSelectChange = (field, selectedOptions, actionMeta) => {
         if (actionMeta.action === "select-option" && selectedOptions.some(opt => opt.value === "SELECT_ALL")) {
-            // Select All clicked -> Use a special "ALL" marker or just clear to signify all in some contexts
-            // For simplicity and backend compatibility, we'll keep the full list but only if it's reasonably small.
-            // Actually, BETTER: Set it to a special "ALL" value that the API helper understands.
-            setFilters(prev => ({ ...prev, [field]: ["__ALL__"] }));
+            // Select All clicked
+            if (field === 'campus' && isRestricted) {
+                // For restricted users, "Select All" means select all ALLOWED campuses
+                setFilters(prev => ({ ...prev, [field]: allowedCampuses }));
+            } else {
+                setFilters(prev => ({ ...prev, [field]: ["__ALL__"] }));
+            }
         } else if (actionMeta.action === "deselect-option" && actionMeta.option && actionMeta.option.value === "SELECT_ALL") {
-            // Deselect All clicked -> Clear all
-            setFilters(prev => ({ ...prev, [field]: [] }));
+            // Deselect All clicked
+            if (field === 'campus' && isRestricted) {
+                // For restricted users, deselecting all should revert to the allowed list (STRICT)
+                setFilters(prev => ({ ...prev, [field]: allowedCampuses }));
+            } else {
+                setFilters(prev => ({ ...prev, [field]: [] }));
+            }
         } else {
             // Normal selection
-            const values = selectedOptions ? selectedOptions.map(opt => opt.value).filter(v => v !== 'SELECT_ALL') : [];
-            // If the user manually selects everything, we could also convert to __ALL__ but let's keep it explicit for now
+            let values = selectedOptions ? selectedOptions.map(opt => opt.value).filter(v => v !== 'SELECT_ALL') : [];
+
+            // STRICT ENFORCEMENT: If campus is restricted, it can NEVER be empty
+            if (field === 'campus' && isRestricted && values.length === 0) {
+                values = allowedCampuses;
+            }
+
             setFilters(prev => ({ ...prev, [field]: values }));
         }
     };
@@ -180,23 +193,21 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
         if (!inputValue || inputValue.length < 1) return []; // Search from 1 character
 
         try {
-            let url = `${API_URL}${endpoints.students}?quickSearch=${encodeURIComponent(inputValue)}`;
-            // Enforce restricted campus in search
+            // Build query strictly
+            const searchParams = new URLSearchParams();
+            searchParams.append('quickSearch', inputValue);
+
+            // Enforce restricted campuses in search
             if (isRestricted) {
-                // If strictly one campus, send as single param (backend optimization)
-                if (allowedCampuses.length === 1) {
-                    url += `&campus=${encodeURIComponent(allowedCampuses[0])}`;
-                } else {
-                    // Send ALL allowed campuses as filters so backend restricts search results
-                    allowedCampuses.forEach(c => {
-                        url += `&campus=${encodeURIComponent(c)}`;
-                    });
-                }
+                allowedCampuses.forEach(c => {
+                    searchParams.append('campus', c);
+                });
             }
 
+            const url = `${API_URL}${endpoints.students}?${searchParams.toString()}`;
             const res = await fetch(url);
             const data = await res.json();
-            console.log("[loadStudentOptions] Data received:", data);
+
             return data.map(s => ({
                 value: s.id,
                 label: `${s.name} (${s.id})`,
@@ -312,7 +323,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
 
     const resetFilters = () => {
         setFilters({
-            campus: isRestricted && allowedCampuses.length === 1 ? [allowedCampuses[0]] : (isRestricted ? allowedCampuses : []),
+            campus: isRestricted ? allowedCampuses : [],
             stream: [],
             testType: [],
             test: [],
@@ -334,26 +345,31 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                         defaultOptions={[]}
                         placeholder="Search Student Name or ID..."
                         onChange={(opt) => {
-                            console.log("Global Search Selection:", opt);
                             if (opt) {
+                                // STRICT ENFORCEMENT: Ensure the student belongs to an allowed campus
+                                // This is a safety check as loadStudentOptions already filters
+                                const finalCampus = isRestricted
+                                    ? (allowedCampuses.includes(opt.campus) ? [opt.campus] : allowedCampuses)
+                                    : (opt.campus ? [opt.campus] : []);
+
                                 setFilters(prev => ({
                                     ...prev,
                                     studentSearch: [opt.value],
-                                    quickSearch: opt.label, // Keep the label for display
-                                    // Auto-select Campus and Stream IF NOT RESTRICTED
-                                    studentSearch: [opt.value],
-                                    quickSearch: opt.label, // Keep the label for display
-                                    // Auto-select Campus and Stream IF NOT RESTRICTED
-                                    campus: isRestricted && allowedCampuses.length === 1 ? [allowedCampuses[0]] : (opt.campus ? [opt.campus] : []),
+                                    quickSearch: opt.label,
+                                    campus: finalCampus,
                                     stream: opt.stream ? [opt.stream] : [],
-                                    testType: [], test: [], topAll: []
+                                    testType: [],
+                                    test: [],
+                                    topAll: []
                                 }));
                             } else {
                                 // Cleared
                                 setFilters(prev => ({
                                     ...prev,
                                     studentSearch: [],
-                                    quickSearch: ''
+                                    quickSearch: '',
+                                    // Reset campus to restricted list if active
+                                    campus: isRestricted ? allowedCampuses : []
                                 }));
                             }
                         }}
