@@ -7,8 +7,11 @@ import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { logActivity } from '../utils/activityLogger';
+import { useAuth } from './auth/AuthProvider';
 
 const AverageReport = ({ filters }) => {
+    const { userData } = useAuth();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
@@ -47,6 +50,13 @@ const AverageReport = ({ filters }) => {
             const data = await response.json();
             setHistory(data);
             setCurrentStudentIndex(0);
+
+            // Log activity
+            const studentCount = new Set(data.map(h => h.STUD_ID)).size;
+            logActivity(userData, 'Generated Progress Report', {
+                studentCount,
+                campus: filters.campus
+            });
         } catch (err) {
             console.error("Fetch Error:", err);
             setModal({
@@ -344,6 +354,7 @@ const AverageReport = ({ filters }) => {
                 const doc = generateStudentPDF(grouped[studentIds[0]], logoImg, impactFont, bookmanFont, bookmanBoldFont);
                 const sName = grouped[studentIds[0]][0].NAME_OF_THE_STUDENT || 'Report';
                 doc.save(`${sName}_Progress_Report.pdf`);
+                logActivity(userData, 'Downloaded Progress PDF', { student: sName });
             } else {
                 // Bulk Download (ZIP)
                 const zip = new JSZip();
@@ -359,6 +370,7 @@ const AverageReport = ({ filters }) => {
 
                 const content = await zip.generateAsync({ type: "blob" });
                 saveAs(content, `${campusName}_Progress_Reports.zip`);
+                logActivity(userData, 'Downloaded Bulk Progress PDF', { count: studentIds.length, campus: campusName });
             }
 
         } catch (err) {

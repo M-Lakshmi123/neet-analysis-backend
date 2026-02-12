@@ -746,7 +746,7 @@ body {
     justify-content: center;
     transition: all 0.2s;
     color: var(--medicon-navy);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .nav-btn:hover {
@@ -1554,17 +1554,52 @@ body {
 }
 
 .action-tag {
-    background: #f1f5f9;
+    display: inline-block;
     padding: 0.25rem 0.6rem;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    font-weight: 600;
+    border-radius: 12px;
+    background: #f1f5f9;
     color: #475569;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: capitalize;
 }
 
 .tag-red {
     background: #fef2f2 !important;
     color: #991b1b !important;
+    border: 1px solid #fee2e2;
+}
+
+.tag-blue {
+    background: #eff6ff !important;
+    color: #1e40af !important;
+    border: 1px solid #dbeafe;
+}
+
+.tag-green {
+    background: #ecfdf5 !important;
+    color: #065f46 !important;
+    border: 1px solid #d1fae5;
+}
+
+.tag-purple {
+    background: #f5f3ff !important;
+    color: #5b21b6 !important;
+    border: 1px solid #ede9fe;
+}
+
+.action-tag-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+}
+
+.log-details {
+    font-size: 0.65rem;
+    color: #64748b;
+    font-style: italic;
+    font-weight: 500;
 }
 
 /* Main App Header */

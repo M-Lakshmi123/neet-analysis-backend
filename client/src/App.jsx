@@ -20,6 +20,7 @@ import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import Sidebar from './components/Sidebar';
 import UserApprovals from './components/admin/UserApprovals';
 import ActivityLogs from './components/admin/ActivityLogs';
+import { logActivity } from './utils/activityLogger';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
     const { currentUser, userData, loading, isAdmin } = useAuth();
@@ -116,32 +117,32 @@ const Dashboard = () => {
     const hasLoggedSession = React.useRef(false);
 
     useEffect(() => {
-        // Log "Opened Dashboard" only once per browser session per login
+        // Log "Session Started" only once per browser session per login
         const sessionKey = 'dashboard_session_active';
         const isSessionActive = sessionStorage.getItem(sessionKey);
 
         if (!isAdmin && userData?.email && !hasLoggedSession.current && !isSessionActive) {
-            const logActivity = async () => {
-                try {
-                    hasLoggedSession.current = true;
-                    sessionStorage.setItem(sessionKey, 'true'); // Mark session as active
-
-                    await addDoc(collection(db, "activity_logs"), {
-                        email: userData.email,
-                        name: userData.name,
-                        campus: userData.campus,
-                        timestamp: new Date().toISOString(),
-                        action: 'Opened Dashboard'
-                    });
-                } catch (err) {
-                    hasLoggedSession.current = false;
-                    sessionStorage.removeItem(sessionKey); // Retry on next attempt if failed
-                    console.error("Failed to log activity:", err);
-                }
-            };
-            logActivity();
+            hasLoggedSession.current = true;
+            sessionStorage.setItem(sessionKey, 'true'); // Mark session as active
+            logActivity(userData, 'Logged In', { method: 'automatic' });
         }
     }, [userData, isAdmin]);
+
+    // Tracking Page Changes
+    useEffect(() => {
+        if (!isAdmin && userData?.email && hasLoggedSession.current) {
+            const pageNames = {
+                'analysis': 'Analysis Report',
+                'averages': 'Average Marks Report',
+                'progress': 'Progress Report',
+                'errors': 'Error Report',
+                'error_top': 'Error Top 100%',
+                'error_count': 'Error Count Report'
+            };
+            const pageName = pageNames[activePage] || activePage;
+            logActivity(userData, `Opened ${pageName}`);
+        }
+    }, [activePage, userData, isAdmin]);
 
 
 

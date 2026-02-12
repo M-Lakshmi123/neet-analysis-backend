@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import FilterBar from './FilterBar';
 import { API_URL, buildQueryParams } from '../utils/apiHelper';
 import { useAuth } from './auth/AuthProvider';
 import jsPDF from 'jspdf';
 import { saveAs } from 'file-saver';
 import Select from 'react-select';
+import { logActivity } from '../utils/activityLogger';
 
 // Subject Sorting Order
 const SUBJECT_ORDER = {
@@ -28,7 +28,7 @@ const TOP_STUDENTS = [
 ];
 
 const ErrorTop100 = ({ filters, setFilters }) => {
-    const { isAdmin, isCoAdmin } = useAuth();
+    const { userData, isAdmin, isCoAdmin } = useAuth();
     // Use props filters instead of local state
     const [subjectFilter, setSubjectFilter] = useState({ value: 'ALL', label: 'All Subjects' });
     const [reportData, setReportData] = useState([]);
@@ -138,6 +138,9 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 });
 
                 setReportData(processed);
+                if (processed.length > 0) {
+                    logActivity(userData, 'Generated Error Top 100 Report', { testCount: processed.length });
+                }
 
             } catch (err) {
                 console.error("Error fetching report:", err);
@@ -443,6 +446,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 ? `${reportData[0].date}_${reportData[0].stream}_${reportData[0].testName}_Error Analysis.pdf`
                 : `Top_100_Error_Report.pdf`;
             doc.save(filename);
+            logActivity(userData, 'Downloaded Error Top 100 PDF', { file: filename });
 
         } catch (err) {
             console.error(err);

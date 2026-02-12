@@ -6,9 +6,12 @@ import Modal from './Modal';
 import LoadingTimer from './LoadingTimer';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import { logActivity } from '../utils/activityLogger';
+import { useAuth } from './auth/AuthProvider';
 
 
 const AnalysisReport = ({ filters }) => {
+    const { userData } = useAuth();
     const [examStats, setExamStats] = useState([]);
     const [studentMarks, setStudentMarks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -38,6 +41,10 @@ const AnalysisReport = ({ filters }) => {
 
                 if (!controller.signal.aborted) {
                     setStudentMarks(marksData && marksData.students ? marksData.students : []);
+                    // Log activity
+                    if (marksData && marksData.students && marksData.students.length > 0) {
+                        logActivity(userData, 'Generated Analysis Report', { studentCount: marksData.students.length });
+                    }
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -414,6 +421,7 @@ const AnalysisReport = ({ filters }) => {
             });
 
             doc.save(`${fullPattern}.pdf`);
+            logActivity(userData, 'Exported Analysis PDF', { file: fullPattern });
         } catch (error) {
             console.error("PDF Export Error:", error);
             setModal({
@@ -571,6 +579,7 @@ const AnalysisReport = ({ filters }) => {
             const buffer = await workbook.xlsx.writeBuffer();
             const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             saveAs(blob, `${fullPattern}.xlsx`);
+            logActivity(userData, 'Exported Analysis Excel', { file: fullPattern });
 
         } catch (error) {
             console.error("Excel Export Error:", error);

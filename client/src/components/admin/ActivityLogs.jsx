@@ -166,7 +166,18 @@ const ActivityLogs = () => {
                                 const logTime = new Date(log.timestamp).getTime();
                                 const now = new Date().getTime();
                                 const isRecent = (now - logTime) < (5 * 60 * 1000); // 5 minutes window
-                                const isLive = isRecent && log.action === 'Opened Dashboard';
+
+                                // Live if there's ANY recent activity from this user
+                                const isLive = isRecent;
+
+                                // Helper for action colors
+                                const getActionClass = (action) => {
+                                    if (action?.includes('Downloaded')) return 'tag-green';
+                                    if (action?.includes('Opened')) return 'tag-blue';
+                                    if (action?.includes('Generated')) return 'tag-purple';
+                                    if (action?.includes('Logged Out') || action?.includes('Cleared')) return 'tag-red';
+                                    return '';
+                                };
 
                                 return (
                                     <tr key={log.id}>
@@ -179,9 +190,18 @@ const ActivityLogs = () => {
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={`action-tag ${log.action === 'Logged Out' ? 'tag-red' : ''}`}>
-                                                {log.action}
-                                            </span>
+                                            <div className="action-tag-container">
+                                                <span className={`action-tag ${getActionClass(log.action)}`}>
+                                                    {log.action}
+                                                </span>
+                                                {log.details && (
+                                                    <div className="log-details">
+                                                        {log.details.student || log.details.count ? (
+                                                            <span>{log.details.student || `${log.details.count} students`}</span>
+                                                        ) : null}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </td>
                                         <td>
                                             {isLive ? (
