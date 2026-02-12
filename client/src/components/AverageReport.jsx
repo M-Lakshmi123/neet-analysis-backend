@@ -267,15 +267,15 @@ const AverageReport = ({ filters }) => {
                 textColor: [0, 0, 0]
             },
             columnStyles: {
-                0: { halign: 'left', cellWidth: 62 }, // Test Name
-                1: { cellWidth: 23 }, // Date
-                2: { cellWidth: 15, fillColor: [255, 255, 204] }, // Total
-                3: { cellWidth: 15 }, // AIR
-                4: { cellWidth: 13, fillColor: [253, 233, 217] }, // Bot
-                5: { cellWidth: 13, fillColor: [218, 238, 243] }, // Zoo
-                6: { cellWidth: 13, fillColor: [224, 231, 255] }, // Bio
-                7: { cellWidth: 13, fillColor: [235, 241, 222] }, // Phy
-                8: { cellWidth: 13, fillColor: [242, 220, 219] }  // Chem
+                0: { halign: 'center', cellWidth: 52 }, // Test Name
+                1: { cellWidth: 26 }, // Date
+                2: { cellWidth: 17, fillColor: [255, 255, 204] }, // Total
+                3: { cellWidth: 17 }, // AIR
+                4: { cellWidth: 13.6, fillColor: [253, 233, 217] }, // Bot
+                5: { cellWidth: 13.6, fillColor: [218, 238, 243] }, // Zoo
+                6: { cellWidth: 13.6, fillColor: [224, 231, 255] }, // Bio
+                7: { cellWidth: 13.6, fillColor: [235, 241, 222] }, // Phy
+                8: { cellWidth: 13.6, fillColor: [242, 220, 219] }  // Chem
             },
             margin: { left: 15, right: 15, bottom: 15 },
             didParseCell: (data) => {
@@ -288,7 +288,7 @@ const AverageReport = ({ filters }) => {
                     } else {
                         data.cell.styles.fontStyle = 'bold';
                     }
-                    data.cell.styles.fillColor = [224, 231, 255];
+                    data.cell.styles.fillColor = [218, 238, 243]; // #DAEEF3
                     data.cell.styles.textColor = [0, 0, 0];
                 }
             }
