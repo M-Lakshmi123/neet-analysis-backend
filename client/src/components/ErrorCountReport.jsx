@@ -66,24 +66,55 @@ const ErrorCountReport = ({ filters }) => {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Error Count Report');
 
-        // 1. Branding Row
-        worksheet.addRow(['Sri Chaitanya Educational Institutions., India']);
         const totalCols = 3 + data.tests.length * 18;
         const lastColLetter = getColumnLetter(totalCols);
+
+        // Define border style
+        const thinBorder = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+        };
+
+        // 1. Branding Row (Merged A1 to Last)
         worksheet.mergeCells(`A1:${lastColLetter}1`);
-        const brandingCell = worksheet.getCell('A1');
-        brandingCell.font = { size: 20, bold: true, color: { argb: 'FF0070C0' } };
-        brandingCell.alignment = { horizontal: 'center', vertical: 'middle' };
-        worksheet.getRow(1).height = 35;
+        const row1 = worksheet.getCell('A1');
+        row1.value = {
+            richText: [
+                { text: '          Sri Chaitanya ', font: { name: 'Impact', size: 32, color: { argb: 'FF00B0F0' } } },
+                { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 32, color: { argb: 'FF00B0F0' } } }
+            ]
+        };
+        row1.alignment = { horizontal: 'center', vertical: 'middle' };
+        worksheet.getRow(1).height = 50;
+
+        // Add Logo
+        try {
+            const response = await fetch('/logo.png');
+            const blob = await response.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const imageId = workbook.addImage({
+                buffer: arrayBuffer,
+                extension: 'png',
+            });
+            worksheet.addImage(imageId, {
+                tl: { col: 0.1, row: 0.1 },
+                ext: { width: 65, height: 60 },
+                editAs: 'oneCell'
+            });
+        } catch (e) {
+            console.error("Failed to add logo:", e);
+        }
 
         // 2. Report Name Row
-        worksheet.addRow(["Test Wise 'W' and 'U' Counts"]);
-        worksheet.mergeCells('A2:C2');
+        worksheet.mergeCells(`A2:${lastColLetter}2`);
         const nameCell = worksheet.getCell('A2');
+        nameCell.value = "Test Wise 'W' and 'U' Counts";
         nameCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF339966' } };
-        nameCell.font = { size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+        nameCell.font = { size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
         nameCell.alignment = { horizontal: 'center', vertical: 'middle' };
-        worksheet.getRow(2).height = 25;
+        worksheet.getRow(2).height = 30;
 
         // 3. Header Row 1 (Fixed cols + Test Names)
         const header1 = ['STUD_ID', 'Name', 'Campus'];
@@ -98,11 +129,36 @@ const ErrorCountReport = ({ filters }) => {
         worksheet.mergeCells('B3:B4');
         worksheet.mergeCells('C3:C4');
 
-        // Merge Test Names horizontally
-        data.tests.forEach((_, idx) => {
+        // Styling for fixed headers
+        ['A3', 'B3', 'C3', 'A4', 'B4', 'C4'].forEach(addr => {
+            const cell = worksheet.getCell(addr);
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+            cell.font = { bold: true };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = thinBorder;
+        });
+
+        // Test Pastel Colors
+        const testColors = ['FFEBF1DE', 'FFDDD9C4', 'FFE4DFEC', 'FFFDE9D9', 'FFDCE6F1', 'FFFFF2CC'];
+
+        // Merge Test Names and Apply Colors
+        data.tests.forEach((testName, idx) => {
             const startCol = 4 + idx * 18;
             const endCol = startCol + 17;
+            const color = testColors[idx % testColors.length];
+
             worksheet.mergeCells(3, startCol, 3, endCol);
+            const testCell = worksheet.getCell(3, startCol);
+            testCell.value = testName;
+            testCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF172554' } }; // Dark blue for test background as shown in second pic
+            testCell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+            testCell.alignment = { horizontal: 'center', vertical: 'middle' };
+            testCell.border = thinBorder;
+
+            // Apply borders to the rest of merged area
+            for (let c = startCol; c <= endCol; c++) {
+                worksheet.getCell(3, c).border = thinBorder;
+            }
         });
 
         // 4. Header Row 2 (Subheaders)
@@ -118,26 +174,26 @@ const ErrorCountReport = ({ filters }) => {
         });
         worksheet.addRow(header2);
 
-        // Styling Headers
-        [3, 4].forEach(rowNum => {
-            const row = worksheet.getRow(rowNum);
-            row.eachCell(cell => {
+        // Styling Row 4 sub-headers with pastel colors
+        data.tests.forEach((_, testIdx) => {
+            const startCol = 4 + testIdx * 18;
+            const endCol = startCol + 17;
+            const color = testColors[testIdx % testColors.length];
+
+            for (let c = startCol; c <= endCol; c++) {
+                const cell = worksheet.getCell(4, c);
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
                 cell.font = { bold: true, size: 9 };
                 cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowNum === 3 ? 'FF008080' : 'FFF3F4F6' } };
-                if (rowNum === 3) cell.font.color = { argb: 'FFFFFFFF' };
-                cell.border = {
-                    top: { style: 'thin' },
-                    left: { style: 'thin' },
-                    bottom: { style: 'thin' },
-                    right: { style: 'thin' }
-                };
-            });
+                cell.border = thinBorder;
+            }
         });
+        worksheet.getRow(3).height = 25;
+        worksheet.getRow(4).height = 35;
 
         // 5. Data Rows
         data.students.forEach(student => {
-            const vals = [student.STUD_ID, student.name, student.campus];
+            const vals = [student.STUD_ID || '', student.name || '', student.campus || ''];
             data.tests.forEach(testName => {
                 const t = student.tests[testName] || {};
                 vals.push(
@@ -148,17 +204,18 @@ const ErrorCountReport = ({ filters }) => {
                     t.che || 0, t.che_rank || 0, t.che_w || 0, t.che_u || 0
                 );
             });
-            const row = worksheet.addRow(vals);
-            row.eachCell((cell, colIdx) => {
-                cell.alignment = { horizontal: colIdx <= 3 ? 'left' : 'center' };
+            const dataRow = worksheet.addRow(vals);
+            dataRow.eachCell((cell, colIdx) => {
+                cell.alignment = { horizontal: colIdx <= 3 ? 'left' : 'center', vertical: 'middle' };
                 cell.border = {
-                    top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                    left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                    bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-                    right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+                    top: { style: 'thin', color: { argb: 'FF000000' } },
+                    left: { style: 'thin', color: { argb: 'FF000000' } },
+                    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                    right: { style: 'thin', color: { argb: 'FF000000' } }
                 };
+                cell.font = { size: 10 };
 
-                // Highlight W and U columns
+                // Alternate background for sub-sections if needed, but here we use W/U highlight as before
                 if (colIdx > 3) {
                     const relativeIdx = (colIdx - 4) % 18;
                     const isW = [4, 8, 12, 16].includes(relativeIdx);
@@ -174,12 +231,13 @@ const ErrorCountReport = ({ filters }) => {
         worksheet.getColumn(2).width = 30;
         worksheet.getColumn(3).width = 25;
         for (let i = 4; i <= totalCols; i++) {
-            worksheet.getColumn(i).width = 8;
+            worksheet.getColumn(i).width = 9;
         }
 
         const buffer = await workbook.xlsx.writeBuffer();
-        saveAs(new Blob([buffer]), 'Error_Count_Report.xlsx');
-        logActivity(userData, 'Exported Error Count Excel', { file: 'Error_Count_Report.xlsx' });
+        const fileName = `Error_Count_Report_${formatDate(new Date(), 'dd-mmm-yy')}.xlsx`;
+        saveAs(new Blob([buffer]), fileName);
+        logActivity(userData, 'Exported Error Count Excel', { file: fileName });
     };
 
     const getColumnLetter = (col) => {
