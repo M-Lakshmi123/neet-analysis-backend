@@ -6,9 +6,12 @@ import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Trophy, AlertCircle, FileSpreadsheet, FileText } from 'lucide-react';
+import { logActivity } from '../utils/activityLogger';
+import { useAuth } from './auth/AuthProvider';
 
 
 const AverageMarksReport = ({ filters }) => {
+    const { userData } = useAuth();
     const [data, setData] = useState([]);
     const [examMeta, setExamMeta] = useState([]);
     const [totalConducted, setTotalConducted] = useState(0);
@@ -36,6 +39,11 @@ const AverageMarksReport = ({ filters }) => {
                 setData(result.students || []);
                 setExamMeta(result.exams || []);
                 setTotalConducted(result.t_cnt || 0);
+
+                // Log activity
+                if (result.students && result.students.length > 0) {
+                    logActivity(userData, 'Generated Average Marks Report', { studentCount: result.students.length });
+                }
             } catch (error) {
                 console.error("Failed to fetch average report:", error);
                 setData([]);
@@ -272,6 +280,7 @@ const AverageMarksReport = ({ filters }) => {
 
         const buffer = await workbook.xlsx.writeBuffer();
         saveAs(new Blob([buffer]), `${getDynamicFileName()}.xlsx`);
+        logActivity(userData, 'Exported Average Marks Excel', { file: getDynamicFileName() });
     };
 
 
@@ -348,7 +357,28 @@ const AverageMarksReport = ({ filters }) => {
                         </table>
                     </div>
                 </div>
-                <div className="avg-range-column">{ranges.map((r, i) => { const count = getRangeCount(r.min); const isActive = selectedRange?.min === r.min; return (<button key={i} className={`range-card ${isActive ? 'active' : ''}`} onClick={() => setSelectedRange(isActive ? null : r)}><div className="range-label">{r.label}</div><div className="range-count">{count || '--'}</div></button>); })}</div>
+                <div className="avg-range-column">
+                    {ranges.map((r, i) => {
+                        const count = getRangeCount(r.min);
+                        const isActive = selectedRange?.min === r.min;
+                        return (
+                            <button
+                                key={i}
+                                className={`range-card ${isActive ? 'active' : ''}`}
+                                onClick={() => {
+                                    const nextState = isActive ? null : r;
+                                    setSelectedRange(nextState);
+                                    if (nextState) {
+                                        logActivity(userData, 'Filtered Progress by Range', { range: r.label });
+                                    }
+                                }}
+                            >
+                                <div className="range-label">{r.label}</div>
+                                <div className="range-count">{count || '--'}</div>
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
             <style>{`
                 .average-marks-container { padding: 0; }

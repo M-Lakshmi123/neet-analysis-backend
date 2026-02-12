@@ -5,8 +5,11 @@ import LoadingTimer from './LoadingTimer';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import Modal from './Modal';
+import { logActivity } from '../utils/activityLogger';
+import { useAuth } from './auth/AuthProvider';
 
 const ErrorCountReport = ({ filters }) => {
+    const { userData } = useAuth();
     const [data, setData] = useState({ students: [], tests: [] });
     const [loading, setLoading] = useState(false);
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
@@ -39,6 +42,10 @@ const ErrorCountReport = ({ filters }) => {
             if (!response.ok) throw new Error("Failed to fetch data");
             const result = await response.json();
             setData(result);
+            // Log activity
+            if (result.students && result.students.length > 0) {
+                logActivity(userData, 'Generated Error Count Report', { studentCount: result.students.length });
+            }
         } catch (err) {
             console.error(err);
             setModal({
@@ -172,6 +179,7 @@ const ErrorCountReport = ({ filters }) => {
 
         const buffer = await workbook.xlsx.writeBuffer();
         saveAs(new Blob([buffer]), 'Error_Count_Report.xlsx');
+        logActivity(userData, 'Exported Error Count Excel', { file: 'Error_Count_Report.xlsx' });
     };
 
     const getColumnLetter = (col) => {

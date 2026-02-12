@@ -172,9 +172,9 @@ const ActivityLogs = () => {
 
                                 // Helper for action colors
                                 const getActionClass = (action) => {
-                                    if (action?.includes('Downloaded')) return 'tag-green';
+                                    if (action?.includes('Downloaded') || action?.includes('Exported')) return 'tag-green';
                                     if (action?.includes('Opened')) return 'tag-blue';
-                                    if (action?.includes('Generated')) return 'tag-purple';
+                                    if (action?.includes('Generated') || action === 'Logged In') return 'tag-purple';
                                     if (action?.includes('Logged Out') || action?.includes('Cleared')) return 'tag-red';
                                     return '';
                                 };

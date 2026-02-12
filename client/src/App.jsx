@@ -121,16 +121,16 @@ const Dashboard = () => {
         const sessionKey = 'dashboard_session_active';
         const isSessionActive = sessionStorage.getItem(sessionKey);
 
-        if (!isAdmin && userData?.email && !hasLoggedSession.current && !isSessionActive) {
+        if (userData?.email && !hasLoggedSession.current && !isSessionActive) {
             hasLoggedSession.current = true;
             sessionStorage.setItem(sessionKey, 'true'); // Mark session as active
             logActivity(userData, 'Logged In', { method: 'automatic' });
         }
-    }, [userData, isAdmin]);
+    }, [userData]);
 
     // Tracking Page Changes
     useEffect(() => {
-        if (!isAdmin && userData?.email && hasLoggedSession.current) {
+        if (userData?.email) {
             const pageNames = {
                 'analysis': 'Analysis Report',
                 'averages': 'Average Marks Report',
@@ -142,7 +142,7 @@ const Dashboard = () => {
             const pageName = pageNames[activePage] || activePage;
             logActivity(userData, `Opened ${pageName}`);
         }
-    }, [activePage, userData, isAdmin]);
+    }, [activePage, userData]);
 
 
 
