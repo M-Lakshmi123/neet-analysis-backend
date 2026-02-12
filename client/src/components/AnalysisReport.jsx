@@ -32,7 +32,31 @@ const AnalysisReport = ({ filters }) => {
                 const statsRes = await fetch(`${API_URL}/api/exam-stats?${queryParams}`, { signal: controller.signal });
                 const statsData = await statsRes.json();
                 if (!controller.signal.aborted) {
-                    setExamStats(statsData && Array.isArray(statsData) ? statsData : []);
+                    let processedStats = [];
+                    if (statsData && Array.isArray(statsData)) {
+                        // Aggregate duplicate rows (test + date)
+                        const grouped = statsData.reduce((acc, curr) => {
+                            const key = `${curr.DATE}_${curr.Test}`;
+                            if (!acc[key]) {
+                                acc[key] = { ...curr };
+                            } else {
+                                acc[key].Attn = (Number(acc[key].Attn) || 0) + (Number(curr.Attn) || 0);
+                                // Max of max scores
+                                acc[key].Max_T = Math.max(Number(acc[key].Max_T) || 0, Number(curr.Max_T) || 0);
+                                acc[key].Max_B = Math.max(Number(acc[key].Max_B) || 0, Number(curr.Max_B) || 0);
+                                acc[key].Max_Z = Math.max(Number(acc[key].Max_Z) || 0, Number(curr.Max_Z) || 0);
+                                acc[key].Max_P = Math.max(Number(acc[key].Max_P) || 0, Number(curr.Max_P) || 0);
+                                acc[key].Max_C = Math.max(Number(acc[key].Max_C) || 0, Number(curr.Max_C) || 0);
+                                // Sum of threshold counts
+                                ['T_700', 'T_680', 'T_650', 'T_600', 'T_550', 'T_530', 'T_450', 'B_160', 'Z_160', 'P_120', 'P_100', 'C_130', 'C_100'].forEach(field => {
+                                    acc[key][field] = (Number(acc[key][field]) || 0) + (Number(curr[field]) || 0);
+                                });
+                            }
+                            return acc;
+                        }, {});
+                        processedStats = Object.values(grouped);
+                    }
+                    setExamStats(processedStats);
                 }
 
                 // Fetch Table 2: Student Marks
