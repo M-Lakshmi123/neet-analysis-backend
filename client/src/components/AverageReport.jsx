@@ -66,7 +66,7 @@ const AverageReport = ({ filters }) => {
         });
     };
 
-    const generateStudentPDF = (studentData, bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont) => {
+    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont) => {
         const doc = new jsPDF('p', 'mm', 'a4');
 
         // Add Fonts
@@ -83,21 +83,9 @@ const AverageReport = ({ filters }) => {
             doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
         }
 
-        // Draw background on first page
-        if (bgImg) {
-            try {
-                doc.addImage(bgImg, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
-            } catch (e) { }
-        }
-
-        // Add event listener for SUBSEQUENT pages to draw background BEFORE content
-        doc.internal.events.subscribe('addPage', () => {
-            if (bgImg) {
-                try {
-                    doc.addImage(bgImg, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
-                } catch (e) { }
-            }
-        });
+        // Plain Background - fulfill "pastel plain" by using a very subtle pastel tint
+        doc.setFillColor(255, 255, 255); // Plain White for best printability
+        doc.rect(0, 0, 210, 297, 'F');
 
         let currentY = 11; // Reduced top margin
 
@@ -221,7 +209,7 @@ const AverageReport = ({ filters }) => {
             currentY += 18;
         }
 
-        const tableColumn = ["Test Name", "Date", "Total\n720", "AIR", "Bot\n180", "Zoo\n180", "Phy\n180", "Chem\n180"];
+        const tableColumn = ["Test Name", "Date", "Total\n720", "AIR", "Bot\n180", "Zoo\n180", "Bio\n360", "Phy\n180", "Chem\n180"];
         const tableRows = studentData.map(row => [
             row.Test,
             formatDate(row.DATE),
@@ -229,6 +217,7 @@ const AverageReport = ({ filters }) => {
             Math.round(row.AIR) || '-',
             Math.round(row.Botany || 0),
             Math.round(row.Zoology || 0),
+            Math.round((Number(row.Botany) || 0) + (Number(row.Zoology) || 0)),
             Math.round(row.Physics || 0),
             Math.round(row.Chemistry || 0)
         ]);
@@ -245,6 +234,7 @@ const AverageReport = ({ filters }) => {
                 avgAIR,
                 avg('Botany'),
                 avg('Zoology'),
+                Math.round(studentData.reduce((a, b) => a + (Number(b.Botany) || 0) + (Number(b.Zoology) || 0), 0) / studentData.length),
                 avg('Physics'),
                 avg('Chemistry')
             ]);
@@ -268,7 +258,7 @@ const AverageReport = ({ filters }) => {
             styles: {
                 font: bookmanFont ? "Bookman" : "helvetica", // Use Bookman
                 fontSize: 9,
-                cellPadding: 2.5,
+                cellPadding: 1.2, // Reduced to save space for printing
                 overflow: 'linebreak',
                 halign: 'center',
                 valign: 'middle',
@@ -277,7 +267,15 @@ const AverageReport = ({ filters }) => {
                 textColor: [0, 0, 0]
             },
             columnStyles: {
-                0: { halign: 'center' } // Centered and auto-fit
+                0: { halign: 'left', cellWidth: 62 }, // Test Name
+                1: { cellWidth: 23 }, // Date
+                2: { cellWidth: 15, fillColor: [255, 255, 204] }, // Total
+                3: { cellWidth: 15 }, // AIR
+                4: { cellWidth: 13, fillColor: [253, 233, 217] }, // Bot
+                5: { cellWidth: 13, fillColor: [218, 238, 243] }, // Zoo
+                6: { cellWidth: 13, fillColor: [224, 231, 255] }, // Bio
+                7: { cellWidth: 13, fillColor: [235, 241, 222] }, // Phy
+                8: { cellWidth: 13, fillColor: [242, 220, 219] }  // Chem
             },
             margin: { left: 15, right: 15, bottom: 15 },
             didParseCell: (data) => {
@@ -318,8 +316,7 @@ const AverageReport = ({ filters }) => {
                 }
             };
 
-            const [bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
-                loadImage('/college-bg.png'),
+            const [logoImg, impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
                 loadImage('/logo.png'),
                 loadFont('/fonts/unicode.impact.ttf'),
                 loadFont('/fonts/bookman-old-style.ttf'),
@@ -339,7 +336,7 @@ const AverageReport = ({ filters }) => {
 
             if (studentIds.length === 1) {
                 // Single Download
-                const doc = generateStudentPDF(grouped[studentIds[0]], bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont);
+                const doc = generateStudentPDF(grouped[studentIds[0]], logoImg, impactFont, bookmanFont, bookmanBoldFont);
                 const sName = grouped[studentIds[0]][0].NAME_OF_THE_STUDENT || 'Report';
                 doc.save(`${sName}_Progress_Report.pdf`);
             } else {
@@ -350,7 +347,7 @@ const AverageReport = ({ filters }) => {
                 studentIds.forEach(id => {
                     const sRows = grouped[id];
                     const sName = sRows[0].NAME_OF_THE_STUDENT || id;
-                    const doc = generateStudentPDF(sRows, bgImg, logoImg, impactFont, bookmanFont, bookmanBoldFont);
+                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont);
                     const pdfBlob = doc.output('blob');
                     zip.file(`${sName}_Progress_Report.pdf`, pdfBlob);
                 });
