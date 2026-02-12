@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { buildQueryParams, API_URL } from '../utils/apiHelper';
+import { buildQueryParams, formatDate, API_URL } from '../utils/apiHelper';
 import LoadingTimer from './LoadingTimer';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
