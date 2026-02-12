@@ -727,6 +727,39 @@ body {
     overflow-x: auto;
 }
 
+/* Navigation Controls */
+.navigation-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.nav-btn {
+    background: white;
+    border: 1.5px solid var(--border-light);
+    border-radius: 6px;
+    padding: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    color: var(--medicon-navy);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.nav-btn:hover {
+    background: #eff6ff;
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.nav-btn:active {
+    transform: translateY(0);
+}
+
 /* Authentication Styles */
 .auth-container {
     height: 100vh;

@@ -6,11 +6,13 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const AverageReport = ({ filters }) => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
+    const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
 
@@ -18,6 +20,7 @@ const AverageReport = ({ filters }) => {
     useEffect(() => {
         setHistory([]);
         setHasSearched(false);
+        setCurrentStudentIndex(0);
     }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.studentSearch]);
 
     const fetchData = async () => {
@@ -43,6 +46,7 @@ const AverageReport = ({ filters }) => {
             }
             const data = await response.json();
             setHistory(data);
+            setCurrentStudentIndex(0);
         } catch (err) {
             console.error("Fetch Error:", err);
             setModal({
@@ -374,15 +378,23 @@ const AverageReport = ({ filters }) => {
     // For now, let's show the FIRST student's data as a preview if multiple are selected,
     // possibly adding a banner saying "X Students Selected".
 
-    // Helper to get preview student
-    const previewStudent = history.length > 0 ? history[0] : null;
-    // Actually, if mixed, history[0] is just the first row. We need to find rows for that student.
-    const previewRows = previewStudent
-        ? history.filter(h => h.STUD_ID?.toString() === previewStudent.STUD_ID?.toString())
+    // Unique students logic
+    const uniqueStudentIds = [...new Set(history.map(h => h.STUD_ID))];
+    const uniqueStudents = uniqueStudentIds.length;
+
+    // Helper to get preview student based on navigation
+    const previewStudentId = uniqueStudentIds[currentStudentIndex];
+    const previewRows = previewStudentId
+        ? history.filter(h => h.STUD_ID?.toString() === previewStudentId.toString())
         : [];
 
-    // Unique students count
-    const uniqueStudents = new Set(history.map(h => h.STUD_ID)).size;
+    const handleNext = () => {
+        setCurrentStudentIndex(prev => (prev + 1) % uniqueStudents);
+    };
+
+    const handlePrev = () => {
+        setCurrentStudentIndex(prev => (prev - 1 + uniqueStudents) % uniqueStudents);
+    };
 
     return (
         <div className="average-report-container">
@@ -391,12 +403,20 @@ const AverageReport = ({ filters }) => {
                     <div>
                         <h3 style={{ margin: 0 }}>Detailed Performance</h3>
                         {uniqueStudents > 1 && (
-                            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                                (Previewing 1 of {uniqueStudents} selected students)
-                            </span>
+                            <div className="navigation-status" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                <button className="nav-btn" onClick={handlePrev} title="Previous Student">
+                                    <ChevronLeft size={16} />
+                                </button>
+                                <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
+                                    Student {currentStudentIndex + 1} of {uniqueStudents}
+                                </span>
+                                <button className="nav-btn" onClick={handleNext} title="Next Student">
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
                         )}
                     </div>
-                    <div className="button-group" style={{ display: 'flex', gap: '10px' }}>
+                    <div className="button-group" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <button className="btn-primary" onClick={fetchData} style={{ backgroundColor: '#6366f1' }}>
                             View Report
                         </button>
@@ -458,24 +478,24 @@ const AverageReport = ({ filters }) => {
                                             <tr key={idx}>
                                                 <td>{row.Test}</td>
                                                 <td>{formatDate(row.DATE)}</td>
-                                                <td className="col-yellow font-bold">{Number(row.Tot_720 || 0).toFixed(1)}</td>
+                                                <td className="col-yellow font-bold">{Math.round(row.Tot_720 || 0)}</td>
                                                 <td className="text-brown">{Math.round(row.AIR) || '-'}</td>
-                                                <td className="col-orange">{Number(row.Botany || 0).toFixed(1)}</td>
-                                                <td className="col-blue-light">{Number(row.Zoology || 0).toFixed(1)}</td>
-                                                <td className="col-blue-med font-bold">{((Number(row.Botany || 0) + Number(row.Zoology || 0))).toFixed(1)}</td>
-                                                <td className="col-green-pale">{Number(row.Physics || 0).toFixed(1)}</td>
-                                                <td className="col-pink-pale">{Number(row.Chemistry || 0).toFixed(1)}</td>
+                                                <td className="col-orange">{Math.round(row.Botany || 0)}</td>
+                                                <td className="col-blue-light">{Math.round(row.Zoology || 0)}</td>
+                                                <td className="col-blue-med font-bold">{Math.round((Number(row.Botany || 0) + Number(row.Zoology || 0)))}</td>
+                                                <td className="col-green-pale">{Math.round(row.Physics || 0)}</td>
+                                                <td className="col-pink-pale">{Math.round(row.Chemistry || 0)}</td>
                                             </tr>
                                         ))}
                                         <tr className="total-row">
                                             <td colSpan={2} className="text-right">AVERAGES</td>
-                                            <td className="col-yellow">{(previewRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / previewRows.length).toFixed(1)}</td>
+                                            <td className="col-yellow">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / previewRows.length)}</td>
                                             <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / previewRows.length)}</td>
-                                            <td className="col-orange">{(previewRows.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / previewRows.length).toFixed(1)}</td>
-                                            <td className="col-blue-light">{(previewRows.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / previewRows.length).toFixed(1)}</td>
-                                            <td className="col-blue-med">{(previewRows.reduce((a, b) => a + (Number(b.Botany || 0) + Number(b.Zoology || 0)), 0) / previewRows.length).toFixed(1)}</td>
-                                            <td className="col-green-pale">{(previewRows.reduce((a, b) => a + (Number(b.Physics) || 0), 0) / previewRows.length).toFixed(1)}</td>
-                                            <td className="col-pink-pale">{(previewRows.reduce((a, b) => a + (Number(b.Chemistry) || 0), 0) / previewRows.length).toFixed(1)}</td>
+                                            <td className="col-orange">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / previewRows.length)}</td>
+                                            <td className="col-blue-light">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / previewRows.length)}</td>
+                                            <td className="col-blue-med">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Botany || 0) + Number(b.Zoology || 0)), 0) / previewRows.length)}</td>
+                                            <td className="col-green-pale">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Physics) || 0), 0) / previewRows.length)}</td>
+                                            <td className="col-pink-pale">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Chemistry) || 0), 0) / previewRows.length)}</td>
                                         </tr>
                                     </tbody>
                                 </table>
