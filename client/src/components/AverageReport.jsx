@@ -213,19 +213,20 @@ const AverageReport = ({ filters }) => {
         const tableRows = studentData.map(row => [
             row.Test,
             formatDate(row.DATE),
-            Math.round(row.Tot_720 || 0),
+            Number(row.Tot_720 || 0).toFixed(1),
             Math.round(row.AIR) || '-',
-            Math.round(row.Botany || 0),
-            Math.round(row.Zoology || 0),
-            Math.round((Number(row.Botany) || 0) + (Number(row.Zoology) || 0)),
-            Math.round(row.Physics || 0),
-            Math.round(row.Chemistry || 0)
+            Number(row.Botany || 0).toFixed(1),
+            Number(row.Zoology || 0).toFixed(1),
+            (Number(row.Botany || 0) + Number(row.Zoology || 0)).toFixed(1),
+            Number(row.Physics || 0).toFixed(1),
+            Number(row.Chemistry || 0).toFixed(1)
         ]);
 
         // Average
         if (studentData.length > 0) {
-            const avg = (key) => Math.round(studentData.reduce((a, b) => a + (Number(b[key]) || 0), 0) / studentData.length);
+            const avg = (key) => (studentData.reduce((a, b) => a + (Number(b[key]) || 0), 0) / studentData.length).toFixed(1);
             const avgAIR = Math.round(studentData.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / studentData.length);
+            const avgBio = (studentData.reduce((a, b) => a + (Number(b.Botany) || 0) + (Number(b.Zoology) || 0), 0) / studentData.length).toFixed(1);
 
             tableRows.push([
                 "AVERAGE",
@@ -234,7 +235,7 @@ const AverageReport = ({ filters }) => {
                 avgAIR,
                 avg('Botany'),
                 avg('Zoology'),
-                Math.round(studentData.reduce((a, b) => a + (Number(b.Botany) || 0) + (Number(b.Zoology) || 0), 0) / studentData.length),
+                avgBio,
                 avg('Physics'),
                 avg('Chemistry')
             ]);
