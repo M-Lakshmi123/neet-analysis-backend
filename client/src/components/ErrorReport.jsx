@@ -450,7 +450,11 @@ const ErrorReport = ({ filters, setFilters }) => {
                 let percVal = "";
                 if (percRaw !== undefined && percRaw !== null && percRaw !== '') {
                     const num = parseFloat(percRaw);
-                    if (!isNaN(num)) percVal = Math.round(num * 100) + "%";
+                    if (!isNaN(num)) {
+                        // If it contains '%' OR it's a high number > 1, treat as already being a percentage
+                        const isAlreadyPercent = String(percRaw).includes('%') || num > 1.0;
+                        percVal = isAlreadyPercent ? Math.round(num) + "%" : Math.round(num * 100) + "%";
+                    }
                 }
 
                 // Details Height: Stacked 2 lines minimum
@@ -852,9 +856,13 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                         <div style={{ marginTop: '2px' }}>
                                                             <span style={{ color: '#FFFF00' }}>Top%: </span>
                                                             <span style={{ color: 'white', marginLeft: '5px' }}>
-                                                                {q.National_Wide_Error && !isNaN(parseFloat(q.National_Wide_Error))
-                                                                    ? Math.round(parseFloat(q.National_Wide_Error) * 100) + '%'
-                                                                    : ''}
+                                                                {(() => {
+                                                                    const raw = q.National_Wide_Error;
+                                                                    if (!raw || isNaN(parseFloat(raw))) return '';
+                                                                    const num = parseFloat(raw);
+                                                                    const isAlreadyPercent = String(raw).includes('%') || num > 1.0;
+                                                                    return isAlreadyPercent ? Math.round(num) + '%' : Math.round(num * 100) + '%';
+                                                                })()}
                                                             </span>
                                                         </div>
                                                     </td>

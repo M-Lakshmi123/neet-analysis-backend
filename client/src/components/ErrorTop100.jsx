@@ -374,7 +374,9 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     doc.text("(%):", currX + wTop / 2, yPos + rowH / 2 + 1, { align: 'center' });
                     doc.setTextColor(255, 0, 0);
                     doc.setFontSize(9);
-                    const perc = q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%';
+                    const num = parseFloat(q.nationalError);
+                    const isAlreadyPercent = String(q.nationalError).includes('%') || num > 1.0;
+                    const perc = q.nationalError ? (isAlreadyPercent ? Math.round(num) + '%' : Math.round(num * 100) + '%') : '0%';
                     doc.text(perc, currX + wTop / 2, yPos + rowH / 2 + 6, { align: 'center' });
                     doc.setTextColor(0);
 
@@ -530,7 +532,13 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
                                                 <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>Top 100(%):</div>
                                                 <div style={{ color: 'red', fontSize: '14px', fontWeight: 'bold' }}>
-                                                    {q.nationalError ? Math.round(parseFloat(q.nationalError) * 100) + '%' : '0%'}
+                                                    {(() => {
+                                                        const raw = q.nationalError;
+                                                        if (!raw || isNaN(parseFloat(raw))) return '0%';
+                                                        const num = parseFloat(raw);
+                                                        const isAlreadyPercent = String(raw).includes('%') || num > 1.0;
+                                                        return isAlreadyPercent ? Math.round(num) + '%' : Math.round(num * 100) + '%';
+                                                    })()}
                                                 </div>
                                             </td>
                                             <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>

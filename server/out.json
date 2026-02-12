@@ -1,0 +1,37 @@
+﻿[dotenv@17.2.3] injecting env (8) from .env -- tip: ≡ƒôí add observability to secrets: https://dotenvx.com/ops
+Connecting to TiDB at gateway01.ap-southeast-1.prod.aws.tidbcloud.com:4000...
+Connected to TiDB (MySQL) Successfully!
+[
+  {
+    "STUD_ID": "246408834",
+    "Student_Name": "DAYANITHA P",
+    "Branch": "VIDYARANYAPURA",
+    "Exam_Date": "06-01-26",
+    "Test_Type": "PT",
+    "Test": "PT-06",
+    "Tot_720": "619",
+    "AIR": "165",
+    "Botany": "146",
+    "B_Rank": "541",
+    "Zoology": "160",
+    "Z_Rank": "512",
+    "Physics": "148",
+    "P_Rank": "90",
+    "Chemistry": "165",
+    "C_Rank": "175",
+    "Q_No": "22",
+    "W_U": "W",
+    "National_Wide_Error": "86%",
+    "Q_URL": "https://i.ibb.co/HDTsQxmX/Q22.png",
+    "S_URL": "https://i.ibb.co/39NdBtbF/S22.png",
+    "Key_Value": "1",
+    "Subject": "PHYSICS",
+    "Topic": "Work, Energy, Power including collisions",
+    "Sub_Topic": "Collisions",
+    "Question_Type": "A&R",
+    "Statement": "Assertion & Reason",
+    "Year": "2025",
+    "Top_ALL": "TOP",
+    "Stream": "SR_ELITE_SET_01"
+  }
+]
