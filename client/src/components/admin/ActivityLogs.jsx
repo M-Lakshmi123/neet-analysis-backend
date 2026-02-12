@@ -9,6 +9,7 @@ const ActivityLogs = () => {
     const [loading, setLoading] = useState(true);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [lastTick, setLastTick] = useState(Date.now());
 
     const [modal, setModal] = useState({
         isOpen: false,
@@ -63,7 +64,15 @@ const ActivityLogs = () => {
 
         setupListener();
 
-        return () => unsubscribe();
+        // Refresh live status markers every 30s
+        const interval = setInterval(() => {
+            setLastTick(Date.now());
+        }, 30000);
+
+        return () => {
+            unsubscribe();
+            clearInterval(interval);
+        };
     }, [startDate, endDate]);
 
     const confirmClearAll = () => {
@@ -162,61 +171,63 @@ const ActivityLogs = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {activityLogs.map(log => {
-                                const logTime = new Date(log.timestamp).getTime();
-                                const now = new Date().getTime();
-                                const isRecent = (now - logTime) < (5 * 60 * 1000); // 5 minutes window
+                            {activityLogs
+                                .filter(log => log.role !== 'admin' && log.email !== "yenjarappa.s@varsitymgmt.com")
+                                .map(log => {
+                                    // Calculate time difference using the latest tick
+                                    const logTime = log.serverTimestamp ? log.serverTimestamp.toMillis() : new Date(log.timestamp).getTime();
+                                    const isRecent = (lastTick - logTime) < (5 * 60 * 1000); // 5 minutes window
 
-                                // Live if there's ANY recent activity from this user
-                                const isLive = isRecent;
+                                    // Status logic
+                                    const isLive = isRecent;
 
-                                // Helper for action colors
-                                const getActionClass = (action) => {
-                                    if (action?.includes('Downloaded') || action?.includes('Exported')) return 'tag-green';
-                                    if (action?.includes('Opened')) return 'tag-blue';
-                                    if (action?.includes('Generated') || action === 'Logged In') return 'tag-purple';
-                                    if (action?.includes('Logged Out') || action?.includes('Cleared')) return 'tag-red';
-                                    return '';
-                                };
+                                    // Helper for action colors
+                                    const getActionClass = (action) => {
+                                        if (action?.includes('Downloaded') || action?.includes('Exported')) return 'tag-green';
+                                        if (action?.includes('Opened')) return 'tag-blue';
+                                        if (action?.includes('Generated') || action === 'Logged In') return 'tag-purple';
+                                        if (action?.includes('Logged Out') || action?.includes('Cleared')) return 'tag-red';
+                                        return '';
+                                    };
 
-                                return (
-                                    <tr key={log.id}>
-                                        <td className="font-bold">{log.name}</td>
-                                        <td>{log.campus}</td>
-                                        <td>
-                                            <div className="time-display">
-                                                <span className="date">{new Date(log.timestamp).toLocaleDateString()}</span>
-                                                <span className="time">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div className="action-tag-container">
-                                                <span className={`action-tag ${getActionClass(log.action)}`}>
-                                                    {log.action}
-                                                </span>
-                                                {log.details && (
-                                                    <div className="log-details">
-                                                        {log.details.student || log.details.count ? (
-                                                            <span>{log.details.student || `${log.details.count} students`}</span>
-                                                        ) : null}
-                                                    </div>
+                                    return (
+                                        <tr key={log.id}>
+                                            <td className="font-bold">{log.name}</td>
+                                            <td>{log.campus}</td>
+                                            <td>
+                                                <div className="time-display">
+                                                    <span className="date">{new Date(log.timestamp).toLocaleDateString()}</span>
+                                                    <span className="time">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div className="action-tag-container">
+                                                    <span className={`action-tag ${getActionClass(log.action)}`}>
+                                                        {log.action}
+                                                    </span>
+                                                    {log.details && (
+                                                        <div className="log-details">
+                                                            {log.details.student || log.details.count ? (
+                                                                <span>{log.details.student || `${log.details.count} students`}</span>
+                                                            ) : null}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {isLive ? (
+                                                    <span className="status-badge live">
+                                                        <span className="online-indicator"></span> Live
+                                                    </span>
+                                                ) : (
+                                                    <span className="status-badge offline">
+                                                        <span className="offline-indicator"></span> Offline
+                                                    </span>
                                                 )}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            {isLive ? (
-                                                <span className="status-badge live">
-                                                    <span className="online-indicator"></span> Live
-                                                </span>
-                                            ) : (
-                                                <span className="status-badge offline">
-                                                    <span className="offline-indicator"></span> Offline
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             {activityLogs.length === 0 && !loading && (
                                 <tr>
                                     <td colSpan="5" className="text-center py-8">No activity recorded yet</td>

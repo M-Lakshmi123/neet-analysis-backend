@@ -12,11 +12,15 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 export const logActivity = async (userData, action, details = null) => {
     if (!userData || !userData.email) return;
 
+    // Do not log activity for System Admins as requested
+    if (userData.role === 'admin') return;
+
     try {
         await addDoc(collection(db, "activity_logs"), {
             email: userData.email,
             name: userData.name || 'Unknown',
             campus: userData.campus || 'Not Set',
+            role: userData.role || 'principal',
             action: action,
             details: details,
             timestamp: new Date().toISOString(), // Keeping ISO string for compatibility with existing code
