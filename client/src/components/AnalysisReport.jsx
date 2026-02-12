@@ -36,20 +36,34 @@ const AnalysisReport = ({ filters }) => {
                     if (statsData && Array.isArray(statsData)) {
                         // Aggregate duplicate rows (test + date)
                         const grouped = statsData.reduce((acc, curr) => {
-                            const key = `${curr.DATE}_${curr.Test}`;
-                            if (!acc[key]) {
-                                acc[key] = { ...curr };
+                            // Normalize Key: Use the same display format for the key to avoid timezone/format mismatches
+                            const dateKey = formatDate(curr.DATE);
+                            const testKey = String(curr.Test || '').trim().toUpperCase();
+                            const groupKey = `${dateKey}_${testKey}`;
+
+                            if (!acc[groupKey]) {
+                                acc[groupKey] = { ...curr };
+                                // Ensure numeric fields are numbers
+                                acc[groupKey].Attn = Number(curr.Attn) || 0;
+                                acc[groupKey].Max_T = Number(curr.Max_T) || 0;
+                                acc[groupKey].Max_B = Number(curr.Max_B) || 0;
+                                acc[groupKey].Max_Z = Number(curr.Max_Z) || 0;
+                                acc[groupKey].Max_P = Number(curr.Max_P) || 0;
+                                acc[groupKey].Max_C = Number(curr.Max_C) || 0;
+                                ['T_700', 'T_680', 'T_650', 'T_600', 'T_550', 'T_530', 'T_450', 'B_160', 'Z_160', 'P_120', 'P_100', 'C_130', 'C_100'].forEach(field => {
+                                    acc[groupKey][field] = Number(curr[field]) || 0;
+                                });
                             } else {
-                                acc[key].Attn = (Number(acc[key].Attn) || 0) + (Number(curr.Attn) || 0);
+                                acc[groupKey].Attn = (Number(acc[groupKey].Attn) || 0) + (Number(curr.Attn) || 0);
                                 // Max of max scores
-                                acc[key].Max_T = Math.max(Number(acc[key].Max_T) || 0, Number(curr.Max_T) || 0);
-                                acc[key].Max_B = Math.max(Number(acc[key].Max_B) || 0, Number(curr.Max_B) || 0);
-                                acc[key].Max_Z = Math.max(Number(acc[key].Max_Z) || 0, Number(curr.Max_Z) || 0);
-                                acc[key].Max_P = Math.max(Number(acc[key].Max_P) || 0, Number(curr.Max_P) || 0);
-                                acc[key].Max_C = Math.max(Number(acc[key].Max_C) || 0, Number(curr.Max_C) || 0);
+                                acc[groupKey].Max_T = Math.max(Number(acc[groupKey].Max_T) || 0, Number(curr.Max_T) || 0, Number(acc[groupKey].Max_T) || 0);
+                                acc[groupKey].Max_B = Math.max(Number(acc[groupKey].Max_B) || 0, Number(curr.Max_B) || 0, Number(acc[groupKey].Max_B) || 0);
+                                acc[groupKey].Max_Z = Math.max(Number(acc[groupKey].Max_Z) || 0, Number(curr.Max_Z) || 0, Number(acc[groupKey].Max_Z) || 0);
+                                acc[groupKey].Max_P = Math.max(Number(acc[groupKey].Max_P) || 0, Number(curr.Max_P) || 0, Number(acc[groupKey].Max_P) || 0);
+                                acc[groupKey].Max_C = Math.max(Number(acc[groupKey].Max_C) || 0, Number(curr.Max_C) || 0, Number(acc[groupKey].Max_C) || 0);
                                 // Sum of threshold counts
                                 ['T_700', 'T_680', 'T_650', 'T_600', 'T_550', 'T_530', 'T_450', 'B_160', 'Z_160', 'P_120', 'P_100', 'C_130', 'C_100'].forEach(field => {
-                                    acc[key][field] = (Number(acc[key][field]) || 0) + (Number(curr[field]) || 0);
+                                    acc[groupKey][field] = (Number(acc[groupKey][field]) || 0) + (Number(curr[field]) || 0);
                                 });
                             }
                             return acc;
