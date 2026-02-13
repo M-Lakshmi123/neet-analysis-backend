@@ -483,8 +483,12 @@ app.get('/api/analysis-report', async (req, res) => {
 app.get('/api/erp/filters', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const { branch, stream, testType, test } = req.query;
-        console.log(`[ERP Filters] Request: branch=${branch}, stream=${stream}, testType=${testType}, test=${test}`);
+        // Frontend sends 'campus', but we use 'Branch' in ERP_REPORT table.
+        // We handle both for compatibility.
+        const { branch, campus, stream, testType, test } = req.query;
+        const activeBranch = branch || campus;
+
+        console.log(`[ERP Filters] Request: branch=${activeBranch}, stream=${stream}, testType=${testType}, test=${test}`);
 
         const buildOptionClause = (column, values) => {
             if (!values || values === 'All' || values === '__ALL__') return null;
@@ -499,28 +503,33 @@ app.get('/api/erp/filters', async (req, res) => {
             return `${column} IN (${list})`;
         };
 
-        // Note: Frontend sends 'branch' (mapped to campus filter), we query 'Branch' column
-        const branchClause = buildOptionClause('Branch', branch);
+        const branchClause = buildOptionClause('Branch', activeBranch);
         const streamClause = buildOptionClause('Stream', stream);
         const testTypeClause = buildOptionClause('Test_Type', testType);
         const testClause = buildOptionClause('Test', test);
 
+        // 1. Branches Query - Should we filter this? 
+        // For restricted users, the frontend handles it, but let's keep it open for admins to see all.
         const branchesQuery = 'SELECT DISTINCT TRIM(Branch) as Branch FROM ERP_REPORT WHERE Branch IS NOT NULL AND Branch != \'\' ORDER BY Branch';
 
+        // 2. Streams - Dependent on Branch
         const sWhere = branchClause ? `WHERE ${branchClause}` : 'WHERE 1=1';
         const streamsQuery = `SELECT DISTINCT TRIM(Stream) as Stream FROM ERP_REPORT ${sWhere} AND Stream IS NOT NULL AND Stream != '' ORDER BY Stream`;
 
+        // 3. Test Types - Dependent on Branch + Stream
         let ttClauses = [];
         if (branchClause) ttClauses.push(branchClause);
         if (streamClause) ttClauses.push(streamClause);
         const ttWhere = ttClauses.length > 0 ? `WHERE ${ttClauses.join(' AND ')}` : 'WHERE 1=1';
         const testTypesQuery = `SELECT DISTINCT TRIM(Test_Type) as Test_Type FROM ERP_REPORT ${ttWhere} AND Test_Type IS NOT NULL AND Test_Type != '' ORDER BY Test_Type`;
 
+        // 4. Tests - Dependent on Branch + Stream + Test_Type
         let tClauses = [...ttClauses];
         if (testTypeClause) tClauses.push(testTypeClause);
         const tWhere = tClauses.length > 0 ? `WHERE ${tClauses.join(' AND ')}` : 'WHERE 1=1';
         const testsQuery = `SELECT DISTINCT TRIM(Test) as Test FROM ERP_REPORT ${tWhere} AND Test IS NOT NULL AND Test != '' ORDER BY Test`;
 
+        // 5. Top_ALL - Dependent on Branch + Stream + Test_Type + Test
         let topClauses = [...tClauses];
         if (testClause) topClauses.push(testClause);
         const topWhere = topClauses.length > 0 ? `WHERE ${topClauses.join(' AND ')}` : 'WHERE 1=1';
