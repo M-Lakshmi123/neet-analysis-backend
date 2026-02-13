@@ -101,27 +101,29 @@ const ErrorReport = ({ filters, setFilters }) => {
             const processed = Object.values(grouped).map(student => {
                 let testsArr = Object.values(student.tests);
 
-                // Sort Tests by Date (Latest First)
+                const parseDate = (d) => {
+                    if (!d || typeof d !== 'string') return 0;
+                    const parts = d.split('-');
+                    if (parts.length !== 3) return 0;
+                    const [day, month, year] = parts.map(Number);
+                    const fullYear = year < 100 ? 2000 + year : year;
+                    return new Date(fullYear, month - 1, day).getTime();
+                };
+
+                // Sort Tests by Date (Oldest to Newest)
                 testsArr.sort((a, b) => {
-                    const d1 = new Date(a.meta.date);
-                    const d2 = new Date(b.meta.date);
-                    return d2 - d1;
+                    return parseDate(a.meta.date) - parseDate(b.meta.date);
                 });
 
-                // Sort Questions by National Error Descending (Largest to Smallest)
+                // Sort Questions by Sequence Order (Q1, Q2, Q3...)
                 testsArr = testsArr.map(t => {
                     t.questions.sort((a, b) => {
-                        const valA = parseFloat(a.National_Wide_Error) || 0;
-                        const valB = parseFloat(b.National_Wide_Error) || 0;
-                        if (valB !== valA) return valB - valA;
-
-                        // Fallback to Subject then QNo
-                        const subOrder = getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject);
-                        if (subOrder !== 0) return subOrder;
-
                         const qNoA = parseInt(a.Q_No) || 0;
                         const qNoB = parseInt(b.Q_No) || 0;
-                        return qNoA - qNoB;
+                        if (qNoA !== qNoB) return qNoA - qNoB;
+
+                        // Same question number (rare), sort by subject
+                        return getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject);
                     });
                     return t;
                 });

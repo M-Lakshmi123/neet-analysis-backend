@@ -101,8 +101,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     });
                 });
 
-                // Process into array and sort
-                const processed = Object.values(testsGrouped).map(test => {
+                // Process into array
+                let processed = Object.values(testsGrouped).map(test => {
                     const questionsArr = Object.values(test.questions).map(q => {
                         // Group wrong students by campus
                         const byCampus = {};
