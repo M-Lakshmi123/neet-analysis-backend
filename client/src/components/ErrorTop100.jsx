@@ -35,6 +35,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
     const [loading, setLoading] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
     const [pdfProgress, setPdfProgress] = useState('');
+    const [zoom, setZoom] = useState(1);
 
     // Subject Options
     const subjectOptions = [
@@ -461,8 +462,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
     if (!isAdmin && !isCoAdmin) return <div style={{ padding: '50px', textAlign: 'center', color: 'white' }}>Access Denied. Admins Only.</div>;
 
     return (
-        <div style={{ padding: '20px', backgroundColor: '#808080', minHeight: '100vh', boxSizing: 'border-box' }}>
-            <div className="no-print" style={{ maxWidth: '1200px', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px' }}>
+        <div style={{ padding: '20px', backgroundColor: '#808080', minHeight: '100vh', boxSizing: 'border-box', overflow: 'auto' }}>
+            <div className="no-print" style={{ maxWidth: '98%', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px' }}>
                 {/* Removed FilterBar from here as it is now in App.jsx */}
 
                 <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -471,6 +472,14 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                         <div style={{ width: '200px' }}>
                             <Select options={subjectOptions} value={subjectFilter} onChange={setSubjectFilter} />
                         </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #dee2e6' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '13px', marginRight: '5px' }}>Zoom:</span>
+                        <button onClick={() => setZoom(prev => Math.max(prev - 0.1, 0.5))} style={{ padding: '2px 8px', cursor: 'pointer' }}>-</button>
+                        <span style={{ minWidth: '45px', textAlign: 'center', fontWeight: 'bold' }}>{Math.round(zoom * 100)}%</span>
+                        <button onClick={() => setZoom(prev => Math.min(prev + 0.1, 2))} style={{ padding: '2px 8px', cursor: 'pointer' }}>+</button>
+                        <button onClick={() => setZoom(1)} style={{ padding: '2px 8px', cursor: 'pointer', marginLeft: '5px', fontSize: '12px' }}>Reset</button>
                     </div>
 
                     <div style={{ flex: 1, textAlign: 'right' }}>
@@ -499,19 +508,28 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 if (renderQs.length === 0) return null;
 
                 return (
-                    <div key={tIdx} style={{ maxWidth: '1200px', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '20px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
+                    <div key={tIdx} style={{
+                        maxWidth: '98%',
+                        margin: '0 auto 40px auto',
+                        backgroundColor: 'white',
+                        padding: '20px',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'top center',
+                        marginBottom: `${(100 * zoom) - 100 + 40}px` // Minimal adjustment for Top100 as it's not fixed height
+                    }}>
                         <h2 style={{ textAlign: 'center', color: '#000', fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
                             {test.date}_{test.stream}_{test.testName}_Error Analysis
                         </h2>
 
                         <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', tableLayout: 'fixed' }}>
                             <colgroup>
-                                <col style={{ width: '40px' }} />
-                                <col style={{ width: '60px' }} />
-                                <col style={{ width: '80px' }} />
-                                <col style={{ width: '341px' }} />
-                                <col style={{ width: '100px' }} />
-                                <col style={{ width: 'auto' }} />
+                                <col style={{ width: '4%' }} />
+                                <col style={{ width: '6%' }} />
+                                <col style={{ width: '8%' }} />
+                                <col style={{ width: '30%' }} />
+                                <col style={{ width: '10%' }} />
+                                <col style={{ width: '42%' }} />
                             </colgroup>
                             <tbody>
                                 {renderQs.map((q, qIdx) => (
@@ -542,7 +560,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                                                 </div>
                                             </td>
                                             <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-                                                {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '318px', height: 'auto', display: 'block', margin: '0 auto' }} />}
+                                                {q.qUrl && <img src={q.qUrl} alt="Question" style={{ width: '100%', maxWidth: '450px', height: 'auto', display: 'block', margin: '0 auto' }} />}
                                             </td>
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.subject}</td>
                                             <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top', backgroundColor: '#4F81BD', color: 'white' }}>

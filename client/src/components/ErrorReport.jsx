@@ -29,7 +29,7 @@ const ErrorReport = ({ filters, setFilters }) => {
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
-    const [pdfProgress, setPdfProgress] = useState('');
+    const [zoom, setZoom] = useState(1);
     const reportRef = useRef(null);
 
     // Subject Options
@@ -662,9 +662,13 @@ const ErrorReport = ({ filters, setFilters }) => {
         }
     };
 
+    const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
+    const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.5));
+    const handleZoomReset = () => setZoom(1);
+
     return (
         <div style={{ padding: '20px', backgroundColor: '#808080', fontFamily: '"Bookman Old Style", "Times New Roman", serif', minHeight: '100vh', boxSizing: 'border-box', overflow: 'auto' }}>
-            <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', fontFamily: 'Arial, sans-serif' }}>
+            <div className="no-print" style={{ maxWidth: '100%', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', fontFamily: 'Arial, sans-serif' }}>
                 {/* Removed FilterBar from here as it is now in App.jsx */}
 
                 {/* SUBJECT FILTER & ACTION BUTTONS */}
@@ -679,6 +683,14 @@ const ErrorReport = ({ filters, setFilters }) => {
                                 onChange={setSubjectFilter}
                             />
                         </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #dee2e6' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '13px', marginRight: '5px' }}>Zoom:</span>
+                        <button onClick={handleZoomOut} style={{ padding: '2px 8px', cursor: 'pointer' }}>-</button>
+                        <span style={{ minWidth: '45px', textAlign: 'center', fontWeight: 'bold' }}>{Math.round(zoom * 100)}%</span>
+                        <button onClick={handleZoomIn} style={{ padding: '2px 8px', cursor: 'pointer' }}>+</button>
+                        <button onClick={handleZoomReset} style={{ padding: '2px 8px', cursor: 'pointer', marginLeft: '5px', fontSize: '12px' }}>Reset</button>
                     </div>
 
                     {/* View Report Button */}
@@ -731,12 +743,23 @@ const ErrorReport = ({ filters, setFilters }) => {
 
             <LoadingTimer isLoading={loading} />
 
-            {!loading && reportData.slice(0, 20).map((student, sIdx) => {
+            {!loading && reportData.map((student, sIdx) => {
 
                 // Filter questions for rendering
 
                 return (
-                    <div key={sIdx} style={{ width: '210mm', minHeight: '297mm', margin: '0 auto 40px auto', backgroundColor: 'white', padding: '10mm', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', boxSizing: 'border-box' }}>
+                    <div key={sIdx} style={{
+                        width: '98%',
+                        minHeight: '297mm',
+                        margin: '0 auto 40px auto',
+                        backgroundColor: 'white',
+                        padding: '10mm',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                        boxSizing: 'border-box',
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'top center',
+                        marginBottom: `${(zoom - 1) * 287 + 20}mm` // Correctly pushes next page down; 210mm width, 297mm height base
+                    }}>
 
                         {/* Header */}
                         <div style={{ textAlign: 'center', marginBottom: '15px' }}>
@@ -830,11 +853,11 @@ const ErrorReport = ({ filters, setFilters }) => {
                                     {renderQs.map((q, qIdx) => (
                                         <table key={qIdx} style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', marginBottom: '10px', backgroundColor: 'white' }}>
                                             <colgroup>
-                                                <col style={{ width: '15mm' }} />
-                                                <col style={{ width: '11mm' }} />
-                                                <col style={{ width: '72mm' }} />
-                                                <col style={{ width: '72mm' }} />
-                                                <col style={{ width: '22mm' }} />
+                                                <col style={{ width: '7.8%' }} />
+                                                <col style={{ width: '5.7%' }} />
+                                                <col style={{ width: '37.5%' }} />
+                                                <col style={{ width: '37.5%' }} />
+                                                <col style={{ width: '11.5%' }} />
                                             </colgroup>
                                             <thead>
                                                 <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
@@ -884,7 +907,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                                         <div style={{ padding: '4px', fontSize: '10px', fontWeight: 'bold', color: '#666' }}>Q.{q.Q_No}</div>
                                                                         <div style={{ textAlign: 'center', paddingBottom: '10px' }}>
                                                                             {q.Q_URL ? (
-                                                                                <img src={q.Q_URL} style={{ width: '321px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
+                                                                                <img src={q.Q_URL} style={{ width: '100%', maxWidth: '450px', height: 'auto', display: 'block', margin: '0 auto' }} alt="Q" />
                                                                             ) : (
                                                                                 <div style={{ padding: '20px', fontStyle: 'italic', color: '#ccc', fontSize: '12px' }}>No Image</div>
                                                                             )}
