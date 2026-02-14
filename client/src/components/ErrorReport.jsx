@@ -29,6 +29,7 @@ const ErrorReport = ({ filters, setFilters }) => {
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
+    const [pdfProgress, setPdfProgress] = useState('');
     const [zoom, setZoom] = useState(1);
     const reportRef = useRef(null);
 

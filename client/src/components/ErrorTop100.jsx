@@ -456,6 +456,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
             alert("Error generating PDF");
         } finally {
             setGeneratingPdf(false);
+            setPdfProgress('');
         }
     };
 
@@ -488,7 +489,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                             disabled={reportData.length === 0 || generatingPdf}
                             style={{ backgroundColor: '#0070c0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                         >
-                            {generatingPdf ? 'Generating...' : `⬇ Download PDF Report`}
+                            {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download PDF Report`}
                         </button>
                     </div>
                 </div>
