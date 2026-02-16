@@ -861,7 +861,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                 <col style={{ width: '11.5%' }} />
                                             </colgroup>
                                             <thead>
-                                                <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '11px', fontWeight: 'bold' }}>
+                                                <tr style={{ backgroundColor: '#800000', color: 'white', fontSize: '13px', fontWeight: 'bold' }}>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center', height: '28px' }}>{q.W_U}</td>
                                                     <td style={{ border: '1px solid black', borderRight: '1px solid white', textAlign: 'center' }}>{q.Q_No}</td>
 
