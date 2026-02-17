@@ -148,7 +148,7 @@ const TargetVsAchieved = ({ filters }) => {
                 data: [targetVal, achievedVal],
                 backgroundColor: [
                     '#003366', // Dark Target Blue
-                    achievedVal >= targetVal ? '#006600' : '#1F497D' // Pure Green or Pulse Red
+                    achievedVal >= targetVal ? '#006600' : '#FF0066' // Pure Green or Pulse Red
                 ],
                 borderRadius: 12,
                 barThickness: 80,
@@ -311,15 +311,15 @@ const TargetVsAchieved = ({ filters }) => {
                 .label { font-size: 0.7rem; font-weight: 900; color: #000; margin-bottom: 2px; }
                 .value { font-size: 1.1rem; font-weight: 950; color: #000; }
                 
-                .match-green { background: rgba(0, 102, 0, 0.1) !important; color: #006600 !important; }
-                .match-green .value, .match-green .label { color: #006600 !important; }
+                .match-green { background: #006600 !important; border: 1px solid rgba(255,255,255,0.1) !important; }
+                .match-green .value, .match-green .label { color: #fff !important; }
                 
-                .match-red { background: rgba(31, 73, 125, 0.1) !important; }
-                .match-red .value, .match-red .label { color: #1F497D !important; }
+                .match-red { background: #1F497D !important; border: 1px solid rgba(255,255,255,0.1) !important; }
+                .match-red .value, .match-red .label { color: #fff !important; }
                 
                 .interactive { cursor: pointer; transition: 0.3s; }
                 .interactive:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-                .active-ring { border: 2px solid #000 !important; }
+                .active-ring { border: 2px solid #fff !important; }
 
                 .split-view {
                     display: grid;
