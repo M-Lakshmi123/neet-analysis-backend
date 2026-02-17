@@ -314,7 +314,7 @@ const TargetVsAchieved = ({ filters }) => {
                 .match-green { background: #006600 !important; border: 1px solid rgba(255,255,255,0.1) !important; }
                 .match-green .value, .match-green .label { color: #fff !important; }
                 
-                .match-red { background: #1F497D !important; border: 1px solid rgba(255,255,255,0.1) !important; }
+                .match-red { background: #FF0066 !important; border: 1px solid rgba(255,255,255,0.1) !important; }
                 .match-red .value, .match-red .label { color: #fff !important; }
                 
                 .interactive { cursor: pointer; transition: 0.3s; }
