@@ -5,25 +5,21 @@ import {
     Chart as ChartJS,
     CategoryScale,
     LinearScale,
-    PointElement,
-    LineElement,
+    BarElement,
     Title,
     Tooltip,
-    Legend,
-    Filler
+    Legend
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 ChartJS.register(
     CategoryScale,
     LinearScale,
-    PointElement,
-    LineElement,
+    BarElement,
     Title,
     Tooltip,
     Legend,
-    Filler,
     ChartDataLabels
 );
 
@@ -32,7 +28,8 @@ const TargetVsAchieved = ({ filters }) => {
     const [studentResults, setStudentResults] = useState([]);
     const [examStats, setExamStats] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [selectedThreshold, setSelectedThreshold] = useState(null);
+    // Default to first threshold to show something in the chart/table
+    const [selectedThreshold, setSelectedThreshold] = useState('>= 710');
 
     const thresholds = [
         { label: '>= 710', key: '>= 710M', statsKey: 'T_710', value: 710 },
@@ -51,7 +48,6 @@ const TargetVsAchieved = ({ filters }) => {
         { label: '>= 200', key: '>= 200M', statsKey: 'T_200', value: 200 },
     ];
 
-    // Fetch Target Definitions once
     useEffect(() => {
         const fetchTargets = async () => {
             try {
@@ -65,24 +61,16 @@ const TargetVsAchieved = ({ filters }) => {
         fetchTargets();
     }, []);
 
-    // Fetch Data based on filters
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
                 const queryParams = buildQueryParams(filters).toString();
-
-                // 1. Fetch Student Merit List (Averages) for detail table
                 const marksPromise = fetch(`${API_URL}/api/analysis-report?${queryParams}`).then(r => r.json());
-
-                // 2. Fetch Exam Stats (for average count per exam)
                 const statsPromise = fetch(`${API_URL}/api/exam-stats?${queryParams}`).then(r => r.json());
-
                 const [marksData, statsData] = await Promise.all([marksPromise, statsPromise]);
-
                 setStudentResults(marksData.students || []);
                 setExamStats(statsData || []);
-
             } catch (error) {
                 console.error("Failed to fetch performance data:", error);
             } finally {
@@ -92,10 +80,9 @@ const TargetVsAchieved = ({ filters }) => {
         fetchData();
     }, [filters]);
 
-    // Compute Filtered Targets
+    // Mapping Logic for Stream
     const aggregatedTarget = useMemo(() => {
         if (!allTargets.length) return {};
-
         let filtered = allTargets;
 
         // Filter by Campus
@@ -105,10 +92,16 @@ const TargetVsAchieved = ({ filters }) => {
             );
         }
 
-        // Filter by Stream
+        // Filter by Stream with SR ELITE mapping
         if (filters.stream && filters.stream.length > 0 && !filters.stream.includes('All')) {
+            const mappedStreams = filters.stream.map(s => {
+                const up = s.trim().toUpperCase();
+                if (up === 'SR_ELITE_SET_01' || up === 'SR_ELITE_SET_02' || up === 'SR ELITE') return 'SR ELITE';
+                return up;
+            });
+
             filtered = filtered.filter(t =>
-                filters.stream.some(s => t.Stream.trim().toUpperCase() === s.trim().toUpperCase())
+                mappedStreams.includes(t.Stream.trim().toUpperCase())
             );
         }
 
@@ -119,421 +112,266 @@ const TargetVsAchieved = ({ filters }) => {
         return result;
     }, [allTargets, filters, thresholds]);
 
-    // Compute Achieved Counts (Average per Exam)
+    // Achieved Counts (Average per Exam)
     const achievedCounts = useMemo(() => {
         if (!examStats.length) return {};
         const totalExams = examStats.length;
         const counts = {};
         thresholds.forEach(th => {
             const sumOfCounts = examStats.reduce((acc, curr) => acc + (Number(curr[th.statsKey]) || 0), 0);
-            counts[th.key] = Math.round((sumOfCounts / totalExams) * 10) / 10; // 1 decimal place
+            counts[th.key] = Math.round((sumOfCounts / totalExams) * 10) / 10;
         });
         return counts;
     }, [examStats, thresholds]);
 
-    // Students for the selected threshold table (based on their average performance)
+    // Detail Students
     const detailStudents = useMemo(() => {
-        if (!selectedThreshold) return [];
         const thresholdValue = thresholds.find(t => t.label === selectedThreshold)?.value || 0;
         return studentResults
             .filter(s => Number(s.tot) >= thresholdValue)
             .sort((a, b) => b.tot - a.tot);
     }, [studentResults, selectedThreshold]);
 
-    // Chart Data
+    // Bar Chart Data (Comparison for Selected Threshold)
+    const selectedThInfo = thresholds.find(t => t.label === selectedThreshold);
     const chartData = {
-        labels: thresholds.map(t => t.label),
+        labels: [selectedThreshold + ' Threshold Comparison'],
         datasets: [
             {
                 label: 'Target',
-                data: thresholds.map(t => aggregatedTarget[t.key] || 0),
-                borderColor: '#1e40af', // Darker Blue
-                backgroundColor: 'rgba(30, 64, 175, 0.1)',
-                borderWidth: 4,
-                pointRadius: 5,
-                pointHoverRadius: 8,
-                tension: 0.3,
-                fill: true,
-                datalabels: { align: 'top', color: '#1e40af', font: { weight: 'bold', size: 11 } }
+                data: [aggregatedTarget[selectedThInfo?.key] || 0],
+                backgroundColor: '#1e40af', // Deep Blue
+                borderRadius: 8,
+                barThickness: 60,
+                datalabels: { color: 'white', font: { weight: 'bold' } }
             },
             {
                 label: 'Achieved',
-                data: thresholds.map(t => achievedCounts[t.key] || 0),
-                borderColor: '#059669', // Emerald Green
-                backgroundColor: 'rgba(5, 150, 105, 0.1)',
-                borderWidth: 4,
-                pointRadius: 5,
-                pointHoverRadius: 8,
-                tension: 0.3,
-                fill: true,
-                datalabels: { align: 'bottom', color: '#047857', font: { weight: 'bold', size: 11 } }
+                data: [achievedCounts[selectedThInfo?.key] || 0],
+                backgroundColor: (aggregatedTarget[selectedThInfo?.key] || 0) <= (achievedCounts[selectedThInfo?.key] || 0) ? '#16a34a' : '#dc2626', // Solid Green or Red
+                borderRadius: 8,
+                barThickness: 60,
+                datalabels: { color: 'white', font: { weight: 'bold' } }
             }
         ]
     };
 
     const chartOptions = {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
-            legend: {
-                position: 'top',
-                labels: { font: { size: 14, weight: 'bold' }, usePointStyle: true, boxWidth: 10 }
-            },
-            tooltip: {
-                mode: 'index',
-                intersect: false,
-                padding: 12,
-                backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                titleColor: '#1e293b',
-                bodyColor: '#475569',
-                borderColor: '#cbd5e1',
-                borderWidth: 1,
-                titleFont: { size: 14, weight: 'bold' }
-            },
-            datalabels: {
-                display: (context) => context.dataset.data[context.dataIndex] > 0
-            }
+            legend: { position: 'top', labels: { font: { weight: 'bold' } } },
+            datalabels: { anchor: 'center', align: 'center', formatter: (v) => v }
         },
         scales: {
-            y: {
-                beginAtZero: true,
-                grid: { color: 'rgba(0, 0, 0, 0.04)', drawBorder: false },
-                title: { display: true, text: 'Number of Students', font: { weight: 'bold', size: 14 } }
-            },
-            x: {
-                grid: { display: false },
-                title: { display: true, text: 'Marks Threshold', font: { weight: 'bold', size: 14 } }
-            }
+            y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+            x: { grid: { display: false } }
         }
     };
 
-    const getCompareColorClass = (target, achieved) => {
-        if (!target && !achieved) return 'bg-slate-50';
-        if (target === 0) return 'bg-emerald-600 text-white';
-        return achieved >= target ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white';
-    };
-
     return (
-        <div className="premium-report-page">
+        <div className="target-vs-achieved-page">
             <LoadingTimer isLoading={loading} />
 
-            <div className="report-main-grid">
-                {/* Left Section: Visual Insights */}
-                <div className="visualization-section">
-                    <div className="glass-card chart-card-large">
-                        <div className="card-header-premium">
-                            <div className="header-icon-wrap bg-blue-100 text-blue-600">
-                                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
-                            </div>
-                            <div className="header-text">
-                                <h3>Performance Gap Analysis</h3>
-                                <p>Target vs Average Achievement across Exams</p>
-                            </div>
+            {/* FULL WIDTH TARGETS TABLE */}
+            <div className="full-width-section">
+                <div className="section-label">TARGET DEFINITIONS (ALL STREAMS)</div>
+                <div className="stats-grid-container targets-grid">
+                    {thresholds.map(th => (
+                        <div key={th.label} className="grid-cell">
+                            <div className="cell-header">{th.label}</div>
+                            <div className="cell-value">{aggregatedTarget[th.key] || '--'}</div>
                         </div>
-                        <div className="chart-body">
-                            <Line data={chartData} options={chartOptions} />
-                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* FULL WIDTH ACHIEVED TABLE */}
+            <div className="full-width-section">
+                <div className="section-label">AVERAGE ACHIEVEMENT (PER EXAM)</div>
+                <div className="stats-grid-container achieved-grid">
+                    {thresholds.map(th => {
+                        const target = aggregatedTarget[th.key] || 0;
+                        const achieved = achievedCounts[th.key] || 0;
+                        const isMatch = achieved >= target;
+                        const isSelected = selectedThreshold === th.label;
+                        return (
+                            <div
+                                key={th.label}
+                                className={`grid-cell interactive-cell ${isMatch ? 'match-green' : 'match-red'} ${isSelected ? 'selected' : ''}`}
+                                onClick={() => setSelectedThreshold(th.label)}
+                            >
+                                <div className="cell-header">{th.label}</div>
+                                <div className="cell-value">{achieved || '--'}</div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* BOTTOM SPLIT: CHART & STUDENT DATA */}
+            <div className="bottom-split-container">
+                {/* Left: Comparison Chart */}
+                <div className="split-card left-chart">
+                    <div className="card-header-simple">Threshold Comparison: {selectedThreshold}</div>
+                    <div className="chart-wrapper">
+                        <Bar data={chartData} options={chartOptions} />
                     </div>
                 </div>
 
-                {/* Right Section: Data & Details */}
-                <div className="data-section-column">
-                    {/* Metrics Tables */}
-                    <div className="metrics-group">
-                        <div className="metrics-row targets-metric">
-                            <div className="metric-label-sidebar bg-blue-900">TARGET</div>
-                            <div className="metric-stats-grid">
-                                {thresholds.map(th => (
-                                    <div key={th.label} className="metric-cell">
-                                        <span className="cell-label">{th.label}</span>
-                                        <span className="cell-value">{aggregatedTarget[th.key] || '--'}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="metrics-row achieved-metric">
-                            <div className="metric-label-sidebar bg-slate-800">ACHIEVED</div>
-                            <div className="metric-stats-grid">
-                                {thresholds.map(th => {
-                                    const targetVal = aggregatedTarget[th.key] || 0;
-                                    const achievedVal = achievedCounts[th.key] || 0;
-                                    const isSelected = selectedThreshold === th.label;
-                                    return (
-                                        <div
-                                            key={th.label}
-                                            className={`metric-cell interactive-cell ${getCompareColorClass(targetVal, achievedVal)} ${isSelected ? 'selected-cell' : ''}`}
-                                            onClick={() => setSelectedThreshold(isSelected ? null : th.label)}
-                                        >
-                                            <span className="cell-label opacity-80">{th.label}</span>
-                                            <span className="cell-value font-bold">{achievedVal || '--'}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                {/* Right: Student Data */}
+                <div className="split-card right-table">
+                    <div className="card-header-simple">
+                        Students Meeting {selectedThreshold} ({detailStudents.length})
                     </div>
-
-                    {/* Student List (Filtered) */}
-                    <div className={`detail-section-wrap ${selectedThreshold ? 'visible' : 'hidden'}`}>
-                        <div className="glass-card detail-card">
-                            <div className="detail-header bg-purple-900">
-                                <div className="detail-title">
-                                    <span className="highlight-tag bg-white/20">Threshold: {selectedThreshold}</span>
-                                    <h3>Student Group Analysis</h3>
-                                    <span className="count-badge">{detailStudents.length} Students</span>
-                                </div>
-                                <button className="close-btn" onClick={() => setSelectedThreshold(null)}>&times;</button>
-                            </div>
-                            <div className="detail-table-container">
-                                <table className="premium-table">
-                                    <thead>
-                                        <tr>
-                                            <th>STUDENT NAME</th>
-                                            <th>CAMPUS</th>
-                                            <th className="text-center">AVG TOT</th>
-                                            <th className="text-center">AIR</th>
-                                            <th className="text-center">BOT</th>
-                                            <th className="text-center">ZOO</th>
-                                            <th className="text-center">PHY</th>
-                                            <th className="text-center">CHE</th>
-                                            <th className="text-center">EXAMS</th>
+                    <div className="table-inner-wrap">
+                        <table className="neat-table">
+                            <thead>
+                                <tr>
+                                    <th>NAME</th>
+                                    <th>CAMPUS</th>
+                                    <th className="text-center">TOT</th>
+                                    <th className="text-center">AIR</th>
+                                    <th className="text-center">BOT</th>
+                                    <th className="text-center">ZOO</th>
+                                    <th className="text-center">PHY</th>
+                                    <th className="text-center">CHE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {detailStudents.length === 0 ? (
+                                    <tr><td colSpan="8" className="text-center py-8 text-slate-400">No students found matching this criteria</td></tr>
+                                ) : (
+                                    detailStudents.map((s, idx) => (
+                                        <tr key={s.STUD_ID || idx}>
+                                            <td className="font-bold">{s.name}</td>
+                                            <td className="text-sm opacity-70">{s.campus}</td>
+                                            <td className="text-center font-bold text-blue-700">{Number(s.tot).toFixed(1)}</td>
+                                            <td className="text-center">{Math.round(s.air) || '-'}</td>
+                                            <td className="text-center">{Number(s.bot || 0).toFixed(0)}</td>
+                                            <td className="text-center">{Number(s.zoo || 0).toFixed(0)}</td>
+                                            <td className="text-center">{Number(s.phy || 0).toFixed(0)}</td>
+                                            <td className="text-center">{Number(s.che || 0).toFixed(0)}</td>
                                         </tr>
-                                    </thead>
-                                    <tbody>
-                                        {detailStudents.map((s, idx) => (
-                                            <tr key={s.STUD_ID || idx}>
-                                                <td className="font-bold text-slate-800">{s.name}</td>
-                                                <td className="text-slate-500 text-sm">{s.campus}</td>
-                                                <td className="text-center"><span className="score-pill bg-yellow-100 text-yellow-800">{Number(s.tot).toFixed(1)}</span></td>
-                                                <td className="text-center font-semibold text-amber-900">{Math.round(s.air) || '-'}</td>
-                                                <td className="text-center text-slate-600">{Number(s.bot).toFixed(0)}</td>
-                                                <td className="text-center text-slate-600">{Number(s.zoo).toFixed(0)}</td>
-                                                <td className="text-center text-slate-600">{Number(s.phy).toFixed(0)}</td>
-                                                <td className="text-center text-slate-600">{Number(s.che).toFixed(0)}</td>
-                                                <td className="text-center font-bold text-blue-600">{s.t_app}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
 
             <style jsx>{`
-                .premium-report-page {
-                    padding: 2rem;
-                    background: #f1f5f9;
-                    min-height: calc(100vh - 80px);
-                    font-family: 'Inter', system-ui, sans-serif;
-                }
-                .report-main-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1.35fr;
-                    gap: 2rem;
-                    max-width: 1800px;
-                    margin: 0 auto;
-                }
-                .glass-card {
-                    background: white;
-                    border-radius: 20px;
-                    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
-                    border: 1px solid rgba(255,255,255,0.8);
-                    overflow: hidden;
-                    transition: all 0.3s ease;
-                }
-                .chart-card-large {
-                    padding: 2rem;
-                    height: 100%;
-                    min-height: 600px;
-                }
-                .card-header-premium {
+                .target-vs-achieved-page {
+                    padding: 24px;
+                    background: #f8fafc;
                     display: flex;
-                    align-items: center;
-                    gap: 1.25rem;
-                    margin-bottom: 2rem;
+                    flex-direction: column;
+                    gap: 24px;
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                 }
-                .header-icon-wrap {
-                    width: 48px;
-                    height: 48px;
+                .full-width-section {
+                    background: white;
                     border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .header-text h3 {
-                    margin: 0;
-                    font-size: 1.25rem;
-                    font-weight: 800;
-                    color: #0f172a;
-                }
-                .header-text p {
-                    margin: 2px 0 0 0;
-                    font-size: 0.875rem;
-                    color: #64748b;
-                }
-                .chart-body {
-                    height: calc(100% - 100px);
-                }
-                
-                .data-section-column {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 2rem;
-                }
-                
-                .metrics-group {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 1.25rem;
-                }
-                .metrics-row {
-                    display: flex;
-                    border-radius: 16px;
-                    overflow: hidden;
-                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
                     border: 1px solid #e2e8f0;
+                    overflow: hidden;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                 }
-                .metric-label-sidebar {
-                    writing-mode: vertical-lr;
-                    transform: rotate(180deg);
-                    padding: 1rem 0.75rem;
+                .section-label {
+                    background: #1e293b;
                     color: white;
-                    font-weight: 900;
+                    padding: 8px 16px;
                     font-size: 0.75rem;
-                    letter-spacing: 0.1em;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
+                    font-weight: 800;
+                    letter-spacing: 0.05em;
                 }
-                .metric-stats-grid {
-                    flex: 1;
+                .stats-grid-container {
                     display: grid;
-                    grid-template-columns: repeat(7, 1fr);
+                    grid-template-columns: repeat(14, 1fr);
+                    border-top: 1px solid #e2e8f0;
+                }
+                .grid-cell {
+                    padding: 16px 8px;
+                    text-align: center;
+                    border-right: 1px solid #f1f5f9;
                     background: white;
                 }
-                .metric-cell {
-                    padding: 1rem 0.5rem;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    border-right: 1px solid #f1f5f9;
-                    border-bottom: 1px solid #f1f5f9;
-                    min-height: 90px;
-                    transition: all 0.2s ease;
-                }
-                .cell-label {
-                    font-size: 0.65rem;
-                    font-weight: 800;
-                    margin-bottom: 6px;
-                    color: inherit;
-                    opacity: 0.7;
-                }
-                .targets-metric .cell-value {
-                    font-size: 1.1rem;
-                    font-weight: 800;
-                    color: #1e293b;
-                }
-                .achieved-metric .cell-value {
-                    font-size: 1.25rem;
-                }
-                
-                .interactive-cell {
-                    cursor: pointer;
-                }
-                .interactive-cell:hover {
-                    filter: brightness(1.1);
-                    transform: translateY(-2px);
-                    box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
-                }
-                .selected-cell {
-                    border: 4px solid #facc15 !important;
-                    z-index: 10;
-                    position: relative;
-                }
-                
-                .detail-section-wrap {
-                    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-                }
-                .detail-section-wrap.hidden { display: none; }
-                
-                .detail-header {
-                    padding: 1.5rem 2rem;
-                    color: white;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: flex-start;
-                }
-                .detail-title h3 {
-                    margin: 8px 0;
-                    font-size: 1.5rem;
-                    font-weight: 800;
-                }
-                .highlight-tag {
+                .grid-cell:last-child { border-right: none; }
+                .cell-header {
                     font-size: 0.7rem;
                     font-weight: 700;
-                    padding: 4px 10px;
-                    border-radius: 100px;
-                    text-transform: uppercase;
+                    color: black !important; /* Force black */
+                    margin-bottom: 8px;
                 }
-                .count-badge {
-                    font-size: 0.875rem;
-                    font-weight: 600;
-                    opacity: 0.9;
+                .cell-value {
+                    font-size: 1.1rem;
+                    font-weight: 800;
+                    color: black !important; /* Force black */
                 }
-                .close-btn {
-                    font-size: 2rem;
-                    line-height: 1;
-                    background: none;
-                    border: none;
-                    color: white;
-                    cursor: pointer;
-                    opacity: 0.7;
-                    transition: 0.2s;
-                }
-                .close-btn:hover { opacity: 1; }
                 
-                .detail-table-container {
-                    max-height: 600px;
-                    overflow-y: auto;
+                /* Achieved Grid Highlights */
+                .match-green { background: #dcfce7 !important; } /* Soft Green */
+                .match-red { background: #fee2e2 !important; } /* Soft Red */
+                .interactive-cell { cursor: pointer; transition: 0.2s; }
+                .interactive-cell:hover { filter: brightness(0.95); }
+                .interactive-cell.selected { 
+                    box-shadow: inset 0 0 0 3px #1e40af; 
+                    z-index: 5;
                 }
-                .premium-table {
+
+                .bottom-split-container {
+                    display: grid;
+                    grid-template-columns: 1fr 1.5fr;
+                    gap: 24px;
+                    min-height: 500px;
+                }
+                .split-card {
+                    background: white;
+                    border-radius: 12px;
+                    border: 1px solid #e2e8f0;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                }
+                .card-header-simple {
+                    padding: 12px 20px;
+                    font-weight: 800;
+                    font-size: 1rem;
+                    color: #1e293b;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                .chart-wrapper {
+                    flex: 1;
+                    padding: 24px;
+                    position: relative;
+                }
+                .table-inner-wrap {
+                    flex: 1;
+                    overflow-y: auto;
+                    max-height: 500px;
+                }
+                .neat-table {
                     width: 100%;
                     border-collapse: collapse;
                 }
-                .premium-table th {
-                    position: sticky;
-                    top: 0;
+                .neat-table th {
                     background: #f8fafc;
-                    padding: 1rem;
+                    padding: 12px;
                     font-size: 0.75rem;
                     font-weight: 800;
-                    color: #475569;
+                    color: #64748b;
                     text-align: left;
-                    border-bottom: 2px solid #e2e8f0;
-                    z-index: 10;
+                    position: sticky;
+                    top: 0;
+                    border-bottom: 1px solid #e2e8f0;
                 }
-                .premium-table td {
-                    padding: 1.25rem 1rem;
+                .neat-table td {
+                    padding: 12px;
                     border-bottom: 1px solid #f1f5f9;
-                    font-size: 0.9375rem;
+                    font-size: 0.85rem;
+                    color: black;
                 }
-                .premium-table tr:hover {
-                    background: #f8fafc;
-                }
-                .score-pill {
-                    padding: 6px 12px;
-                    border-radius: 8px;
-                    font-weight: 800;
-                    font-size: 0.875rem;
-                }
-
-                @keyframes fadeInUp {
-                    from { opacity: 0; transform: translateY(30px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
+                .neat-table tr:hover { background: #f8fafc; }
             `}</style>
         </div>
     );
