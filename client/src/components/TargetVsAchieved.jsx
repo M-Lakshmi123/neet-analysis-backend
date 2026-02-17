@@ -148,7 +148,7 @@ const TargetVsAchieved = ({ filters }) => {
                 data: [targetVal, achievedVal],
                 backgroundColor: [
                     '#003366', // Dark Target Blue
-                    achievedVal >= targetVal ? '#006600' : '#FF0066' // Pure Green or Pulse Red
+                    achievedVal >= targetVal ? '#006600' : '#1F497D' // Pure Green or Pulse Red
                 ],
                 borderRadius: 12,
                 barThickness: 80,
@@ -276,25 +276,25 @@ const TargetVsAchieved = ({ filters }) => {
 
             <style jsx>{`
                 .target-analysis-final {
-                    padding: 24px;
+                    padding: 16px 24px;
                     display: flex;
                     flex-direction: column;
-                    gap: 30px;
+                    gap: 16px;
                     background: #f0f2f5;
                 }
                 .full-width-glass {
                     background: rgba(255, 255, 255, 0.7);
                     backdrop-filter: blur(12px);
                     border: 1px solid rgba(255, 255, 255, 0.5);
-                    border-radius: 16px;
-                    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+                    border-radius: 12px;
+                    box-shadow: 0 4px 20px 0 rgba(31, 38, 135, 0.05);
                     overflow: hidden;
                 }
                 .glass-header {
                     background: #1e1e1e;
                     color: #fff;
-                    padding: 10px 20px;
-                    font-size: 0.8rem;
+                    padding: 8px 16px;
+                    font-size: 0.75rem;
                     font-weight: 900;
                     letter-spacing: 1px;
                 }
@@ -303,53 +303,53 @@ const TargetVsAchieved = ({ filters }) => {
                     grid-template-columns: repeat(14, 1fr);
                 }
                 .glass-cell {
-                    padding: 18px 10px;
+                    padding: 8px 4px;
                     text-align: center;
                     border-right: 1px solid rgba(0,0,0,0.05);
                 }
                 .glass-cell:last-child { border: none; }
-                .label { font-size: 0.75rem; font-weight: 900; color: #000; margin-bottom: 6px; }
-                .value { font-size: 1.2rem; font-weight: 950; color: #000; }
+                .label { font-size: 0.7rem; font-weight: 900; color: #000; margin-bottom: 2px; }
+                .value { font-size: 1.1rem; font-weight: 950; color: #000; }
                 
                 .match-green { background: rgba(0, 102, 0, 0.1) !important; color: #006600 !important; }
                 .match-green .value, .match-green .label { color: #006600 !important; }
                 
-                .match-red { background: rgba(255, 0, 102, 0.1) !important; }
-                .match-red .value, .match-red .label { color: #000 !important; }
+                .match-red { background: rgba(31, 73, 125, 0.1) !important; }
+                .match-red .value, .match-red .label { color: #1F497D !important; }
                 
                 .interactive { cursor: pointer; transition: 0.3s; }
                 .interactive:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-                .active-ring { border: 3px solid #000 !important; }
+                .active-ring { border: 2px solid #000 !important; }
 
                 .split-view {
                     display: grid;
                     grid-template-columns: 30% 70%;
-                    gap: 30px;
+                    gap: 16px;
                 }
                 .glass-card {
                     background: rgba(255, 255, 255, 0.8);
                     backdrop-filter: blur(10px);
-                    border-radius: 20px;
+                    border-radius: 16px;
                     border: 1px solid rgba(255, 255, 255, 0.6);
-                    box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+                    box-shadow: 0 8px 30px rgba(0,0,0,0.06);
                     overflow: hidden;
                 }
                 .card-header-dark {
                     background: #000;
                     color: #fff;
-                    padding: 15px 25px;
+                    padding: 10px 20px;
                     font-weight: 900;
-                    font-size: 1rem;
+                    font-size: 0.95rem;
                 }
                 .chart-side {
-                    height: 550px;
+                    height: 480px;
                 }
                 .chart-area {
-                    height: calc(100% - 60px);
-                    padding: 40px 20px 20px;
+                    height: calc(100% - 40px);
+                    padding: 15px 15px 10px;
                 }
                 .table-side {
-                    height: 550px;
+                    height: 480px;
                     display: flex;
                     flex-direction: column;
                 }
@@ -358,8 +358,8 @@ const TargetVsAchieved = ({ filters }) => {
                 .modern-table { width: 100%; border-collapse: collapse; }
                 .modern-table th {
                     background: #f8f9fa;
-                    padding: 14px;
-                    font-size: 0.7rem;
+                    padding: 10px 14px;
+                    font-size: 0.68rem;
                     font-weight: 900;
                     color: #555;
                     text-align: left;
@@ -367,13 +367,13 @@ const TargetVsAchieved = ({ filters }) => {
                     position: sticky; top: 0;
                 }
                 .modern-table td {
-                    padding: 14px;
+                    padding: 8px 14px;
                     border-bottom: 1px solid #f0f0f0;
-                    font-size: 0.9rem;
+                    font-size: 0.88rem;
                     color: #000;
                 }
-                .bold-black { font-weight: 900; color: #000 !important; }
-                .campus-text { opacity: 0.6; font-size: 0.8rem; white-space: nowrap; }
+                .bold-black { font-weight: 950; color: #000 !important; }
+                .campus-text { opacity: 0.6; font-size: 0.78rem; white-space: nowrap; }
                 .score-high { color: #003366 !important; font-weight: 950; }
                 
                 tr:hover { background: rgba(0,0,0,0.02); }
