@@ -194,7 +194,9 @@ const TargetVsAchieved = ({ filters }) => {
             <LoadingTimer isLoading={loading} />
 
             <div className="full-width-glass target-section">
-                <div className="glass-header">TARGET DEFINITIONS (ALL STREAMS)</div>
+                <div className="glass-header">
+                    TARGET DEFINITIONS ({filters.stream && filters.stream.length > 0 && !filters.stream.includes('__ALL__') ? filters.stream.join(', ') : 'ALL STREAMS'})
+                </div>
                 <div className="glass-grid">
                     {thresholds.map(th => (
                         <div key={th.label} className="glass-cell">
@@ -281,22 +283,24 @@ const TargetVsAchieved = ({ filters }) => {
                     flex-direction: column;
                     gap: 16px;
                     background: #f0f2f5;
+                    font-family: 'Comic Sans MS', 'Comic Sans', cursive;
                 }
                 .full-width-glass {
-                    background: rgba(255, 255, 255, 0.7);
+                    background: #FFFFCC;
                     backdrop-filter: blur(12px);
-                    border: 1px solid rgba(255, 255, 255, 0.5);
+                    border: 1px solid rgba(0, 0, 102, 0.1);
                     border-radius: 12px;
-                    box-shadow: 0 4px 20px 0 rgba(31, 38, 135, 0.05);
+                    box-shadow: 0 4px 20px 0 rgba(0, 0, 102, 0.05);
                     overflow: hidden;
                 }
                 .glass-header {
-                    background: #1e1e1e;
-                    color: #fff;
+                    background: #FFFFCC;
+                    color: #000066;
                     padding: 8px 16px;
-                    font-size: 0.75rem;
+                    font-size: 0.85rem;
                     font-weight: 900;
                     letter-spacing: 1px;
+                    border-bottom: 2px solid #000066;
                 }
                 .glass-grid {
                     display: grid;
@@ -305,11 +309,11 @@ const TargetVsAchieved = ({ filters }) => {
                 .glass-cell {
                     padding: 8px 4px;
                     text-align: center;
-                    border-right: 1px solid rgba(0,0,0,0.05);
+                    border-right: 1px solid rgba(0,0,102,0.1);
                 }
                 .glass-cell:last-child { border: none; }
-                .label { font-size: 0.7rem; font-weight: 900; color: #000; margin-bottom: 2px; }
-                .value { font-size: 1.1rem; font-weight: 950; color: #000; }
+                .label { font-size: 0.75rem; font-weight: 900; color: #000066; margin-bottom: 2px; }
+                .value { font-size: 1.15rem; font-weight: 950; color: #000066; }
                 
                 .match-green { background: #006600 !important; border: 1px solid rgba(255,255,255,0.1) !important; }
                 .match-green .value, .match-green .label { color: #fff !important; }
@@ -319,7 +323,7 @@ const TargetVsAchieved = ({ filters }) => {
                 
                 .interactive { cursor: pointer; transition: 0.3s; }
                 .interactive:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-                .active-ring { border: 2px solid #fff !important; }
+                .active-ring { border: 2px solid #000066 !important; }
 
                 .split-view {
                     display: grid;
@@ -327,19 +331,20 @@ const TargetVsAchieved = ({ filters }) => {
                     gap: 16px;
                 }
                 .glass-card {
-                    background: rgba(255, 255, 255, 0.8);
+                    background: #FFFFCC;
                     backdrop-filter: blur(10px);
                     border-radius: 16px;
-                    border: 1px solid rgba(255, 255, 255, 0.6);
-                    box-shadow: 0 8px 30px rgba(0,0,0,0.06);
+                    border: 1px solid rgba(0, 0, 102, 0.2);
+                    box-shadow: 0 8px 30px rgba(0,0,102,0.06);
                     overflow: hidden;
                 }
                 .card-header-dark {
-                    background: #000;
-                    color: #fff;
+                    background: #FFFFCC;
+                    color: #000066;
                     padding: 10px 20px;
                     font-weight: 900;
-                    font-size: 0.95rem;
+                    font-size: 1rem;
+                    border-bottom: 2px solid #000066;
                 }
                 .chart-side {
                     height: 480px;
@@ -357,24 +362,24 @@ const TargetVsAchieved = ({ filters }) => {
                 
                 .modern-table { width: 100%; border-collapse: collapse; }
                 .modern-table th {
-                    background: #f8f9fa;
+                    background: #FFFFCC;
                     padding: 10px 14px;
-                    font-size: 0.68rem;
+                    font-size: 0.75rem;
                     font-weight: 900;
-                    color: #555;
+                    color: #000066;
                     text-align: left;
-                    border-bottom: 2px solid #eee;
+                    border-bottom: 2px solid #000066;
                     position: sticky; top: 0;
                 }
                 .modern-table td {
                     padding: 8px 14px;
-                    border-bottom: 1px solid #f0f0f0;
+                    border-bottom: 1px solid rgba(0,0,102,0.1);
                     font-size: 0.88rem;
-                    color: #000;
+                    color: #000066;
                 }
-                .bold-black { font-weight: 950; color: #000 !important; }
-                .campus-text { opacity: 0.6; font-size: 0.78rem; white-space: nowrap; }
-                .score-high { color: #003366 !important; font-weight: 950; }
+                .bold-black { font-weight: 950; color: #000066 !important; }
+                .campus-text { opacity: 0.7; font-size: 0.78rem; white-space: nowrap; color: #000066; }
+                .score-high { color: #000066 !important; font-weight: 950; }
                 
                 tr:hover { background: rgba(0,0,0,0.02); }
             `}</style>
