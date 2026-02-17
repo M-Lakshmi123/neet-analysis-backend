@@ -286,7 +286,7 @@ const TargetVsAchieved = ({ filters }) => {
                     font-family: 'Comic Sans MS', 'Comic Sans', cursive;
                 }
                 .full-width-glass {
-                    background: #FFFFCC;
+                    background: rgba(255, 255, 255, 0.85);
                     backdrop-filter: blur(12px);
                     border: 1px solid rgba(0, 0, 102, 0.1);
                     border-radius: 12px;
@@ -331,10 +331,10 @@ const TargetVsAchieved = ({ filters }) => {
                     gap: 16px;
                 }
                 .glass-card {
-                    background: #FFFFCC;
+                    background: rgba(255, 255, 255, 0.85);
                     backdrop-filter: blur(10px);
                     border-radius: 16px;
-                    border: 1px solid rgba(0, 0, 102, 0.2);
+                    border: 1px solid rgba(0,0,102,0.1);
                     box-shadow: 0 8px 30px rgba(0,0,102,0.06);
                     overflow: hidden;
                 }
@@ -360,7 +360,7 @@ const TargetVsAchieved = ({ filters }) => {
                 }
                 .table-scroll { flex: 1; overflow-y: auto; }
                 
-                .modern-table { width: 100%; border-collapse: collapse; }
+                .modern-table { width: 100%; border-collapse: collapse; background: #fff; }
                 .modern-table th {
                     background: #FFFFCC;
                     padding: 10px 14px;
