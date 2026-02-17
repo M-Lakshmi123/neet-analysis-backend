@@ -391,13 +391,21 @@ app.get('/api/exam-stats', async (req, res) => {
                 Test, 
                 COUNT(STUD_ID) as Attn,
                 MAX(CAST(Tot_720 AS FLOAT)) as Max_T,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) > 700 THEN 1 ELSE 0 END) as T_700,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) > 680 THEN 1 ELSE 0 END) as T_680,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) > 650 THEN 1 ELSE 0 END) as T_650,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) > 600 THEN 1 ELSE 0 END) as T_600,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) > 550 THEN 1 ELSE 0 END) as T_550,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) > 530 THEN 1 ELSE 0 END) as T_530,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) > 450 THEN 1 ELSE 0 END) as T_450,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 710 THEN 1 ELSE 0 END) as T_710,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 700 THEN 1 ELSE 0 END) as T_700,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 685 THEN 1 ELSE 0 END) as T_685,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 655 THEN 1 ELSE 0 END) as T_655,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 640 THEN 1 ELSE 0 END) as T_640,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 600 THEN 1 ELSE 0 END) as T_600,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 595 THEN 1 ELSE 0 END) as T_595,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 570 THEN 1 ELSE 0 END) as T_570,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 550 THEN 1 ELSE 0 END) as T_550,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 530 THEN 1 ELSE 0 END) as T_530,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 490 THEN 1 ELSE 0 END) as T_490,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 450 THEN 1 ELSE 0 END) as T_450,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 400 THEN 1 ELSE 0 END) as T_400,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 300 THEN 1 ELSE 0 END) as T_300,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 200 THEN 1 ELSE 0 END) as T_200,
                 MAX(CAST(Botany AS FLOAT)) as Max_B,
                 SUM(CASE WHEN CAST(Botany AS FLOAT) > 160 THEN 1 ELSE 0 END) as B_160,
                 MAX(CAST(Zoology AS FLOAT)) as Max_Z,
@@ -473,6 +481,18 @@ app.get('/api/analysis-report', async (req, res) => {
         });
     } catch (err) {
         console.error(err);
+        res.status(500).send(err.message);
+    }
+});
+
+// Get TARGETS data
+app.get('/api/targets', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const result = await pool.request().query('SELECT * FROM TARGETS ORDER BY NAME_OF_THE_CAMPUS, Stream');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("[Targets] ERROR:", err);
         res.status(500).send(err.message);
     }
 });

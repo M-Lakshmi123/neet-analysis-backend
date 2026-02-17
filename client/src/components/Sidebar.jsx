@@ -17,6 +17,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
         { id: 'averages', label: 'Average Marks Report', icon: <ClipboardList size={18} />, roles: ['principal', 'admin'] },
         { id: 'progress', label: 'Progress Report', icon: <Users size={18} />, roles: ['principal', 'admin'] },
         { id: 'errors', label: 'Error Report', icon: <FileWarning size={18} />, roles: ['principal', 'admin'] },
+        { id: 'target_vs_achieved', label: 'Target Vs Achieved', icon: <ClipboardList size={18} />, roles: ['principal', 'admin'] },
         { id: 'error_count', label: 'Error Count Report', icon: <ClipboardList size={18} />, roles: ['principal', 'admin', 'co_admin'] }
     ];
 

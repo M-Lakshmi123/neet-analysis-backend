@@ -12,6 +12,7 @@ import AverageMarksReport from './components/AverageMarksReport';
 import ErrorReport from './components/ErrorReport';
 import ErrorTop100 from './components/ErrorTop100';
 import ErrorCountReport from './components/ErrorCountReport';
+import TargetVsAchieved from './components/TargetVsAchieved';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -179,6 +180,12 @@ const Dashboard = () => {
                         <ErrorCountReport filters={globalFilters} />
                     </div>
                 );
+            case 'target_vs_achieved':
+                return (
+                    <div className="report-sections">
+                        <TargetVsAchieved filters={globalFilters} />
+                    </div>
+                );
             case 'approvals':
                 return isAdmin ? <UserApprovals /> : <div className="p-4">Access Denied</div>;
             case 'logs':
@@ -188,7 +195,7 @@ const Dashboard = () => {
         }
     };
 
-    const showFilterBar = ['analysis', 'averages', 'progress', 'errors', 'error_top', 'error_count'].includes(activePage);
+    const showFilterBar = ['analysis', 'averages', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved'].includes(activePage);
 
     return (
         <div className="dashboard-root">
@@ -201,7 +208,8 @@ const Dashboard = () => {
                                 activePage === 'errors' ? 'Error Report' :
                                     activePage === 'error_top' ? 'Error Top 100%' :
                                         activePage === 'error_count' ? 'Error Count Report' :
-                                            activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
+                                            activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
+                                                activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
                     {showFilterBar && (
