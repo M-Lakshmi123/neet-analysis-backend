@@ -294,7 +294,7 @@ const TargetVsAchieved = ({ filters }) => {
                     overflow: hidden;
                 }
                 .glass-header {
-                    background: #FFFFCC;
+                    background: #EBF1DE;
                     color: #000066;
                     padding: 8px 16px;
                     font-size: 0.85rem;
@@ -339,7 +339,7 @@ const TargetVsAchieved = ({ filters }) => {
                     overflow: hidden;
                 }
                 .card-header-dark {
-                    background: #FFFFCC;
+                    background: #EBF1DE;
                     color: #000066;
                     padding: 10px 20px;
                     font-weight: 900;
@@ -362,7 +362,7 @@ const TargetVsAchieved = ({ filters }) => {
                 
                 .modern-table { width: 100%; border-collapse: collapse; background: #fff; }
                 .modern-table th {
-                    background: #FFFFCC;
+                    background: #EBF1DE;
                     padding: 10px 14px;
                     font-size: 0.75rem;
                     font-weight: 900;
@@ -376,9 +376,10 @@ const TargetVsAchieved = ({ filters }) => {
                     border-bottom: 1px solid rgba(0,0,102,0.1);
                     font-size: 0.88rem;
                     color: #000066;
+                    font-family: 'Inter', system-ui, -apple-system, sans-serif;
                 }
-                .bold-black { font-weight: 950; color: #000066 !important; }
-                .campus-text { opacity: 0.7; font-size: 0.78rem; white-space: nowrap; color: #000066; }
+                .bold-black { font-weight: 950; color: #000066 !important; font-family: 'Inter', system-ui, sans-serif; }
+                .campus-text { opacity: 0.7; font-size: 0.78rem; white-space: nowrap; color: #000066; font-family: 'Inter', system-ui, sans-serif; }
                 .score-high { color: #000066 !important; font-weight: 950; }
                 
                 tr:hover { background: rgba(0,0,0,0.02); }
