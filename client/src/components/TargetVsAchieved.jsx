@@ -148,7 +148,7 @@ const TargetVsAchieved = ({ filters }) => {
                 data: [targetVal, achievedVal],
                 backgroundColor: [
                     '#003366', // Dark Target Blue
-                    achievedVal >= targetVal ? '#006600' : '#FF0066' // Pure Green or Pulse Red
+                    achievedVal >= targetVal ? '#006600' : '#FFC000' // Green or Amber
                 ],
                 borderRadius: 12,
                 barThickness: 80,
@@ -314,8 +314,8 @@ const TargetVsAchieved = ({ filters }) => {
                 .match-green { background: #006600 !important; border: 1px solid rgba(255,255,255,0.1) !important; }
                 .match-green .value, .match-green .label { color: #fff !important; }
                 
-                .match-red { background: #FF0066 !important; border: 1px solid rgba(255,255,255,0.1) !important; }
-                .match-red .value, .match-red .label { color: #fff !important; }
+                .match-red { background: #FFC000 !important; border: 1px solid rgba(0,0,0,0.1) !important; }
+                .match-red .value, .match-red .label { color: #000 !important; }
                 
                 .interactive { cursor: pointer; transition: 0.3s; }
                 .interactive:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
