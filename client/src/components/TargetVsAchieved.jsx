@@ -28,8 +28,7 @@ const TargetVsAchieved = ({ filters }) => {
     const [studentResults, setStudentResults] = useState([]);
     const [examStats, setExamStats] = useState([]);
     const [loading, setLoading] = useState(true);
-    // Default to first threshold to show something in the chart/table
-    const [selectedThreshold, setSelectedThreshold] = useState('>= 710');
+    const [selectedThreshold, setSelectedThreshold] = useState('>= 550');
 
     const thresholds = [
         { label: '>= 710', key: '>= 710M', statsKey: 'T_710', value: 710 },
@@ -80,31 +79,22 @@ const TargetVsAchieved = ({ filters }) => {
         fetchData();
     }, [filters]);
 
-    // Mapping Logic for Stream
     const aggregatedTarget = useMemo(() => {
         if (!allTargets.length) return {};
         let filtered = allTargets;
-
-        // Filter by Campus
         if (filters.campus && filters.campus.length > 0 && !filters.campus.includes('All')) {
             filtered = filtered.filter(t =>
                 filters.campus.some(c => t.NAME_OF_THE_CAMPUS.trim().toUpperCase() === c.trim().toUpperCase())
             );
         }
-
-        // Filter by Stream with SR ELITE mapping
         if (filters.stream && filters.stream.length > 0 && !filters.stream.includes('All')) {
             const mappedStreams = filters.stream.map(s => {
                 const up = s.trim().toUpperCase();
                 if (up === 'SR_ELITE_SET_01' || up === 'SR_ELITE_SET_02' || up === 'SR ELITE') return 'SR ELITE';
                 return up;
             });
-
-            filtered = filtered.filter(t =>
-                mappedStreams.includes(t.Stream.trim().toUpperCase())
-            );
+            filtered = filtered.filter(t => mappedStreams.includes(t.Stream.trim().toUpperCase()));
         }
-
         const result = {};
         thresholds.forEach(th => {
             result[th.key] = filtered.reduce((sum, row) => sum + (Number(row[th.key]) || 0), 0);
@@ -112,19 +102,16 @@ const TargetVsAchieved = ({ filters }) => {
         return result;
     }, [allTargets, filters, thresholds]);
 
-    // Achieved Counts (Average per Exam)
     const achievedCounts = useMemo(() => {
-        if (!examStats.length) return {};
-        const totalExams = examStats.length;
+        if (!studentResults.length) return {};
         const counts = {};
         thresholds.forEach(th => {
-            const sumOfCounts = examStats.reduce((acc, curr) => acc + (Number(curr[th.statsKey]) || 0), 0);
-            counts[th.key] = Math.round((sumOfCounts / totalExams) * 10) / 10;
+            const count = studentResults.filter(s => Number(s.tot) >= th.value).length;
+            counts[th.key] = count;
         });
         return counts;
-    }, [examStats, thresholds]);
+    }, [studentResults, thresholds]);
 
-    // Detail Students
     const detailStudents = useMemo(() => {
         const thresholdValue = thresholds.find(t => t.label === selectedThreshold)?.value || 0;
         return studentResults
@@ -132,26 +119,27 @@ const TargetVsAchieved = ({ filters }) => {
             .sort((a, b) => b.tot - a.tot);
     }, [studentResults, selectedThreshold]);
 
-    // Bar Chart Data (Comparison for Selected Threshold)
     const selectedThInfo = thresholds.find(t => t.label === selectedThreshold);
+    const targetVal = aggregatedTarget[selectedThInfo?.key] || 0;
+    const achievedVal = achievedCounts[selectedThInfo?.key] || 0;
+
     const chartData = {
-        labels: [selectedThreshold + ' Threshold Comparison'],
+        labels: ['Target', 'Achieved'],
         datasets: [
             {
-                label: 'Target',
-                data: [aggregatedTarget[selectedThInfo?.key] || 0],
-                backgroundColor: '#1e40af', // Deep Blue
-                borderRadius: 8,
-                barThickness: 60,
-                datalabels: { color: 'white', font: { weight: 'bold' } }
-            },
-            {
-                label: 'Achieved',
-                data: [achievedCounts[selectedThInfo?.key] || 0],
-                backgroundColor: (aggregatedTarget[selectedThInfo?.key] || 0) <= (achievedCounts[selectedThInfo?.key] || 0) ? '#16a34a' : '#dc2626', // Solid Green or Red
-                borderRadius: 8,
-                barThickness: 60,
-                datalabels: { color: 'white', font: { weight: 'bold' } }
+                data: [targetVal, achievedVal],
+                backgroundColor: [
+                    '#003366', // Dark Target Blue
+                    achievedVal >= targetVal ? '#006600' : '#FF0066' // Pure Green or Pulse Red
+                ],
+                borderRadius: 12,
+                barThickness: 80,
+                datalabels: {
+                    color: 'white',
+                    font: { weight: '900', size: 16 },
+                    anchor: 'center',
+                    align: 'center'
+                }
             }
         ]
     };
@@ -160,36 +148,48 @@ const TargetVsAchieved = ({ filters }) => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { position: 'top', labels: { font: { weight: 'bold' } } },
-            datalabels: { anchor: 'center', align: 'center', formatter: (v) => v }
+            legend: { display: false },
+            tooltip: { enabled: true },
+            datalabels: { display: true }
         },
         scales: {
-            y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-            x: { grid: { display: false } }
+            y: {
+                beginAtZero: true,
+                grid: { color: 'rgba(0,0,0,0.05)' },
+                ticks: { color: '#000', font: { weight: 'bold', size: 12 } }
+            },
+            x: {
+                grid: { display: false },
+                ticks: { color: '#000', font: { weight: '900', size: 14 } }
+            }
+        },
+        elements: {
+            bar: {
+                borderWidth: 2,
+                borderColor: 'rgba(255,255,255,0.2)'
+            }
         }
     };
 
     return (
-        <div className="target-vs-achieved-page">
+        <div className="target-analysis-final">
             <LoadingTimer isLoading={loading} />
 
-            {/* FULL WIDTH TARGETS TABLE */}
-            <div className="full-width-section">
-                <div className="section-label">TARGET DEFINITIONS (ALL STREAMS)</div>
-                <div className="stats-grid-container targets-grid">
+            <div className="full-width-glass target-section">
+                <div className="glass-header">TARGET DEFINITIONS (ALL STREAMS)</div>
+                <div className="glass-grid">
                     {thresholds.map(th => (
-                        <div key={th.label} className="grid-cell">
-                            <div className="cell-header">{th.label}</div>
-                            <div className="cell-value">{aggregatedTarget[th.key] || '--'}</div>
+                        <div key={th.label} className="glass-cell">
+                            <div className="label">{th.label}</div>
+                            <div className="value">{aggregatedTarget[th.key] || '--'}</div>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {/* FULL WIDTH ACHIEVED TABLE */}
-            <div className="full-width-section">
-                <div className="section-label">AVERAGE ACHIEVEMENT (PER EXAM)</div>
-                <div className="stats-grid-container achieved-grid">
+            <div className="full-width-glass achieved-section">
+                <div className="glass-header">TOTAL ACHIEVED (UNIQUE STUDENTS)</div>
+                <div className="glass-grid">
                     {thresholds.map(th => {
                         const target = aggregatedTarget[th.key] || 0;
                         const achieved = achievedCounts[th.key] || 0;
@@ -198,37 +198,34 @@ const TargetVsAchieved = ({ filters }) => {
                         return (
                             <div
                                 key={th.label}
-                                className={`grid-cell interactive-cell ${isMatch ? 'match-green' : 'match-red'} ${isSelected ? 'selected' : ''}`}
+                                className={`glass-cell interactive ${isMatch ? 'match-green' : 'match-red'} ${isSelected ? 'active-ring' : ''}`}
                                 onClick={() => setSelectedThreshold(th.label)}
                             >
-                                <div className="cell-header">{th.label}</div>
-                                <div className="cell-value">{achieved || '--'}</div>
+                                <div className="label">{th.label}</div>
+                                <div className="value">{achieved || '--'}</div>
                             </div>
                         );
                     })}
                 </div>
             </div>
 
-            {/* BOTTOM SPLIT: CHART & STUDENT DATA */}
-            <div className="bottom-split-container">
-                {/* Left: Comparison Chart */}
-                <div className="split-card left-chart">
-                    <div className="card-header-simple">Threshold Comparison: {selectedThreshold}</div>
-                    <div className="chart-wrapper">
+            <div className="split-view">
+                <div className="glass-card chart-side">
+                    <div className="card-header-dark">Comparison for {selectedThreshold}</div>
+                    <div className="chart-area">
                         <Bar data={chartData} options={chartOptions} />
                     </div>
                 </div>
 
-                {/* Right: Student Data */}
-                <div className="split-card right-table">
-                    <div className="card-header-simple">
-                        Students Meeting {selectedThreshold} ({detailStudents.length})
+                <div className="glass-card table-side">
+                    <div className="card-header-dark">
+                        Student List ({detailStudents.length})
                     </div>
-                    <div className="table-inner-wrap">
-                        <table className="neat-table">
+                    <div className="table-scroll">
+                        <table className="modern-table">
                             <thead>
                                 <tr>
-                                    <th>NAME</th>
+                                    <th>STUDENT</th>
                                     <th>CAMPUS</th>
                                     <th className="text-center">TOT</th>
                                     <th className="text-center">AIR</th>
@@ -239,22 +236,18 @@ const TargetVsAchieved = ({ filters }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {detailStudents.length === 0 ? (
-                                    <tr><td colSpan="8" className="text-center py-8 text-slate-400">No students found matching this criteria</td></tr>
-                                ) : (
-                                    detailStudents.map((s, idx) => (
-                                        <tr key={s.STUD_ID || idx}>
-                                            <td className="font-bold">{s.name}</td>
-                                            <td className="text-sm opacity-70">{s.campus}</td>
-                                            <td className="text-center font-bold text-blue-700">{Number(s.tot).toFixed(1)}</td>
-                                            <td className="text-center">{Math.round(s.air) || '-'}</td>
-                                            <td className="text-center">{Number(s.bot || 0).toFixed(0)}</td>
-                                            <td className="text-center">{Number(s.zoo || 0).toFixed(0)}</td>
-                                            <td className="text-center">{Number(s.phy || 0).toFixed(0)}</td>
-                                            <td className="text-center">{Number(s.che || 0).toFixed(0)}</td>
-                                        </tr>
-                                    ))
-                                )}
+                                {detailStudents.map((s, idx) => (
+                                    <tr key={s.STUD_ID || idx}>
+                                        <td className="bold-black">{s.name}</td>
+                                        <td className="campus-text">{s.campus}</td>
+                                        <td className="text-center score-high">{Number(s.tot).toFixed(1)}</td>
+                                        <td className="text-center">{Math.round(s.air) || '-'}</td>
+                                        <td className="text-center">{Number(s.bot || 0).toFixed(0)}</td>
+                                        <td className="text-center">{Number(s.zoo || 0).toFixed(0)}</td>
+                                        <td className="text-center">{Number(s.phy || 0).toFixed(0)}</td>
+                                        <td className="text-center">{Number(s.che || 0).toFixed(0)}</td>
+                                    </tr>
+                                ))}
                             </tbody>
                         </table>
                     </div>
@@ -262,116 +255,108 @@ const TargetVsAchieved = ({ filters }) => {
             </div>
 
             <style jsx>{`
-                .target-vs-achieved-page {
+                .target-analysis-final {
                     padding: 24px;
-                    background: #f8fafc;
                     display: flex;
                     flex-direction: column;
-                    gap: 24px;
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    gap: 30px;
+                    background: #f0f2f5;
                 }
-                .full-width-section {
-                    background: white;
-                    border-radius: 12px;
-                    border: 1px solid #e2e8f0;
+                .full-width-glass {
+                    background: rgba(255, 255, 255, 0.7);
+                    backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255, 255, 255, 0.5);
+                    border-radius: 16px;
+                    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
                     overflow: hidden;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                 }
-                .section-label {
-                    background: #1e293b;
-                    color: white;
-                    padding: 8px 16px;
-                    font-size: 0.75rem;
-                    font-weight: 800;
-                    letter-spacing: 0.05em;
+                .glass-header {
+                    background: #1e1e1e;
+                    color: #fff;
+                    padding: 10px 20px;
+                    font-size: 0.8rem;
+                    font-weight: 900;
+                    letter-spacing: 1px;
                 }
-                .stats-grid-container {
+                .glass-grid {
                     display: grid;
                     grid-template-columns: repeat(14, 1fr);
-                    border-top: 1px solid #e2e8f0;
                 }
-                .grid-cell {
-                    padding: 16px 8px;
+                .glass-cell {
+                    padding: 18px 10px;
                     text-align: center;
-                    border-right: 1px solid #f1f5f9;
-                    background: white;
+                    border-right: 1px solid rgba(0,0,0,0.05);
                 }
-                .grid-cell:last-child { border-right: none; }
-                .cell-header {
-                    font-size: 0.7rem;
-                    font-weight: 700;
-                    color: black !important; /* Force black */
-                    margin-bottom: 8px;
-                }
-                .cell-value {
-                    font-size: 1.1rem;
-                    font-weight: 800;
-                    color: black !important; /* Force black */
-                }
+                .glass-cell:last-child { border: none; }
+                .label { font-size: 0.75rem; font-weight: 900; color: #000; margin-bottom: 6px; }
+                .value { font-size: 1.2rem; font-weight: 950; color: #000; }
                 
-                /* Achieved Grid Highlights */
-                .match-green { background: #dcfce7 !important; } /* Soft Green */
-                .match-red { background: #fee2e2 !important; } /* Soft Red */
-                .interactive-cell { cursor: pointer; transition: 0.2s; }
-                .interactive-cell:hover { filter: brightness(0.95); }
-                .interactive-cell.selected { 
-                    box-shadow: inset 0 0 0 3px #1e40af; 
-                    z-index: 5;
-                }
+                .match-green { background: rgba(0, 102, 0, 0.1) !important; color: #006600 !important; }
+                .match-green .value, .match-green .label { color: #006600 !important; }
+                
+                .match-red { background: rgba(255, 0, 102, 0.1) !important; color: #FF0066 !important; }
+                .match-red .value, .match-red .label { color: #FF0066 !important; }
+                
+                .interactive { cursor: pointer; transition: 0.3s; }
+                .interactive:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+                .active-ring { border: 3px solid #000 !important; }
 
-                .bottom-split-container {
+                .split-view {
                     display: grid;
-                    grid-template-columns: 1fr 1.5fr;
-                    gap: 24px;
-                    min-height: 500px;
+                    grid-template-columns: 450px 1fr;
+                    gap: 30px;
                 }
-                .split-card {
-                    background: white;
-                    border-radius: 12px;
-                    border: 1px solid #e2e8f0;
+                .glass-card {
+                    background: rgba(255, 255, 255, 0.8);
+                    backdrop-filter: blur(10px);
+                    border-radius: 20px;
+                    border: 1px solid rgba(255, 255, 255, 0.6);
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+                    overflow: hidden;
+                }
+                .card-header-dark {
+                    background: #000;
+                    color: #fff;
+                    padding: 15px 25px;
+                    font-weight: 900;
+                    font-size: 1rem;
+                }
+                .chart-side {
+                    height: 550px;
+                }
+                .chart-area {
+                    height: calc(100% - 60px);
+                    padding: 40px 20px 20px;
+                }
+                .table-side {
+                    height: 550px;
                     display: flex;
                     flex-direction: column;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                 }
-                .card-header-simple {
-                    padding: 12px 20px;
-                    font-weight: 800;
-                    font-size: 1rem;
-                    color: #1e293b;
-                    border-bottom: 1px solid #e2e8f0;
-                }
-                .chart-wrapper {
-                    flex: 1;
-                    padding: 24px;
-                    position: relative;
-                }
-                .table-inner-wrap {
-                    flex: 1;
-                    overflow-y: auto;
-                    max-height: 500px;
-                }
-                .neat-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                .neat-table th {
-                    background: #f8fafc;
-                    padding: 12px;
-                    font-size: 0.75rem;
-                    font-weight: 800;
-                    color: #64748b;
+                .table-scroll { flex: 1; overflow-y: auto; }
+                
+                .modern-table { width: 100%; border-collapse: collapse; }
+                .modern-table th {
+                    background: #f8f9fa;
+                    padding: 14px;
+                    font-size: 0.7rem;
+                    font-weight: 900;
+                    color: #555;
                     text-align: left;
-                    position: sticky;
-                    top: 0;
-                    border-bottom: 1px solid #e2e8f0;
+                    border-bottom: 2px solid #eee;
+                    position: sticky; top: 0;
                 }
-                .neat-table td {
-                    padding: 12px;
-                    border-bottom: 1px solid #f1f5f9;
-                    font-size: 0.85rem;
-                    color: black;
+                .modern-table td {
+                    padding: 14px;
+                    border-bottom: 1px solid #f0f0f0;
+                    font-size: 0.9rem;
+                    color: #000;
                 }
-                .neat-table tr:hover { background: #f8fafc; }
+                .bold-black { font-weight: 900; color: #000 !important; }
+                .campus-text { opacity: 0.6; font-size: 0.8rem; }
+                .score-high { color: #003366 !important; font-weight: 950; }
+                
+                tr:hover { background: rgba(0,0,0,0.02); }
             `}</style>
         </div>
     );
