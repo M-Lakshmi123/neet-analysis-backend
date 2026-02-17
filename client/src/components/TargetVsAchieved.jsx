@@ -153,7 +153,7 @@ const TargetVsAchieved = ({ filters }) => {
                 borderRadius: 12,
                 barThickness: 80,
                 datalabels: {
-                    color: 'white',
+                    color: '#000',
                     font: { weight: '900', size: 16 },
                     anchor: 'center',
                     align: 'center'
