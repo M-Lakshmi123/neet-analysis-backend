@@ -233,6 +233,7 @@ const TargetVsAchieved = ({ filters }) => {
                                     <th className="text-center">ZOO</th>
                                     <th className="text-center">PHY</th>
                                     <th className="text-center">CHE</th>
+                                    <th className="text-center">EXAMS</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -246,6 +247,7 @@ const TargetVsAchieved = ({ filters }) => {
                                         <td className="text-center">{Number(s.zoo || 0).toFixed(0)}</td>
                                         <td className="text-center">{Number(s.phy || 0).toFixed(0)}</td>
                                         <td className="text-center">{Number(s.che || 0).toFixed(0)}</td>
+                                        <td className="text-center font-bold text-blue-600">{s.t_app}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -294,8 +296,8 @@ const TargetVsAchieved = ({ filters }) => {
                 .match-green { background: rgba(0, 102, 0, 0.1) !important; color: #006600 !important; }
                 .match-green .value, .match-green .label { color: #006600 !important; }
                 
-                .match-red { background: rgba(255, 0, 102, 0.1) !important; color: #FF0066 !important; }
-                .match-red .value, .match-red .label { color: #FF0066 !important; }
+                .match-red { background: rgba(255, 0, 102, 0.1) !important; }
+                .match-red .value, .match-red .label { color: #000 !important; }
                 
                 .interactive { cursor: pointer; transition: 0.3s; }
                 .interactive:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
@@ -303,7 +305,7 @@ const TargetVsAchieved = ({ filters }) => {
 
                 .split-view {
                     display: grid;
-                    grid-template-columns: 450px 1fr;
+                    grid-template-columns: 30% 70%;
                     gap: 30px;
                 }
                 .glass-card {
@@ -353,7 +355,7 @@ const TargetVsAchieved = ({ filters }) => {
                     color: #000;
                 }
                 .bold-black { font-weight: 900; color: #000 !important; }
-                .campus-text { opacity: 0.6; font-size: 0.8rem; }
+                .campus-text { opacity: 0.6; font-size: 0.8rem; white-space: nowrap; }
                 .score-high { color: #003366 !important; font-weight: 950; }
                 
                 tr:hover { background: rgba(0,0,0,0.02); }

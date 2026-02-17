@@ -13,11 +13,11 @@ const Sidebar = ({ activePage, setActivePage }) => {
     const canSeeErrorTop = isAdmin || isCoAdmin;
 
     const menuItems = [
-        { id: 'analysis', label: 'Analysis Report', icon: <BarChart3 size={18} />, roles: ['principal', 'admin'] },
+        { id: 'analysis', label: 'Analysis Report', icon: <BarChart2 size={18} />, roles: ['principal', 'admin', 'co_admin'] },
         { id: 'averages', label: 'Average Marks Report', icon: <ClipboardList size={18} />, roles: ['principal', 'admin'] },
+        { id: 'target_vs_achieved', label: 'Target Vs Achieved', icon: <ClipboardList size={18} />, roles: ['principal', 'admin'] },
         { id: 'progress', label: 'Progress Report', icon: <Users size={18} />, roles: ['principal', 'admin'] },
         { id: 'errors', label: 'Error Report', icon: <FileWarning size={18} />, roles: ['principal', 'admin'] },
-        { id: 'target_vs_achieved', label: 'Target Vs Achieved', icon: <ClipboardList size={18} />, roles: ['principal', 'admin'] },
         { id: 'error_count', label: 'Error Count Report', icon: <ClipboardList size={18} />, roles: ['principal', 'admin', 'co_admin'] }
     ];
 
