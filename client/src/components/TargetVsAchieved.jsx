@@ -82,22 +82,36 @@ const TargetVsAchieved = ({ filters }) => {
     const aggregatedTarget = useMemo(() => {
         if (!allTargets.length) return {};
         let filtered = allTargets;
-        if (filters.campus && filters.campus.length > 0 && !filters.campus.includes('All')) {
+
+        // Filter by Campus - handle 'All' or 'All Selected' or empty
+        const campusFilter = filters.campus || [];
+        const isAllCampus = campusFilter.length === 0 ||
+            campusFilter.some(c => ['All', 'All Selected', 'ALL SELECTED'].includes(c));
+
+        if (!isAllCampus) {
             filtered = filtered.filter(t =>
-                filters.campus.some(c => t.NAME_OF_THE_CAMPUS.trim().toUpperCase() === c.trim().toUpperCase())
+                campusFilter.some(c => t.NAME_OF_THE_CAMPUS.trim().toUpperCase() === c.trim().toUpperCase())
             );
         }
-        if (filters.stream && filters.stream.length > 0 && !filters.stream.includes('All')) {
-            const mappedStreams = filters.stream.map(s => {
+
+        // Filter by Stream - handle 'All' or empty
+        const streamFilter = filters.stream || [];
+        const isAllStream = streamFilter.length === 0 || streamFilter.includes('All');
+
+        if (!isAllStream) {
+            const mappedStreams = streamFilter.map(s => {
                 const up = s.trim().toUpperCase();
-                if (up === 'SR_ELITE_SET_01' || up === 'SR_ELITE_SET_02' || up === 'SR ELITE') return 'SR ELITE';
+                // Map all Elite variants to "SR ELITE" to match TARGETS table
+                if (up.includes('SR_ELITE') || up.includes('SR ELITE')) return 'SR ELITE';
                 return up;
             });
             filtered = filtered.filter(t => mappedStreams.includes(t.Stream.trim().toUpperCase()));
         }
+
         const result = {};
         thresholds.forEach(th => {
-            result[th.key] = filtered.reduce((sum, row) => sum + (Number(row[th.key]) || 0), 0);
+            const sum = filtered.reduce((acc, row) => acc + (Number(row[th.key]) || 0), 0);
+            result[th.key] = sum > 0 ? sum : 0; // Ensure 0 is a number, not empty
         });
         return result;
     }, [allTargets, filters, thresholds]);
@@ -181,7 +195,7 @@ const TargetVsAchieved = ({ filters }) => {
                     {thresholds.map(th => (
                         <div key={th.label} className="glass-cell">
                             <div className="label">{th.label}</div>
-                            <div className="value">{aggregatedTarget[th.key] || '--'}</div>
+                            <div className="value">{(aggregatedTarget[th.key] !== undefined && aggregatedTarget[th.key] !== null && aggregatedTarget[th.key] !== '') ? aggregatedTarget[th.key] : '--'}</div>
                         </div>
                     ))}
                 </div>
@@ -192,7 +206,7 @@ const TargetVsAchieved = ({ filters }) => {
                 <div className="glass-grid">
                     {thresholds.map(th => {
                         const target = aggregatedTarget[th.key] || 0;
-                        const achieved = achievedCounts[th.key] || 0;
+                        const achieved = (achievedCounts[th.key] !== undefined && achievedCounts[th.key] !== null) ? achievedCounts[th.key] : 0;
                         const isMatch = achieved >= target;
                         const isSelected = selectedThreshold === th.label;
                         return (
@@ -202,7 +216,7 @@ const TargetVsAchieved = ({ filters }) => {
                                 onClick={() => setSelectedThreshold(th.label)}
                             >
                                 <div className="label">{th.label}</div>
-                                <div className="value">{achieved || '--'}</div>
+                                <div className="value">{achieved !== undefined && achieved !== null ? achieved : '--'}</div>
                             </div>
                         );
                     })}
