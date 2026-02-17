@@ -83,10 +83,10 @@ const TargetVsAchieved = ({ filters }) => {
         if (!allTargets.length) return {};
         let filtered = allTargets;
 
-        // Filter by Campus - handle 'All' or 'All Selected' or empty
+        // Filter by Campus - handle 'All', 'All Selected', '__ALL__' or empty
         const campusFilter = filters.campus || [];
         const isAllCampus = campusFilter.length === 0 ||
-            campusFilter.some(c => ['All', 'All Selected', 'ALL SELECTED'].includes(c));
+            campusFilter.some(c => ['All', 'All Selected', 'ALL SELECTED', '__ALL__'].includes(c));
 
         if (!isAllCampus) {
             filtered = filtered.filter(t =>
@@ -94,9 +94,10 @@ const TargetVsAchieved = ({ filters }) => {
             );
         }
 
-        // Filter by Stream - handle 'All' or empty
+        // Filter by Stream - handle 'All', '__ALL__' or empty
         const streamFilter = filters.stream || [];
-        const isAllStream = streamFilter.length === 0 || streamFilter.includes('All');
+        const isAllStream = streamFilter.length === 0 ||
+            streamFilter.some(s => ['All', '__ALL__'].includes(s));
 
         if (!isAllStream) {
             const mappedStreams = streamFilter.map(s => {
@@ -105,13 +106,16 @@ const TargetVsAchieved = ({ filters }) => {
                 if (up.includes('SR_ELITE') || up.includes('SR ELITE')) return 'SR ELITE';
                 return up;
             });
-            filtered = filtered.filter(t => mappedStreams.includes(t.Stream.trim().toUpperCase()));
+            filtered = filtered.filter(t => {
+                const tStream = t.Stream ? t.Stream.trim().toUpperCase() : '';
+                return mappedStreams.includes(tStream);
+            });
         }
 
         const result = {};
         thresholds.forEach(th => {
             const sum = filtered.reduce((acc, row) => acc + (Number(row[th.key]) || 0), 0);
-            result[th.key] = sum > 0 ? sum : 0; // Ensure 0 is a number, not empty
+            result[th.key] = sum || 0;
         });
         return result;
     }, [allTargets, filters, thresholds]);
