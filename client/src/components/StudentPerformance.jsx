@@ -37,13 +37,39 @@ const StudentPerformance = ({ filters }) => {
         const fetchStudentList = async () => {
             setListLoading(true);
             try {
+                // If global filters have a studentSearch value, we should fetch that specific student 
+                // but keep the list logic working too.
                 const queryParams = buildQueryParams(filters).toString();
                 const res = await fetch(`${API_URL}/api/studentsByCampus?${queryParams}`);
                 const data = await res.json();
                 setStudents(data || []);
 
-                // Automatically select first student if none selected
-                if (data && data.length > 0 && !selectedStudent) {
+                // SYNC selected student with global filters SELECT
+                if (filters.studentSearch && filters.studentSearch.length > 0) {
+                    const searchedId = filters.studentSearch[0].toString();
+                    const foundInLocal = data.find(s => s.id.toString() === searchedId);
+                    if (foundInLocal) {
+                        setSelectedStudent(foundInLocal);
+                    } else {
+                        // If not in current list, we fetch specifically if we have a search
+                        const fetchSpec = async () => {
+                            try {
+                                const sRes = await fetch(`${API_URL}/api/history?id=${searchedId}`);
+                                const sData = await sRes.json();
+                                if (sData && sData.length > 0) {
+                                    const first = sData[0];
+                                    setSelectedStudent({
+                                        id: first.STUD_ID,
+                                        name: first.NAME_OF_THE_STUDENT,
+                                        campus: first.CAMPUS_NAME,
+                                        stream: first.Stream || ''
+                                    });
+                                }
+                            } catch (e) { console.error("Spec fetch error:", e); }
+                        };
+                        fetchSpec();
+                    }
+                } else if (data && data.length > 0 && !selectedStudent) {
                     setSelectedStudent(data[0]);
                 }
             } catch (error) {
@@ -62,7 +88,17 @@ const StudentPerformance = ({ filters }) => {
         const fetchPerformance = async () => {
             setLoading(true);
             try {
-                const res = await fetch(`${API_URL}/api/history?id=${selectedStudent.id}`);
+                // Fetch ALL history for this student, ignore other filters for individual progress 
+                // UNLESS the user wants to see their performance in specific tests.
+                // Let's use test filters if they exists.
+                const testParams = new URLSearchParams();
+                testParams.append('id', selectedStudent.id);
+
+                if (filters.test && filters.test.length > 0 && !filters.test.includes('__ALL__')) {
+                    filters.test.forEach(t => testParams.append('test', t));
+                }
+
+                const res = await fetch(`${API_URL}/api/history?${testParams.toString()}`);
                 const data = await res.json();
                 setPerformanceData(data || []);
             } catch (error) {
@@ -72,20 +108,20 @@ const StudentPerformance = ({ filters }) => {
             }
         };
         fetchPerformance();
-    }, [selectedStudent]);
+    }, [selectedStudent, filters.test]);
 
     const filteredStudents = useMemo(() => {
         if (!searchTerm) return students;
         const term = searchTerm.toLowerCase();
         return students.filter(s =>
-            s.name.toLowerCase().includes(term) ||
-            s.id.toString().toLowerCase().includes(term)
+            (s.name && s.name.toLowerCase().includes(term)) ||
+            (s.id && s.id.toString().toLowerCase().includes(term))
         );
     }, [students, searchTerm]);
 
     const createChartData = (label, dataKey, color) => {
-        // We only want to show tests that have data for this key
-        const validData = performanceData.filter(d => d[dataKey] !== null && d[dataKey] !== undefined);
+        // Filter out zero or empty recordings to keep graph clean
+        const validData = performanceData.filter(d => d[dataKey] !== null && d[dataKey] !== undefined && d[dataKey] !== '');
 
         return {
             labels: validData.map(d => d.Test),
@@ -94,14 +130,15 @@ const StudentPerformance = ({ filters }) => {
                     label: label,
                     data: validData.map(d => Number(d[dataKey])),
                     backgroundColor: color,
-                    borderRadius: 8,
+                    borderRadius: 12,
                     borderSkipped: false,
-                    barThickness: 30,
+                    barThickness: 'flex',
+                    maxBarThickness: 45,
                     datalabels: {
                         color: '#000',
                         anchor: 'center',
                         align: 'center',
-                        font: { weight: 'bold', size: 14 },
+                        font: { weight: '900', size: 13 },
                         formatter: (value) => Math.round(value)
                     }
                 }
@@ -118,18 +155,19 @@ const StudentPerformance = ({ filters }) => {
             title: {
                 display: true,
                 text: title,
-                color: '#000',
-                font: { size: 16, weight: 'bold' },
-                padding: { bottom: 10 }
+                color: '#1e293b',
+                font: { size: 18, weight: '900', family: 'Inter' },
+                padding: { bottom: 20 }
             },
             tooltip: {
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
                 titleColor: '#000',
                 bodyColor: '#000',
-                borderColor: '#ddd',
+                borderColor: '#1e293b',
                 borderWidth: 1,
-                padding: 10,
-                displayColors: false
+                padding: 12,
+                displayColors: false,
+                titleFont: { weight: 'bold' }
             },
             datalabels: {
                 display: true
@@ -137,21 +175,28 @@ const StudentPerformance = ({ filters }) => {
         },
         scales: {
             x: {
-                display: false, // Hide X axis as labels are inside bars
+                display: false,
                 grid: { display: false }
             },
             y: {
                 grid: { display: false },
                 ticks: {
-                    color: '#444',
-                    font: { weight: 'bold', size: 12 }
+                    color: '#1e293b',
+                    font: { weight: '800', size: 11 },
+                    autoSkip: false
                 }
             }
         },
         layout: {
-            padding: { left: 10, right: 40 } // Space for labels
+            padding: { left: 5, right: 35 }
         }
     });
+
+    // Helper to calculate required height for the graph based on number of tests
+    const getChartHeight = () => {
+        const count = performanceData.length || 0;
+        return Math.max(320, count * 45); // At least 45px per bar
+    };
 
     return (
         <div className="performance-report-container">
@@ -164,7 +209,7 @@ const StudentPerformance = ({ filters }) => {
                         <Search size={18} className="search-icon" />
                         <input
                             type="text"
-                            placeholder="Search student..."
+                            placeholder="Local search in this list..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -182,7 +227,10 @@ const StudentPerformance = ({ filters }) => {
                             </button>
                         ))}
                         {filteredStudents.length === 0 && !listLoading && (
-                            <div className="no-students">No students found</div>
+                            <div className="no-students">
+                                <p>No matching students in current view.</p>
+                                <p style={{ fontSize: '0.75rem', marginTop: '5px', opacity: 0.7 }}>Tip: Use the global search bar at the top for a site-wide search.</p>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -193,51 +241,66 @@ const StudentPerformance = ({ filters }) => {
                         <>
                             <div className="student-info-header-glass">
                                 <div className="user-icon-circle">
-                                    <User size={24} />
+                                    <User size={28} />
                                 </div>
                                 <div className="student-details">
                                     <h2>{selectedStudent.name}</h2>
-                                    <p>ID: {selectedStudent.id} | Campus: {selectedStudent.campus} | Stream: {selectedStudent.stream}</p>
+                                    <div className="details-badges">
+                                        <span className="badge-glass">ID: {selectedStudent.id}</span>
+                                        <span className="badge-glass">CAMPUS: {selectedStudent.campus}</span>
+                                        {selectedStudent.stream && <span className="badge-glass">STREAM: {selectedStudent.stream}</span>}
+                                    </div>
                                 </div>
                             </div>
 
                             <div className="graphs-grid">
                                 <div className="graph-card-glass wide">
-                                    <Bar
-                                        data={createChartData('Total Marks', 'Tot_720', '#4ade80')}
-                                        options={chartOptions('Total Marks')}
-                                    />
+                                    <div style={{ height: getChartHeight(), minHeight: '100%' }}>
+                                        <Bar
+                                            data={createChartData('Total Marks(720)', 'Tot_720', '#4ade80')}
+                                            options={chartOptions('Total Marks (720)')}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="graph-card-glass wide">
-                                    <Bar
-                                        data={createChartData('Botany', 'Botany', '#f472b6')}
-                                        options={chartOptions('Botany')}
-                                    />
+                                    <div style={{ height: getChartHeight(), minHeight: '100%' }}>
+                                        <Bar
+                                            data={createChartData('Botany (180)', 'Botany', '#f472b6')}
+                                            options={chartOptions('Botany (180)')}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="graph-card-glass">
-                                    <Bar
-                                        data={createChartData('Zoology', 'Zoology', '#fb923c')}
-                                        options={chartOptions('Zoology')}
-                                    />
+                                    <div style={{ height: getChartHeight(), minHeight: '100%' }}>
+                                        <Bar
+                                            data={createChartData('Zoology (180)', 'Zoology', '#fb923c')}
+                                            options={chartOptions('Zoology (180)')}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="graph-card-glass">
-                                    <Bar
-                                        data={createChartData('Physics', 'Physics', '#60a5fa')}
-                                        options={chartOptions('Physics')}
-                                    />
+                                    <div style={{ height: getChartHeight(), minHeight: '100%' }}>
+                                        <Bar
+                                            data={createChartData('Physics (180)', 'Physics', '#60a5fa')}
+                                            options={chartOptions('Physics (180)')}
+                                        />
+                                    </div>
                                 </div>
                                 <div className="graph-card-glass">
-                                    <Bar
-                                        data={createChartData('Chemistry', 'Chemistry', '#94a3b8')}
-                                        options={chartOptions('Chemistry')}
-                                    />
+                                    <div style={{ height: getChartHeight(), minHeight: '100%' }}>
+                                        <Bar
+                                            data={createChartData('Chemistry (180)', 'Chemistry', '#94a3b8')}
+                                            options={chartOptions('Chemistry (180)')}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </>
                     ) : (
                         <div className="select-student-prompt">
                             <div className="prompt-icon">👈</div>
-                            <h3>Please select a student from the list</h3>
+                            <h3>Please select a student to view analysis</h3>
+                            <p>You can search for any student using the top search bar.</p>
                         </div>
                     )}
                 </div>
@@ -402,44 +465,64 @@ const StudentPerformance = ({ filters }) => {
 
                 .student-details h2 {
                     margin: 0;
-                    font-size: 1.8rem;
+                    font-size: 2.2rem;
                     color: #0f172a;
                     font-weight: 900;
-                    letter-spacing: -0.5px;
+                    letter-spacing: -1px;
                 }
 
-                .student-details p {
-                    margin: 4px 0 0;
-                    color: #64748b;
-                    font-size: 1rem;
-                    font-weight: 600;
+                .details-badges {
+                    display: flex;
+                    gap: 10px;
+                    margin-top: 8px;
+                    flex-wrap: wrap;
+                }
+
+                .badge-glass {
+                    background: rgba(128, 0, 64, 0.1);
+                    color: #800040;
+                    padding: 5px 12px;
+                    border-radius: 10px;
+                    font-size: 0.8rem;
+                    font-weight: 800;
+                    border: 1px solid rgba(128, 0, 64, 0.2);
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
                 }
 
                 .graphs-grid {
                     display: grid;
                     grid-template-columns: repeat(6, 1fr);
                     gap: 25px;
-                    padding-bottom: 20px;
+                    padding-bottom: 30px;
                 }
 
                 .graph-card-glass {
-                    background: rgba(255, 255, 255, 0.4);
-                    backdrop-filter: blur(15px);
-                    border-radius: 24px;
+                    background: rgba(255, 255, 255, 0.5);
+                    backdrop-filter: blur(20px);
+                    border-radius: 28px;
                     padding: 25px;
-                    border: 2px solid rgba(255, 255, 255, 0.5);
-                    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.07);
-                    height: 320px;
+                    border: 2px solid rgba(255, 255, 255, 0.6);
+                    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
+                    height: 450px; /* Base height */
+                    overflow-y: auto; /* Allow scrolling for many tests */
                     transition: all 0.4s ease;
                     grid-column: span 2;
                     position: relative;
                 }
 
+                .graph-card-glass::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .graph-card-glass::-webkit-scrollbar-thumb {
+                    background: rgba(0, 0, 0, 0.1);
+                    border-radius: 10px;
+                }
+
                 .graph-card-glass:hover {
-                    transform: translateY(-8px) scale(1.01);
-                    box-shadow: 0 25px 55px rgba(0, 0, 0, 0.12);
-                    background: rgba(255, 255, 255, 0.55);
-                    border-color: rgba(255, 255, 255, 0.8);
+                    transform: translateY(-5px);
+                    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.12);
+                    background: rgba(255, 255, 255, 0.65);
                 }
 
                 .graph-card-glass.wide {
