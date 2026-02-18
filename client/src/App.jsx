@@ -13,6 +13,7 @@ import ErrorReport from './components/ErrorReport';
 import ErrorTop100 from './components/ErrorTop100';
 import ErrorCountReport from './components/ErrorCountReport';
 import TargetVsAchieved from './components/TargetVsAchieved';
+import StudentPerformance from './components/StudentPerformance';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -141,7 +142,8 @@ const Dashboard = () => {
                 'progress': 'Progress Report',
                 'errors': 'Error Report',
                 'error_top': 'Error Top 100%',
-                'error_count': 'Error Count Report'
+                'error_count': 'Error Count Report',
+                'student_performance': 'Student Performance'
             };
             const pageName = pageNames[activePage] || activePage;
             logActivity(userData, `Opened ${pageName}`);
@@ -186,6 +188,12 @@ const Dashboard = () => {
                         <TargetVsAchieved filters={globalFilters} />
                     </div>
                 );
+            case 'student_performance':
+                return (
+                    <div className="report-sections">
+                        <StudentPerformance filters={globalFilters} />
+                    </div>
+                );
             case 'approvals':
                 return isAdmin ? <UserApprovals /> : <div className="p-4">Access Denied</div>;
             case 'logs':
@@ -195,7 +203,7 @@ const Dashboard = () => {
         }
     };
 
-    const showFilterBar = ['analysis', 'averages', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved'].includes(activePage);
+    const showFilterBar = ['analysis', 'averages', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
 
     return (
         <div className="dashboard-root">
@@ -209,7 +217,8 @@ const Dashboard = () => {
                                     activePage === 'error_top' ? 'Error Top 100%' :
                                         activePage === 'error_count' ? 'Error Count Report' :
                                             activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
-                                                activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
+                                                activePage === 'student_performance' ? 'Student Performance' :
+                                                    activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
                     {showFilterBar && (
