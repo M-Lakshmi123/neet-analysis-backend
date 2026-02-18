@@ -30,7 +30,6 @@ const StudentPerformance = ({ filters }) => {
     const [performanceData, setPerformanceData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [listLoading, setListLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
 
     // Fetch student list based on filters
     useEffect(() => {
@@ -51,7 +50,7 @@ const StudentPerformance = ({ filters }) => {
                     if (foundInLocal) {
                         setSelectedStudent(foundInLocal);
                     } else {
-                        // If not in current list, we fetch specifically if we have a search
+                        // If not in current list (limit reached or filters), fetch specifically
                         const fetchSpec = async () => {
                             try {
                                 const sRes = await fetch(`${API_URL}/api/history?id=${searchedId}`);
@@ -81,24 +80,23 @@ const StudentPerformance = ({ filters }) => {
         fetchStudentList();
     }, [filters]);
 
-    // Fetch performance data when selected student changes
+    // Fetch performance data when selected student changes OR filters change
     useEffect(() => {
         if (!selectedStudent) return;
 
         const fetchPerformance = async () => {
             setLoading(true);
             try {
-                // Fetch ALL history for this student, ignore other filters for individual progress 
-                // UNLESS the user wants to see their performance in specific tests.
-                // Let's use test filters if they exists.
-                const testParams = new URLSearchParams();
-                testParams.append('id', selectedStudent.id);
+                // Combine student ID with global filters (Test Type, Test selection, etc.)
+                // This ensures if user selects GT, we only show GT.
+                const perfFilters = { ...filters };
+                perfFilters.studentSearch = [selectedStudent.id];
+                // Remove campus/stream/etc if we want pure student history, 
+                // but the user specifically asked why WT shows when GT is selected.
+                // So we MUST respect the test and testType filters.
 
-                if (filters.test && filters.test.length > 0 && !filters.test.includes('__ALL__')) {
-                    filters.test.forEach(t => testParams.append('test', t));
-                }
-
-                const res = await fetch(`${API_URL}/api/history?${testParams.toString()}`);
+                const queryParams = buildQueryParams(perfFilters).toString();
+                const res = await fetch(`${API_URL}/api/history?${queryParams}`);
                 const data = await res.json();
                 setPerformanceData(data || []);
             } catch (error) {
@@ -108,16 +106,7 @@ const StudentPerformance = ({ filters }) => {
             }
         };
         fetchPerformance();
-    }, [selectedStudent, filters.test]);
-
-    const filteredStudents = useMemo(() => {
-        if (!searchTerm) return students;
-        const term = searchTerm.toLowerCase();
-        return students.filter(s =>
-            (s.name && s.name.toLowerCase().includes(term)) ||
-            (s.id && s.id.toString().toLowerCase().includes(term))
-        );
-    }, [students, searchTerm]);
+    }, [selectedStudent, filters.test, filters.testType, filters.stream]);
 
     const createChartData = (label, dataKey, color) => {
         // Filter out zero or empty recordings to keep graph clean
@@ -195,66 +184,59 @@ const StudentPerformance = ({ filters }) => {
     // Helper to calculate required height for the graph based on number of tests
     const getChartHeight = () => {
         const count = performanceData.length || 0;
-        return Math.max(320, count * 45); // At least 45px per bar
+        return Math.max(250, count * 35); // Reduced from 55px to 35px for compact view
     };
 
     return (
-        <div className="performance-report-container">
+        <div className="performance-report-container compact">
             <LoadingTimer isLoading={loading || listLoading} />
 
             <div className="performance-layout">
                 {/* Left Sidebar: Student List */}
-                <div className="student-sidebar-glass">
-                    <div className="search-container-glass">
-                        <Search size={18} className="search-icon" />
-                        <input
-                            type="text"
-                            placeholder="Local search in this list..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                <div className="student-sidebar-glass compact">
+                    <div className="sidebar-header-glass">
+                        Student List
                     </div>
 
                     <div className="student-list-scroll">
-                        {filteredStudents.map(student => (
+                        {students.map(student => (
                             <button
                                 key={student.id}
-                                className={`student-btn-glass ${selectedStudent?.id === student.id ? 'active' : ''}`}
+                                className={`student-btn-glass compact ${selectedStudent?.id === student.id ? 'active' : ''}`}
                                 onClick={() => setSelectedStudent(student)}
                             >
                                 <div className="btn-indicator" />
                                 <span className="student-name">{student.name}</span>
                             </button>
                         ))}
-                        {filteredStudents.length === 0 && !listLoading && (
+                        {students.length === 0 && !listLoading && (
                             <div className="no-students">
-                                <p>No matching students in current view.</p>
-                                <p style={{ fontSize: '0.75rem', marginTop: '5px', opacity: 0.7 }}>Tip: Use the global search bar at the top for a site-wide search.</p>
+                                <p>No matching students.</p>
                             </div>
                         )}
                     </div>
                 </div>
 
                 {/* Right Content: Graphs */}
-                <div className="graphs-content">
+                <div className="graphs-content compact">
                     {selectedStudent ? (
                         <>
-                            <div className="student-info-header-glass">
-                                <div className="user-icon-circle">
-                                    <User size={28} />
+                            <div className="student-info-header-glass compact">
+                                <div className="user-icon-circle compact">
+                                    <User size={20} />
                                 </div>
                                 <div className="student-details">
                                     <h2>{selectedStudent.name}</h2>
                                     <div className="details-badges">
                                         <span className="badge-glass">ID: {selectedStudent.id}</span>
-                                        <span className="badge-glass">CAMPUS: {selectedStudent.campus}</span>
-                                        {selectedStudent.stream && <span className="badge-glass">STREAM: {selectedStudent.stream}</span>}
+                                        <span className="badge-glass">{selectedStudent.campus}</span>
+                                        {selectedStudent.stream && <span className="badge-glass">{selectedStudent.stream}</span>}
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="graphs-grid">
-                                <div className="graph-card-glass wide">
+                            <div className="graphs-grid compact">
+                                <div className="graph-card-glass wide compact">
                                     <div style={{ height: getChartHeight(), minHeight: '100%' }}>
                                         <Bar
                                             data={createChartData('Total Marks(720)', 'Tot_720', '#4ade80')}
@@ -262,7 +244,7 @@ const StudentPerformance = ({ filters }) => {
                                         />
                                     </div>
                                 </div>
-                                <div className="graph-card-glass wide">
+                                <div className="graph-card-glass wide compact">
                                     <div style={{ height: getChartHeight(), minHeight: '100%' }}>
                                         <Bar
                                             data={createChartData('Botany (180)', 'Botany', '#f472b6')}
@@ -270,7 +252,7 @@ const StudentPerformance = ({ filters }) => {
                                         />
                                     </div>
                                 </div>
-                                <div className="graph-card-glass">
+                                <div className="graph-card-glass compact">
                                     <div style={{ height: getChartHeight(), minHeight: '100%' }}>
                                         <Bar
                                             data={createChartData('Zoology (180)', 'Zoology', '#fb923c')}
@@ -278,7 +260,7 @@ const StudentPerformance = ({ filters }) => {
                                         />
                                     </div>
                                 </div>
-                                <div className="graph-card-glass">
+                                <div className="graph-card-glass compact">
                                     <div style={{ height: getChartHeight(), minHeight: '100%' }}>
                                         <Bar
                                             data={createChartData('Physics (180)', 'Physics', '#60a5fa')}
@@ -286,7 +268,7 @@ const StudentPerformance = ({ filters }) => {
                                         />
                                     </div>
                                 </div>
-                                <div className="graph-card-glass">
+                                <div className="graph-card-glass compact">
                                     <div style={{ height: getChartHeight(), minHeight: '100%' }}>
                                         <Bar
                                             data={createChartData('Chemistry (180)', 'Chemistry', '#94a3b8')}
@@ -299,8 +281,7 @@ const StudentPerformance = ({ filters }) => {
                     ) : (
                         <div className="select-student-prompt">
                             <div className="prompt-icon">👈</div>
-                            <h3>Please select a student to view analysis</h3>
-                            <p>You can search for any student using the top search bar.</p>
+                            <h3>Please select a student</h3>
                         </div>
                     )}
                 </div>
@@ -308,64 +289,50 @@ const StudentPerformance = ({ filters }) => {
 
             <style jsx>{`
                 .performance-report-container {
-                    padding: 20px;
-                    height: calc(100vh - 160px);
+                    padding: 10px 15px;
+                    height: calc(100vh - 180px); /* Adjusted for FilterBar Height */
                     background: transparent;
+                    transition: all 0.3s ease;
                 }
 
                 .performance-layout {
                     display: flex;
-                    gap: 25px;
+                    gap: 15px;
                     height: 100%;
                 }
 
-                /* Student Sidebar Glass Effect */
+                /* Student List Sidebar */
                 .student-sidebar-glass {
-                    width: 300px;
-                    background: rgba(255, 255, 255, 0.25);
+                    width: 240px;
+                    background: rgba(255, 255, 255, 0.4);
                     backdrop-filter: blur(15px);
-                    border: 2px solid rgba(255, 255, 255, 0.4);
-                    border-radius: 24px;
+                    border: 1px solid rgba(255, 255, 255, 0.6);
+                    border-radius: 16px;
                     display: flex;
                     flex-direction: column;
-                    box-shadow: 0 15px 35px 0 rgba(0, 0, 0, 0.1);
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
                     overflow: hidden;
                     height: 100%;
-                    transition: all 0.3s ease;
                 }
 
-                .search-container-glass {
-                    padding: 20px;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    background: rgba(255, 255, 255, 0.4);
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+                .sidebar-header-glass {
+                    padding: 12px 15px;
+                    background: rgba(128, 0, 64, 0.1);
+                    color: #800040;
+                    font-weight: 900;
+                    font-size: 0.8rem;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    border-bottom: 1px solid rgba(128, 0, 64, 0.1);
                 }
-
-                .search-container-glass input {
-                    flex: 1;
-                    background: transparent;
-                    border: none;
-                    outline: none;
-                    font-size: 0.95rem;
-                    font-weight: 600;
-                    color: #1e293b;
-                }
-
-                .search-container-glass input::placeholder {
-                    color: #94a3b8;
-                }
-
-                .search-icon { color: #800040; }
 
                 .student-list-scroll {
                     flex: 1;
                     overflow-y: auto;
-                    padding: 15px;
+                    padding: 8px;
                     display: flex;
                     flex-direction: column;
-                    gap: 10px;
+                    gap: 6px;
                 }
 
                 .student-list-scroll::-webkit-scrollbar {
@@ -378,54 +345,54 @@ const StudentPerformance = ({ filters }) => {
 
                 .student-btn-glass {
                     background: rgba(255, 255, 255, 0.5);
-                    border: 1px solid rgba(255, 255, 255, 0.7);
-                    padding: 14px 18px;
-                    border-radius: 16px;
+                    border: 1px solid rgba(255, 255, 255, 0.8);
+                    padding: 8px 12px;
+                    border-radius: 10px;
                     text-align: left;
                     cursor: pointer;
-                    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    transition: all 0.2s ease;
                     display: flex;
                     align-items: center;
-                    gap: 15px;
+                    gap: 10px;
                     position: relative;
                     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
                 }
 
                 .student-btn-glass:hover {
-                    background: rgba(255, 255, 255, 0.8);
-                    transform: translateX(8px) scale(1.02);
-                    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+                    background: rgba(255, 255, 255, 0.9);
+                    transform: translateX(3px);
+                    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.03);
                 }
 
                 .student-btn-glass.active {
-                    background: linear-gradient(135deg, #800040, #600030);
+                    background: #800040;
                     color: white;
                     border-color: #800040;
-                    box-shadow: 0 10px 25px rgba(128, 0, 64, 0.4);
-                    transform: translateX(10px) scale(1.03);
+                    box-shadow: 0 4px 12px rgba(128, 0, 64, 0.3);
+                    transform: translateX(5px);
                 }
 
                 .btn-indicator {
-                    width: 5px;
+                    width: 3px;
                     height: 0;
                     background: #fbbf24;
-                    border-radius: 3px;
-                    transition: height 0.4s ease;
-                    box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+                    border-radius: 2px;
+                    transition: height 0.3s ease;
+                    box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
                 }
 
                 .student-btn-glass.active .btn-indicator {
-                    height: 25px;
+                    height: 15px;
                 }
 
                 .student-name {
                     font-weight: 700;
-                    font-size: 0.95rem;
+                    font-size: 0.8rem;
                     text-transform: uppercase;
                     white-space: nowrap;
                     overflow: hidden;
                     text-overflow: ellipsis;
-                    letter-spacing: 0.3px;
+                    letter-spacing: 0.2px;
                 }
 
                 /* Graphs Content */
@@ -433,96 +400,104 @@ const StudentPerformance = ({ filters }) => {
                     flex: 1;
                     display: flex;
                     flex-direction: column;
-                    gap: 25px;
+                    gap: 15px;
                     overflow-y: auto;
-                    padding-right: 10px;
+                    padding-right: 5px;
+                }
+
+                .graphs-content::-webkit-scrollbar {
+                    width: 5px;
+                }
+                .graphs-content::-webkit-scrollbar-thumb {
+                    background: rgba(0, 0, 0, 0.1);
+                    border-radius: 10px;
                 }
 
                 .student-info-header-glass {
-                    background: rgba(255, 255, 255, 0.3);
+                    background: rgba(255, 255, 255, 0.5);
                     backdrop-filter: blur(15px);
-                    padding: 20px 30px;
-                    border-radius: 24px;
-                    border: 2px solid rgba(255, 255, 255, 0.4);
+                    padding: 12px 20px;
+                    border-radius: 16px;
+                    border: 1px solid rgba(255, 255, 255, 0.8);
                     display: flex;
                     align-items: center;
-                    gap: 25px;
-                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+                    gap: 15px;
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
                 }
 
                 .user-icon-circle {
-                    width: 60px;
-                    height: 60px;
+                    width: 40px;
+                    height: 40px;
                     background: linear-gradient(135deg, #800040, #b91c1c);
                     color: white;
                     border-radius: 50%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    box-shadow: 0 8px 16px rgba(128, 0, 64, 0.2);
-                    border: 3px solid white;
+                    box-shadow: 0 4px 8px rgba(128, 0, 64, 0.1);
+                    border: 2px solid white;
                 }
 
                 .student-details h2 {
                     margin: 0;
-                    font-size: 2.2rem;
-                    color: #0f172a;
-                    font-weight: 900;
-                    letter-spacing: -1px;
+                    font-size: 1.3rem;
+                    color: #1e293b;
+                    font-weight: 800;
+                    letter-spacing: -0.5px;
                 }
 
                 .details-badges {
                     display: flex;
-                    gap: 10px;
-                    margin-top: 8px;
+                    gap: 8px;
+                    margin-top: 4px;
                     flex-wrap: wrap;
                 }
 
                 .badge-glass {
-                    background: rgba(128, 0, 64, 0.1);
+                    background: rgba(128, 0, 64, 0.08);
                     color: #800040;
-                    padding: 5px 12px;
-                    border-radius: 10px;
-                    font-size: 0.8rem;
-                    font-weight: 800;
-                    border: 1px solid rgba(128, 0, 64, 0.2);
+                    padding: 2px 8px;
+                    border-radius: 6px;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                    border: 1px solid rgba(128, 0, 64, 0.15);
                     text-transform: uppercase;
-                    letter-spacing: 0.5px;
+                    letter-spacing: 0.3px;
                 }
 
                 .graphs-grid {
                     display: grid;
                     grid-template-columns: repeat(6, 1fr);
-                    gap: 25px;
-                    padding-bottom: 30px;
+                    gap: 15px;
+                    padding-bottom: 10px;
                 }
 
                 .graph-card-glass {
-                    background: rgba(255, 255, 255, 0.5);
-                    backdrop-filter: blur(20px);
-                    border-radius: 28px;
-                    padding: 25px;
-                    border: 2px solid rgba(255, 255, 255, 0.6);
-                    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
-                    height: 450px; /* Base height */
+                    background: rgba(255, 255, 255, 0.6);
+                    backdrop-filter: blur(10px);
+                    border-radius: 16px;
+                    padding: 15px;
+                    border: 1px solid rgba(255, 255, 255, 0.9);
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+                    height: 280px; /* Base height */
                     overflow-y: auto; /* Allow scrolling for many tests */
-                    transition: all 0.4s ease;
+                    transition: all 0.3s ease;
                     grid-column: span 2;
                     position: relative;
                 }
 
                 .graph-card-glass::-webkit-scrollbar {
-                    width: 6px;
+                    width: 4px;
                 }
                 .graph-card-glass::-webkit-scrollbar-thumb {
                     background: rgba(0, 0, 0, 0.1);
-                    border-radius: 10px;
+                    border-radius: 5px;
                 }
 
                 .graph-card-glass:hover {
-                    transform: translateY(-5px);
-                    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.12);
-                    background: rgba(255, 255, 255, 0.65);
+                    transform: translateY(-2px);
+                    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.06);
+                    background: rgba(255, 255, 255, 0.75);
                 }
 
                 .graph-card-glass.wide {
@@ -538,20 +513,20 @@ const StudentPerformance = ({ filters }) => {
                     color: #64748b;
                     text-align: center;
                     background: rgba(255, 255, 255, 0.1);
-                    border-radius: 24px;
-                    border: 2px dashed rgba(255, 255, 255, 0.4);
+                    border-radius: 16px;
+                    border: 1px dashed rgba(255, 255, 255, 0.4);
                 }
 
                 .prompt-icon {
-                    font-size: 4rem;
-                    margin-bottom: 15px;
-                    filter: drop-shadow(0 10px 10px rgba(0,0,0,0.1));
+                    font-size: 3rem;
+                    margin-bottom: 10px;
+                    filter: drop-shadow(0 5px 5px rgba(0,0,0,0.05));
                 }
 
                 .select-student-prompt h3 {
                     margin: 0;
-                    font-weight: 800;
-                    font-size: 1.5rem;
+                    font-weight: 700;
+                    font-size: 1.2rem;
                     color: #1e293b;
                 }
 
