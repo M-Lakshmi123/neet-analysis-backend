@@ -66,7 +66,7 @@ const buildWhereClause = (req, options = {}) => {
             .map(v => v.replace(/'/g, "''"));
         if (cleanValues.length === 0) return;
         const list = cleanValues.map(v => `'${v}'`).join(',');
-        clauses.push(`UPPER(TRIM(${field})) IN (${list})`);
+        clauses.push(`${field} IN (${list})`);
     };
 
     if (!options.ignoreCampus) addClause('CAMPUS_NAME', campus);
@@ -84,11 +84,11 @@ const buildWhereClause = (req, options = {}) => {
 
     if (cleanIds.length > 0) {
         const list = cleanIds.map(v => `'${v}'`).join(',');
-        clauses.push(`UPPER(TRIM(STUD_ID)) IN (${list})`);
+        clauses.push(`STUD_ID IN (${list})`);
     } else if (quickSearch && typeof quickSearch === 'string' && quickSearch.trim() !== '') {
         // Only use quickSearch LIKE if no specific student is selected
         const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
-        clauses.push(`(UPPER(TRIM(NAME_OF_THE_STUDENT)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
+        clauses.push(`(NAME_OF_THE_STUDENT LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
     }
 
     const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -376,6 +376,13 @@ app.get('/api/studentsByCampus', async (req, res) => {
 app.get('/api/exam-stats', async (req, res) => {
     try {
         const pool = await connectToDb();
+        const cacheKey = `exam_stats_${JSON.stringify(req.query)}`;
+        const cached = cache.get(cacheKey);
+        if (cached) {
+            console.log("[Exam Stats] Cache Hit");
+            return res.json(cached);
+        }
+
         let where = buildWhereClause(req);
         // Filter out empty/invalid metadata rows
         const isValid = "Test IS NOT NULL AND Test != '' AND DATE IS NOT NULL AND DATE != ''";
@@ -424,6 +431,7 @@ app.get('/api/exam-stats', async (req, res) => {
 
         logQuery(query, req.query);
         const result = await pool.request().query(query);
+        cache.set(cacheKey, result.recordset, 60); // Cache for 1 minute
         res.json(result.recordset);
     } catch (err) {
         console.error(err);
@@ -435,6 +443,13 @@ app.get('/api/exam-stats', async (req, res) => {
 app.get('/api/analysis-report', async (req, res) => {
     try {
         const pool = await connectToDb();
+        const cacheKey = `analysis_report_${JSON.stringify(req.query)}`;
+        const cached = cache.get(cacheKey);
+        if (cached) {
+            console.log("[Analysis Report] Cache Hit");
+            return res.json(cached);
+        }
+
         const where = buildWhereClause(req);
 
         // 1. Get Student Data
@@ -474,11 +489,14 @@ app.get('/api/analysis-report', async (req, res) => {
             pool.request().query(metaQuery)
         ]);
 
-        res.json({
+        const responseData = {
             students: studentRes.recordset,
             exams: metaRes.recordset,
             t_cnt: metaRes.recordset.length
-        });
+        };
+
+        cache.set(cacheKey, responseData, 60); // Cache for 1 minute
+        res.json(responseData);
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);
@@ -588,7 +606,7 @@ app.get('/api/erp/report', async (req, res) => {
             const valArray = Array.isArray(value) ? value : [value];
             const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
             if (cleanValues.length === 0) return;
-            clauses.push(`UPPER(TRIM(${field})) IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`${field} IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
 
         // Map filters to ERP columns
@@ -605,12 +623,12 @@ app.get('/api/erp/report', async (req, res) => {
         const cleanNames = sNames.map(n => n ? n.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
 
         if (cleanIds.length > 0) {
-            clauses.push(`UPPER(TRIM(STUD_ID)) IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`STUD_ID IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
         } else if (cleanNames.length > 0) {
             clauses.push(`UPPER(TRIM(Student_Name)) IN (${cleanNames.map(v => `'${v}'`).join(',')})`);
         } else if (quickSearch && quickSearch.trim() !== '') {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
-            clauses.push(`(UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
+            clauses.push(`(Student_Name LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
         }
 
         // Filter for W and U only
@@ -650,7 +668,7 @@ app.get('/api/erp/error-count-report', async (req, res) => {
             const valArray = Array.isArray(value) ? value : [value];
             const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
             if (cleanValues.length === 0) return;
-            clauses.push(`UPPER(TRIM(${field})) IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`${field} IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
 
         addClause('Branch', campus);
@@ -663,10 +681,10 @@ app.get('/api/erp/error-count-report', async (req, res) => {
         const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
 
         if (cleanIds.length > 0) {
-            clauses.push(`UPPER(TRIM(STUD_ID)) IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`STUD_ID IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
         } else if (quickSearch && quickSearch.trim() !== '') {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
-            clauses.push(`(UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
+            clauses.push(`(Student_Name LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
         }
 
         const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -860,7 +878,7 @@ app.get('/api/erp/students', async (req, res) => {
             const valArray = Array.isArray(value) ? value : [value];
             const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
             if (cleanValues.length === 0) return;
-            clauses.push(`UPPER(TRIM(${field})) IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`${field} IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
 
         // Apply Filters
@@ -875,7 +893,7 @@ app.get('/api/erp/students', async (req, res) => {
 
         if (quickSearch && quickSearch.trim() !== '') {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
-            clauses.push(`(UPPER(TRIM(Student_Name)) LIKE '%${safeSearch}%' OR UPPER(TRIM(STUD_ID)) LIKE '%${safeSearch}%')`);
+            clauses.push(`(Student_Name LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
         }
 
         const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : "WHERE 1=1";
