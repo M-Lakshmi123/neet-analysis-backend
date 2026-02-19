@@ -546,36 +546,35 @@ const AnalysisReport = ({ filters }) => {
             subTitleCell.border = borderStyle;
             worksheet.getRow(2).height = 30;
 
-            // Spacer Row
-            worksheet.addRow([]);
-            worksheet.getRow(3).height = 10;
-
-            // 3. Multi-level Headers (Rows 4 & 5)
-            const headerRow4Values = [
+            // 3. Multi-level Headers (Rows 3 & 4)
+            const headerRow3Values = [
                 'STUD ID', 'NAME OF THE STUDENT', 'CAMPUS NAME', 'Tot 720', 'AIR',
                 'Botany M180', '', 'Zoology M180', '', 'Biology 360',
                 'Physics M180', '', 'Chemistry M180', '', 'EXAMS'
             ];
-            const row4 = worksheet.addRow(headerRow4Values);
-            row4.height = 30;
-            worksheet.mergeCells('F4:G4');
-            worksheet.mergeCells('H4:I4');
-            worksheet.mergeCells('K4:L4');
-            worksheet.mergeCells('M4:N4');
-            ['A', 'B', 'C', 'D', 'E', 'J', 'O'].forEach(col => {
-                worksheet.mergeCells(`${col}4:${col}5`);
-            });
+            const row3 = worksheet.addRow(headerRow3Values);
+            row3.height = 30;
 
-            const headerRow5Values = [
+            const headerRow4Values = [
                 '', '', '', '', '',
                 'BOT', 'RANK', 'ZOO', 'RANK', '',
                 'PHY', 'RANK', 'CHEM', 'RANK', ''
             ];
-            const row5 = worksheet.addRow(headerRow5Values);
-            row5.height = 25;
+            const row4 = worksheet.addRow(headerRow4Values);
+            row4.height = 25;
+
+            // Merge single column headers vertically (Row 3 & Row 4)
+            ['A', 'B', 'C', 'D', 'E', 'J', 'O'].forEach(col => {
+                worksheet.mergeCells(`${col}3:${col}4`);
+            });
+            // Merge subject headers horizontally
+            worksheet.mergeCells('F3:G3');
+            worksheet.mergeCells('H3:I3');
+            worksheet.mergeCells('K3:L3');
+            worksheet.mergeCells('M3:N3');
 
             // Style headers matching AverageMarksReport
-            [row4, row5].forEach(row => {
+            [row3, row4].forEach(row => {
                 row.eachCell((cell, colNumber) => {
                     if ([1, 2, 3, 6, 7].includes(colNumber)) cell.style = getHeaderBaseStyle('FFFFFFCC');
                     else if (colNumber === 4) cell.style = getHeaderBaseStyle('FF002060', 'FFFFFF00');
@@ -604,14 +603,14 @@ const AnalysisReport = ({ filters }) => {
                     Number(student.tot || 0),
                     Math.round(student.air) || '-',
                     Number(student.bot || 0),
-                    Number(student.b_rank || 0),
+                    Math.round(student.b_rank || 0),
                     Number(student.zoo || 0),
-                    Number(student.z_rank || 0),
+                    Math.round(student.z_rank || 0),
                     Number((Number(student.bot) || 0) + (Number(student.zoo) || 0)),
                     Number(student.phy || 0),
-                    Number(student.p_rank || 0),
+                    Math.round(student.p_rank || 0),
                     Number(student.che || 0),
-                    Number(student.c_rank || 0),
+                    Math.round(student.c_rank || 0),
                     student.t_app
                 ];
                 const row = worksheet.addRow(rowData);
@@ -638,15 +637,6 @@ const AnalysisReport = ({ filters }) => {
                     } else {
                         cell.font = { name: 'Arial', size: 10, color: { argb: 'FF000000' } };
                     }
-
-                    // Background Colors matching headers roughly
-                    if ([1, 2, 3, 6, 7].includes(colNumber)) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFCEB' } }; // Light Yellow
-                    else if (colNumber === 4) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBEB' } }; // Matches TOT
-                    else if (colNumber === 5) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // White for AIR
-                    else if ([8, 9].includes(colNumber)) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } }; // Light Blue
-                    else if (colNumber === 10) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } }; // Grey
-                    else if ([11, 12].includes(colNumber)) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7FEE7' } }; // Light Green 
-                    else if ([13, 14].includes(colNumber)) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDF2F8' } }; // Light Pink
                 });
             });
 
