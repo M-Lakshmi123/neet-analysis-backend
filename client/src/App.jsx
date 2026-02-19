@@ -78,9 +78,10 @@ const Dashboard = () => {
 
     const userAllowedCampuses = userData?.allowedCampuses || (userData?.campus && userData.campus !== 'All' ? [userData.campus] : []);
 
-    // STRICT RULE: Only Admins can see All campuses. 
-    // Everyone else is restricted to their assigned campuses.
-    const isRestricted = !isAdmin && !isCoAdmin && !userAllowedCampuses.includes('All');
+    // STRICT RULE: Only Super Admins (isAdmin) have unrestricted access. 
+    // Principals and Co-Admins are restricted to their assigned campuses unless specifically granted 'All'.
+    const userRole = (userData?.role || '').toLowerCase();
+    const isRestricted = !isAdmin && (userRole === 'principal' || userRole === 'user' || !userAllowedCampuses.includes('All'));
 
     const initialFilters = {
         campus: isRestricted ? userAllowedCampuses : [],
@@ -106,12 +107,47 @@ const Dashboard = () => {
     }, [pageFilters]);
 
     // Current page's filters with fallback to initial filters
-    const globalFilters = pageFilters[activePage] || initialFilters;
+    const baseFilters = pageFilters[activePage] || initialFilters;
+
+    // STRICT ENFORCEMENT: If restricted, the campus filter MUST contain only allowed campuses
+    // and CANNOT be empty or include unauthorized campuses.
+    const globalFilters = React.useMemo(() => {
+        if (!isRestricted) return baseFilters;
+
+        const currentCampus = baseFilters.campus || [];
+        // Filter current selection to only include allowed ones
+        let restrictedSelection = currentCampus.filter(c =>
+            userAllowedCampuses.some(allowed => allowed.trim().toUpperCase() === c.trim().toUpperCase())
+        );
+
+        // If selection became empty or was empty, force to ALL allowed campuses
+        if (restrictedSelection.length === 0) {
+            restrictedSelection = userAllowedCampuses;
+        }
+
+        return {
+            ...baseFilters,
+            campus: restrictedSelection
+        };
+    }, [baseFilters, isRestricted, userAllowedCampuses]);
 
     const setGlobalFilters = (updater) => {
         setPageFilters(prev => {
             const current = prev[activePage] || initialFilters;
-            const next = typeof updater === 'function' ? updater(current) : updater;
+            let next = typeof updater === 'function' ? updater(current) : updater;
+
+            // Apply restriction here too for immediate state consistency
+            if (isRestricted) {
+                const nextCampus = next.campus || [];
+                let restrictedSelection = nextCampus.filter(c =>
+                    userAllowedCampuses.some(allowed => allowed.trim().toUpperCase() === c.trim().toUpperCase())
+                );
+                if (restrictedSelection.length === 0) {
+                    restrictedSelection = userAllowedCampuses;
+                }
+                next = { ...next, campus: restrictedSelection };
+            }
+
             return {
                 ...prev,
                 [activePage]: next
