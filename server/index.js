@@ -1,4 +1,6 @@
 const express = require('express');
+const https = require('https');
+
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -961,3 +963,20 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error("UNHANDLED REJECTION:", reason);
     fs.appendFileSync('crash.log', `[${new Date().toISOString()}] UNHANDLED REJECTION: ${reason}\n`);
 });
+
+// --- RENDER KEEP-ALIVE SYSTEM ---
+// Render free tier services sleep after 15 minutes of inactivity.
+// This script pings the server every 14 minutes to keep it awake.
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+
+if (RENDER_EXTERNAL_URL) {
+    setInterval(() => {
+        https.get(RENDER_EXTERNAL_URL, (res) => {
+            console.log(`[Keep-Alive] Pinged ${RENDER_EXTERNAL_URL} - Status: ${res.statusCode}`);
+        }).on('error', (err) => {
+            console.error(`[Keep-Alive] Ping failed: ${err.message}`);
+        });
+    }, 14 * 60 * 1000); // 14 minutes
+} else {
+    console.log("[Keep-Alive] RENDER_EXTERNAL_URL not found, self-pinging skipped.");
+}
