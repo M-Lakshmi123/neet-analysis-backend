@@ -110,6 +110,18 @@ const AnalysisReport = ({ filters }) => {
         };
     }, [filters]);
 
+    const getStreamLabel = () => {
+        const selectedStreams = Array.isArray(filters.stream) ? filters.stream : [];
+        if (selectedStreams.length === 0) return "ALL";
+        const srEliteMatches = ["SR ELITE", "SR_ELITE_SET_01", "SET-02"];
+        const jrEliteMatches = ["JR ELITE"];
+        const isSrElite = selectedStreams.every(s => srEliteMatches.includes(s));
+        if (isSrElite) return "SR ELITE";
+        const isJrElite = selectedStreams.every(s => jrEliteMatches.includes(s));
+        if (isJrElite) return "JR ELITE";
+        return selectedStreams.join(', ');
+    };
+
     const calculateTotals = () => {
         if (!studentMarks || studentMarks.length === 0) return null;
         const count = studentMarks.length;
@@ -476,32 +488,67 @@ const AnalysisReport = ({ filters }) => {
         try {
             const workbook = new ExcelJS.Workbook();
             const worksheet = workbook.addWorksheet('Analysis Report');
+            const stream = getStreamLabel();
 
-            // 1. Add Title (Merged Row 1)
-            // Excel Export - split lines? Excel merges are tricky for multi-color in one cell.
-            // We'll keep it one cell but change color to main Blue #0070C0
-            worksheet.addRow(['SRI CHAITANYA EDUCATIONAL INSTITUTIONS']);
+            const borderStyle = {
+                top: { style: 'thin', color: { argb: 'FF00B0F0' } },
+                left: { style: 'thin', color: { argb: 'FF00B0F0' } },
+                bottom: { style: 'thin', color: { argb: 'FF00B0F0' } },
+                right: { style: 'thin', color: { argb: 'FF00B0F0' } }
+            };
+
+            const getHeaderBaseStyle = (bgColor, fgColor = 'FF0000FF') => ({
+                fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } },
+                font: { color: { argb: fgColor }, bold: true, size: 10 },
+                alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+                border: borderStyle
+            });
+
+            // 1. Add Title (Merged Row 1) with Logo
             worksheet.mergeCells('A1:O1');
             const titleCell = worksheet.getCell('A1');
-            titleCell.font = { name: 'Impact', size: 28, bold: true, color: { argb: 'FF0070C0' } }; // Increased Size
+            titleCell.value = {
+                richText: [
+                    { text: '          Sri Chaitanya ', font: { name: 'Impact', size: 32, color: { argb: 'FF00B0F0' } } },
+                    { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 32, color: { argb: 'FF00B0F0' } } }
+                ]
+            };
             titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-            worksheet.getRow(1).height = 40; // Adjusted height for larger font
+            titleCell.border = borderStyle;
+            worksheet.getRow(1).height = 50;
 
-            // 2. Add Subtitle (Pattern Row 2)
-            const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
-            const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
-            const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
-            const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
+            // Add Logo
+            try {
+                const response = await fetch('/logo.png');
+                const blob = await response.blob();
+                const arrayBuffer = await blob.arrayBuffer();
+                const imageId = workbook.addImage({
+                    buffer: arrayBuffer,
+                    extension: 'png',
+                });
+                worksheet.addImage(imageId, {
+                    tl: { col: 0.1, row: 0.1 },
+                    ext: { width: 65, height: 60 },
+                    editAs: 'oneCell'
+                });
+            } catch (e) {
+                console.error("Failed to add logo to excel:", e);
+            }
 
-            worksheet.addRow([fullPattern]);
+            // 2. Add Subtitle (Row 2)
+            const subTitleText = `${stream}_Averages of the Selected Exams`;
             worksheet.mergeCells('A2:O2');
             const subTitleCell = worksheet.getCell('A2');
-            subTitleCell.font = { size: 14, bold: true, italic: true, color: { argb: 'FF800040' } };
+            subTitleCell.value = subTitleText;
+            subTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF31869B' } };
+            subTitleCell.font = { name: 'MS Gothic', size: 16, color: { argb: 'FFFFFF00' }, bold: true };
             subTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-            worksheet.getRow(2).height = 20; // Reduced height to tighten space
+            subTitleCell.border = borderStyle;
+            worksheet.getRow(2).height = 30;
 
-            // Empty spacer row
+            // Spacer Row
             worksheet.addRow([]);
+            worksheet.getRow(3).height = 10;
 
             // 3. Multi-level Headers (Rows 4 & 5)
             const headerRow4Values = [
@@ -509,12 +556,12 @@ const AnalysisReport = ({ filters }) => {
                 'Botany M180', '', 'Zoology M180', '', 'Biology 360',
                 'Physics M180', '', 'Chemistry M180', '', 'EXAMS'
             ];
-            worksheet.addRow(headerRow4Values);
+            const row4 = worksheet.addRow(headerRow4Values);
+            row4.height = 30;
             worksheet.mergeCells('F4:G4');
             worksheet.mergeCells('H4:I4');
             worksheet.mergeCells('K4:L4');
             worksheet.mergeCells('M4:N4');
-            // Merge single column headers vertically
             ['A', 'B', 'C', 'D', 'E', 'J', 'O'].forEach(col => {
                 worksheet.mergeCells(`${col}4:${col}5`);
             });
@@ -524,27 +571,26 @@ const AnalysisReport = ({ filters }) => {
                 'BOT', 'RANK', 'ZOO', 'RANK', '',
                 'PHY', 'RANK', 'CHEM', 'RANK', ''
             ];
-            worksheet.addRow(headerRow5Values);
+            const row5 = worksheet.addRow(headerRow5Values);
+            row5.height = 25;
 
-            // Style headers
-            [4, 5].forEach(rowNum => {
-                const row = worksheet.getRow(rowNum);
-                row.eachCell(cell => {
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
-                    cell.font = { color: { argb: 'FFFFFFFF' }, bold: true, size: 10 };
-                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-                    cell.border = {
-                        top: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-                        left: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-                        bottom: { style: 'thin', color: { argb: 'FFFFFFFF' } },
-                        right: { style: 'thin', color: { argb: 'FFFFFFFF' } }
-                    };
+            // Style headers matching AverageMarksReport
+            [row4, row5].forEach(row => {
+                row.eachCell((cell, colNumber) => {
+                    if ([1, 2, 3, 6, 7].includes(colNumber)) cell.style = getHeaderBaseStyle('FFFFFFCC');
+                    else if (colNumber === 4) cell.style = getHeaderBaseStyle('FF002060', 'FFFFFF00');
+                    else if (colNumber === 5) cell.style = getHeaderBaseStyle('FFFFFF00', 'FF0000FF');
+                    else if ([8, 9].includes(colNumber)) cell.style = getHeaderBaseStyle('FFFDE9D9');
+                    else if (colNumber === 10) cell.style = getHeaderBaseStyle('FFD9D9D9');
+                    else if ([11, 12].includes(colNumber)) cell.style = getHeaderBaseStyle('FFE4DFEC');
+                    else if ([13, 14].includes(colNumber)) cell.style = getHeaderBaseStyle('FFDDD9C4');
+                    else if (colNumber === 15) cell.style = getHeaderBaseStyle('FFFCD5B4');
                 });
             });
 
             // Set column widths
             worksheet.columns = [
-                { width: 15 }, { width: 35 }, { width: 25 }, { width: 10 }, { width: 10 },
+                { width: 14 }, { width: 35 }, { width: 25 }, { width: 10 }, { width: 10 },
                 { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 12 },
                 { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }
             ];
@@ -555,69 +601,80 @@ const AnalysisReport = ({ filters }) => {
                     student.STUD_ID,
                     (student.name || '').toUpperCase(),
                     (student.campus || '').toUpperCase(),
-                    Number(student.tot || 0).toFixed(1),
+                    Number(student.tot || 0),
                     Math.round(student.air) || '-',
-                    Number(student.bot || 0).toFixed(1),
-                    Number(student.b_rank || 0).toFixed(1),
-                    Number(student.zoo || 0).toFixed(1),
-                    Number(student.z_rank || 0).toFixed(1),
-                    ((Number(student.bot) || 0) + (Number(student.zoo) || 0)).toFixed(1),
-                    Number(student.phy || 0).toFixed(1),
-                    Number(student.p_rank || 0).toFixed(1),
-                    Number(student.che || 0).toFixed(1),
-                    Number(student.c_rank || 0).toFixed(1),
+                    Number(student.bot || 0),
+                    Number(student.b_rank || 0),
+                    Number(student.zoo || 0),
+                    Number(student.z_rank || 0),
+                    Number((Number(student.bot) || 0) + (Number(student.zoo) || 0)),
+                    Number(student.phy || 0),
+                    Number(student.p_rank || 0),
+                    Number(student.che || 0),
+                    Number(student.c_rank || 0),
                     student.t_app
                 ];
                 const row = worksheet.addRow(rowData);
+                row.height = 20;
 
                 row.eachCell((cell, colNumber) => {
-                    cell.alignment = { horizontal: colNumber <= 3 ? 'left' : 'center', vertical: 'middle' };
-                    cell.font = { size: 10, bold: colNumber === 4 || colNumber === 10 };
-                    cell.border = {
-                        top: { style: 'thin', color: { argb: 'FFADD8E6' } },
-                        left: { style: 'thin', color: { argb: 'FFADD8E6' } },
-                        bottom: { style: 'thin', color: { argb: 'FFADD8E6' } },
-                        right: { style: 'thin', color: { argb: 'FFADD8E6' } }
-                    };
+                    cell.border = borderStyle;
+                    cell.alignment = { vertical: 'middle', horizontal: colNumber <= 3 ? 'left' : 'center' };
 
-                    // Background Colors matching PDF
-                    if (colNumber === 4) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } }; // Yellow
-                    if (colNumber === 6 || colNumber === 7) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE9D9' } }; // Orange
-                    if (colNumber === 8 || colNumber === 9) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDAEEF3' } }; // Light Blue
-                    if (colNumber === 10) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFBFBF' } }; // Biology Grey
-                    if (colNumber === 11 || colNumber === 12) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEBF1DE' } }; // Green pale
-                    if (colNumber === 13 || colNumber === 14) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2DCDB' } }; // Pink pale
+                    // Format numbers with 1 decimal point for marks
+                    if ([4, 6, 8, 10, 11, 13].includes(colNumber)) {
+                        cell.numFmt = '0.0';
+                    }
+
+                    if (colNumber <= 3) {
+                        cell.font = { name: 'Arial', size: 9, color: { argb: 'FF000000' } };
+                    } else if ([4, 6, 8, 10, 11, 13].includes(colNumber)) {
+                        const color = (colNumber === 4) ? 'FF0070C0' : 'FF7030A0'; // Blue for TOT, Purple for others
+                        const fontName = (colNumber === 4) ? 'Arial Black' : 'Arial';
+                        cell.font = { name: fontName, size: 10, bold: true, color: { argb: color } };
+                    } else if ([5, 7, 9, 12, 14].includes(colNumber)) {
+                        const color = (colNumber === 5) ? 'FF0000FF' : 'FFFF0000'; // Blue for AIR, Red for Others
+                        cell.font = { name: 'Arial', size: 10, bold: true, italic: (colNumber === 5), color: { argb: color } };
+                    } else {
+                        cell.font = { name: 'Arial', size: 10, color: { argb: 'FF000000' } };
+                    }
+
+                    // Background Colors matching headers roughly
+                    if ([1, 2, 3, 6, 7].includes(colNumber)) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFCEB' } }; // Light Yellow
+                    else if (colNumber === 4) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBEB' } }; // Matches TOT
+                    else if (colNumber === 5) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // White for AIR
+                    else if ([8, 9].includes(colNumber)) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } }; // Light Blue
+                    else if (colNumber === 10) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } }; // Grey
+                    else if ([11, 12].includes(colNumber)) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7FEE7' } }; // Light Green 
+                    else if ([13, 14].includes(colNumber)) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDF2F8' } }; // Light Pink
                 });
             });
 
             // 5. Add Totals Row
             if (totals) {
                 const totalRowData = [
-                    'Campus Selection Average', '', '',
+                    'Selection Average', '', '',
                     totals.tot, totals.air, totals.bot, totals.b_rank,
                     totals.zoo, totals.z_rank, (Number(totals.bot) + Number(totals.zoo)),
                     totals.phy, totals.p_rank, totals.che, totals.c_rank, ''
                 ];
                 const totalRow = worksheet.addRow(totalRowData);
                 worksheet.mergeCells(`A${totalRow.number}:C${totalRow.number}`);
+                totalRow.height = 25;
 
                 totalRow.eachCell(cell => {
                     cell.font = { bold: true, size: 10 };
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
-                    cell.border = {
-                        top: { style: 'thin', color: { argb: 'FF000000' } },
-                        left: { style: 'thin', color: { argb: 'FF000000' } },
-                        bottom: { style: 'thin', color: { argb: 'FF000000' } },
-                        right: { style: 'thin', color: { argb: 'FF000000' } }
-                    };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    cell.border = borderStyle;
                 });
             }
 
-            // Write buffer and save
+            const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
+            const fileName = `${stream}_Averages_${testDate}`.replace(/\//g, '-');
             const buffer = await workbook.xlsx.writeBuffer();
-            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            saveAs(blob, `${fullPattern}.xlsx`);
-            logActivity(userData, 'Exported Analysis Excel', { file: fullPattern });
+            saveAs(new Blob([buffer]), `${fileName}.xlsx`);
+            logActivity(userData, 'Exported Analysis Excel', { file: fileName });
 
         } catch (error) {
             console.error("Excel Export Error:", error);
