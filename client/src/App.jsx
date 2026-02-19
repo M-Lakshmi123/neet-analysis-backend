@@ -76,21 +76,25 @@ const Dashboard = () => {
         sessionStorage.setItem('dashboard_active_page', activePage);
     }, [activePage]);
 
-    const userAllowedCampuses = userData?.allowedCampuses || (userData?.campus && userData.campus !== 'All' ? [userData.campus] : []);
+    const userAllowedCampuses = React.useMemo(() => {
+        return userData?.allowedCampuses || (userData?.campus && userData.campus !== 'All' ? [userData.campus] : []);
+    }, [userData]);
 
     // STRICT RULE: Only Super Admins (isAdmin) have unrestricted access. 
     // Principals and Co-Admins are restricted to their assigned campuses unless specifically granted 'All'.
-    const userRole = (userData?.role || '').toLowerCase();
-    const isRestricted = !isAdmin && (userRole === 'principal' || userRole === 'user' || !userAllowedCampuses.includes('All'));
+    const isRestricted = React.useMemo(() => {
+        const userRole = (userData?.role || '').toLowerCase();
+        return !isAdmin && (userRole === 'principal' || userRole === 'user' || !userAllowedCampuses.includes('All'));
+    }, [isAdmin, userData, userAllowedCampuses]);
 
-    const initialFilters = {
+    const initialFilters = React.useMemo(() => ({
         campus: isRestricted ? userAllowedCampuses : [],
         stream: [],
         testType: [],
         test: [],
         topAll: [],
         studentSearch: []
-    };
+    }), [isRestricted, userAllowedCampuses]);
 
     // Separate filters for each page to allow independent selections
     const [pageFilters, setPageFilters] = useState(() => {
@@ -109,6 +113,15 @@ const Dashboard = () => {
     // Current page's filters with fallback to initial filters
     const baseFilters = pageFilters[activePage] || initialFilters;
 
+    // Helper to check if two campus arrays are logically identical
+    const areCampusesSame = (arr1, arr2) => {
+        if (arr1 === arr2) return true;
+        if (!arr1 || !arr2 || arr1.length !== arr2.length) return false;
+        const sorted1 = [...arr1].sort();
+        const sorted2 = [...arr2].sort();
+        return sorted1.every((v, i) => v === sorted2[i]);
+    };
+
     // STRICT ENFORCEMENT: If restricted, the campus filter MUST contain only allowed campuses
     // and CANNOT be empty or include unauthorized campuses.
     const globalFilters = React.useMemo(() => {
@@ -123,6 +136,11 @@ const Dashboard = () => {
         // If selection became empty or was empty, force to ALL allowed campuses
         if (restrictedSelection.length === 0) {
             restrictedSelection = userAllowedCampuses;
+        }
+
+        // Stability check: if logically the same as base, return base
+        if (areCampusesSame(currentCampus, restrictedSelection)) {
+            return baseFilters;
         }
 
         return {
@@ -145,8 +163,15 @@ const Dashboard = () => {
                 if (restrictedSelection.length === 0) {
                     restrictedSelection = userAllowedCampuses;
                 }
-                next = { ...next, campus: restrictedSelection };
+
+                // Only update campus if it's actually different to avoid redundant re-renders
+                if (!areCampusesSame(nextCampus, restrictedSelection)) {
+                    next = { ...next, campus: restrictedSelection };
+                }
             }
+
+            // check if next is actually different from current
+            if (next === current) return prev;
 
             return {
                 ...prev,
