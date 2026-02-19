@@ -354,7 +354,7 @@ app.get('/api/studentsByCampus', async (req, res) => {
                 TRIM(STUD_ID) as id, 
                 MAX(TRIM(NAME_OF_THE_STUDENT)) as name,
                 MAX(TRIM(CAMPUS_NAME)) as campus,
-                MAX(TRIM(Stream)) as stream
+                GROUP_CONCAT(DISTINCT TRIM(Stream)) as streams
             FROM MEDICAL_RESULT 
             ${where} 
             GROUP BY STUD_ID

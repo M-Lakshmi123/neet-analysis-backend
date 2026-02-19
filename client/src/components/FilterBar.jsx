@@ -212,7 +212,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                 value: s.id,
                 label: `${s.name} (${s.id})`,
                 campus: s.campus,
-                stream: s.stream
+                streams: s.streams ? s.streams.split(',').map(v => v.trim()) : []
             }));
         } catch (err) {
             console.error("Async Search Error:", err);
@@ -357,7 +357,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                                     studentSearch: [opt.value],
                                     quickSearch: opt.label,
                                     campus: finalCampus,
-                                    stream: opt.stream ? [opt.stream] : [],
+                                    stream: opt.streams && opt.streams.length > 0 ? opt.streams : [],
                                     testType: [],
                                     test: [],
                                     topAll: []
