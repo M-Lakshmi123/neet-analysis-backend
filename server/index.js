@@ -825,7 +825,7 @@ app.get('/api/erp/participants', async (req, res) => {
         const sNames = Array.isArray(studentNames) ? studentNames : [];
         if (sNames.length === 0 || !test) return res.json({});
 
-        const cleanNames = sNames.map(n => `'${n.toString().trim().toUpperCase().replace(/' / g, "''")}'`).join(', ');
+        const cleanNames = sNames.map(n => `'${n.toString().trim().toUpperCase().replace(/'/g, "''")}'`).join(', ');
         const testList = (Array.isArray(test) ? test : [test]).map(t => `'${t.toString().trim().toUpperCase().replace(/'/g, "''")}'`).join(',');
 
         // Query MEDICAL_RESULT to see who actually took these tests
