@@ -84,20 +84,35 @@ const AverageReport = ({ filters }) => {
         const streams = [...new Set(data.map(row => row.Stream?.trim().toUpperCase()).filter(Boolean))];
         if (streams.length === 0) return '';
 
-        // SR ELITE family normalization (SR ELITE, SR_ELITE_SET_01, SR_ELITE_SET_02 etc -> SR ELITE)
-        if (streams.some(s => s.includes('SR ELITE') || s.includes('SR_ELITE'))) {
+        // User selected stream in filters
+        const selectedStream = (Array.isArray(filters.stream) ? filters.stream[0] : filters.stream)?.toString().toUpperCase() || '';
+        const isFilteringJR = selectedStream.includes('JR');
+        const isFilteringSR = selectedStream.includes('SR');
+
+        const hasSr = streams.some(s => s.includes('SR ELITE') || s.includes('SR_ELITE'));
+        const hasJrEliteAiims = streams.some(s => (s.includes('JR ELITE') || s.includes('JR_ELITE')) && s.includes('AIIMS'));
+        const hasJrElite = streams.includes('JR ELITE') || streams.includes('JR_ELITE');
+        const hasJrAiims = streams.includes('JR AIIMS') || streams.includes('JR_AIIMS');
+
+        // IF user is filtering for JR, prioritize JR normalization
+        if (isFilteringJR) {
+            if (hasJrEliteAiims && hasJrElite) return 'JR ELITE';
+            if (hasJrEliteAiims && hasJrAiims) return 'JR AIIMS';
+            if (hasJrElite) return 'JR ELITE';
+            if (hasJrAiims) return 'JR AIIMS';
+        }
+
+        // IF user is filtering for SR, prioritize SR normalization
+        if (isFilteringSR && hasSr) {
             return 'SR ELITE';
         }
 
-        const hasJrEliteAiims = streams.includes('JR ELITE & JR AIIMS');
-        const hasJrElite = streams.includes('JR ELITE');
-        const hasJrAiims = streams.includes('JR AIIMS');
+        // Fallback to original priority logic if no specific filter match or "All"
+        if (hasSr) return 'SR ELITE';
 
-        // JR Logic as per user rules
+        // JR variants
         if (hasJrEliteAiims && hasJrElite) return 'JR ELITE';
         if (hasJrEliteAiims && hasJrAiims) return 'JR AIIMS';
-
-        // Individual JR fallbacks
         if (hasJrElite) return 'JR ELITE';
         if (hasJrAiims) return 'JR AIIMS';
 
