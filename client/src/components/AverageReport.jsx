@@ -13,6 +13,7 @@ import { useAuth } from './auth/AuthProvider';
 const AverageReport = ({ filters }) => {
     const { userData } = useAuth();
     const [history, setHistory] = useState([]);
+    const [allExams, setAllExams] = useState([]);
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
@@ -22,6 +23,7 @@ const AverageReport = ({ filters }) => {
     // Reset results when filters change to maintain consistency
     useEffect(() => {
         setHistory([]);
+        setAllExams([]);
         setHasSearched(false);
         setCurrentStudentIndex(0);
     }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.studentSearch]);
@@ -42,17 +44,24 @@ const AverageReport = ({ filters }) => {
         setHasSearched(true);
         try {
             const params = buildQueryParams(filters);
+            params.append('includeExams', 'true');
             const response = await fetch(`${API_URL}/api/history?${params.toString()}`);
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(errorText || `Status: ${response.status}`);
             }
             const data = await response.json();
-            setHistory(data);
+
+            // Handle new response format { history, allExams }
+            const historyData = data.history || [];
+            const examData = data.allExams || [];
+
+            setHistory(historyData);
+            setAllExams(examData);
             setCurrentStudentIndex(0);
 
             // Log activity
-            const studentCount = new Set(data.map(h => h.STUD_ID)).size;
+            const studentCount = new Set(historyData.map(h => h.STUD_ID)).size;
             logActivity(userData, 'Generated Progress Report', {
                 studentCount,
                 campus: filters.campus
@@ -259,23 +268,57 @@ const AverageReport = ({ filters }) => {
         }
 
         const tableColumn = ["Test Name", "Date", "Total\n720", "AIR", "Bot\n180", "Zoo\n180", "Bio\n360", "Phy\n180", "Chem\n180"];
-        const tableRows = studentData.map(row => [
-            row.Test,
-            formatDate(row.DATE),
-            Math.round(row.Tot_720 || 0),
-            Math.round(row.AIR) || '-',
-            Math.round(row.Botany || 0),
-            Math.round(row.Zoology || 0),
-            Math.round((Number(row.Botany) || 0) + (Number(row.Zoology) || 0)),
-            Math.round(row.Physics || 0),
-            Math.round(row.Chemistry || 0)
-        ]);
 
-        // Average
-        if (studentData.length > 0) {
-            const avg = (key) => Math.round(studentData.reduce((a, b) => a + (Number(b[key]) || 0), 0) / studentData.length);
-            const avgAIR = Math.round(studentData.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / studentData.length);
-            const avgBio = Math.round(studentData.reduce((a, b) => a + (Number(b.Botany) || 0) + (Number(b.Zoology) || 0), 0) / studentData.length);
+        // Transform studentData to include ALL exams (even missing ones as AB)
+        const transformedRows = allExams.map(exam => {
+            const existing = studentData.find(r => r.Test === exam.Test);
+            if (existing) {
+                return {
+                    ...existing,
+                    isAB: false
+                };
+            } else {
+                return {
+                    Test: exam.Test,
+                    DATE: exam.DATE,
+                    isAB: true
+                };
+            }
+        });
+
+        const tableRows = transformedRows.map(row => {
+            if (row.isAB) {
+                return [
+                    row.Test,
+                    formatDate(row.DATE),
+                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
+                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
+                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
+                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
+                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
+                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
+                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } }
+                ];
+            }
+            return [
+                row.Test,
+                formatDate(row.DATE),
+                Math.round(row.Tot_720 || 0),
+                Math.round(row.AIR) || '-',
+                Math.round(row.Botany || 0),
+                Math.round(row.Zoology || 0),
+                Math.round((Number(row.Botany) || 0) + (Number(row.Zoology) || 0)),
+                Math.round(row.Physics || 0),
+                Math.round(row.Chemistry || 0)
+            ];
+        });
+
+        // Average - Count ONLY attempted tests
+        const attemptedRows = studentData; // Original rows only
+        if (attemptedRows.length > 0) {
+            const avg = (key) => Math.round(attemptedRows.reduce((a, b) => a + (Number(b[key]) || 0), 0) / attemptedRows.length);
+            const avgAIR = Math.round(attemptedRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / attemptedRows.length);
+            const avgBio = Math.round(attemptedRows.reduce((a, b) => a + (Number(b.Botany) || 0) + (Number(b.Zoology) || 0), 0) / attemptedRows.length);
 
             tableRows.push([
                 "AVERAGE",
@@ -525,29 +568,50 @@ const AverageReport = ({ filters }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {previewRows.map((row, idx) => (
-                                            <tr key={idx}>
-                                                <td>{row.Test}</td>
-                                                <td>{formatDate(row.DATE)}</td>
-                                                <td className="col-yellow font-bold">{Math.round(row.Tot_720 || 0)}</td>
-                                                <td className="text-brown">{Math.round(row.AIR) || '-'}</td>
-                                                <td className="col-orange">{Math.round(row.Botany || 0)}</td>
-                                                <td className="col-blue-light">{Math.round(row.Zoology || 0)}</td>
-                                                <td className="col-blue-med font-bold">{Math.round((Number(row.Botany || 0) + Number(row.Zoology || 0)))}</td>
-                                                <td className="col-green-pale">{Math.round(row.Physics || 0)}</td>
-                                                <td className="col-pink-pale">{Math.round(row.Chemistry || 0)}</td>
+                                        {allExams.map((exam, idx) => {
+                                            const row = previewRows.find(r => r.Test === exam.Test);
+                                            if (row) {
+                                                return (
+                                                    <tr key={idx}>
+                                                        <td>{row.Test}</td>
+                                                        <td>{formatDate(row.DATE)}</td>
+                                                        <td className="col-yellow font-bold">{Math.round(row.Tot_720 || 0)}</td>
+                                                        <td className="text-brown">{Math.round(row.AIR) || '-'}</td>
+                                                        <td className="col-orange">{Math.round(row.Botany || 0)}</td>
+                                                        <td className="col-blue-light">{Math.round(row.Zoology || 0)}</td>
+                                                        <td className="col-blue-med font-bold">{Math.round((Number(row.Botany || 0) + Number(row.Zoology || 0)))}</td>
+                                                        <td className="col-green-pale">{Math.round(row.Physics || 0)}</td>
+                                                        <td className="col-pink-pale">{Math.round(row.Chemistry || 0)}</td>
+                                                    </tr>
+                                                );
+                                            } else {
+                                                return (
+                                                    <tr key={idx}>
+                                                        <td>{exam.Test}</td>
+                                                        <td>{formatDate(exam.DATE)}</td>
+                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
+                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
+                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
+                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
+                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
+                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
+                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
+                                                    </tr>
+                                                );
+                                            }
+                                        })}
+                                        {previewRows.length > 0 && (
+                                            <tr className="total-row">
+                                                <td colSpan={2} className="text-right">AVERAGES</td>
+                                                <td className="col-yellow">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / previewRows.length)}</td>
+                                                <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / previewRows.length)}</td>
+                                                <td className="col-orange">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / previewRows.length)}</td>
+                                                <td className="col-blue-light">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / previewRows.length)}</td>
+                                                <td className="col-blue-med">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Botany || 0) + Number(b.Zoology || 0)), 0) / previewRows.length)}</td>
+                                                <td className="col-green-pale">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Physics) || 0), 0) / previewRows.length)}</td>
+                                                <td className="col-pink-pale">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Chemistry) || 0), 0) / previewRows.length)}</td>
                                             </tr>
-                                        ))}
-                                        <tr className="total-row">
-                                            <td colSpan={2} className="text-right">AVERAGES</td>
-                                            <td className="col-yellow">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / previewRows.length)}</td>
-                                            <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / previewRows.length)}</td>
-                                            <td className="col-orange">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / previewRows.length)}</td>
-                                            <td className="col-blue-light">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / previewRows.length)}</td>
-                                            <td className="col-blue-med">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Botany || 0) + Number(b.Zoology || 0)), 0) / previewRows.length)}</td>
-                                            <td className="col-green-pale">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Physics) || 0), 0) / previewRows.length)}</td>
-                                            <td className="col-pink-pale">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Chemistry) || 0), 0) / previewRows.length)}</td>
-                                        </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>

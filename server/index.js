@@ -78,19 +78,21 @@ const buildWhereClause = (req, options = {}) => {
     if (!options.ignoreTopAll) addClause('Top_ALL', topAll);
 
     // If specific student IDs are selected, use them exclusively
-    const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
-    const cleanIds = sSearch
-        .filter(id => id && id !== 'null' && id !== 'undefined')
-        .map(id => id.toString().trim().toUpperCase().replace(/'/g, "''"))
-        .filter(v => v !== '');
+    if (!options.ignoreStudent) {
+        const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
+        const cleanIds = sSearch
+            .filter(id => id && id !== 'null' && id !== 'undefined')
+            .map(id => id.toString().trim().toUpperCase().replace(/'/g, "''"))
+            .filter(v => v !== '');
 
-    if (cleanIds.length > 0) {
-        const list = cleanIds.map(v => `'${v}'`).join(',');
-        clauses.push(`STUD_ID IN (${list})`);
-    } else if (quickSearch && typeof quickSearch === 'string' && quickSearch.trim() !== '') {
-        // Only use quickSearch LIKE if no specific student is selected
-        const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
-        clauses.push(`(NAME_OF_THE_STUDENT LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
+        if (cleanIds.length > 0) {
+            const list = cleanIds.map(v => `'${v}'`).join(',');
+            clauses.push(`STUD_ID IN (${list})`);
+        } else if (quickSearch && typeof quickSearch === 'string' && quickSearch.trim() !== '') {
+            // Only use quickSearch LIKE if no specific student is selected
+            const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
+            clauses.push(`(NAME_OF_THE_STUDENT LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
+        }
     }
 
     const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -294,15 +296,13 @@ app.get('/api/performance', async (req, res) => {
 app.get('/api/history', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const { id, name, campus } = req.query; // Search params
+        const { id, name, campus, includeExams } = req.query; // Search params
 
         let whereClause = '';
         if (id) whereClause = `WHERE STUD_ID = ${id}`;
         else if (name) whereClause = `WHERE NAME_OF_THE_STUDENT = '${name}'`;
 
         // If we have filters, apply them too
-        // For History/Progress Report, we respect all filters 
-        // but can ignore if user wants "All" - handled by buildWhereClause logic
         const baseWhere = buildWhereClause(req, { ignoreTest: false, ignoreTestType: false });
         if (baseWhere && !whereClause) whereClause = baseWhere;
         else if (baseWhere && whereClause) whereClause += ` AND ` + baseWhere.replace('WHERE ', '');
@@ -335,6 +335,27 @@ app.get('/api/history', async (req, res) => {
 
         logQuery(query, req.query);
         const result = await pool.request().query(query);
+
+        if (includeExams === 'true') {
+            // Fetch all exams for this context (Campus, Stream, etc.) without student filter
+            // This is for progress reports that want to show AB for missing exams
+            const examsWhere = buildWhereClause(req, {
+                ignoreStudent: true,
+                ignoreTest: true // We want ALL tests for this stream
+            });
+            const examsQuery = `
+                SELECT DISTINCT Test, DATE 
+                FROM MEDICAL_RESULT 
+                ${examsWhere}
+                ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') ASC
+            `;
+            const examsResult = await pool.request().query(examsQuery);
+            return res.json({
+                history: result.recordset,
+                allExams: examsResult.recordset
+            });
+        }
+
         res.json(result.recordset);
     } catch (err) {
         console.error(err);
