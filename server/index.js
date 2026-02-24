@@ -336,6 +336,17 @@ app.get('/api/history', async (req, res) => {
         logQuery(query, req.query);
         const result = await pool.request().query(query);
 
+        // Deduplicate history (student results)
+        const historyMap = new Map();
+        result.recordset.forEach(row => {
+            const testKey = row.Test ? row.Test.trim() : 'Unknown';
+            // If duplicate, prefer 4-digit year dates if available
+            if (!historyMap.has(testKey) || (row.DATE && row.DATE.length > (historyMap.get(testKey).DATE?.length || 0))) {
+                historyMap.set(testKey, row);
+            }
+        });
+        const deduplicatedHistory = Array.from(historyMap.values());
+
         if (includeExams === 'true') {
             // Fetch all exams for this context (Campus, Stream, etc.) without student filter
             // This is for progress reports that want to show AB for missing exams
@@ -344,19 +355,30 @@ app.get('/api/history', async (req, res) => {
                 ignoreTest: true // We want ALL tests for this stream
             });
             const examsQuery = `
-                SELECT DISTINCT Test, DATE 
-                FROM MEDICAL_RESULT 
+                SELECT DISTINCT Test, DATE
+                FROM MEDICAL_RESULT
                 ${examsWhere}
                 ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') ASC
             `;
             const examsResult = await pool.request().query(examsQuery);
+
+            // Deduplicate exams list
+            const examMap = new Map();
+            examsResult.recordset.forEach(exam => {
+                const testKey = exam.Test ? exam.Test.trim() : 'Unknown';
+                if (!examMap.has(testKey) || (exam.DATE && exam.DATE.length > examMap.get(testKey).DATE?.length)) {
+                    examMap.set(testKey, exam);
+                }
+            });
+            const deduplicatedExams = Array.from(examMap.values());
+
             return res.json({
-                history: result.recordset,
-                allExams: examsResult.recordset
+                history: deduplicatedHistory,
+                allExams: deduplicatedExams
             });
         }
 
-        res.json(result.recordset);
+        res.json(deduplicatedHistory);
     } catch (err) {
         console.error(err);
         res.status(500).send(err.message);
@@ -374,11 +396,11 @@ app.get('/api/studentsByCampus', async (req, res) => {
         console.log(`[studentsByCampus] Global Search - Generated WHERE: "${where}"`);
 
         const query = `
-            SELECT 
-                TRIM(STUD_ID) as id, 
-                MAX(TRIM(NAME_OF_THE_STUDENT)) as name,
-                MAX(TRIM(CAMPUS_NAME)) as campus,
-                GROUP_CONCAT(DISTINCT TRIM(Stream)) as streams
+        SELECT
+        TRIM(STUD_ID) as id,
+            MAX(TRIM(NAME_OF_THE_STUDENT)) as name,
+            MAX(TRIM(CAMPUS_NAME)) as campus,
+            GROUP_CONCAT(DISTINCT TRIM(Stream)) as streams
             FROM MEDICAL_RESULT 
             ${where} 
             GROUP BY STUD_ID
@@ -386,7 +408,7 @@ app.get('/api/studentsByCampus', async (req, res) => {
             LIMIT 100`;
 
         const students = await pool.request().query(query);
-        console.log(`[studentsByCampus] Found ${students.recordset.length} students. First result:`, students.recordset[0]);
+        console.log(`[studentsByCampus] Found ${students.recordset.length} students.First result: `, students.recordset[0]);
 
         logQuery(query, req.query);
         // cache.set(cacheKey, students.recordset, 30); // Disabled for debug
@@ -400,7 +422,7 @@ app.get('/api/studentsByCampus', async (req, res) => {
 app.get('/api/exam-stats', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const cacheKey = `exam_stats_${JSON.stringify(req.query)}`;
+        const cacheKey = `exam_stats_${JSON.stringify(req.query)} `;
         const cached = cache.get(cacheKey);
         if (cached) {
             console.log("[Exam Stats] Cache Hit");
@@ -411,42 +433,42 @@ app.get('/api/exam-stats', async (req, res) => {
         // Filter out empty/invalid metadata rows
         const isValid = "Test IS NOT NULL AND Test != '' AND DATE IS NOT NULL AND DATE != ''";
         if (where) {
-            where += ` AND ${isValid}`;
+            where += ` AND ${isValid} `;
         } else {
-            where = `WHERE ${isValid}`;
+            where = `WHERE ${isValid} `;
         }
 
         const query = `
-            SELECT 
-                DATE,
-                Test, 
-                COUNT(STUD_ID) as Attn,
-                MAX(CAST(Tot_720 AS FLOAT)) as Max_T,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 710 THEN 1 ELSE 0 END) as T_710,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 700 THEN 1 ELSE 0 END) as T_700,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 685 THEN 1 ELSE 0 END) as T_685,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 655 THEN 1 ELSE 0 END) as T_655,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 640 THEN 1 ELSE 0 END) as T_640,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 600 THEN 1 ELSE 0 END) as T_600,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 595 THEN 1 ELSE 0 END) as T_595,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 570 THEN 1 ELSE 0 END) as T_570,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 550 THEN 1 ELSE 0 END) as T_550,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 530 THEN 1 ELSE 0 END) as T_530,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 490 THEN 1 ELSE 0 END) as T_490,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 450 THEN 1 ELSE 0 END) as T_450,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 400 THEN 1 ELSE 0 END) as T_400,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 300 THEN 1 ELSE 0 END) as T_300,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 200 THEN 1 ELSE 0 END) as T_200,
-                MAX(CAST(Botany AS FLOAT)) as Max_B,
-                SUM(CASE WHEN CAST(Botany AS FLOAT) > 160 THEN 1 ELSE 0 END) as B_160,
-                MAX(CAST(Zoology AS FLOAT)) as Max_Z,
-                SUM(CASE WHEN CAST(Zoology AS FLOAT) > 160 THEN 1 ELSE 0 END) as Z_160,
-                MAX(CAST(Physics AS FLOAT)) as Max_P,
-                SUM(CASE WHEN CAST(Physics AS FLOAT) > 120 THEN 1 ELSE 0 END) as P_120,
-                SUM(CASE WHEN CAST(Physics AS FLOAT) > 100 THEN 1 ELSE 0 END) as P_100,
-                MAX(CAST(Chemistry AS FLOAT)) as Max_C,
-                SUM(CASE WHEN CAST(Chemistry AS FLOAT) > 130 THEN 1 ELSE 0 END) as C_130,
-                SUM(CASE WHEN CAST(Chemistry AS FLOAT) > 100 THEN 1 ELSE 0 END) as C_100
+        SELECT
+        DATE,
+            Test,
+            COUNT(STUD_ID) as Attn,
+            MAX(CAST(Tot_720 AS FLOAT)) as Max_T,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 710 THEN 1 ELSE 0 END) as T_710,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 700 THEN 1 ELSE 0 END) as T_700,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 685 THEN 1 ELSE 0 END) as T_685,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 655 THEN 1 ELSE 0 END) as T_655,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 640 THEN 1 ELSE 0 END) as T_640,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 600 THEN 1 ELSE 0 END) as T_600,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 595 THEN 1 ELSE 0 END) as T_595,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 570 THEN 1 ELSE 0 END) as T_570,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 550 THEN 1 ELSE 0 END) as T_550,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 530 THEN 1 ELSE 0 END) as T_530,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 490 THEN 1 ELSE 0 END) as T_490,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 450 THEN 1 ELSE 0 END) as T_450,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 400 THEN 1 ELSE 0 END) as T_400,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 300 THEN 1 ELSE 0 END) as T_300,
+            SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 200 THEN 1 ELSE 0 END) as T_200,
+            MAX(CAST(Botany AS FLOAT)) as Max_B,
+            SUM(CASE WHEN CAST(Botany AS FLOAT) > 160 THEN 1 ELSE 0 END) as B_160,
+            MAX(CAST(Zoology AS FLOAT)) as Max_Z,
+            SUM(CASE WHEN CAST(Zoology AS FLOAT) > 160 THEN 1 ELSE 0 END) as Z_160,
+            MAX(CAST(Physics AS FLOAT)) as Max_P,
+            SUM(CASE WHEN CAST(Physics AS FLOAT) > 120 THEN 1 ELSE 0 END) as P_120,
+            SUM(CASE WHEN CAST(Physics AS FLOAT) > 100 THEN 1 ELSE 0 END) as P_100,
+            MAX(CAST(Chemistry AS FLOAT)) as Max_C,
+            SUM(CASE WHEN CAST(Chemistry AS FLOAT) > 130 THEN 1 ELSE 0 END) as C_130,
+            SUM(CASE WHEN CAST(Chemistry AS FLOAT) > 100 THEN 1 ELSE 0 END) as C_100
             FROM MEDICAL_RESULT
             ${where}
             GROUP BY Test, DATE
@@ -467,7 +489,7 @@ app.get('/api/exam-stats', async (req, res) => {
 app.get('/api/analysis-report', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const cacheKey = `analysis_report_${JSON.stringify(req.query)}`;
+        const cacheKey = `analysis_report_${JSON.stringify(req.query)} `;
         const cached = cache.get(cacheKey);
         if (cached) {
             console.log("[Analysis Report] Cache Hit");
@@ -478,26 +500,26 @@ app.get('/api/analysis-report', async (req, res) => {
 
         // 1. Get Student Data
         const studentQuery = `
-            SELECT 
-                STUD_ID,
-                MAX(NAME_OF_THE_STUDENT) as name,
-                MAX(CAMPUS_NAME) as campus,
-                AVG(CAST(Tot_720 as FLOAT)) as tot,
-                AVG(CAST(AIR as FLOAT)) as air,
-                AVG(CAST(Botany as FLOAT)) as bot,
-                AVG(CAST(B_Rank as FLOAT)) as b_rank,
-                AVG(CAST(Zoology as FLOAT)) as zoo,
-                AVG(CAST(Z_Rank as FLOAT)) as z_rank,
-                AVG(CAST(Physics as FLOAT)) as phy,
-                AVG(CAST(P_Rank as FLOAT)) as p_rank,
-                AVG(CAST(Chemistry as FLOAT)) as che,
-                AVG(CAST(C_Rank as FLOAT)) as c_rank,
-                COUNT(Test) as t_app
+        SELECT
+        STUD_ID,
+            MAX(NAME_OF_THE_STUDENT) as name,
+            MAX(CAMPUS_NAME) as campus,
+            AVG(CAST(Tot_720 as FLOAT)) as tot,
+            AVG(CAST(AIR as FLOAT)) as air,
+            AVG(CAST(Botany as FLOAT)) as bot,
+            AVG(CAST(B_Rank as FLOAT)) as b_rank,
+            AVG(CAST(Zoology as FLOAT)) as zoo,
+            AVG(CAST(Z_Rank as FLOAT)) as z_rank,
+            AVG(CAST(Physics as FLOAT)) as phy,
+            AVG(CAST(P_Rank as FLOAT)) as p_rank,
+            AVG(CAST(Chemistry as FLOAT)) as che,
+            AVG(CAST(C_Rank as FLOAT)) as c_rank,
+            COUNT(Test) as t_app
             FROM MEDICAL_RESULT
             ${where}
             GROUP BY STUD_ID
             ORDER BY tot DESC
-        `;
+            `;
 
         // 2. Get Metadata (Test Names, Dates, Total Count)
         const metaQuery = `
@@ -505,7 +527,7 @@ app.get('/api/analysis-report', async (req, res) => {
             FROM MEDICAL_RESULT
             ${where}
             ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') ASC
-        `;
+            `;
 
         logQuery(studentQuery, req.query);
         const [studentRes, metaRes] = await Promise.all([
@@ -550,7 +572,7 @@ app.get('/api/erp/filters', async (req, res) => {
         const { branch, campus, stream, testType, test } = req.query;
         const activeBranch = branch || campus;
 
-        console.log(`[ERP Filters] Request: branch=${activeBranch}, stream=${stream}, testType=${testType}, test=${test}`);
+        console.log(`[ERP Filters]Request: branch = ${activeBranch}, stream = ${stream}, testType = ${testType}, test = ${test} `);
 
         const buildOptionClause = (column, values) => {
             if (!values || values === 'All' || values === '__ALL__') return null;
@@ -562,7 +584,7 @@ app.get('/api/erp/filters', async (req, res) => {
 
             if (cleanValues.length === 0) return null;
             const list = cleanValues.map(v => `'${v}'`).join(',');
-            return `${column} IN (${list})`;
+            return `${column} IN(${list})`;
         };
 
         const branchClause = buildOptionClause('Branch', activeBranch);
@@ -575,26 +597,26 @@ app.get('/api/erp/filters', async (req, res) => {
         const branchesQuery = 'SELECT DISTINCT TRIM(Branch) as Branch FROM ERP_REPORT WHERE Branch IS NOT NULL AND Branch != \'\' ORDER BY Branch';
 
         // 2. Streams - Dependent on Branch
-        const sWhere = branchClause ? `WHERE ${branchClause}` : 'WHERE 1=1';
+        const sWhere = branchClause ? `WHERE ${branchClause} ` : 'WHERE 1=1';
         const streamsQuery = `SELECT DISTINCT TRIM(Stream) as Stream FROM ERP_REPORT ${sWhere} AND Stream IS NOT NULL AND Stream != '' ORDER BY Stream`;
 
         // 3. Test Types - Dependent on Branch + Stream
         let ttClauses = [];
         if (branchClause) ttClauses.push(branchClause);
         if (streamClause) ttClauses.push(streamClause);
-        const ttWhere = ttClauses.length > 0 ? `WHERE ${ttClauses.join(' AND ')}` : 'WHERE 1=1';
+        const ttWhere = ttClauses.length > 0 ? `WHERE ${ttClauses.join(' AND ')} ` : 'WHERE 1=1';
         const testTypesQuery = `SELECT DISTINCT TRIM(Test_Type) as Test_Type FROM ERP_REPORT ${ttWhere} AND Test_Type IS NOT NULL AND Test_Type != '' ORDER BY Test_Type`;
 
         // 4. Tests - Dependent on Branch + Stream + Test_Type
         let tClauses = [...ttClauses];
         if (testTypeClause) tClauses.push(testTypeClause);
-        const tWhere = tClauses.length > 0 ? `WHERE ${tClauses.join(' AND ')}` : 'WHERE 1=1';
+        const tWhere = tClauses.length > 0 ? `WHERE ${tClauses.join(' AND ')} ` : 'WHERE 1=1';
         const testsQuery = `SELECT DISTINCT TRIM(Test) as Test FROM ERP_REPORT ${tWhere} AND Test IS NOT NULL AND Test != '' ORDER BY Test`;
 
         // 5. Top_ALL - Dependent on Branch + Stream + Test_Type + Test
         let topClauses = [...tClauses];
         if (testClause) topClauses.push(testClause);
-        const topWhere = topClauses.length > 0 ? `WHERE ${topClauses.join(' AND ')}` : 'WHERE 1=1';
+        const topWhere = topClauses.length > 0 ? `WHERE ${topClauses.join(' AND ')} ` : 'WHERE 1=1';
         const topQuery = `SELECT DISTINCT TRIM(Top_ALL) as Top_ALL FROM ERP_REPORT ${topWhere} AND Top_ALL IS NOT NULL AND Top_ALL != '' ORDER BY Top_ALL`;
 
         const [branchesRes, streamsRes, testTypesRes, testsRes, topRes] = await Promise.all([
@@ -630,7 +652,7 @@ app.get('/api/erp/report', async (req, res) => {
             const valArray = Array.isArray(value) ? value : [value];
             const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
             if (cleanValues.length === 0) return;
-            clauses.push(`${field} IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`${field} IN(${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
 
         // Map filters to ERP columns
@@ -647,9 +669,9 @@ app.get('/api/erp/report', async (req, res) => {
         const cleanNames = sNames.map(n => n ? n.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
 
         if (cleanIds.length > 0) {
-            clauses.push(`STUD_ID IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`STUD_ID IN(${cleanIds.map(v => `'${v}'`).join(',')})`);
         } else if (cleanNames.length > 0) {
-            clauses.push(`UPPER(TRIM(Student_Name)) IN (${cleanNames.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`UPPER(TRIM(Student_Name)) IN(${cleanNames.map(v => `'${v}'`).join(',')})`);
         } else if (quickSearch && quickSearch.trim() !== '') {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
             clauses.push(`(Student_Name LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
@@ -658,15 +680,15 @@ app.get('/api/erp/report', async (req, res) => {
         // Filter for W and U only
         clauses.push(`(UPPER(TRIM(W_U)) = 'W' OR UPPER(TRIM(W_U)) = 'U')`);
 
-        const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+        const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')} ` : '';
 
         const query = `
-            SELECT * FROM ERP_REPORT 
+        SELECT * FROM ERP_REPORT 
             ${where}
-            ORDER BY 
-                Student_Name, 
-                STR_TO_DATE(Exam_Date, '%d-%m-%Y') DESC,
-                Subject, 
+            ORDER BY
+        Student_Name,
+            STR_TO_DATE(Exam_Date, '%d-%m-%Y') DESC,
+                Subject,
                 Q_No ASC
         `;
 
@@ -692,7 +714,7 @@ app.get('/api/erp/error-count-report', async (req, res) => {
             const valArray = Array.isArray(value) ? value : [value];
             const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
             if (cleanValues.length === 0) return;
-            clauses.push(`${field} IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`${field} IN(${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
 
         addClause('Branch', campus);
@@ -705,43 +727,43 @@ app.get('/api/erp/error-count-report', async (req, res) => {
         const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
 
         if (cleanIds.length > 0) {
-            clauses.push(`STUD_ID IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`STUD_ID IN(${cleanIds.map(v => `'${v}'`).join(',')})`);
         } else if (quickSearch && quickSearch.trim() !== '') {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
             clauses.push(`(Student_Name LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
         }
 
-        const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+        const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')} ` : '';
 
         const query = `
-            SELECT 
-                STUD_ID,
-                MAX(Student_Name) as name,
-                MAX(Branch) as campus,
-                Test,
-                MAX(CASE WHEN Tot_720 != '' THEN Tot_720 + 0 ELSE 0 END) as tot,
-                MAX(CASE WHEN AIR != '' THEN AIR + 0 ELSE 0 END) as air,
-                MAX(CASE WHEN Botany != '' THEN Botany + 0 ELSE 0 END) as bot,
-                MAX(CASE WHEN B_Rank != '' THEN B_Rank + 0 ELSE 0 END) as bot_rank,
-                MAX(CASE WHEN Zoology != '' THEN Zoology + 0 ELSE 0 END) as zoo,
-                MAX(CASE WHEN Z_Rank != '' THEN Z_Rank + 0 ELSE 0 END) as zoo_rank,
-                MAX(CASE WHEN Physics != '' THEN Physics + 0 ELSE 0 END) as phy,
-                MAX(CASE WHEN P_Rank != '' THEN P_Rank + 0 ELSE 0 END) as phy_rank,
-                MAX(CASE WHEN Chemistry != '' THEN Chemistry + 0 ELSE 0 END) as che,
-                MAX(CASE WHEN C_Rank != '' THEN C_Rank + 0 ELSE 0 END) as che_rank,
-                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as bot_w,
-                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as bot_u,
-                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as zoo_w,
-                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as zoo_u,
-                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as phy_w,
-                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as phy_u,
-                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as che_w,
-                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as che_u
+        SELECT
+        STUD_ID,
+            MAX(Student_Name) as name,
+            MAX(Branch) as campus,
+            Test,
+            MAX(CASE WHEN Tot_720 != '' THEN Tot_720 + 0 ELSE 0 END) as tot,
+            MAX(CASE WHEN AIR != '' THEN AIR + 0 ELSE 0 END) as air,
+            MAX(CASE WHEN Botany != '' THEN Botany + 0 ELSE 0 END) as bot,
+            MAX(CASE WHEN B_Rank != '' THEN B_Rank + 0 ELSE 0 END) as bot_rank,
+            MAX(CASE WHEN Zoology != '' THEN Zoology + 0 ELSE 0 END) as zoo,
+            MAX(CASE WHEN Z_Rank != '' THEN Z_Rank + 0 ELSE 0 END) as zoo_rank,
+            MAX(CASE WHEN Physics != '' THEN Physics + 0 ELSE 0 END) as phy,
+            MAX(CASE WHEN P_Rank != '' THEN P_Rank + 0 ELSE 0 END) as phy_rank,
+            MAX(CASE WHEN Chemistry != '' THEN Chemistry + 0 ELSE 0 END) as che,
+            MAX(CASE WHEN C_Rank != '' THEN C_Rank + 0 ELSE 0 END) as che_rank,
+            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as bot_w,
+            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as bot_u,
+            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as zoo_w,
+            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as zoo_u,
+            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as phy_w,
+            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as phy_u,
+            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as che_w,
+            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as che_u
             FROM ERP_REPORT 
             ${where}
             GROUP BY STUD_ID, Test
             ORDER BY name, Test
-        `;
+            `;
 
         logQuery(query, req.query);
         const result = await pool.request().query(query);
@@ -803,7 +825,7 @@ app.get('/api/erp/participants', async (req, res) => {
         const sNames = Array.isArray(studentNames) ? studentNames : [];
         if (sNames.length === 0 || !test) return res.json({});
 
-        const cleanNames = sNames.map(n => `'${n.toString().trim().toUpperCase().replace(/'/g, "''")}'`).join(',');
+        const cleanNames = sNames.map(n => `'${n.toString().trim().toUpperCase().replace(/' / g, "''")}'`).join(', ');
         const testList = (Array.isArray(test) ? test : [test]).map(t => `'${t.toString().trim().toUpperCase().replace(/'/g, "''")}'`).join(',');
 
         // Query MEDICAL_RESULT to see who actually took these tests

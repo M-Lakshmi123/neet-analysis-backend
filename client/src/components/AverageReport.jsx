@@ -271,7 +271,8 @@ const AverageReport = ({ filters }) => {
 
         // Transform studentData to include ALL exams (even missing ones as AB)
         const transformedRows = allExams.map(exam => {
-            const existing = studentData.find(r => r.Test === exam.Test);
+            const examTest = exam.Test?.trim();
+            const existing = studentData.find(r => r.Test?.trim() === examTest);
             if (existing) {
                 return {
                     ...existing,
@@ -569,7 +570,8 @@ const AverageReport = ({ filters }) => {
                                     </thead>
                                     <tbody>
                                         {allExams.map((exam, idx) => {
-                                            const row = previewRows.find(r => r.Test === exam.Test);
+                                            const examTest = exam.Test?.trim();
+                                            const row = previewRows.find(r => r.Test?.trim() === examTest);
                                             if (row) {
                                                 return (
                                                     <tr key={idx}>
