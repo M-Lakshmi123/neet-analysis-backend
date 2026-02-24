@@ -71,6 +71,30 @@ const AverageReport = ({ filters }) => {
         }
     };
 
+    const getNormalizedStream = (data) => {
+        const streams = [...new Set(data.map(row => row.Stream?.trim().toUpperCase()).filter(Boolean))];
+        if (streams.length === 0) return '';
+
+        // SR ELITE family normalization (SR ELITE, SR_ELITE_SET_01, SR_ELITE_SET_02 etc -> SR ELITE)
+        if (streams.some(s => s.includes('SR ELITE') || s.includes('SR_ELITE'))) {
+            return 'SR ELITE';
+        }
+
+        const hasJrEliteAiims = streams.includes('JR ELITE & JR AIIMS');
+        const hasJrElite = streams.includes('JR ELITE');
+        const hasJrAiims = streams.includes('JR AIIMS');
+
+        // JR Logic as per user rules
+        if (hasJrEliteAiims && hasJrElite) return 'JR ELITE';
+        if (hasJrEliteAiims && hasJrAiims) return 'JR AIIMS';
+
+        // Individual JR fallbacks
+        if (hasJrElite) return 'JR ELITE';
+        if (hasJrAiims) return 'JR AIIMS';
+
+        return streams[0];
+    };
+
     const loadImage = (src) => {
         return new Promise((resolve) => {
             const img = new Image();
@@ -220,6 +244,17 @@ const AverageReport = ({ filters }) => {
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "normal");
             doc.text(student.STUD_ID?.toString() || '', col1X + 30, row2Y);
+
+            // Stream (Added as per user request)
+            const normalizedStream = getNormalizedStream(studentData);
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
+            doc.text("Stream:", col2X, row2Y);
+
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "normal");
+            doc.text(normalizedStream, col2X + 22, row2Y);
+
             currentY += 18;
         }
 
@@ -465,7 +500,11 @@ const AverageReport = ({ filters }) => {
                                                 <div className="header-label">STUD ID</div>
                                                 <div className="header-value">{previewRows[0].STUD_ID}</div>
                                             </th>
-                                            <th colSpan={5} className="header-group-blue">
+                                            <th colSpan={2} className="header-group-blue">
+                                                <div className="header-label">STREAM</div>
+                                                <div className="header-value">{getNormalizedStream(previewRows)}</div>
+                                            </th>
+                                            <th colSpan={3} className="header-group-blue">
                                                 <div className="header-label">NAME OF THE STUDENT</div>
                                                 <div className="header-value">
                                                     {previewRows[0].NAME_OF_THE_STUDENT}

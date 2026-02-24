@@ -326,6 +326,7 @@ app.get('/api/history', async (req, res) => {
                 Chemistry,
                 NAME_OF_THE_STUDENT,
                 CAMPUS_NAME,
+                Stream,
                 STUD_ID
             FROM MEDICAL_RESULT 
             ${whereClause}
