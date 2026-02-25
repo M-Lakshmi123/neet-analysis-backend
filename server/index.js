@@ -62,7 +62,23 @@ const buildWhereClause = (req, options = {}) => {
     const addClause = (field, value) => {
         if (!value || value === 'All' || value === '__ALL__') return;
         const valArray = Array.isArray(value) ? value : [value];
-        const cleanValues = valArray
+
+        // --- STREAM GROUPING LOGIC ---
+        let selection = [...valArray];
+        if (field === 'Stream') {
+            const groups = {
+                'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
+                'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
+                'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
+            };
+            valArray.forEach(v => {
+                if (groups[v]) {
+                    selection = [...new Set([...selection, ...groups[v]])];
+                }
+            });
+        }
+
+        const cleanValues = selection
             .map(v => v ? v.toString().trim().toUpperCase() : '')
             .filter(v => v !== '' && v !== '__ALL__')
             .map(v => v.replace(/'/g, "''"));
@@ -109,7 +125,23 @@ app.get('/api/filters', async (req, res) => {
         const buildOptionClause = (column, values) => {
             if (!values || values === 'All' || values === '__ALL__') return null;
             const valArray = Array.isArray(values) ? values : [values];
-            const cleanValues = valArray
+
+            // --- STREAM GROUPING LOGIC ---
+            let selection = [...valArray];
+            if (field === 'Stream') {
+                const groups = {
+                    'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
+                    'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
+                    'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
+                };
+                valArray.forEach(v => {
+                    if (groups[v]) {
+                        selection = [...new Set([...selection, ...groups[v]])];
+                    }
+                });
+            }
+
+            const cleanValues = selection
                 .map(v => v ? v.toString().trim() : '')
                 .filter(v => v !== '' && v !== '__ALL__')
                 .map(v => v.replace(/'/g, "''"));
@@ -330,7 +362,7 @@ app.get('/api/history', async (req, res) => {
                 STUD_ID
             FROM MEDICAL_RESULT 
             ${whereClause}
-            ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') ASC
+            ORDER BY STR_TO_DATE(REPLACE(DATE, '/', '-'), '%d-%m-%Y') ASC
         `;
 
         logQuery(query, req.query);
@@ -358,7 +390,7 @@ app.get('/api/history', async (req, res) => {
                 SELECT DISTINCT Test, DATE
                 FROM MEDICAL_RESULT
                 ${examsWhere}
-                ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') ASC
+                ORDER BY STR_TO_DATE(REPLACE(DATE, '/', '-'), '%d-%m-%Y') ASC
             `;
             const examsResult = await pool.request().query(examsQuery);
 
@@ -472,7 +504,7 @@ app.get('/api/exam-stats', async (req, res) => {
             FROM MEDICAL_RESULT
             ${where}
             GROUP BY Test, DATE
-            ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') DESC
+            ORDER BY STR_TO_DATE(REPLACE(DATE, '/', '-'), '%d-%m-%Y') DESC
         `;
 
         logQuery(query, req.query);
@@ -526,7 +558,7 @@ app.get('/api/analysis-report', async (req, res) => {
             SELECT DISTINCT Test, DATE 
             FROM MEDICAL_RESULT
             ${where}
-            ORDER BY STR_TO_DATE(DATE, '%d-%m-%Y') ASC
+            ORDER BY STR_TO_DATE(REPLACE(DATE, '/', '-'), '%d-%m-%Y') ASC
             `;
 
         logQuery(studentQuery, req.query);
@@ -687,7 +719,7 @@ app.get('/api/erp/report', async (req, res) => {
             ${where}
             ORDER BY
         Student_Name,
-            STR_TO_DATE(Exam_Date, '%d-%m-%Y') DESC,
+            STR_TO_DATE(REPLACE(Exam_Date, '/', '-'), '%d-%m-%Y') DESC,
                 Subject,
                 Q_No ASC
         `;
