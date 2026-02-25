@@ -128,7 +128,7 @@ app.get('/api/filters', async (req, res) => {
 
             // --- STREAM GROUPING LOGIC ---
             let selection = [...valArray];
-            if (field === 'Stream') {
+            if (column === 'Stream') {
                 const groups = {
                     'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
                     'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
