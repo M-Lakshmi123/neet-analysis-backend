@@ -130,6 +130,17 @@ const TargetVsAchieved = ({ filters }) => {
         return counts;
     }, [studentResults, thresholds]);
 
+    const campusDisplayText = useMemo(() => {
+        const campusFilter = filters.campus || [];
+        const isAll = campusFilter.length === 0 ||
+            campusFilter.some(c => ['All', 'All Selected', 'ALL SELECTED', '__ALL__'].includes(c));
+
+        if (isAll || campusFilter.length > 1) {
+            return "ALL CAMPUSES";
+        }
+        return campusFilter[0];
+    }, [filters.campus]);
+
     const detailStudents = useMemo(() => {
         const thresholdValue = thresholds.find(t => t.label === selectedThreshold)?.value || 0;
         return studentResults
@@ -195,7 +206,7 @@ const TargetVsAchieved = ({ filters }) => {
 
             <div className="full-width-glass target-section">
                 <div className="glass-header">
-                    TARGET DEFINITIONS ({filters.stream && filters.stream.length > 0 && !filters.stream.includes('__ALL__') ? filters.stream.join(', ') : 'ALL STREAMS'})
+                    TARGETS GIVEN BY CO_HYD({filters.stream && filters.stream.length > 0 && !filters.stream.includes('__ALL__') ? filters.stream.join(', ') : 'ALL STREAMS'})
                 </div>
                 <div className="glass-grid">
                     {thresholds.map(th => (
@@ -208,7 +219,7 @@ const TargetVsAchieved = ({ filters }) => {
             </div>
 
             <div className="full-width-glass achieved-section">
-                <div className="glass-header">TOTAL ACHIEVED (UNIQUE STUDENTS)</div>
+                <div className="glass-header">TOTAL ACHIEVED BY {campusDisplayText}</div>
                 <div className="glass-grid">
                     {thresholds.map(th => {
                         const target = aggregatedTarget[th.key] || 0;
