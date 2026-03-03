@@ -20,16 +20,12 @@ const AverageCountReport = ({ filters }) => {
     const getStreamLabel = () => {
         const streamFilter = filters.stream;
         const selected = Array.isArray(streamFilter) ? streamFilter : (streamFilter ? [streamFilter] : []);
-        if (selected.length === 0) return "SR ELITE";
-
+        if (selected.length === 0 || selected.includes('ALL')) return "ALL STREAMS";
         const sStr = selected.map(s => s.toUpperCase().replace(/_/g, ' ')).join('|');
-
-        // Priority logic as per request
         if (sStr.includes('JR AIIMS')) return 'JR AIIMS';
         if (sStr.includes('JR ELITE')) return 'JR ELITE';
         if (sStr.includes('SR ELITE')) return 'SR ELITE';
         if (sStr.includes('SR AIIMS')) return 'SR AIIMS';
-
         return selected[0].toUpperCase().replace(/_/g, ' ');
     };
 
@@ -47,29 +43,20 @@ const AverageCountReport = ({ filters }) => {
                         setStudentData(marksData.students);
                         setTotalConducted(marksData.t_cnt || 0);
                         setExamMeta(marksData.exams || []);
-
                         const currentStream = getStreamLabel();
-
                         const grouped = marksData.students.reduce((acc, curr) => {
                             const campus = String(curr.campus || '').trim().toUpperCase();
                             if (!campus) return acc;
-
                             if (!acc[campus]) {
                                 acc[campus] = {
-                                    Campus: campus,
-                                    Section: currentStream,
-                                    Strength: 0,
-                                    Mark: 0,
-                                    Rank: Infinity,
-                                    T_350: 0, T_650: 0, T_600: 0, T_580: 0, T_530: 0, T_490: 0,
-                                    T_450: 0, T_400: 0, T_360: 0, T_320: 0, T_280: 0, T_L200: 0,
+                                    Campus: campus, Section: currentStream, Strength: 0, Mark: 0, Rank: Infinity,
+                                    T_350: 0, T_650: 0, T_600: 0, T_580: 0, T_530: 0, T_490: 0, T_450: 0, T_400: 0, T_360: 0, T_320: 0, T_280: 0, T_L200: 0,
                                     B_175: 0, B_170: 0, B_160: 0, B_160_170: 0, B_150: 0, B_130: 0,
                                     Z_175: 0, Z_170: 0, Z_160: 0, Z_160_170: 0, Z_150: 0, Z_130: 0,
                                     P_70: 0, P_50_70: 0, P_L50: 0, P_L20: 0,
                                     C_100: 0, C_70_100: 0, C_50_70: 0, C_L50: 0, C_L20: 0,
                                 };
                             }
-
                             acc[campus].Strength += 1;
                             const tot = Number(curr.tot) || 0;
                             const air = Number(curr.air) || 0;
@@ -77,10 +64,8 @@ const AverageCountReport = ({ filters }) => {
                             const zoo = Number(curr.zoo) || 0;
                             const phy = Number(curr.phy) || 0;
                             const che = Number(curr.che) || 0;
-
                             if (tot > acc[campus].Mark) acc[campus].Mark = tot;
                             if (air > 0 && air < acc[campus].Rank) acc[campus].Rank = air;
-
                             if (tot >= 650) acc[campus].T_650++;
                             if (tot >= 600) acc[campus].T_600++;
                             if (tot >= 580) acc[campus].T_580++;
@@ -93,35 +78,29 @@ const AverageCountReport = ({ filters }) => {
                             if (tot >= 280) acc[campus].T_280++;
                             if (tot <= 200) acc[campus].T_L200++;
                             if (tot <= 350) acc[campus].T_350++;
-
                             if (bot >= 175) acc[campus].B_175++;
                             if (bot >= 170) acc[campus].B_170++;
                             if (bot >= 160) acc[campus].B_160++;
                             if (bot >= 160 && bot < 170) acc[campus].B_160_170++;
                             if (bot >= 150) acc[campus].B_150++;
                             if (bot >= 130) acc[campus].B_130++;
-
                             if (zoo >= 175) acc[campus].Z_175++;
                             if (zoo >= 170) acc[campus].Z_170++;
                             if (zoo >= 160) acc[campus].Z_160++;
                             if (zoo >= 160 && zoo < 170) acc[campus].Z_160_170++;
                             if (zoo >= 150) acc[campus].Z_150++;
                             if (zoo >= 130) acc[campus].Z_130++;
-
                             if (phy >= 70) acc[campus].P_70++;
                             if (phy >= 50 && phy < 70) acc[campus].P_50_70++;
                             if (phy <= 50) acc[campus].P_L50++;
                             if (phy <= 20) acc[campus].P_L20++;
-
                             if (che >= 100) acc[campus].C_100++;
                             if (che >= 70 && che < 100) acc[campus].C_70_100++;
                             if (che >= 50 && che < 70) acc[campus].C_50_70++;
                             if (che <= 50) acc[campus].C_L50++;
                             if (che <= 20) acc[campus].C_L20++;
-
                             return acc;
                         }, {});
-
                         setExamStats(Object.values(grouped));
                     }
                 }
@@ -131,7 +110,6 @@ const AverageCountReport = ({ filters }) => {
                 if (!controller.signal.aborted) setLoading(false);
             }
         };
-
         const timeoutId = setTimeout(fetchData, 500);
         return () => {
             controller.abort();
@@ -145,14 +123,8 @@ const AverageCountReport = ({ filters }) => {
             let aVal = a[key] ?? '';
             let bVal = b[key] ?? '';
             const isNumeric = (val) => typeof val === 'number' || (typeof val === 'string' && val.trim() !== '' && !isNaN(val));
-            if (isNumeric(aVal) && isNumeric(bVal)) {
-                aVal = Number(aVal);
-                bVal = Number(bVal);
-            } else {
-                aVal = String(aVal).toLowerCase();
-                bVal = String(bVal).toLowerCase();
-                return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-            }
+            if (isNumeric(aVal) && isNumeric(bVal)) { aVal = Number(aVal); bVal = Number(bVal); }
+            else { aVal = String(aVal).toLowerCase(); bVal = String(bVal).toLowerCase(); return direction === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal); }
             if (aVal === bVal) return 0;
             if (aVal < bVal) return direction === 'asc' ? -1 : 1;
             return direction === 'asc' ? 1 : -1;
@@ -188,11 +160,11 @@ const AverageCountReport = ({ filters }) => {
             bottom: { style: 'thin', color: { argb: 'FF000000' } },
             right: { style: 'thin', color: { argb: 'FF000000' } }
         };
-
         worksheet.columns = Array(38).fill({ width: 10 });
         worksheet.columns[0] = { width: 35 };
 
-        const titleRow = worksheet.addRow(['Grand Total', '', totals?.Strength || 0, Number(totals?.Mark || 0).toFixed(2), (totals?.Rank === Infinity ? '-' : Number(totals?.Rank || 0).toFixed(2)),
+        // ROW 1: Detailed Numerical Totals (Grand Total)
+        const gtRow = worksheet.addRow(['Grand Total', '', totals?.Strength || 0, Number(totals?.Mark || 0).toFixed(2), (totals?.Rank === Infinity ? '-' : Number(totals?.Rank || 0).toFixed(2)),
             totals?.T_350, totals?.T_650, totals?.T_600, totals?.T_580, totals?.T_530, totals?.T_490,
             totals?.T_450, totals?.T_400, totals?.T_360, totals?.T_320, totals?.T_280, totals?.T_L200,
             totals?.B_175, totals?.B_170, totals?.B_160, totals?.B_160_170, totals?.B_150, totals?.B_130,
@@ -201,33 +173,29 @@ const AverageCountReport = ({ filters }) => {
             totals?.C_100, totals?.C_70_100, totals?.C_50_70, totals?.C_L50, totals?.C_L20
         ]);
         worksheet.mergeCells('A1:B1');
-        titleRow.eachCell(cell => {
+        gtRow.eachCell(cell => {
             cell.font = { bold: true };
             cell.alignment = { horizontal: 'center', vertical: 'middle' };
             cell.border = borderStyle;
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F9FA' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
         });
 
+        // ROW 2: Category Headers
         const h1 = worksheet.addRow(['CAMPUS', 'SECTION', 'STRENGTH', 'TOP MARK / RANK', '', 'TOT', 'TOTAL', ...Array(10).fill(''), 'BOTANY', ...Array(5).fill(''), 'ZOOLOGY', ...Array(5).fill(''), 'PHYSICS', ...Array(3).fill(''), 'CHEMISTRY', ...Array(4).fill('')]);
         worksheet.mergeCells('A2:A3'); worksheet.mergeCells('B2:B3'); worksheet.mergeCells('C2:C3'); worksheet.mergeCells('D2:E2');
         worksheet.mergeCells('F2:F3'); worksheet.mergeCells('G2:Q2'); worksheet.mergeCells('R2:W2'); worksheet.mergeCells('X2:AC2'); worksheet.mergeCells('AD2:AG2'); worksheet.mergeCells('AH2:AL2');
 
+        // ROW 3: Detail Labels
         const h2 = worksheet.addRow(['', '', '', 'MARK', 'RANK', '', '>=650', '>=600', '>=580', '>=530', '>=490', '>=450', '>=400', '>=360', '>=320', '>=280', '<=200', '>=175', '>=170', '>=160', '160-170', '>=150', '>=130', '>=175', '>=170', '>=160', '160-170', '>=150', '>=130', '>=70', '50-70', '<=50', '<=20', '>=100', '70-100', '50-70', '<=50', '<=20']);
-
         [h1, h2].forEach(row => row.eachCell(cell => {
-            cell.alignment = { horizontal: 'center', vertical: 'middle' };
-            cell.border = borderStyle;
-            cell.font = { bold: true, size: 9 };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = borderStyle; cell.font = { bold: true, size: 9 };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9ECEF' } };
         }));
 
+        // Data Rows
         sortedExamStats.forEach(row => {
             const r = worksheet.addRow([row.Campus, row.Section, row.Strength, Number(row.Mark).toFixed(2), (row.Rank === Infinity ? '-' : Number(row.Rank).toFixed(2)), row.T_350, row.T_650, row.T_600, row.T_580, row.T_530, row.T_490, row.T_450, row.T_400, row.T_360, row.T_320, row.T_280, row.T_L200, row.B_175, row.B_170, row.B_160, row.B_160_170, row.B_150, row.B_130, row.Z_175, row.Z_170, row.Z_160, row.Z_160_170, row.Z_150, row.Z_130, row.P_70, row.P_50_70, row.P_L50, row.P_L20, row.C_100, row.C_70_100, row.C_50_70, row.C_L50, row.C_L20]);
-            r.eachCell(cell => {
-                cell.border = borderStyle;
-                cell.alignment = { horizontal: 'center' };
-                cell.font = { size: 9 };
-            });
+            r.eachCell(cell => { cell.border = borderStyle; cell.alignment = { horizontal: 'center' }; cell.font = { size: 9 }; });
         });
 
         const buffer = await workbook.xlsx.writeBuffer();
@@ -236,134 +204,96 @@ const AverageCountReport = ({ filters }) => {
 
     const downloadListExcel = async () => {
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Student List');
-        const currentStream = getStreamLabel();
-        const borderStyle = {
-            top: { style: 'thin', color: { argb: 'FF000000' } },
-            left: { style: 'thin', color: { argb: 'FF000000' } },
-            bottom: { style: 'thin', color: { argb: 'FF000000' } },
-            right: { style: 'thin', color: { argb: 'FF000000' } }
-        };
-
-        // Row 1: Title
-        worksheet.mergeCells('A1:R1');
-        const headerCell = worksheet.getCell('A1');
-        headerCell.value = 'Sri Chaitanya Educational Institutions., India';
-        headerCell.font = { bold: true, size: 28, color: { argb: 'FF0070C0' }, name: 'Impact' };
-        headerCell.alignment = { horizontal: 'center', vertical: 'middle' };
-        worksheet.getRow(1).height = 45;
-
-        // Row 2: Subtitle
-        worksheet.mergeCells('A2:R2');
-        const subHeaderCell = worksheet.getCell('A2');
-        subHeaderCell.value = 'Central Office, Madhapur-Hyd.';
-        subHeaderCell.font = { bold: true, size: 14 };
-        subHeaderCell.alignment = { horizontal: 'center', vertical: 'middle' };
-        worksheet.getRow(2).height = 25;
-
-        // Row 3-4: Teal Info Box and Date Range
-        worksheet.mergeCells('A3:E4');
-        const tealBox = worksheet.getCell('A3');
-        tealBox.value = `2025-26_${currentStream}_NEET Avg's`;
-        tealBox.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF31869B' } };
-        tealBox.font = { bold: true, size: 18, color: { argb: 'FFFFFFFF' } };
-        tealBox.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-
-        worksheet.mergeCells('F3:R4');
-        const dateRangeCell = worksheet.getCell('F3');
-        const examDates = examMeta.map(e => formatDate(e.DATE, 'dd/mm/yyyy')).join(', ');
-        dateRangeCell.value = {
-            richText: [
-                { text: `Over All Sr.Inter (Revi) NEET Avg's : \n`, font: { bold: true, size: 12, color: { argb: 'FFFF0000' } } },
-                { text: `Dates :- ${examDates}`, font: { size: 9, color: { argb: 'FF000000' } } }
-            ]
-        };
-        dateRangeCell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
-        worksheet.getRow(3).height = 20;
-        worksheet.getRow(4).height = 30;
-
-        // Column Config
+        const worksheet = workbook.addWorksheet('Estimated Avg');
+        const stream = getStreamLabel();
+        const datesStrWrap = examMeta.map((ex, idx) => `${idx + 1}.(${formatDate(ex.DATE, 'dd/mm/yyyy')})`).join(' ');
         worksheet.columns = [
-            { width: 8 }, { width: 12 }, { width: 35 }, { width: 30 }, { width: 15 },
+            { width: 10 }, { width: 12 }, { width: 35 }, { width: 30 }, { width: 15 },
             { width: 10 }, { width: 8 }, { width: 10 }, { width: 8 }, { width: 10 },
             { width: 10 }, { width: 8 }, { width: 10 }, { width: 8 }, { width: 12 },
-            { width: 10 }, { width: 8 }, { width: 8 }
+            { width: 10 }, { width: 10 }, { width: 10 }
         ];
-
-        // Row 5: Headers with specific colors from screenshot
-        const headersLabels = ['RANK', 'Stud_ID', 'Name', 'CAMPUS NAME', 'Prog. Name', 'BOT 180', 'B_R', 'ZOO 180', 'Z_R', 'BIO', 'PHY 180', 'P_R', 'CHE 180', 'C_R', 'TOT 720', 'AIR', 'T_APP', 'T_CNT'];
-        const row5 = worksheet.addRow(headersLabels);
-        row5.height = 30;
-        row5.eachCell((cell, col) => {
-            cell.font = { bold: true, size: 10, color: { argb: 'FF0000FF' } };
-            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-            cell.border = borderStyle;
-
-            if (col <= 5) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } }; // Light Yellow
-            else if (col <= 7) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCFFFF' } }; // Aqua
-            else if (col <= 9) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE9D9' } }; // Peach
-            else if (col === 10) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE4DFEC' } }; // Purple
-            else if (col <= 12) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9D9D9' } }; // Grey
-            else if (col <= 14) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDD9C4' } }; // Beige
-            else if (col === 15) {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF002060' } }; // Dark Blue
-                cell.font = { bold: true, color: { argb: 'FFFFFF00' } }; // Yellow Text
-            } else {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // Yellow for extra
-            }
+        const borderStyle = {
+            top: { style: 'thin', color: { argb: 'FF00B0F0' } }, left: { style: 'thin', color: { argb: 'FF00B0F0' } },
+            bottom: { style: 'thin', color: { argb: 'FF00B0F0' } }, right: { style: 'thin', color: { argb: 'FF00B0F0' } }
+        };
+        const getHeaderBaseStyle = (bgColor, fgColor = 'FF0000FF') => ({
+            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } }, font: { color: { argb: fgColor }, bold: true },
+            alignment: { horizontal: 'center', vertical: 'middle', wrapText: true }, border: borderStyle
         });
 
-        // Data Rows
-        sortedStudentList.forEach((s, idx) => {
-            const bio = (Number(s.bot) || 0) + (Number(s.zoo) || 0);
-            const r = worksheet.addRow([
-                idx + 1, s.STUD_ID, s.name, s.campus, currentStream,
-                Number(s.bot || 0).toFixed(1), s.b_rank || '-',
-                Number(s.zoo || 0).toFixed(1), s.z_rank || '-',
-                bio.toFixed(1),
-                Number(s.phy || 0).toFixed(1), s.p_rank || '-',
-                Number(s.che || 0).toFixed(1), s.c_rank || '-',
-                Number(s.tot || 0).toFixed(1), s.air || '-',
-                s.t_app, totalConducted
-            ]);
+        worksheet.mergeCells('A1:R1');
+        const row1 = worksheet.getCell('A1');
+        row1.value = { richText: [{ text: '          Sri Chaitanya ', font: { name: 'Impact', size: 32, color: { argb: 'FF00B0F0' } } }, { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 32, color: { argb: 'FF00B0F0' } } }] };
+        row1.alignment = { horizontal: 'center', vertical: 'middle' }; row1.border = borderStyle; worksheet.getRow(1).height = 50;
 
-            r.eachCell((cell, col) => {
-                cell.border = borderStyle;
-                cell.alignment = { horizontal: (col === 3 || col === 4) ? 'left' : 'center', vertical: 'middle' };
-                cell.font = { size: 9 };
-                if (col === 15) {
-                    cell.font = { bold: true, color: { argb: 'FF0070C0' } };
-                }
+        try {
+            const response = await fetch('/logo.png');
+            if (response.ok) {
+                const blob = await response.blob(); const arrayBuffer = await blob.arrayBuffer();
+                const imageId = workbook.addImage({ buffer: arrayBuffer, extension: 'png' });
+                worksheet.addImage(imageId, { tl: { col: 0.1, row: 0.1 }, ext: { width: 65, height: 60 }, editAs: 'oneCell' });
+            }
+        } catch (e) { console.error("Failed to add logo:", e); }
+
+        worksheet.mergeCells('A2:R2');
+        const row2 = worksheet.getCell('A2'); row2.value = 'Central Office, Madhapur-Hyd.'; row2.font = { bold: true, size: 14 };
+        row2.alignment = { horizontal: 'center', vertical: 'middle' }; row2.border = borderStyle; worksheet.getRow(2).height = 25;
+
+        worksheet.mergeCells('A3:E4');
+        const cellA3 = worksheet.getCell('A3');
+        cellA3.value = { richText: [{ text: '2025-26_', font: { name: 'MS Gothic', size: 16, color: { argb: 'FFCCCCFF' }, bold: true } }, { text: stream, font: { name: 'MS Gothic', size: 16, color: { argb: 'FFFFFF00' }, bold: true } }, { text: '_NEET Avg\'s', font: { name: 'MS Gothic', size: 16, color: { argb: 'FFCCCCFF' }, bold: true } }] };
+        cellA3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF31869B' } }; cellA3.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; cellA3.border = borderStyle;
+
+        worksheet.mergeCells('F3:R4');
+        const cellF3 = worksheet.getCell('F3');
+        cellF3.value = { richText: [{ text: `Over All Sr.Inter (Revi) NEET Avg's : \n`, font: { color: { argb: 'FFFF0000' }, name: 'Arial', size: 10, bold: true } }, { text: `Dates :- ${datesStrWrap}`, font: { color: { argb: 'FF000000' }, name: 'Arial', size: 10 } }] };
+        cellF3.alignment = { horizontal: 'left', vertical: 'top', wrapText: true }; cellF3.border = borderStyle; worksheet.getRow(3).height = 20; worksheet.getRow(4).height = 30;
+
+        const headerLabels = ['RANK', 'Stud_ID', 'Name', 'CAMPUS NAME', 'Prog. Name', 'BOT 180', 'B_R', 'ZOO 180', 'Z_R', 'BIO', 'PHY 180', 'P_R', 'CHE 180', 'C_R', 'TOT 720', 'AIR', 'T_App', 'T_Cnt'];
+        const row5 = worksheet.addRow(headerLabels); row5.height = 35;
+        row5.eachCell((cell, colNumber) => {
+            if (colNumber <= 5) cell.style = getHeaderBaseStyle('FFFFFFCC');
+            else if (colNumber <= 7) cell.style = getHeaderBaseStyle('FFCCFFFF');
+            else if (colNumber <= 9) cell.style = getHeaderBaseStyle('FFFDE9D9');
+            else if (colNumber === 10) cell.style = getHeaderBaseStyle('FFE4DFEC');
+            else if (colNumber <= 12) cell.style = getHeaderBaseStyle('FFD9D9D9');
+            else if (colNumber <= 14) cell.style = getHeaderBaseStyle('FFDDD9C4');
+            else if (colNumber === 15) cell.style = getHeaderBaseStyle('FF002060', 'FFFFFF00');
+            else if (colNumber === 16) cell.style = getHeaderBaseStyle('FFFFFF00', 'FF0000FF');
+            else cell.style = getHeaderBaseStyle('FFFFFF00', 'FF0000FF');
+        });
+
+        sortedStudentList.forEach((s, idx) => {
+            const bio = (Number(s.bot || 0) + Number(s.zoo || 0)).toFixed(1);
+            const rowData = [idx + 1, s.STUD_ID || '', (s.name || ''), (s.campus || ''), stream, Number(s.bot || 0).toFixed(1), Number(s.b_rank || 0).toFixed(1), Number(s.zoo || 0).toFixed(1), Number(s.z_rank || 0).toFixed(1), bio, Number(s.phy || 0).toFixed(1), Number(s.p_rank || 0).toFixed(1), Number(s.che || 0).toFixed(1), Number(s.c_rank || 0).toFixed(1), Number(s.tot || 0).toFixed(1), Number(s.air || 0).toFixed(1), s.t_app || 0, totalConducted];
+            const dataRow = worksheet.addRow(rowData);
+            dataRow.eachCell((cell, colNumber) => {
+                cell.border = borderStyle; cell.alignment = { vertical: 'middle', horizontal: colNumber <= 4 ? 'left' : 'center' }; cell.font = { name: 'Arial', size: 9 };
+                if (colNumber === 15) cell.font = { name: 'Arial Black', size: 10, bold: true, color: { argb: 'FF0070C0' } };
             });
         });
 
         const buffer = await workbook.xlsx.writeBuffer();
-        saveAs(new Blob([buffer]), `Student_List_${currentStream}_${formatDate(new Date())}.xlsx`);
+        const fileName = `${stream}_Estimated_Avg`.replace(/[^a-z0-9\-_]/gi, '_');
+        saveAs(new Blob([buffer]), `${fileName}.xlsx`);
     };
 
     const SortIcon = ({ config, columnKey }) => {
         if (config.key !== columnKey) return <span style={{ opacity: 0.2, marginLeft: '4px' }}>⇅</span>;
         return <span style={{ marginLeft: '4px', fontWeight: 'bold', color: '#6366f1' }}>{config.direction === 'desc' ? '↓' : '↑'}</span>;
     };
-
-    const requestSort = (setter, key) => {
-        setter(prev => ({ key, direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc' }));
-    };
+    const requestSort = (setter, key) => setter(prev => ({ key, direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc' }));
 
     return (
         <div className="report-container-main">
             <LoadingTimer isLoading={loading} />
-
             <div className="sticky-action-bar">
                 <div className="action-header">
                     <h3 className="page-title">Average Count & List Report</h3>
                     <div className="action-buttons">
-                        <button className="btn-excel count" onClick={downloadCountExcel}>
-                            <FileSpreadsheet size={16} /> COUNT EXCEL
-                        </button>
-                        <button className="btn-excel list" onClick={downloadListExcel}>
-                            <FileSpreadsheet size={16} /> LIST EXCEL
-                        </button>
+                        <button className="btn-excel count" onClick={downloadCountExcel}><FileSpreadsheet size={16} /> COUNT EXCEL</button>
+                        <button className="btn-excel list" onClick={downloadListExcel}><FileSpreadsheet size={16} /> LIST EXCEL</button>
                     </div>
                 </div>
             </div>
@@ -375,20 +305,20 @@ const AverageCountReport = ({ filters }) => {
                         <table className="analysis-table count-tbl">
                             <thead>
                                 {totals && (
-                                    <tr className="grand-total-row">
-                                        <td colSpan={2} className="txt-center">Grand Total</td>
-                                        <td>{totals.Strength}</td>
-                                        <td>{Number(totals.Mark).toFixed(2)}</td>
-                                        <td>{totals.Rank === Infinity ? '-' : Number(totals.Rank).toFixed(2)}</td>
-                                        <td className="col-tot-highlight">{totals.T_350}</td>
-                                        <td>{totals.T_650}</td><td>{totals.T_600}</td><td>{totals.T_580}</td>
-                                        <td>{totals.T_530}</td><td>{totals.T_490}</td><td>{totals.T_450}</td>
-                                        <td>{totals.T_400}</td><td>{totals.T_360}</td><td>{totals.T_320}</td>
-                                        <td>{totals.T_280}</td><td>{totals.T_L200}</td>
-                                        <td colSpan={6} className="subj-summary">BOT: {totals.B_175}</td>
-                                        <td colSpan={6} className="subj-summary">ZOO: {totals.Z_175}</td>
-                                        <td colSpan={4} className="subj-summary">PHY: {totals.P_70}</td>
-                                        <td colSpan={5} className="subj-summary">CHE: {totals.C_100}</td>
+                                    <tr className="grand-total-header-row">
+                                        <th colSpan={2} className="txt-center bg-yellow-soft">Grand Total</th>
+                                        <th className="bg-yellow-soft">{totals.Strength}</th>
+                                        <th className="bg-yellow-soft bold">{Number(totals.Mark).toFixed(2)}</th>
+                                        <th className="bg-yellow-soft bold">{totals.Rank === Infinity ? '-' : Number(totals.Rank).toFixed(2)}</th>
+                                        <th className="bg-yellow bold">{totals.T_350}</th>
+                                        <th className="bg-yellow">{totals.T_650}</th><th className="bg-yellow">{totals.T_600}</th><th className="bg-yellow">{totals.T_580}</th>
+                                        <th className="bg-yellow">{totals.T_530}</th><th className="bg-yellow">{totals.T_490}</th><th className="bg-yellow">{totals.T_450}</th>
+                                        <th className="bg-yellow">{totals.T_400}</th><th className="bg-yellow">{totals.T_360}</th><th className="bg-yellow">{totals.T_320}</th>
+                                        <th className="bg-yellow">{totals.T_280}</th><th className="bg-yellow">{totals.T_L200}</th>
+                                        <th className="bg-orange">{totals.B_175}</th><th className="bg-orange">{totals.B_170}</th><th className="bg-orange">{totals.B_160}</th><th className="bg-orange">{totals.B_160_170}</th><th className="bg-orange">{totals.B_150}</th><th className="bg-orange">{totals.B_130}</th>
+                                        <th className="bg-blue">{totals.Z_175}</th><th className="bg-blue">{totals.Z_170}</th><th className="bg-blue">{totals.Z_160}</th><th className="bg-blue">{totals.Z_160_170}</th><th className="bg-blue">{totals.Z_150}</th><th className="bg-blue">{totals.Z_130}</th>
+                                        <th className="bg-green">{totals.P_70}</th><th className="bg-green">{totals.P_50_70}</th><th className="bg-green">{totals.P_L50}</th><th className="bg-green">{totals.P_L20}</th>
+                                        <th className="bg-pink">{totals.C_100}</th><th className="bg-pink">{totals.C_70_100}</th><th className="bg-pink">{totals.C_50_70}</th><th className="bg-pink">{totals.C_L50}</th><th className="bg-pink">{totals.C_L20}</th>
                                     </tr>
                                 )}
                                 <tr>
@@ -458,19 +388,12 @@ const AverageCountReport = ({ filters }) => {
                                     <tr><td colSpan="17" className="txt-center py-8">Loading...</td></tr>
                                 ) : sortedStudentList.map((s, idx) => (
                                     <tr key={idx}>
-                                        <td>{idx + 1}</td>
-                                        <td>{s.STUD_ID}</td>
-                                        <td className="txt-left capitalize">{s.name}</td>
-                                        <td className="txt-left">{s.campus}</td>
-                                        <td>{Number(s.bot || 0).toFixed(2)}</td>
-                                        <td className="text-red bold">{Number(s.b_rank || 0).toFixed(2)}</td>
-                                        <td>{Number(s.zoo || 0).toFixed(2)}</td>
-                                        <td className="text-red bold">{Number(s.z_rank || 0).toFixed(2)}</td>
+                                        <td>{idx + 1}</td> <td>{s.STUD_ID}</td> <td className="txt-left">{s.name}</td> <td className="txt-left">{s.campus}</td>
+                                        <td>{Number(s.bot || 0).toFixed(2)}</td> <td className="text-red bold">{Number(s.b_rank || 0).toFixed(2)}</td>
+                                        <td>{Number(s.zoo || 0).toFixed(2)}</td> <td className="text-red bold">{Number(s.z_rank || 0).toFixed(2)}</td>
                                         <td className="bold text-purple">{(Number(s.bot || 0) + Number(s.zoo || 0)).toFixed(2)}</td>
-                                        <td>{Number(s.phy || 0).toFixed(2)}</td>
-                                        <td className="text-red bold">{Number(s.p_rank || 0).toFixed(2)}</td>
-                                        <td>{Number(s.che || 0).toFixed(2)}</td>
-                                        <td className="text-red bold">{Number(s.c_rank || 0).toFixed(2)}</td>
+                                        <td>{Number(s.phy || 0).toFixed(2)}</td> <td className="text-red bold">{Number(s.p_rank || 0).toFixed(2)}</td>
+                                        <td>{Number(s.che || 0).toFixed(2)}</td> <td className="text-red bold">{Number(s.c_rank || 0).toFixed(2)}</td>
                                         <td className="bold text-blue-dark">{Number(s.tot || 0).toFixed(2)}</td>
                                         <td className="bold text-blue-bright italic">{Number(s.air || 0).toFixed(2)}</td>
                                         <td>{s.t_app}</td><td>{totalConducted}</td>
@@ -495,7 +418,7 @@ const AverageCountReport = ({ filters }) => {
                 .block-header { background: #f8fafc; padding: 10px 20px; font-weight: 700; color: #334155; border-bottom: 1px solid #e2e8f0; }
                 .table-wrapper { position: relative; max-height: 450px; overflow: auto; }
                 .analysis-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.75rem; }
-                .analysis-table thead th { position: sticky; top: 0; z-index: 10; background: #f8fafc; padding: 8px; border-bottom: 2px solid #cbd5e1; border-right: 1px solid #e2e8f0; }
+                .analysis-table thead th { position: sticky; top: 0; z-index: 10; background: #f8fafc; padding: 8px; border-bottom: 1px solid #cbd5e1; border-right: 1px solid #e2e8f0; }
                 .analysis-table td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; text-align: center; }
                 .analysis-table.count-tbl { min-width: 2600px; }
                 .analysis-table.list-tbl { min-width: 1700px; }
@@ -515,8 +438,8 @@ const AverageCountReport = ({ filters }) => {
                 .text-blue-dark { color: #1e40af; }
                 .text-blue-bright { color: #2563eb; }
                 .sortable { cursor: pointer; }
-                .grand-total-row { background: #fffbeb; font-weight: bold; }
-                .col-tot-highlight { background: #fef3c7; font-weight: 800; }
+                .grand-total-header-row th { border-bottom: 2px solid #94a3b8 !important; border-top: 1px solid #e2e8f0; }
+                .bg-yellow-soft { background-color: #fefce8 !important; }
             `}</style>
         </div>
     );
