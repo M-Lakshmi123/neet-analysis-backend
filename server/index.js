@@ -682,7 +682,23 @@ app.get('/api/erp/report', async (req, res) => {
         const addClause = (field, value) => {
             if (!value || value === 'All' || value === '__ALL__') return;
             const valArray = Array.isArray(value) ? value : [value];
-            const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+
+            // --- STREAM GROUPING LOGIC ---
+            let selection = [...valArray];
+            if (field === 'Stream') {
+                const groups = {
+                    'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
+                    'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
+                    'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
+                };
+                valArray.forEach(v => {
+                    if (groups[v]) {
+                        selection = [...new Set([...selection, ...groups[v]])];
+                    }
+                });
+            }
+
+            const cleanValues = selection.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
             if (cleanValues.length === 0) return;
             clauses.push(`${field} IN(${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
@@ -715,7 +731,13 @@ app.get('/api/erp/report', async (req, res) => {
         const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')} ` : '';
 
         const query = `
-        SELECT * FROM ERP_REPORT 
+        SELECT 
+            CAST(STUD_ID AS CHAR) as STUD_ID,
+            Student_Name, Branch, Exam_Date, Test_Type, Test, Tot_720, AIR,
+            Botany, B_Rank, Zoology, Z_Rank, Physics, P_Rank, Chemistry, C_Rank,
+            Q_No, W_U, National_Wide_Error, Q_URL, S_URL, Key_Value, Subject,
+            Topic, Sub_Topic, Question_Type, Statement, Year, Top_ALL, Stream
+        FROM ERP_REPORT 
             ${where}
             ORDER BY
         Student_Name,
@@ -744,7 +766,26 @@ app.get('/api/erp/error-count-report', async (req, res) => {
         const addClause = (field, value) => {
             if (!value || value === 'All' || value === '__ALL__') return;
             const valArray = Array.isArray(value) ? value : [value];
-            const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+
+            // --- STREAM GROUPING LOGIC ---
+            let selection = [...valArray];
+            if (field === 'Stream') {
+                const groups = {
+                    'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
+                    'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
+                    'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
+                };
+                valArray.forEach(v => {
+                    if (groups[v]) {
+                        selection = [...new Set([...selection, ...groups[v]])];
+                    }
+                });
+            }
+
+            const cleanValues = selection
+                .map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '')
+                .filter(Boolean);
+
             if (cleanValues.length === 0) return;
             clauses.push(`${field} IN(${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
@@ -769,7 +810,7 @@ app.get('/api/erp/error-count-report', async (req, res) => {
 
         const query = `
         SELECT
-        STUD_ID,
+            CAST(STUD_ID AS CHAR) as STUD_ID,
             MAX(Student_Name) as name,
             MAX(Branch) as campus,
             Test,
@@ -954,7 +995,23 @@ app.get('/api/erp/students', async (req, res) => {
         const addClause = (field, value) => {
             if (!value || value === 'All' || value === '__ALL__') return;
             const valArray = Array.isArray(value) ? value : [value];
-            const cleanValues = valArray.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+
+            // --- STREAM GROUPING LOGIC ---
+            let selection = [...valArray];
+            if (field === 'Stream') {
+                const groups = {
+                    'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
+                    'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
+                    'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
+                };
+                valArray.forEach(v => {
+                    if (groups[v]) {
+                        selection = [...new Set([...selection, ...groups[v]])];
+                    }
+                });
+            }
+
+            const cleanValues = selection.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
             if (cleanValues.length === 0) return;
             clauses.push(`${field} IN (${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
@@ -980,7 +1037,7 @@ app.get('/api/erp/students', async (req, res) => {
 
         const query = `
             SELECT 
-                TRIM(STUD_ID) as id, 
+                CAST(STUD_ID AS CHAR) as id, 
                 MAX(TRIM(Student_Name)) as name,
                 MAX(TRIM(Branch)) as campus,
                 MAX(TRIM(Stream)) as stream

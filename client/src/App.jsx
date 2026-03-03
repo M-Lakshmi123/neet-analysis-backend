@@ -9,6 +9,7 @@ import FilterBar from './components/FilterBar';
 import AnalysisReport from './components/AnalysisReport';
 import AverageReport from './components/AverageReport';
 import AverageMarksReport from './components/AverageMarksReport';
+import AverageCountReport from './components/AverageCountReport';
 import ErrorReport from './components/ErrorReport';
 import ErrorTop100 from './components/ErrorTop100';
 import ErrorCountReport from './components/ErrorCountReport';
@@ -200,6 +201,7 @@ const Dashboard = () => {
             const pageNames = {
                 'analysis': 'Analysis Report',
                 'averages': 'Average Marks Report',
+                'average_count': 'Average Count Report',
                 'progress': 'Progress Report',
                 'errors': 'Error Report',
                 'error_top': 'Error Top 100%',
@@ -225,6 +227,12 @@ const Dashboard = () => {
                 return (
                     <div className="report-sections">
                         <AverageMarksReport filters={globalFilters} />
+                    </div>
+                );
+            case 'average_count':
+                return (
+                    <div className="report-sections">
+                        <AverageCountReport filters={globalFilters} />
                     </div>
                 );
             case 'progress':
@@ -264,7 +272,7 @@ const Dashboard = () => {
         }
     };
 
-    const showFilterBar = ['analysis', 'averages', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
+    const showFilterBar = ['analysis', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
 
     return (
         <div className="dashboard-root">
@@ -273,13 +281,14 @@ const Dashboard = () => {
                 <Header title={
                     activePage === 'analysis' ? 'Analysis Report' :
                         activePage === 'averages' ? 'Average Marks Report' :
-                            activePage === 'progress' ? 'Progress Report' :
-                                activePage === 'errors' ? 'Error Report' :
-                                    activePage === 'error_top' ? 'Error Top 100%' :
-                                        activePage === 'error_count' ? 'Error Count Report' :
-                                            activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
-                                                activePage === 'student_performance' ? 'Student Performance' :
-                                                    activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
+                            activePage === 'average_count' ? 'Average Count Report' :
+                                activePage === 'progress' ? 'Progress Report' :
+                                    activePage === 'errors' ? 'Error Report' :
+                                        activePage === 'error_top' ? 'Error Top 100%' :
+                                            activePage === 'error_count' ? 'Error Count Report' :
+                                                activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
+                                                    activePage === 'student_performance' ? 'Student Performance' :
+                                                        activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
                     {showFilterBar && (
