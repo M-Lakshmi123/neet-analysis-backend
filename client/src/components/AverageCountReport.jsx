@@ -314,18 +314,23 @@ const AverageCountReport = ({ filters }) => {
         });
 
         // Auto-fit columns based on data from row 4 onwards
-        worksheet.columns.forEach((column) => {
+        for (let i = 1; i <= 38; i++) {
+            const column = worksheet.getColumn(i);
             let maxLength = 8;
             column.eachCell({ includeEmpty: true }, (cell, rowNumber) => {
                 if (rowNumber >= 4) {
-                    const columnLength = cell.value ? cell.value.toString().length : 0;
+                    let cellVal = cell.value;
+                    if (cellVal && typeof cellVal === 'object' && cellVal.richText) {
+                        cellVal = cellVal.richText.map(rt => rt.text).join('');
+                    }
+                    const columnLength = cellVal ? cellVal.toString().length : 0;
                     if (columnLength > maxLength) {
                         maxLength = columnLength;
                     }
                 }
             });
-            column.width = maxLength + 2;
-        });
+            column.width = Math.min(maxLength + 2, 40);
+        }
 
         const buffer = await workbook.xlsx.writeBuffer();
         saveAs(new Blob([buffer]), `Count_Summary_${getStreamLabel()}_${formatDate(new Date())}.xlsx`);
@@ -379,7 +384,7 @@ const AverageCountReport = ({ filters }) => {
         cellF3.value = { richText: [{ text: `Over All Sr.Inter (Revi) NEET Avg's : \n`, font: { color: { argb: 'FFFF0000' }, name: 'Arial', size: 10, bold: true } }, { text: `Dates :- ${datesStrWrap}`, font: { color: { argb: 'FF000000' }, name: 'Arial', size: 10 } }] };
         cellF3.alignment = { horizontal: 'left', vertical: 'top', wrapText: true }; cellF3.border = borderStyle; worksheet.getRow(3).height = 20; worksheet.getRow(4).height = 30;
 
-        const headerLabels = ['RANK', 'Stud_ID', 'Name', 'CAMPUS NAME', 'Prog. Name', 'BOT 180', 'B_R', 'ZOO 180', 'Z_R', 'BIO', 'PHY 180', 'P_R', 'CHE 180', 'C_R', 'TOT', 'AIR', 'T_App', 'T_Cnt'];
+        const headerLabels = ['S.No', 'Stud_ID', 'Name', 'CAMPUS NAME', 'Prog. Name', 'BOT 180', 'B_R', 'ZOO 180', 'Z_R', 'BIO', 'PHY 180', 'P_R', 'CHE 180', 'C_R', 'TOT', 'AIR', 'T_App', 'T_Cnt'];
         const row5 = worksheet.addRow(headerLabels); row5.height = 35;
         row5.eachCell((cell, colNumber) => {
             if (colNumber <= 5) cell.style = getHeaderBaseStyle('FFFFFFCC');
@@ -467,7 +472,7 @@ const AverageCountReport = ({ filters }) => {
                                     <th rowSpan="2">SECTION</th>
                                     <th rowSpan="2" onClick={() => requestSort(setStatsSortConfig, 'Strength')} className="sortable">STRENGTH <SortIcon config={statsSortConfig} columnKey="Strength" /></th>
                                     <th colSpan="2">TOP MARK / RANK</th>
-                                    <th colSpan="12" className="bg-yellow">TOT & TOTAL</th>
+                                    <th colSpan="12" className="bg-yellow">TOTAL</th>
                                     <th colSpan="6" className="bg-orange">BOTANY</th>
                                     <th colSpan="6" className="bg-blue">ZOOLOGY</th>
                                     <th colSpan="4" className="bg-green">PHYSICS</th>
