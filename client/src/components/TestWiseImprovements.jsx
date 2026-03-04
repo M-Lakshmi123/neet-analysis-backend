@@ -42,7 +42,7 @@ const TestWiseImprovements = ({ filters }) => {
     }, [filters]);
 
     const handleDownloadStudents = async () => {
-        if (selectedTestIdx === null || !stats[selectedTestIdx]) return;
+        if (selectedTestIdx === null || (selectedTestIdx !== 'overall' && !stats[selectedTestIdx])) return;
         setDownloading(true);
         const isOverall = selectedTestIdx === 'overall';
         const testName = isOverall ? 'OVERALL' : stats[selectedTestIdx].Test;
@@ -153,7 +153,9 @@ const TestWiseImprovements = ({ filters }) => {
     };
 
     const formatDiff = (current, prev) => {
-        const diff = Math.round((current - prev) * 10) / 10;
+        const c = Number(current) || 0;
+        const p = Number(prev) || 0;
+        const diff = Math.round((c - p) * 10) / 10;
         if (diff > 0) return <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '0.9em' }}> (+{diff})</span>;
         if (diff < 0) return <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.9em' }}> ({diff})</span>;
         return <span style={{ color: '#6b7280', fontSize: '0.9em' }}> (0)</span>;
@@ -441,7 +443,7 @@ const TestWiseImprovements = ({ filters }) => {
                                     {stats.map((test, idx) => (
                                         <td key={idx}>
                                             <span style={{ fontWeight: cat.isSpecial ? '700' : '600', color: cat.isSpecial ? '#4f46e5' : '#334155' }}>
-                                                {cat.isSpecial ? Math.round(test[cat.key]) : test[cat.key]}
+                                                {cat.isSpecial ? Math.round(test[cat.key] || 0) : (test[cat.key] || 0)}
                                             </span>
                                             {idx > 0 && formatDiff(test[cat.key], stats[idx - 1][cat.key])}
                                         </td>
