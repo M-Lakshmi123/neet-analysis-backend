@@ -7,6 +7,7 @@ import './index.css';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import AnalysisReport from './components/AnalysisReport';
+import TestWiseImprovements from './components/TestWiseImprovements';
 import AverageReport from './components/AverageReport';
 import AverageMarksReport from './components/AverageMarksReport';
 import AverageCountReport from './components/AverageCountReport';
@@ -200,6 +201,7 @@ const Dashboard = () => {
         if (userData?.email) {
             const pageNames = {
                 'analysis': 'Analysis Report',
+                'test_improvements': 'Test Wise Improvements',
                 'averages': 'Average Marks Report',
                 'average_count': 'Average Count Report',
                 'progress': 'Progress Report',
@@ -221,6 +223,12 @@ const Dashboard = () => {
                 return (
                     <div className="report-sections">
                         <AnalysisReport filters={globalFilters} />
+                    </div>
+                );
+            case 'test_improvements':
+                return (
+                    <div className="report-sections">
+                        <TestWiseImprovements filters={globalFilters} />
                     </div>
                 );
             case 'averages':
@@ -272,7 +280,7 @@ const Dashboard = () => {
         }
     };
 
-    const showFilterBar = ['analysis', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
+    const showFilterBar = ['analysis', 'test_improvements', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
 
     return (
         <div className="dashboard-root">
@@ -280,15 +288,16 @@ const Dashboard = () => {
             <main className="dashboard-main-content">
                 <Header title={
                     activePage === 'analysis' ? 'Analysis Report' :
-                        activePage === 'averages' ? 'Average Marks Report' :
-                            activePage === 'average_count' ? 'Average Count Report' :
-                                activePage === 'progress' ? 'Progress Report' :
-                                    activePage === 'errors' ? 'Error Report' :
-                                        activePage === 'error_top' ? 'Error Top 100%' :
-                                            activePage === 'error_count' ? 'Error Count Report' :
-                                                activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
-                                                    activePage === 'student_performance' ? 'Student Performance' :
-                                                        activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
+                        activePage === 'test_improvements' ? 'Test Wise Improvements' :
+                            activePage === 'averages' ? 'Average Marks Report' :
+                                activePage === 'average_count' ? 'Average Count Report' :
+                                    activePage === 'progress' ? 'Progress Report' :
+                                        activePage === 'errors' ? 'Error Report' :
+                                            activePage === 'error_top' ? 'Error Top 100%' :
+                                                activePage === 'error_count' ? 'Error Count Report' :
+                                                    activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
+                                                        activePage === 'student_performance' ? 'Student Performance' :
+                                                            activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
                     {showFilterBar && (

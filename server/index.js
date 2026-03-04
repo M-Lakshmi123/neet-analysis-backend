@@ -593,6 +593,69 @@ app.get('/api/targets', async (req, res) => {
     }
 });
 
+// --- TEST WISE IMPROVEMENTS ENDPOINTS ---
+app.get('/api/test-improvements/stats', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const where = buildWhereClause(req);
+
+        const isValid = "Test IS NOT NULL AND Test != ''";
+        const finalWhere = where ? `${where} AND ${isValid}` : `WHERE ${isValid}`;
+
+        const query = `
+            SELECT 
+                Test, 
+                MAX(DATE) as DATE,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 500 THEN 1 ELSE 0 END) as cat1,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 450 AND CAST(Tot_720 AS FLOAT) < 500 THEN 1 ELSE 0 END) as cat2,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 400 AND CAST(Tot_720 AS FLOAT) < 450 THEN 1 ELSE 0 END) as cat3,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 350 AND CAST(Tot_720 AS FLOAT) < 400 THEN 1 ELSE 0 END) as cat4,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) < 350 THEN 1 ELSE 0 END) as cat5,
+                AVG(CAST(Botany AS FLOAT)) as avg_bot,
+                AVG(CAST(Zoology AS FLOAT)) as avg_zoo,
+                AVG(CAST(Physics AS FLOAT)) as avg_phy,
+                AVG(CAST(Chemistry AS FLOAT)) as avg_che
+            FROM MEDICAL_RESULT
+            ${finalWhere}
+            GROUP BY Test
+            ORDER BY STR_TO_DATE(REPLACE(MAX(DATE), '/', '-'), '%d-%m-%Y') ASC
+        `;
+
+        const result = await pool.request().query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("[Test Improvements Stats] ERROR:", err);
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/test-improvements/students', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const where = buildWhereClause(req);
+        const query = `
+            SELECT 
+                STUD_ID,
+                NAME_OF_THE_STUDENT as name,
+                CAMPUS_NAME as campus,
+                Stream as stream,
+                CAST(Tot_720 AS FLOAT) as tot,
+                CAST(Botany AS FLOAT) as bot,
+                CAST(Zoology AS FLOAT) as zoo,
+                CAST(Physics AS FLOAT) as phy,
+                CAST(Chemistry AS FLOAT) as che
+            FROM MEDICAL_RESULT
+            ${where}
+            ORDER BY CAST(Tot_720 AS FLOAT) DESC
+        `;
+        const result = await pool.request().query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("[Test Improvements Students] ERROR:", err);
+        res.status(500).send(err.message);
+    }
+});
+
 // --- ERP REPORT API ENDPOINTS ---
 
 // Get ERP Filter Options
