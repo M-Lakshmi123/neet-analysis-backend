@@ -342,6 +342,12 @@ const TestWiseImprovements = ({ filters }) => {
             avg_tot: categoryAverages.avg_tot,
             student_count: categoryAverages.student_count
         };
+    } else if (isOverall && averages) {
+        // Use smarter overall averages from backend when no category filter is active too
+        selectedTest = {
+            ...selectedTest,
+            student_count: averages.student_count
+        };
     }
 
     const maxMarks = 180;
@@ -417,39 +423,54 @@ const TestWiseImprovements = ({ filters }) => {
                 .modern-table thead th {
                     position: sticky;
                     top: 0;
-                    z-index: 10;
-                    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+                    z-index: 30;
+                    background: #ffffff !important;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                    border-bottom: 2px solid #e2e8f0;
                 }
                 .modern-table {
                     width: 100%;
-                    border-collapse: collapse;
-                    background: rgba(255, 255, 255, 0.5);
+                    border-collapse: separate;
+                    border-spacing: 0;
+                    background: #ffffff;
                     table-layout: auto;
                 }
+                .modern-table td {
+                    background: #ffffff;
+                }
                 .modern-table th, .modern-table td {
-                    padding: 0.8rem 1.75rem;
+                    padding: 1rem 1.75rem;
                     text-align: center;
                     border-bottom: 1px solid rgba(226, 232, 240, 0.8);
                     white-space: nowrap;
                 }
                 .modern-table th {
                     min-width: 140px;
-                    background: rgba(248, 250, 252, 0.8);
                     color: #475569;
-                    font-weight: 600;
+                    font-weight: 700;
                     text-transform: uppercase;
-                    font-size: 0.85rem;
+                    font-size: 0.8rem;
                     letter-spacing: 0.05em;
                 }
-                .modern-table tr:hover {
-                    background: rgba(241, 245, 249, 0.5);
-                }
                 .category-label {
+                    position: sticky;
+                    left: 0;
+                    z-index: 20;
+                    background: #ffffff !important;
                     text-align: left !important;
-                    font-weight: 600;
-                    color: #334155;
+                    font-weight: 700;
+                    color: #1e293b;
                     white-space: nowrap;
                     min-width: 180px;
+                    border-right: 1px solid #e2e8f0;
+                    box-shadow: 2px 0 5px rgba(0,0,0,0.02);
+                }
+                .modern-table thead th:first-child {
+                    z-index: 40;
+                    left: 0;
+                }
+                .modern-table tr:hover td {
+                    background: #f8fafc !important;
                 }
                 
                 .test-selector {

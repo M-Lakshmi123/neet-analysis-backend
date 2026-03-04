@@ -663,20 +663,52 @@ app.get('/api/test-improvements/stats', async (req, res) => {
 app.get('/api/test-improvements/averages', async (req, res) => {
     try {
         const pool = await connectToDb();
-        const where = buildWhereClause(req);
+        const baseWhere = buildWhereClause(req, { ignoreCategory: true });
+        const cat = req.query.category;
+
+        let categoryClause = '';
+        if (cat) {
+            if (cat === 'cat1') categoryClause = "avg_tot >= 710";
+            else if (cat === 'cat2') categoryClause = "avg_tot >= 700";
+            else if (cat === 'cat3') categoryClause = "avg_tot >= 685";
+            else if (cat === 'cat4') categoryClause = "avg_tot >= 655";
+            else if (cat === 'cat5') categoryClause = "avg_tot >= 640";
+            else if (cat === 'cat6') categoryClause = "avg_tot >= 595";
+            else if (cat === 'cat7') categoryClause = "avg_tot >= 570";
+            else if (cat === 'cat8') categoryClause = "avg_tot >= 550";
+            else if (cat === 'cat9') categoryClause = "avg_tot >= 530";
+            else if (cat === 'cat10') categoryClause = "avg_tot >= 490";
+            else if (cat === 'cat11') categoryClause = "avg_tot >= 450";
+            else if (cat === 'cat12') categoryClause = "avg_tot >= 490 AND avg_tot < 530";
+            else if (cat === 'cat13') categoryClause = "avg_tot >= 450 AND avg_tot < 490";
+            else if (cat === 'cat14') categoryClause = "avg_tot >= 400 AND avg_tot < 450";
+            else if (cat === 'cat15') categoryClause = "avg_tot >= 350 AND avg_tot < 400";
+        }
+
         const query = `
             SELECT 
-                AVG(CAST(Botany AS FLOAT)) as avg_bot,
-                AVG(CAST(Zoology AS FLOAT)) as avg_zoo,
-                AVG(CAST(Physics AS FLOAT)) as avg_phy,
-                AVG(CAST(Chemistry AS FLOAT)) as avg_che,
-                AVG(CAST(Tot_720 AS FLOAT)) as avg_tot,
-                COUNT(STUD_ID) as student_count
-            FROM MEDICAL_RESULT
-            ${where}
+                AVG(avg_bot) as avg_bot,
+                AVG(avg_zoo) as avg_zoo,
+                AVG(avg_phy) as avg_phy,
+                AVG(avg_che) as avg_che,
+                AVG(avg_tot) as avg_tot,
+                COUNT(*) as student_count
+            FROM (
+                SELECT 
+                    STUD_ID,
+                    AVG(CAST(Botany AS FLOAT)) as avg_bot,
+                    AVG(CAST(Zoology AS FLOAT)) as avg_zoo,
+                    AVG(CAST(Physics AS FLOAT)) as avg_phy,
+                    AVG(CAST(Chemistry AS FLOAT)) as avg_che,
+                    AVG(CAST(Tot_720 AS FLOAT)) as avg_tot
+                FROM MEDICAL_RESULT
+                ${baseWhere}
+                GROUP BY STUD_ID
+            ) t
+            ${categoryClause ? `WHERE ${categoryClause}` : ''}
         `;
         const result = await pool.request().query(query);
-        res.json(result.recordset[0] || { avg_bot: 0, avg_zoo: 0, avg_phy: 0, avg_che: 0, avg_tot: 0 });
+        res.json(result.recordset[0] || { avg_bot: 0, avg_zoo: 0, avg_phy: 0, avg_che: 0, avg_tot: 0, student_count: 0 });
     } catch (err) {
         console.error("[Test Improvements Averages] ERROR:", err);
         res.status(500).send(err.message);
