@@ -333,7 +333,9 @@ const AverageCountReport = ({ filters }) => {
         }
 
         const buffer = await workbook.xlsx.writeBuffer();
-        saveAs(new Blob([buffer]), `Count_Summary_${getStreamLabel()}_${formatDate(new Date())}.xlsx`);
+        const rawFileName = `Count_Summary_${getStreamLabel()}_${formatDate(new Date())}`;
+        const cleanFileName = rawFileName.replace(/[^a-z0-9\-_]/gi, '_');
+        saveAs(new Blob([buffer]), `${cleanFileName}.xlsx`);
     };
 
     const downloadListExcel = async () => {
