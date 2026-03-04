@@ -155,10 +155,10 @@ const AverageCountReport = ({ filters }) => {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Count Summary');
         const borderStyle = {
-            top: { style: 'thin', color: { argb: 'FF000000' } },
-            left: { style: 'thin', color: { argb: 'FF000000' } },
-            bottom: { style: 'thin', color: { argb: 'FF000000' } },
-            right: { style: 'thin', color: { argb: 'FF000000' } }
+            top: { style: 'thin', color: { argb: 'FF40E0D0' } },
+            left: { style: 'thin', color: { argb: 'FF40E0D0' } },
+            bottom: { style: 'thin', color: { argb: 'FF40E0D0' } },
+            right: { style: 'thin', color: { argb: 'FF40E0D0' } }
         };
         worksheet.columns = Array(38).fill({ width: 10 });
         worksheet.columns[0] = { width: 35 };
@@ -287,7 +287,44 @@ const AverageCountReport = ({ filters }) => {
         // Data Rows
         sortedExamStats.forEach(row => {
             const r = worksheet.addRow([row.Campus, row.Section, row.Strength, Number(row.Mark).toFixed(2), (row.Rank === Infinity ? '-' : Number(row.Rank).toFixed(2)), row.T_350, row.T_650, row.T_600, row.T_580, row.T_530, row.T_490, row.T_450, row.T_400, row.T_360, row.T_320, row.T_280, row.T_L200, row.B_175, row.B_170, row.B_160, row.B_170_180, row.B_150, row.B_130, row.Z_175, row.Z_170, row.Z_160, row.Z_170_180, row.Z_150, row.Z_130, row.P_70, row.P_50_70, row.P_L50, row.P_L30, row.C_100, row.C_70_100, row.C_50_70, row.C_L50, row.C_L20]);
-            r.eachCell(cell => { cell.border = borderStyle; cell.alignment = { horizontal: 'center' }; cell.font = { size: 9 }; });
+            r.eachCell((cell, colNumber) => {
+                cell.border = borderStyle;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                if (colNumber >= 1 && colNumber <= 3) {
+                    cell.font = { name: 'Candara', size: 13, bold: false };
+                } else {
+                    cell.font = { name: 'Comic Sans MS', size: 12, bold: false };
+                }
+
+                if (colNumber >= 6 && colNumber <= 17) { // TOT / TOTAL area
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFF0' } }; // #FFFFF0
+                } else if (colNumber >= 18 && colNumber <= 23) { // Botany
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // white
+                } else if (colNumber >= 24 && colNumber <= 29) { // Zoology
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; // #F5F5F5
+                } else if (colNumber >= 30 && colNumber <= 33) { // Physics
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // white
+                } else if (colNumber >= 34 && colNumber <= 38) { // Chemistry
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; // #F5F5F5
+                } else {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // White for A-E and default
+                }
+            });
+        });
+
+        // Auto-fit columns based on data from row 4 onwards
+        worksheet.columns.forEach((column) => {
+            let maxLength = 8;
+            column.eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+                if (rowNumber >= 4) {
+                    const columnLength = cell.value ? cell.value.toString().length : 0;
+                    if (columnLength > maxLength) {
+                        maxLength = columnLength;
+                    }
+                }
+            });
+            column.width = maxLength + 2;
         });
 
         const buffer = await workbook.xlsx.writeBuffer();
@@ -342,7 +379,7 @@ const AverageCountReport = ({ filters }) => {
         cellF3.value = { richText: [{ text: `Over All Sr.Inter (Revi) NEET Avg's : \n`, font: { color: { argb: 'FFFF0000' }, name: 'Arial', size: 10, bold: true } }, { text: `Dates :- ${datesStrWrap}`, font: { color: { argb: 'FF000000' }, name: 'Arial', size: 10 } }] };
         cellF3.alignment = { horizontal: 'left', vertical: 'top', wrapText: true }; cellF3.border = borderStyle; worksheet.getRow(3).height = 20; worksheet.getRow(4).height = 30;
 
-        const headerLabels = ['RANK', 'Stud_ID', 'Name', 'CAMPUS NAME', 'Prog. Name', 'BOT 180', 'B_R', 'ZOO 180', 'Z_R', 'BIO', 'PHY 180', 'P_R', 'CHE 180', 'C_R', '≤350', 'AIR', 'T_App', 'T_Cnt'];
+        const headerLabels = ['RANK', 'Stud_ID', 'Name', 'CAMPUS NAME', 'Prog. Name', 'BOT 180', 'B_R', 'ZOO 180', 'Z_R', 'BIO', 'PHY 180', 'P_R', 'CHE 180', 'C_R', 'TOT', 'AIR', 'T_App', 'T_Cnt'];
         const row5 = worksheet.addRow(headerLabels); row5.height = 35;
         row5.eachCell((cell, colNumber) => {
             if (colNumber <= 5) cell.style = getHeaderBaseStyle('FFFFFFCC');
@@ -430,8 +467,7 @@ const AverageCountReport = ({ filters }) => {
                                     <th rowSpan="2">SECTION</th>
                                     <th rowSpan="2" onClick={() => requestSort(setStatsSortConfig, 'Strength')} className="sortable">STRENGTH <SortIcon config={statsSortConfig} columnKey="Strength" /></th>
                                     <th colSpan="2">TOP MARK / RANK</th>
-                                    <th rowSpan="2" className="bg-yellow">≤350</th>
-                                    <th colSpan="11" className="bg-yellow">TOTAL</th>
+                                    <th colSpan="12" className="bg-yellow">TOT & TOTAL</th>
                                     <th colSpan="6" className="bg-orange">BOTANY</th>
                                     <th colSpan="6" className="bg-blue">ZOOLOGY</th>
                                     <th colSpan="4" className="bg-green">PHYSICS</th>
@@ -439,7 +475,7 @@ const AverageCountReport = ({ filters }) => {
                                 </tr>
                                 <tr>
                                     <th>MARK</th><th>RANK</th>
-                                    <th className="bg-yellow">{'>='}650</th><th className="bg-yellow">{'>='}600</th><th className="bg-yellow">{'>='}580</th><th className="bg-yellow">{'>='}530</th><th className="bg-yellow">{'>='}490</th><th className="bg-yellow">{'>='}450</th><th className="bg-yellow">{'>='}400</th><th className="bg-yellow">{'>='}360</th><th className="bg-yellow">{'>='}320</th><th className="bg-yellow">{'>='}280</th><th className="bg-yellow">{'<='}200</th>
+                                    <th className="bg-yellow">{'<='}350</th><th className="bg-yellow">{'>='}650</th><th className="bg-yellow">{'>='}600</th><th className="bg-yellow">{'>='}580</th><th className="bg-yellow">{'>='}530</th><th className="bg-yellow">{'>='}490</th><th className="bg-yellow">{'>='}450</th><th className="bg-yellow">{'>='}400</th><th className="bg-yellow">{'>='}360</th><th className="bg-yellow">{'>='}320</th><th className="bg-yellow">{'>='}280</th><th className="bg-yellow">{'<='}200</th>
                                     <th className="bg-orange">{'>='}175</th><th className="bg-orange">{'>='}170</th><th className="bg-orange">{'>='}160</th><th className="bg-orange">180-170</th><th className="bg-orange">{'>='}150</th><th className="bg-orange">{'>='}130</th>
                                     <th className="bg-blue">{'>='}175</th><th className="bg-blue">{'>='}170</th><th className="bg-blue">{'>='}160</th><th className="bg-blue">180-170</th><th className="bg-blue">{'>='}150</th><th className="bg-blue">{'>='}130</th>
                                     <th className="bg-green">{'>='}70</th><th className="bg-green">50-70</th><th className="bg-green">{'<='}50</th><th className="bg-green">{'<='}30</th>
