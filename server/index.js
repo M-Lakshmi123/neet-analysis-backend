@@ -640,7 +640,7 @@ app.get('/api/test-improvements/students', async (req, res) => {
         if (groupByStudent) {
             query = `
                 SELECT 
-                    STUD_ID,
+                    TRIM(STUD_ID) as STUD_ID,
                     MAX(NAME_OF_THE_STUDENT) as name,
                     MAX(CAMPUS_NAME) as campus,
                     MAX(Stream) as stream,
@@ -648,10 +648,11 @@ app.get('/api/test-improvements/students', async (req, res) => {
                     AVG(CAST(Botany AS FLOAT)) as bot,
                     AVG(CAST(Zoology AS FLOAT)) as zoo,
                     AVG(CAST(Physics AS FLOAT)) as phy,
-                    AVG(CAST(Chemistry AS FLOAT)) as che
+                    AVG(CAST(Chemistry AS FLOAT)) as che,
+                    COUNT(*) as exam_count
                 FROM MEDICAL_RESULT
                 ${where}
-                GROUP BY STUD_ID
+                GROUP BY TRIM(STUD_ID)
                 ORDER BY AVG(CAST(Tot_720 AS FLOAT)) DESC
             `;
         } else {

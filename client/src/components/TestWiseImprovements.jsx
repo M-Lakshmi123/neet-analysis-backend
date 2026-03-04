@@ -90,7 +90,8 @@ const TestWiseImprovements = ({ filters }) => {
                 { header: 'Che %', key: 'che_pct', width: 10 },
                 { header: 'Che Improve', key: 'che_imp', width: 15 },
                 { header: 'Grand Total', key: 'tot', width: 15 },
-                { header: 'Total %', key: 'tot_pct', width: 12 }
+                { header: 'Total %', key: 'tot_pct', width: 12 },
+                { header: 'Exams', key: 'exam_count', width: 10 }
             ];
 
             // Helper to style subject sheets
@@ -116,7 +117,8 @@ const TestWiseImprovements = ({ filters }) => {
                     { header: 'Stream', key: 'stream', width: 18 },
                     { header: `${sub.name} Marks`, key: 'marks', width: 15 },
                     { header: `${sub.name} %`, key: 'pct', width: 12 },
-                    { header: `Improvement Needed`, key: 'imp', width: 22 }
+                    { header: `Improvement Needed`, key: 'imp', width: 22 },
+                    { header: `Exams`, key: 'exam_count', width: 10 }
                 ];
                 setupSheetStyle(sheet);
                 subjWorksheets[sub.key] = sheet;
@@ -141,19 +143,34 @@ const TestWiseImprovements = ({ filters }) => {
                     phy: p, phy_pct: `${Math.round((p / 180) * 100)}%`, phy_imp: Math.max(0, 180 - p),
                     che: c, che_pct: `${Math.round((c / 180) * 100)}%`, che_imp: Math.max(0, 180 - c),
                     tot: totalMarks,
-                    tot_pct: `${Math.round((totalMarks / 720) * 100)}%`
+                    tot_pct: `${Math.round((totalMarks / 720) * 100)}%`,
+                    exam_count: s.exam_count || 1
+                };
+
+                // Helper for improvement color
+                const getImpColor = (imp) => {
+                    const val = Number(imp) || 0;
+                    if (val === 0) return null;
+                    if (val <= 40) return 'FF10B981'; // Green (Good)
+                    if (val <= 85) return 'FFF59E0B'; // Amber (Moderate)
+                    return 'FFEF4444'; // Red (Critical)
                 };
 
                 // Add to Master
                 const masterRow = masterSheet.addRow(studentData);
-                // Apply Green Font to Improve Columns in Master (Col 8, 11, 14, 17)
-                [8, 11, 14, 17].forEach(col => {
-                    masterRow.getCell(col).font = { color: { argb: 'FF10B981' }, bold: true };
+                // Apply Dynamic Font Color to Improve Columns in Master (Bot/Zoo/Phy/Che)
+                const impCols = { 8: studentData.bot_imp, 11: studentData.zoo_imp, 14: studentData.phy_imp, 17: studentData.che_imp };
+                Object.keys(impCols).forEach(col => {
+                    const color = getImpColor(impCols[col]);
+                    if (color) {
+                        masterRow.getCell(Number(col)).font = { color: { argb: color }, bold: true };
+                    }
                 });
 
                 // Add to Subject Sheets
                 subjects.forEach(sub => {
                     const marks = Number(s[sub.key]) || 0;
+                    const impValue = Math.max(0, 180 - marks);
                     const row = subjWorksheets[sub.key].addRow({
                         sno: idx + 1,
                         id: s.STUD_ID || '-',
@@ -162,10 +179,14 @@ const TestWiseImprovements = ({ filters }) => {
                         stream: s.stream || '-',
                         marks: marks,
                         pct: `${Math.round((marks / 180) * 100)}%`,
-                        imp: Math.max(0, 180 - marks)
+                        imp: impValue,
+                        exam_count: s.exam_count || 1
                     });
-                    // Style Improvement Column (Col 8)
-                    row.getCell(8).font = { color: { argb: 'FF10B981' }, bold: true };
+                    // Style Improvement Column (Col 8) with dynamic color
+                    const color = getImpColor(impValue);
+                    if (color) {
+                        row.getCell(8).font = { color: { argb: color }, bold: true };
+                    }
                 });
             });
 

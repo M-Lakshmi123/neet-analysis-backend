@@ -9,7 +9,7 @@ export const buildQueryParams = (filters) => {
 
     Object.keys(filters).forEach(key => {
         const value = filters[key];
-        if (value && value.length > 0) {
+        if (value !== undefined && value !== null && (typeof value === 'boolean' || typeof value === 'number' || (typeof value === 'string' && value.length > 0) || (Array.isArray(value) && value.length > 0))) {
             if (Array.isArray(value)) {
                 // If it's our special "Select All" marker, don't append anything
                 // The backend will treat absence of parameter as "All"
