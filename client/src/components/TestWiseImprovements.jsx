@@ -203,9 +203,20 @@ const TestWiseImprovements = ({ filters }) => {
                         masterRow.getCell(Number(col)).font = { color: { argb: color }, bold: true };
                     }
                 });
+            });
 
-                // Add to Subject Sheets
-                subjects.forEach(sub => {
+            // Add Data to Subject Sheets with Sorting (Smallest to Largest Improvement)
+            subjects.forEach(sub => {
+                const round2 = (num) => Math.round((Number(num) || 0) * 100) / 100;
+
+                // Sort students for this specific subject
+                const sortedSubStudents = [...students].sort((a, b) => {
+                    const impA = 180 - (Number(a[sub.key]) || 0);
+                    const impB = 180 - (Number(b[sub.key]) || 0);
+                    return impA - impB;
+                });
+
+                sortedSubStudents.forEach((s, idx) => {
                     const marks = round2(s[sub.key]);
                     const impValue = round2(Math.max(0, 180 - marks));
                     const row = subjWorksheets[sub.key].addRow({
@@ -219,7 +230,7 @@ const TestWiseImprovements = ({ filters }) => {
                         imp: impValue,
                         exam_count: s.exam_count || 1
                     });
-                    // Style Improvement Column (Col 8) with dynamic color
+
                     const color = getImpColor(impValue);
                     if (color) {
                         row.getCell(8).font = { color: { argb: color }, bold: true };
