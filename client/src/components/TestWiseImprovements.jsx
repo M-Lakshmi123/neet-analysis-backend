@@ -326,7 +326,8 @@ const TestWiseImprovements = ({ filters }) => {
             avg_zoo: stats.reduce((acc, s) => acc + (Number(s.avg_zoo) || 0), 0) / stats.length,
             avg_phy: stats.reduce((acc, s) => acc + (Number(s.avg_phy) || 0), 0) / stats.length,
             avg_che: stats.reduce((acc, s) => acc + (Number(s.avg_che) || 0), 0) / stats.length,
-            avg_tot: stats.reduce((acc, s) => acc + (Number(s.avg_tot) || 0), 0) / stats.length
+            avg_tot: stats.reduce((acc, s) => acc + (Number(s.avg_tot) || 0), 0) / stats.length,
+            student_count: stats.reduce((acc, s) => acc + (Number(s.student_count) || 0), 0)
         };
     }
 
@@ -338,7 +339,8 @@ const TestWiseImprovements = ({ filters }) => {
             avg_zoo: categoryAverages.avg_zoo,
             avg_phy: categoryAverages.avg_phy,
             avg_che: categoryAverages.avg_che,
-            avg_tot: categoryAverages.avg_tot
+            avg_tot: categoryAverages.avg_tot,
+            student_count: categoryAverages.student_count
         };
     }
 
@@ -397,8 +399,26 @@ const TestWiseImprovements = ({ filters }) => {
                 
                 .modern-table-container {
                     overflow-x: auto;
+                    overflow-y: auto;
+                    max-height: 400px;
                     border-radius: 12px;
                     border: 1px solid rgba(226, 232, 240, 0.8);
+                    scrollbar-width: thin;
+                    scrollbar-color: #cbd5e1 transparent;
+                }
+                .modern-table-container::-webkit-scrollbar {
+                    width: 6px;
+                    height: 6px;
+                }
+                .modern-table-container::-webkit-scrollbar-thumb {
+                    background-color: #cbd5e1;
+                    border-radius: 10px;
+                }
+                .modern-table thead th {
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
                 }
                 .modern-table {
                     width: 100%;
@@ -603,7 +623,7 @@ const TestWiseImprovements = ({ filters }) => {
                                             <span style={{ fontWeight: cat.isSpecial ? '700' : '600', color: cat.isSpecial ? '#4f46e5' : '#334155' }}>
                                                 {cat.isSpecial ? Math.round(test[cat.key] || 0) : (test[cat.key] || 0)}
                                             </span>
-                                            {idx > 0 && formatDiff(test[cat.key], stats[idx - 1][cat.key])}
+                                            {idx > 0 && formatDiff(test[cat.key], stats[0][cat.key])}
                                         </td>
                                     ))}
                                 </tr>
@@ -666,9 +686,18 @@ const TestWiseImprovements = ({ filters }) => {
                 {selectedTest && (
                     <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overall average</span>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                {isOverall ? 'Overall Average' : `${selectedTest.Test} Average`}
+                            </span>
                             <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#1e293b' }}>
                                 {totAvg} <span style={{ fontSize: '0.85rem', color: '#6366f1', opacity: 0.8 }}>/ 720</span>
+                            </div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Student Count</span>
+                            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#6366f1' }}>
+                                {selectedTest.student_count || 0}
+                                <span style={{ fontSize: '0.85rem', marginLeft: '4px', opacity: 0.7 }}>Students</span>
                             </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>

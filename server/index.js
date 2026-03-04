@@ -644,7 +644,8 @@ app.get('/api/test-improvements/stats', async (req, res) => {
                 AVG(CAST(Zoology AS FLOAT)) as avg_zoo,
                 AVG(CAST(Physics AS FLOAT)) as avg_phy,
                 AVG(CAST(Chemistry AS FLOAT)) as avg_che,
-                AVG(CAST(Tot_720 AS FLOAT)) as avg_tot
+                AVG(CAST(Tot_720 AS FLOAT)) as avg_tot,
+                COUNT(STUD_ID) as student_count
             FROM MEDICAL_RESULT
             ${finalWhere}
             GROUP BY Test
@@ -669,7 +670,8 @@ app.get('/api/test-improvements/averages', async (req, res) => {
                 AVG(CAST(Zoology AS FLOAT)) as avg_zoo,
                 AVG(CAST(Physics AS FLOAT)) as avg_phy,
                 AVG(CAST(Chemistry AS FLOAT)) as avg_che,
-                AVG(CAST(Tot_720 AS FLOAT)) as avg_tot
+                AVG(CAST(Tot_720 AS FLOAT)) as avg_tot,
+                COUNT(STUD_ID) as student_count
             FROM MEDICAL_RESULT
             ${where}
         `;
