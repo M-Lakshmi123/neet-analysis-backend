@@ -634,21 +634,43 @@ app.get('/api/test-improvements/students', async (req, res) => {
     try {
         const pool = await connectToDb();
         const where = buildWhereClause(req);
-        const query = `
-            SELECT 
-                STUD_ID,
-                NAME_OF_THE_STUDENT as name,
-                CAMPUS_NAME as campus,
-                Stream as stream,
-                CAST(Tot_720 AS FLOAT) as tot,
-                CAST(Botany AS FLOAT) as bot,
-                CAST(Zoology AS FLOAT) as zoo,
-                CAST(Physics AS FLOAT) as phy,
-                CAST(Chemistry AS FLOAT) as che
-            FROM MEDICAL_RESULT
-            ${where}
-            ORDER BY CAST(Tot_720 AS FLOAT) DESC
-        `;
+        const groupByStudent = req.query.groupByStudent === 'true';
+
+        let query;
+        if (groupByStudent) {
+            query = `
+                SELECT 
+                    STUD_ID,
+                    MAX(NAME_OF_THE_STUDENT) as name,
+                    MAX(CAMPUS_NAME) as campus,
+                    MAX(Stream) as stream,
+                    AVG(CAST(Tot_720 AS FLOAT)) as tot,
+                    AVG(CAST(Botany AS FLOAT)) as bot,
+                    AVG(CAST(Zoology AS FLOAT)) as zoo,
+                    AVG(CAST(Physics AS FLOAT)) as phy,
+                    AVG(CAST(Chemistry AS FLOAT)) as che
+                FROM MEDICAL_RESULT
+                ${where}
+                GROUP BY STUD_ID
+                ORDER BY AVG(CAST(Tot_720 AS FLOAT)) DESC
+            `;
+        } else {
+            query = `
+                SELECT 
+                    STUD_ID,
+                    NAME_OF_THE_STUDENT as name,
+                    CAMPUS_NAME as campus,
+                    Stream as stream,
+                    CAST(Tot_720 AS FLOAT) as tot,
+                    CAST(Botany AS FLOAT) as bot,
+                    CAST(Zoology AS FLOAT) as zoo,
+                    CAST(Physics AS FLOAT) as phy,
+                    CAST(Chemistry AS FLOAT) as che
+                FROM MEDICAL_RESULT
+                ${where}
+                ORDER BY CAST(Tot_720 AS FLOAT) DESC
+            `;
+        }
         const result = await pool.request().query(query);
         res.json(result.recordset);
     } catch (err) {

@@ -48,7 +48,7 @@ const TestWiseImprovements = ({ filters }) => {
         const testName = isOverall ? 'OVERALL' : stats[selectedTestIdx].Test;
 
         try {
-            const queryFilters = isOverall ? { ...filters } : { ...filters, test: [testName] };
+            const queryFilters = isOverall ? { ...filters, groupByStudent: true } : { ...filters, test: [testName] };
             const queryParams = buildQueryParams(queryFilters).toString();
             const res = await fetch(`${API_URL}/api/test-improvements/students?${queryParams}`);
             const students = await res.json();
@@ -60,89 +60,139 @@ const TestWiseImprovements = ({ filters }) => {
             }
 
             const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet('Improvement List');
 
-            // Define Columns
-            worksheet.columns = [
+            // Define sheets configuration
+            const subjects = [
+                { name: 'Botany', key: 'bot', colIdx: 8, impIdx: 9, max: 180 },
+                { name: 'Zoology', key: 'zoo', colIdx: 11, impIdx: 12, max: 180 },
+                { name: 'Physics', key: 'phy', colIdx: 14, impIdx: 15, max: 180 },
+                { name: 'Chemistry', key: 'che', colIdx: 17, impIdx: 18, max: 180 }
+            ];
+
+            // 1. MASTER SHEET
+            const masterSheet = workbook.addWorksheet('Master Report');
+            masterSheet.columns = [
                 { header: 'S.No', key: 'sno', width: 8 },
                 { header: 'Student ID', key: 'id', width: 15 },
                 { header: 'Student Name', key: 'name', width: 30 },
-                { header: 'Campus Name', key: 'campus', width: 20 },
-                { header: 'Stream', key: 'stream', width: 20 },
-                { header: 'Botany Marks', key: 'bot', width: 15 },
-                { header: 'Botany %', key: 'bot_pct', width: 12 },
-                { header: 'Botany Improve', key: 'bot_imp', width: 17 },
-                { header: 'Zoology Marks', key: 'zoo', width: 15 },
-                { header: 'Zoology %', key: 'zoo_pct', width: 12 },
-                { header: 'Zoology Improve', key: 'zoo_imp', width: 18 },
-                { header: 'Physics Marks', key: 'phy', width: 15 },
-                { header: 'Physics %', key: 'phy_pct', width: 12 },
-                { header: 'Physics Improve', key: 'phy_imp', width: 18 },
-                { header: 'Chemistry Marks', key: 'che', width: 18 },
-                { header: 'Chemistry %', key: 'che_pct', width: 12 },
-                { header: 'Chemistry Improve', key: 'che_imp', width: 20 },
-                { header: 'Total Marks', key: 'tot', width: 15 },
+                { header: 'Campus Name', key: 'campus', width: 22 },
+                { header: 'Stream', key: 'stream', width: 18 },
+                { header: 'Botany', key: 'bot', width: 12 },
+                { header: 'Bot %', key: 'bot_pct', width: 10 },
+                { header: 'Bot Improve', key: 'bot_imp', width: 15 },
+                { header: 'Zoology', key: 'zoo', width: 12 },
+                { header: 'Zoo %', key: 'zoo_pct', width: 10 },
+                { header: 'Zoo Improve', key: 'zoo_imp', width: 15 },
+                { header: 'Physics', key: 'phy', width: 12 },
+                { header: 'Phy %', key: 'phy_pct', width: 10 },
+                { header: 'Phy Improve', key: 'phy_imp', width: 15 },
+                { header: 'Chemistry', key: 'che', width: 12 },
+                { header: 'Che %', key: 'che_pct', width: 10 },
+                { header: 'Che Improve', key: 'che_imp', width: 15 },
+                { header: 'Grand Total', key: 'tot', width: 15 },
                 { header: 'Total %', key: 'tot_pct', width: 12 }
             ];
 
-            // Add Header Row Styling
-            worksheet.getRow(1).eachCell((cell) => {
-                cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
-                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            // Helper to style subject sheets
+            const setupSheetStyle = (sheet) => {
+                sheet.getRow(1).eachCell((cell) => {
+                    cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                });
+            };
+
+            setupSheetStyle(masterSheet);
+
+            // Create Subject Sheets
+            const subjWorksheets = {};
+            subjects.forEach(sub => {
+                const sheet = workbook.addWorksheet(sub.name);
+                sheet.columns = [
+                    { header: 'S.No', key: 'sno', width: 8 },
+                    { header: 'Student ID', key: 'id', width: 15 },
+                    { header: 'Student Name', key: 'name', width: 30 },
+                    { header: 'Campus', key: 'campus', width: 22 },
+                    { header: 'Stream', key: 'stream', width: 18 },
+                    { header: `${sub.name} Marks`, key: 'marks', width: 15 },
+                    { header: `${sub.name} %`, key: 'pct', width: 12 },
+                    { header: `Improvement Needed`, key: 'imp', width: 22 }
+                ];
+                setupSheetStyle(sheet);
+                subjWorksheets[sub.key] = sheet;
             });
 
-            // Add Data
+            // Add Data to all sheets
             students.forEach((s, idx) => {
-                const bot = Number(s.bot) || 0;
-                const zoo = Number(s.zoo) || 0;
-                const phy = Number(s.phy) || 0;
-                const che = Number(s.che) || 0;
+                const b = Number(s.bot) || 0;
+                const z = Number(s.zoo) || 0;
+                const p = Number(s.phy) || 0;
+                const c = Number(s.che) || 0;
+                const totalMarks = Number(s.tot) || (b + z + p + c);
 
-                worksheet.addRow({
+                const studentData = {
                     sno: idx + 1,
                     id: s.STUD_ID || '-',
                     name: s.name || 'N/A',
                     campus: s.campus || 'N/A',
                     stream: s.stream || '-',
-                    bot: bot,
-                    bot_pct: `${Math.round((bot / 180) * 100)}%`,
-                    bot_imp: Math.max(0, 180 - bot),
-                    zoo: zoo,
-                    zoo_pct: `${Math.round((zoo / 180) * 100)}%`,
-                    zoo_imp: Math.max(0, 180 - zoo),
-                    phy: phy,
-                    phy_pct: `${Math.round((phy / 180) * 100)}%`,
-                    phy_imp: Math.max(0, 180 - phy),
-                    che: che,
-                    che_pct: `${Math.round((che / 180) * 100)}%`,
-                    che_imp: Math.max(0, 180 - che),
-                    tot: Number(s.tot) || 0,
-                    tot_pct: `${Math.round((Number(s.tot) / 720) * 100)}%`
+                    bot: b, bot_pct: `${Math.round((b / 180) * 100)}%`, bot_imp: Math.max(0, 180 - b),
+                    zoo: z, zoo_pct: `${Math.round((z / 180) * 100)}%`, zoo_imp: Math.max(0, 180 - z),
+                    phy: p, phy_pct: `${Math.round((p / 180) * 100)}%`, phy_imp: Math.max(0, 180 - p),
+                    che: c, che_pct: `${Math.round((c / 180) * 100)}%`, che_imp: Math.max(0, 180 - c),
+                    tot: totalMarks,
+                    tot_pct: `${Math.round((totalMarks / 720) * 100)}%`
+                };
+
+                // Add to Master
+                const masterRow = masterSheet.addRow(studentData);
+                // Apply Green Font to Improve Columns in Master (Col 8, 11, 14, 17)
+                [8, 11, 14, 17].forEach(col => {
+                    masterRow.getCell(col).font = { color: { argb: 'FF10B981' }, bold: true };
+                });
+
+                // Add to Subject Sheets
+                subjects.forEach(sub => {
+                    const marks = Number(s[sub.key]) || 0;
+                    const row = subjWorksheets[sub.key].addRow({
+                        sno: idx + 1,
+                        id: s.STUD_ID || '-',
+                        name: s.name || 'N/A',
+                        campus: s.campus || 'N/A',
+                        stream: s.stream || '-',
+                        marks: marks,
+                        pct: `${Math.round((marks / 180) * 100)}%`,
+                        imp: Math.max(0, 180 - marks)
+                    });
+                    // Style Improvement Column (Col 8)
+                    row.getCell(8).font = { color: { argb: 'FF10B981' }, bold: true };
                 });
             });
 
-            // Auto-format numeric columns to center
-            worksheet.eachRow((row, rowNumber) => {
-                if (rowNumber > 1) {
-                    [1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].forEach(colIndex => {
-                        const cell = row.getCell(colIndex);
-                        if (cell) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            // Universal Alignment Formatting
+            workbook.eachSheet(sheet => {
+                sheet.eachRow((row, rowNumber) => {
+                    row.eachCell(cell => {
+                        cell.alignment = { vertical: 'middle', horizontal: 'center' };
                     });
-                }
+                });
             });
 
-            // Add total count footer to worksheet
-            const totalCount = students.length;
-            const footerRowIdx = totalCount + 3;
-            const footerRow = worksheet.getRow(footerRowIdx);
-            footerRow.getCell(2).value = isOverall ? `Overall Total Student Count: ${totalCount}` : `Total Students for ${testName}: ${totalCount}`;
-            footerRow.getCell(2).font = { bold: true };
-            footerRow.commit();
+            // Add Footer info to the LAST sheet (Chemistry)
+            const lastSheet = workbook.getWorksheet('Chemistry');
+            const footerRowIdx = students.length + 3;
+
+            const footer1 = lastSheet.getRow(footerRowIdx);
+            footer1.getCell(2).value = isOverall ? `Overall Analysis From: ${stats.length} Tests` : `Single Test: ${testName}`;
+            footer1.getCell(2).font = { bold: true, size: 12, color: { argb: 'FF4F46E5' } };
+
+            const footer2 = lastSheet.getRow(footerRowIdx + 1);
+            footer2.getCell(2).value = `Total Students Record Count: ${students.length}`;
+            footer2.getCell(2).font = { bold: true, size: 12 };
 
             const buffer = await workbook.xlsx.writeBuffer();
-            saveAs(new Blob([buffer]), isOverall ? `Overall_Improvement_List.xlsx` : `Improvement_List_${testName}.xlsx`);
-            logActivity(userData, 'Exported Student Improvements List', { test: isOverall ? 'Overall' : testName });
+            saveAs(new Blob([buffer]), isOverall ? `Overall_Improvement_Report.xlsx` : `Improvement_Report_${testName}.xlsx`);
+            logActivity(userData, 'Exported Multi-Sheet Improvement Report', { test: isOverall ? 'Overall' : testName });
 
         } catch (err) {
             console.error("Error downloading student list:", err);
