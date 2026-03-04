@@ -126,11 +126,12 @@ const TestWiseImprovements = ({ filters }) => {
 
             // Add Data to all sheets
             students.forEach((s, idx) => {
-                const b = Number(s.bot) || 0;
-                const z = Number(s.zoo) || 0;
-                const p = Number(s.phy) || 0;
-                const c = Number(s.che) || 0;
-                const totalMarks = Number(s.tot) || (b + z + p + c);
+                const round2 = (num) => Math.round((Number(num) || 0) * 100) / 100;
+                const b = round2(s.bot);
+                const z = round2(s.zoo);
+                const p = round2(s.phy);
+                const c = round2(s.che);
+                const totalMarks = round2(s.tot || (b + z + p + c));
 
                 const studentData = {
                     sno: idx + 1,
@@ -138,12 +139,12 @@ const TestWiseImprovements = ({ filters }) => {
                     name: s.name || 'N/A',
                     campus: s.campus || 'N/A',
                     stream: s.stream || '-',
-                    bot: b, bot_pct: `${Math.round((b / 180) * 100)}%`, bot_imp: Math.max(0, 180 - b),
-                    zoo: z, zoo_pct: `${Math.round((z / 180) * 100)}%`, zoo_imp: Math.max(0, 180 - z),
-                    phy: p, phy_pct: `${Math.round((p / 180) * 100)}%`, phy_imp: Math.max(0, 180 - p),
-                    che: c, che_pct: `${Math.round((c / 180) * 100)}%`, che_imp: Math.max(0, 180 - c),
+                    bot: b, bot_pct: `${round2((b / 180) * 100)}%`, bot_imp: round2(Math.max(0, 180 - b)),
+                    zoo: z, zoo_pct: `${round2((z / 180) * 100)}%`, zoo_imp: round2(Math.max(0, 180 - z)),
+                    phy: p, phy_pct: `${round2((p / 180) * 100)}%`, phy_imp: round2(Math.max(0, 180 - p)),
+                    che: c, che_pct: `${round2((c / 180) * 100)}%`, che_imp: round2(Math.max(0, 180 - c)),
                     tot: totalMarks,
-                    tot_pct: `${Math.round((totalMarks / 720) * 100)}%`,
+                    tot_pct: `${round2((totalMarks / 720) * 100)}%`,
                     exam_count: s.exam_count || 1
                 };
 
@@ -169,8 +170,8 @@ const TestWiseImprovements = ({ filters }) => {
 
                 // Add to Subject Sheets
                 subjects.forEach(sub => {
-                    const marks = Number(s[sub.key]) || 0;
-                    const impValue = Math.max(0, 180 - marks);
+                    const marks = round2(s[sub.key]);
+                    const impValue = round2(Math.max(0, 180 - marks));
                     const row = subjWorksheets[sub.key].addRow({
                         sno: idx + 1,
                         id: s.STUD_ID || '-',
@@ -178,7 +179,7 @@ const TestWiseImprovements = ({ filters }) => {
                         campus: s.campus || 'N/A',
                         stream: s.stream || '-',
                         marks: marks,
-                        pct: `${Math.round((marks / 180) * 100)}%`,
+                        pct: `${round2((marks / 180) * 100)}%`,
                         imp: impValue,
                         exam_count: s.exam_count || 1
                     });
