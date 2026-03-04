@@ -394,13 +394,16 @@ const TestWiseImprovements = ({ filters }) => {
                     width: 100%;
                     border-collapse: collapse;
                     background: rgba(255, 255, 255, 0.5);
+                    table-layout: auto;
                 }
                 .modern-table th, .modern-table td {
-                    padding: 0.6rem 0.75rem;
+                    padding: 0.8rem 1.75rem;
                     text-align: center;
                     border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+                    white-space: nowrap;
                 }
                 .modern-table th {
+                    min-width: 140px;
                     background: rgba(248, 250, 252, 0.8);
                     color: #475569;
                     font-weight: 600;
@@ -415,6 +418,8 @@ const TestWiseImprovements = ({ filters }) => {
                     text-align: left !important;
                     font-weight: 600;
                     color: #334155;
+                    white-space: nowrap;
+                    min-width: 180px;
                 }
                 
                 .test-selector {
