@@ -116,8 +116,8 @@ const buildWhereClause = (req, options = {}) => {
         if (cat === 'cat1') clauses.push("CAST(Tot_720 AS FLOAT) >= 500");
         else if (cat === 'cat2') clauses.push("CAST(Tot_720 AS FLOAT) >= 450 AND CAST(Tot_720 AS FLOAT) < 500");
         else if (cat === 'cat3') clauses.push("CAST(Tot_720 AS FLOAT) >= 400 AND CAST(Tot_720 AS FLOAT) < 450");
-        else if (cat === 'cat4') clauses.push("CAST(Tot_720 AS FLOAT) >= 351 AND CAST(Tot_720 AS FLOAT) < 400");
-        else if (cat === 'cat5') clauses.push("CAST(Tot_720 AS FLOAT) <= 350");
+        else if (cat === 'cat4') clauses.push("CAST(Tot_720 AS FLOAT) >= 350 AND CAST(Tot_720 AS FLOAT) < 400");
+        else if (cat === 'cat5') clauses.push("CAST(Tot_720 AS FLOAT) < 350");
     }
 
     const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';

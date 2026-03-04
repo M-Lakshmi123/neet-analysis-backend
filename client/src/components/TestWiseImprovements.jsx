@@ -99,10 +99,10 @@ const TestWiseImprovements = ({ filters }) => {
 
             // Define sheets configuration
             const subjects = [
-                { name: 'Botany', key: 'bot', colIdx: 8, impIdx: 9, max: 180 },
-                { name: 'Zoology', key: 'zoo', colIdx: 11, impIdx: 12, max: 180 },
-                { name: 'Physics', key: 'phy', colIdx: 14, impIdx: 15, max: 180 },
-                { name: 'Chemistry', key: 'che', colIdx: 17, impIdx: 18, max: 180 }
+                { name: 'Botany', key: 'bot', max: 180 },
+                { name: 'Zoology', key: 'zoo', max: 180 },
+                { name: 'Physics', key: 'phy', max: 180 },
+                { name: 'Chemistry', key: 'che', max: 180 }
             ];
 
             // 1. MASTER SHEET
@@ -160,6 +160,15 @@ const TestWiseImprovements = ({ filters }) => {
                 subjWorksheets[sub.key] = sheet;
             });
 
+            // Helper for improvement color
+            const getImpColor = (imp) => {
+                const val = Number(imp) || 0;
+                if (val === 0) return null;
+                if (val <= 40) return 'FF10B981'; // Green (Good)
+                if (val <= 85) return 'FFF59E0B'; // Amber (Moderate)
+                return 'FFEF4444'; // Red (Critical)
+            };
+
             // Add Data to all sheets
             students.forEach((s, idx) => {
                 const round2 = (num) => Math.round((Number(num) || 0) * 100) / 100;
@@ -184,14 +193,7 @@ const TestWiseImprovements = ({ filters }) => {
                     exam_count: s.exam_count || 1
                 };
 
-                // Helper for improvement color
-                const getImpColor = (imp) => {
-                    const val = Number(imp) || 0;
-                    if (val === 0) return null;
-                    if (val <= 40) return 'FF10B981'; // Green (Good)
-                    if (val <= 85) return 'FFF59E0B'; // Amber (Moderate)
-                    return 'FFEF4444'; // Red (Critical)
-                };
+
 
                 // Add to Master
                 const masterRow = masterSheet.addRow(studentData);
@@ -246,18 +248,18 @@ const TestWiseImprovements = ({ filters }) => {
                     });
                 });
             });
-
-            // Add Footer info to the LAST sheet (Chemistry)
+            // Add Footer info to the LAST sheet (Chemistry if it exists)
             const lastSheet = workbook.getWorksheet('Chemistry');
-            const footerRowIdx = students.length + 3;
+            if (lastSheet) {
+                const footerRowIdx = students.length + 3;
+                const footer1 = lastSheet.getRow(footerRowIdx);
+                footer1.getCell(2).value = isOverall ? `Overall Analysis From: ${stats.length} Tests` : `Single Test: ${testName}`;
+                footer1.getCell(2).font = { bold: true, size: 12, color: { argb: 'FF4F46E5' } };
 
-            const footer1 = lastSheet.getRow(footerRowIdx);
-            footer1.getCell(2).value = isOverall ? `Overall Analysis From: ${stats.length} Tests` : `Single Test: ${testName}`;
-            footer1.getCell(2).font = { bold: true, size: 12, color: { argb: 'FF4F46E5' } };
-
-            const footer2 = lastSheet.getRow(footerRowIdx + 1);
-            footer2.getCell(2).value = `Total Students Record Count: ${students.length}`;
-            footer2.getCell(2).font = { bold: true, size: 12 };
+                const footer2 = lastSheet.getRow(footerRowIdx + 1);
+                footer2.getCell(2).value = `Total Students Record Count: ${students.length}`;
+                footer2.getCell(2).font = { bold: true, size: 12 };
+            }
 
             const buffer = await workbook.xlsx.writeBuffer();
             saveAs(new Blob([buffer]), isOverall ? `Overall_Improvement_Report.xlsx` : `Improvement_Report_${testName}.xlsx`);
