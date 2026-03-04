@@ -113,11 +113,21 @@ const buildWhereClause = (req, options = {}) => {
 
     if (req.query.category) {
         const cat = req.query.category;
-        if (cat === 'cat1') clauses.push("CAST(Tot_720 AS FLOAT) >= 500");
-        else if (cat === 'cat2') clauses.push("CAST(Tot_720 AS FLOAT) >= 450 AND CAST(Tot_720 AS FLOAT) < 500");
-        else if (cat === 'cat3') clauses.push("CAST(Tot_720 AS FLOAT) >= 400 AND CAST(Tot_720 AS FLOAT) < 450");
-        else if (cat === 'cat4') clauses.push("CAST(Tot_720 AS FLOAT) >= 350 AND CAST(Tot_720 AS FLOAT) < 400");
-        else if (cat === 'cat5') clauses.push("CAST(Tot_720 AS FLOAT) < 350");
+        if (cat === 'cat1') clauses.push("CAST(Tot_720 AS FLOAT) >= 710");
+        else if (cat === 'cat2') clauses.push("CAST(Tot_720 AS FLOAT) >= 700");
+        else if (cat === 'cat3') clauses.push("CAST(Tot_720 AS FLOAT) >= 685");
+        else if (cat === 'cat4') clauses.push("CAST(Tot_720 AS FLOAT) >= 655");
+        else if (cat === 'cat5') clauses.push("CAST(Tot_720 AS FLOAT) >= 640");
+        else if (cat === 'cat6') clauses.push("CAST(Tot_720 AS FLOAT) >= 595");
+        else if (cat === 'cat7') clauses.push("CAST(Tot_720 AS FLOAT) >= 570");
+        else if (cat === 'cat8') clauses.push("CAST(Tot_720 AS FLOAT) >= 550");
+        else if (cat === 'cat9') clauses.push("CAST(Tot_720 AS FLOAT) >= 530");
+        else if (cat === 'cat10') clauses.push("CAST(Tot_720 AS FLOAT) >= 490");
+        else if (cat === 'cat11') clauses.push("CAST(Tot_720 AS FLOAT) >= 450");
+        else if (cat === 'cat12') clauses.push("CAST(Tot_720 AS FLOAT) >= 490 AND CAST(Tot_720 AS FLOAT) < 530");
+        else if (cat === 'cat13') clauses.push("CAST(Tot_720 AS FLOAT) >= 450 AND CAST(Tot_720 AS FLOAT) < 490");
+        else if (cat === 'cat14') clauses.push("CAST(Tot_720 AS FLOAT) >= 400 AND CAST(Tot_720 AS FLOAT) < 450");
+        else if (cat === 'cat15') clauses.push("CAST(Tot_720 AS FLOAT) >= 350 AND CAST(Tot_720 AS FLOAT) < 400");
     }
 
     const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
@@ -615,11 +625,21 @@ app.get('/api/test-improvements/stats', async (req, res) => {
             SELECT 
                 Test, 
                 MAX(DATE) as DATE,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 500 THEN 1 ELSE 0 END) as cat1,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 450 AND CAST(Tot_720 AS FLOAT) < 500 THEN 1 ELSE 0 END) as cat2,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 400 AND CAST(Tot_720 AS FLOAT) < 450 THEN 1 ELSE 0 END) as cat3,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 351 AND CAST(Tot_720 AS FLOAT) < 400 THEN 1 ELSE 0 END) as cat4,
-                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) <= 350 THEN 1 ELSE 0 END) as cat5,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 710 THEN 1 ELSE 0 END) as cat1,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 700 THEN 1 ELSE 0 END) as cat2,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 685 THEN 1 ELSE 0 END) as cat3,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 655 THEN 1 ELSE 0 END) as cat4,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 640 THEN 1 ELSE 0 END) as cat5,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 595 THEN 1 ELSE 0 END) as cat6,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 570 THEN 1 ELSE 0 END) as cat7,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 550 THEN 1 ELSE 0 END) as cat8,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 530 THEN 1 ELSE 0 END) as cat9,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 490 THEN 1 ELSE 0 END) as cat10,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 450 THEN 1 ELSE 0 END) as cat11,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 490 AND CAST(Tot_720 AS FLOAT) < 530 THEN 1 ELSE 0 END) as cat12,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 450 AND CAST(Tot_720 AS FLOAT) < 490 THEN 1 ELSE 0 END) as cat13,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 400 AND CAST(Tot_720 AS FLOAT) < 450 THEN 1 ELSE 0 END) as cat14,
+                SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 350 AND CAST(Tot_720 AS FLOAT) < 400 THEN 1 ELSE 0 END) as cat15,
                 AVG(CAST(Botany AS FLOAT)) as avg_bot,
                 AVG(CAST(Zoology AS FLOAT)) as avg_zoo,
                 AVG(CAST(Physics AS FLOAT)) as avg_phy,

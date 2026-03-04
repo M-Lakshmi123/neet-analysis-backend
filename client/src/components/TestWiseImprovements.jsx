@@ -283,11 +283,21 @@ const TestWiseImprovements = ({ filters }) => {
     };
 
     const categories = [
-        { label: '500+', key: 'cat1' },
-        { label: '450 - 499', key: 'cat2' },
-        { label: '400 - 449', key: 'cat3' },
-        { label: '350 - 399', key: 'cat4' },
-        { label: '<= 350', key: 'cat5' },
+        { label: '>= 710', key: 'cat1' },
+        { label: '>= 700', key: 'cat2' },
+        { label: '>= 685', key: 'cat3' },
+        { label: '>= 655', key: 'cat4' },
+        { label: '>= 640', key: 'cat5' },
+        { label: '>= 595', key: 'cat6' },
+        { label: '>= 570', key: 'cat7' },
+        { label: '>= 550', key: 'cat8' },
+        { label: '>= 530', key: 'cat9' },
+        { label: '>= 490', key: 'cat10' },
+        { label: '>= 450', key: 'cat11' },
+        { label: '490 - 530', key: 'cat12' },
+        { label: '450 - 490', key: 'cat13' },
+        { label: '400 - 450', key: 'cat14' },
+        { label: '350 - 400', key: 'cat15' },
         { label: 'Overall Average', key: 'avg_tot', isSpecial: true },
     ];
 
