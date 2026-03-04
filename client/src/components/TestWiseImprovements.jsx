@@ -13,7 +13,7 @@ const TestWiseImprovements = ({ filters }) => {
     const [loading, setLoading] = useState(false);
     const [selectedTestIdx, setSelectedTestIdx] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const [categoryAverages, setCategoryAverages] = useState(null);
+    const [averages, setAverages] = useState(null);
     const [loadingAverages, setLoadingAverages] = useState(false);
     const [downloading, setDownloading] = useState(false);
 
@@ -45,12 +45,14 @@ const TestWiseImprovements = ({ filters }) => {
     }, [filters]);
 
     useEffect(() => {
-        if (selectedTestIdx === null || selectedCategory === 'all') {
-            setCategoryAverages(null);
+        // Fetch averages if we have a category selected OR if we are looking at Overall
+        // This ensures "Overall" count is always the "Smarter" unique student count
+        if (selectedTestIdx === null) {
+            setAverages(null);
             return;
         }
 
-        const fetchCategoryAverages = async () => {
+        const fetchAverages = async () => {
             setLoadingAverages(true);
             try {
                 const isOverall = selectedTestIdx === 'overall';
@@ -58,20 +60,23 @@ const TestWiseImprovements = ({ filters }) => {
 
                 const queryFilters = { ...filters };
                 if (testName) queryFilters.test = [testName];
-                queryFilters.category = selectedCategory;
+                // Always include category if it's not 'all'
+                if (selectedCategory !== 'all') {
+                    queryFilters.category = selectedCategory;
+                }
 
                 const queryParams = buildQueryParams(queryFilters).toString();
                 const res = await fetch(`${API_URL}/api/test-improvements/averages?${queryParams}`);
                 const data = await res.json();
-                setCategoryAverages(data);
+                setAverages(data);
             } catch (err) {
-                console.error("Failed to fetch category averages:", err);
+                console.error("Failed to fetch averages:", err);
             } finally {
                 setLoadingAverages(false);
             }
         };
 
-        fetchCategoryAverages();
+        fetchAverages();
     }, [selectedTestIdx, selectedCategory, filters, stats]);
 
     const handleDownloadStudents = async () => {
@@ -97,12 +102,12 @@ const TestWiseImprovements = ({ filters }) => {
 
             const workbook = new ExcelJS.Workbook();
 
-            // Define sheets configuration
+            // Define sheets configuration with dynamic cutoffs
             const subjects = [
-                { name: 'Botany', key: 'bot', max: 180 },
-                { name: 'Zoology', key: 'zoo', max: 180 },
-                { name: 'Physics', key: 'phy', max: 180 },
-                { name: 'Chemistry', key: 'che', max: 180 }
+                { name: 'Botany', key: 'bot', max: currentCutoff.bot },
+                { name: 'Zoology', key: 'zoo', max: currentCutoff.zoo },
+                { name: 'Physics', key: 'phy', max: currentCutoff.phy },
+                { name: 'Chemistry', key: 'che', max: currentCutoff.che }
             ];
 
             // 1. MASTER SHEET
@@ -184,10 +189,10 @@ const TestWiseImprovements = ({ filters }) => {
                     name: s.name || 'N/A',
                     campus: s.campus || 'N/A',
                     stream: s.stream || '-',
-                    bot: b, bot_pct: `${round2((b / 180) * 100)}%`, bot_imp: round2(Math.max(0, 180 - b)),
-                    zoo: z, zoo_pct: `${round2((z / 180) * 100)}%`, zoo_imp: round2(Math.max(0, 180 - z)),
-                    phy: p, phy_pct: `${round2((p / 180) * 100)}%`, phy_imp: round2(Math.max(0, 180 - p)),
-                    che: c, che_pct: `${round2((c / 180) * 100)}%`, che_imp: round2(Math.max(0, 180 - c)),
+                    bot: b, bot_pct: `${round2((b / currentCutoff.bot) * 100)}%`, bot_imp: round2(Math.max(0, currentCutoff.bot - b)),
+                    zoo: z, zoo_pct: `${round2((z / currentCutoff.zoo) * 100)}%`, zoo_imp: round2(Math.max(0, currentCutoff.zoo - z)),
+                    phy: p, phy_pct: `${round2((p / currentCutoff.phy) * 100)}%`, phy_imp: round2(Math.max(0, currentCutoff.phy - p)),
+                    che: c, che_pct: `${round2((c / currentCutoff.che) * 100)}%`, che_imp: round2(Math.max(0, currentCutoff.che - c)),
                     tot: totalMarks,
                     tot_pct: `${round2((totalMarks / 720) * 100)}%`,
                     exam_count: s.exam_count || 1
@@ -220,7 +225,7 @@ const TestWiseImprovements = ({ filters }) => {
 
                 sortedSubStudents.forEach((s, idx) => {
                     const marks = round2(s[sub.key]);
-                    const impValue = round2(Math.max(0, 180 - marks));
+                    const impValue = round2(Math.max(0, sub.max - marks));
                     const row = subjWorksheets[sub.key].addRow({
                         sno: idx + 1,
                         id: s.STUD_ID || '-',
@@ -228,7 +233,7 @@ const TestWiseImprovements = ({ filters }) => {
                         campus: s.campus || 'N/A',
                         stream: s.stream || '-',
                         marks: marks,
-                        pct: `${round2((marks / 180) * 100)}%`,
+                        pct: `${round2((marks / sub.max) * 100)}%`,
                         imp: impValue,
                         exam_count: s.exam_count || 1
                     });
@@ -301,6 +306,27 @@ const TestWiseImprovements = ({ filters }) => {
         { label: 'Overall Average', key: 'avg_tot', isSpecial: true },
     ];
 
+    const THRESHOLD_CUTOFFS = {
+        all: { bot: 180, zoo: 180, phy: 180, che: 180, tot: 720 },
+        cat1: { bot: 180, zoo: 180, phy: 180, che: 180, tot: 710 },
+        cat2: { bot: 180, zoo: 180, phy: 168, che: 170, tot: 700 },
+        cat3: { bot: 175, zoo: 175, phy: 165, che: 170, tot: 685 },
+        cat4: { bot: 170, zoo: 170, phy: 150, che: 165, tot: 655 },
+        cat5: { bot: 170, zoo: 165, phy: 145, che: 160, tot: 640 },
+        cat6: { bot: 165, zoo: 165, phy: 125, che: 140, tot: 595 },
+        cat7: { bot: 160, zoo: 160, phy: 120, che: 130, tot: 570 },
+        cat8: { bot: 160, zoo: 160, phy: 110, che: 120, tot: 550 },
+        cat9: { bot: 160, zoo: 160, phy: 100, che: 110, tot: 530 },
+        cat10: { bot: 150, zoo: 150, phy: 80, che: 110, tot: 490 },
+        cat11: { bot: 140, zoo: 140, phy: 70, che: 100, tot: 450 },
+        cat12: { bot: 155, zoo: 155, phy: 90, che: 110, tot: 530 },
+        cat13: { bot: 145, zoo: 145, phy: 75, che: 105, tot: 490 },
+        cat14: { bot: 135, zoo: 135, phy: 65, che: 95, tot: 450 },
+        cat15: { bot: 125, zoo: 125, phy: 60, che: 80, tot: 400 },
+    };
+
+    const currentCutoff = THRESHOLD_CUTOFFS[selectedCategory] || THRESHOLD_CUTOFFS.all;
+
     if (loading) {
         return <LoadingTimer isLoading={true} message="Fetching improvements data..." />;
     }
@@ -331,36 +357,29 @@ const TestWiseImprovements = ({ filters }) => {
         };
     }
 
-    // Override with category averages if active
-    if (selectedCategory !== 'all' && categoryAverages) {
+    // Override with averages if active
+    if (averages) {
         selectedTest = {
             ...selectedTest,
-            avg_bot: categoryAverages.avg_bot,
-            avg_zoo: categoryAverages.avg_zoo,
-            avg_phy: categoryAverages.avg_phy,
-            avg_che: categoryAverages.avg_che,
-            avg_tot: categoryAverages.avg_tot,
-            student_count: categoryAverages.student_count
-        };
-    } else if (isOverall && averages) {
-        // Use smarter overall averages from backend when no category filter is active too
-        selectedTest = {
-            ...selectedTest,
+            avg_bot: averages.avg_bot,
+            avg_zoo: averages.avg_zoo,
+            avg_phy: averages.avg_phy,
+            avg_che: averages.avg_che,
+            avg_tot: averages.avg_tot,
             student_count: averages.student_count
         };
     }
 
-    const maxMarks = 180;
-
-    const computeSubject = (avg) => {
+    const computeSubject = (avg, subKey) => {
         const val = Math.round(avg || 0);
-        return { avg: val, improve: Math.max(0, maxMarks - val), percent: Math.round((val / maxMarks) * 100) };
+        const max = currentCutoff[subKey];
+        return { avg: val, improve: Math.max(0, max - val), percent: Math.round((val / max) * 100) };
     };
 
-    const botData = computeSubject(selectedTest?.avg_bot);
-    const zooData = computeSubject(selectedTest?.avg_zoo);
-    const phyData = computeSubject(selectedTest?.avg_phy);
-    const cheData = computeSubject(selectedTest?.avg_che);
+    const botData = computeSubject(selectedTest?.avg_bot, 'bot');
+    const zooData = computeSubject(selectedTest?.avg_zoo, 'zoo');
+    const phyData = computeSubject(selectedTest?.avg_phy, 'phy');
+    const cheData = computeSubject(selectedTest?.avg_che, 'che');
     const totAvg = Math.round(selectedTest?.avg_tot || 0);
     const totPct = Math.round((totAvg / 720) * 100);
 

@@ -19,7 +19,7 @@ import StudentPerformance from './components/StudentPerformance';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import AdminDashboard from './components/admin/AdminDashboard';
-import { AuthProvider, useAuth } from './components/auth/AuthProvider';
+import { AuthProvider, useAuth, AuthContext } from './components/auth/AuthProvider';
 
 import Sidebar from './components/Sidebar';
 import UserApprovals from './components/admin/UserApprovals';
@@ -338,17 +338,91 @@ class ErrorBoundary extends React.Component {
     render() {
         if (this.state.hasError) {
             return (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
-                    <h2>Something went wrong.</h2>
-                    <details style={{ whiteSpace: 'pre-wrap', marginTop: '1rem', textAlign: 'left', background: '#fef2f2', padding: '1rem' }}>
-                        {this.state.error && this.state.error.toString()}
-                        <br />
-                        {this.state.errorInfo && this.state.errorInfo.componentStack}
-                    </details>
-                    <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}>
-                        Reload Application
-                    </button>
-                </div>
+                <AuthContext.Consumer>
+                    {({ isAdmin }) => {
+                        if (isAdmin) {
+                            return (
+                                <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626', background: '#fff', height: '100vh' }}>
+                                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Something went wrong.</h2>
+                                    <div style={{ textAlign: 'left', margin: '0 auto', maxWidth: '800px', background: '#fef2f2', padding: '1.5rem', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                                        <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', color: '#991b1b' }}>Debug Information (Admin Only):</p>
+                                        <details style={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', color: '#450a0a' }}>
+                                            <summary style={{ cursor: 'pointer', marginBottom: '0.5rem' }}>View Stack Trace</summary>
+                                            {this.state.error && this.state.error.toString()}
+                                            <br />
+                                            {this.state.errorInfo && this.state.errorInfo.componentStack}
+                                        </details>
+                                    </div>
+                                    <button
+                                        onClick={() => window.location.reload()}
+                                        style={{ marginTop: '2rem', padding: '0.75rem 1.5rem', background: '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
+                                    >
+                                        Reload Application
+                                    </button>
+                                </div>
+                            );
+                        }
+
+                        // Professional message for Principals / Co-Admins
+                        return (
+                            <div style={{
+                                height: '100vh',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: '#f8fafc',
+                                padding: '1rem'
+                            }}>
+                                <div style={{
+                                    background: 'white',
+                                    padding: '3rem',
+                                    borderRadius: '16px',
+                                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                                    textAlign: 'center',
+                                    maxWidth: '500px',
+                                    width: '100%'
+                                }}>
+                                    <div style={{
+                                        width: '64px',
+                                        height: '64px',
+                                        background: '#eff6ff',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        margin: '0 auto 1.5rem'
+                                    }}>
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                                        </svg>
+                                    </div>
+                                    <h2 style={{ color: '#1e293b', fontSize: '1.5rem', fontWeight: '700', marginBottom: '1rem' }}>
+                                        System Maintenance
+                                    </h2>
+                                    <p style={{ color: '#64748b', fontSize: '1.05rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+                                        We are currently performing scheduled maintenance to optimize your experience. Please try logging back in after some time.
+                                    </p>
+                                    <button
+                                        onClick={() => window.location.assign('/login')}
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.875rem',
+                                            background: '#3b82f6',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            fontWeight: '600',
+                                            cursor: 'pointer',
+                                            transition: 'background 0.2s'
+                                        }}
+                                    >
+                                        Back to Login
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    }}
+                </AuthContext.Consumer>
             );
         }
 
@@ -358,8 +432,8 @@ class ErrorBoundary extends React.Component {
 
 const App = () => {
     return (
-        <ErrorBoundary>
-            <AuthProvider>
+        <AuthProvider>
+            <ErrorBoundary>
                 <Router>
                     <div className="app-container">
                         <Routes>
@@ -375,8 +449,8 @@ const App = () => {
                         </Routes>
                     </div>
                 </Router>
-            </AuthProvider>
-        </ErrorBoundary>
+            </ErrorBoundary>
+        </AuthProvider>
     );
 };
 
