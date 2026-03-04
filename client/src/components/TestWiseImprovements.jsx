@@ -12,6 +12,9 @@ const TestWiseImprovements = ({ filters }) => {
     const [stats, setStats] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedTestIdx, setSelectedTestIdx] = useState(null);
+    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [categoryAverages, setCategoryAverages] = useState(null);
+    const [loadingAverages, setLoadingAverages] = useState(false);
     const [downloading, setDownloading] = useState(false);
 
     useEffect(() => {
@@ -41,6 +44,36 @@ const TestWiseImprovements = ({ filters }) => {
         return () => clearTimeout(timeoutId);
     }, [filters]);
 
+    useEffect(() => {
+        if (selectedTestIdx === null || selectedCategory === 'all') {
+            setCategoryAverages(null);
+            return;
+        }
+
+        const fetchCategoryAverages = async () => {
+            setLoadingAverages(true);
+            try {
+                const isOverall = selectedTestIdx === 'overall';
+                const testName = isOverall ? null : stats[selectedTestIdx].Test;
+
+                const queryFilters = { ...filters };
+                if (testName) queryFilters.test = [testName];
+                queryFilters.category = selectedCategory;
+
+                const queryParams = buildQueryParams(queryFilters).toString();
+                const res = await fetch(`${API_URL}/api/test-improvements/averages?${queryParams}`);
+                const data = await res.json();
+                setCategoryAverages(data);
+            } catch (err) {
+                console.error("Failed to fetch category averages:", err);
+            } finally {
+                setLoadingAverages(false);
+            }
+        };
+
+        fetchCategoryAverages();
+    }, [selectedTestIdx, selectedCategory, filters, stats]);
+
     const handleDownloadStudents = async () => {
         if (selectedTestIdx === null || (selectedTestIdx !== 'overall' && !stats[selectedTestIdx])) return;
         setDownloading(true);
@@ -49,6 +82,9 @@ const TestWiseImprovements = ({ filters }) => {
 
         try {
             const queryFilters = isOverall ? { ...filters, groupByStudent: true } : { ...filters, test: [testName] };
+            if (selectedCategory !== 'all') {
+                queryFilters.category = selectedCategory;
+            }
             const queryParams = buildQueryParams(queryFilters).toString();
             const res = await fetch(`${API_URL}/api/test-improvements/students?${queryParams}`);
             const students = await res.json();
@@ -268,6 +304,18 @@ const TestWiseImprovements = ({ filters }) => {
             avg_phy: stats.reduce((acc, s) => acc + (Number(s.avg_phy) || 0), 0) / stats.length,
             avg_che: stats.reduce((acc, s) => acc + (Number(s.avg_che) || 0), 0) / stats.length,
             avg_tot: stats.reduce((acc, s) => acc + (Number(s.avg_tot) || 0), 0) / stats.length
+        };
+    }
+
+    // Override with category averages if active
+    if (selectedCategory !== 'all' && categoryAverages) {
+        selectedTest = {
+            ...selectedTest,
+            avg_bot: categoryAverages.avg_bot,
+            avg_zoo: categoryAverages.avg_zoo,
+            avg_phy: categoryAverages.avg_phy,
+            avg_che: categoryAverages.avg_che,
+            avg_tot: categoryAverages.avg_tot
         };
     }
 
@@ -536,6 +584,29 @@ const TestWiseImprovements = ({ filters }) => {
                     </div>
                 </div>
 
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Filter by Category</div>
+                    <div className="test-selector">
+                        <div
+                            className={`test-pill ${selectedCategory === 'all' ? 'active' : ''}`}
+                            onClick={() => setSelectedCategory('all')}
+                        >
+                            OVERALL (ALL)
+                        </div>
+                        {categories.filter(c => !c.isSpecial).map((cat) => (
+                            <div
+                                key={cat.key}
+                                className={`test-pill ${selectedCategory === cat.key ? 'active' : ''}`}
+                                onClick={() => setSelectedCategory(cat.key)}
+                                style={{ borderLeft: selectedCategory === cat.key ? 'none' : '4px solid #6366f1' }}
+                            >
+                                {cat.label}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '0.75rem', letterSpacing: '0.05em' }}>Select Test</div>
                 <div className="test-selector" style={{ marginBottom: '1.5rem' }}>
                     <div
                         className={`test-pill ${selectedTestIdx === 'overall' ? 'active' : ''}`}
@@ -570,7 +641,12 @@ const TestWiseImprovements = ({ filters }) => {
                 )}
 
                 {selectedTest && (
-                    <>
+                    <div style={{ opacity: loadingAverages ? 0.6 : 1, transition: 'opacity 0.3s ease', position: 'relative' }}>
+                        {loadingAverages && (
+                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 10, fontWeight: '700', color: '#6366f1', background: 'rgba(255,255,255,0.8)', padding: '0.5rem 1rem', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                                Updating Averages...
+                            </div>
+                        )}
                         <div className="subjects-grid">
                             {/* BOTANY */}
                             <div className="subject-card botany">
@@ -671,7 +747,7 @@ const TestWiseImprovements = ({ filters }) => {
                                 {downloading ? 'Generating Excel...' : `Download ${isOverall ? 'Overall' : selectedTest.Test} Target Students`}
                             </button>
                         </div>
-                    </>
+                    </div>
                 )}
             </div>
         </div>

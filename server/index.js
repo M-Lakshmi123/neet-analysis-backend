@@ -111,6 +111,15 @@ const buildWhereClause = (req, options = {}) => {
         }
     }
 
+    if (req.query.category) {
+        const cat = req.query.category;
+        if (cat === 'cat1') clauses.push("CAST(Tot_720 AS FLOAT) >= 500");
+        else if (cat === 'cat2') clauses.push("CAST(Tot_720 AS FLOAT) >= 450 AND CAST(Tot_720 AS FLOAT) < 500");
+        else if (cat === 'cat3') clauses.push("CAST(Tot_720 AS FLOAT) >= 400 AND CAST(Tot_720 AS FLOAT) < 450");
+        else if (cat === 'cat4') clauses.push("CAST(Tot_720 AS FLOAT) >= 351 AND CAST(Tot_720 AS FLOAT) < 400");
+        else if (cat === 'cat5') clauses.push("CAST(Tot_720 AS FLOAT) <= 350");
+    }
+
     const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
     return where;
 };
@@ -626,6 +635,28 @@ app.get('/api/test-improvements/stats', async (req, res) => {
         res.json(result.recordset);
     } catch (err) {
         console.error("[Test Improvements Stats] ERROR:", err);
+        res.status(500).send(err.message);
+    }
+});
+
+app.get('/api/test-improvements/averages', async (req, res) => {
+    try {
+        const pool = await connectToDb();
+        const where = buildWhereClause(req);
+        const query = `
+            SELECT 
+                AVG(CAST(Botany AS FLOAT)) as avg_bot,
+                AVG(CAST(Zoology AS FLOAT)) as avg_zoo,
+                AVG(CAST(Physics AS FLOAT)) as avg_phy,
+                AVG(CAST(Chemistry AS FLOAT)) as avg_che,
+                AVG(CAST(Tot_720 AS FLOAT)) as avg_tot
+            FROM MEDICAL_RESULT
+            ${where}
+        `;
+        const result = await pool.request().query(query);
+        res.json(result.recordset[0] || { avg_bot: 0, avg_zoo: 0, avg_phy: 0, avg_che: 0, avg_tot: 0 });
+    } catch (err) {
+        console.error("[Test Improvements Averages] ERROR:", err);
         res.status(500).send(err.message);
     }
 });
