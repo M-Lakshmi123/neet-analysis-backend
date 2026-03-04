@@ -23,7 +23,7 @@ const TestWiseImprovements = ({ filters }) => {
                 const data = await res.json();
                 setStats(data || []);
                 if (data && data.length > 0) {
-                    setSelectedTestIdx(0); // select first test by default
+                    setSelectedTestIdx('overall'); // select OVERALL by default
                 } else {
                     setSelectedTestIdx(null);
                 }
@@ -44,10 +44,12 @@ const TestWiseImprovements = ({ filters }) => {
     const handleDownloadStudents = async () => {
         if (selectedTestIdx === null || !stats[selectedTestIdx]) return;
         setDownloading(true);
-        const testName = stats[selectedTestIdx].Test;
+        const isOverall = selectedTestIdx === 'overall';
+        const testName = isOverall ? 'OVERALL' : stats[selectedTestIdx].Test;
 
         try {
-            const queryParams = buildQueryParams({ ...filters, test: [testName] }).toString();
+            const queryFilters = isOverall ? { ...filters } : { ...filters, test: [testName] };
+            const queryParams = buildQueryParams(queryFilters).toString();
             const res = await fetch(`${API_URL}/api/test-improvements/students?${queryParams}`);
             const students = await res.json();
 
@@ -130,16 +132,17 @@ const TestWiseImprovements = ({ filters }) => {
                 }
             });
 
-            const buffer = await workbook.xlsx.writeBuffer();
-            saveAs(new Blob([buffer]), `Improvement_List_${testName}.xlsx`);
-            logActivity(userData, 'Exported Student Improvements List', { test: testName });
-
             // Add total count footer to worksheet
-            const footerRowIdx = students.length + 3;
+            const totalCount = students.length;
+            const footerRowIdx = totalCount + 3;
             const footerRow = worksheet.getRow(footerRowIdx);
-            footerRow.getCell(2).value = `Total Exams in Record: ${students.length}`;
+            footerRow.getCell(2).value = isOverall ? `Overall Total Student Count: ${totalCount}` : `Total Students for ${testName}: ${totalCount}`;
             footerRow.getCell(2).font = { bold: true };
             footerRow.commit();
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            saveAs(new Blob([buffer]), isOverall ? `Overall_Improvement_List.xlsx` : `Improvement_List_${testName}.xlsx`);
+            logActivity(userData, 'Exported Student Improvements List', { test: isOverall ? 'Overall' : testName });
 
         } catch (err) {
             console.error("Error downloading student list:", err);
@@ -161,7 +164,7 @@ const TestWiseImprovements = ({ filters }) => {
         { label: '450 - 499', key: 'cat2' },
         { label: '400 - 449', key: 'cat3' },
         { label: '350 - 399', key: 'cat4' },
-        { label: '< 350', key: 'cat5' },
+        { label: '<= 350', key: 'cat5' },
         { label: 'Overall Average', key: 'avg_tot', isSpecial: true },
     ];
 
@@ -180,7 +183,20 @@ const TestWiseImprovements = ({ filters }) => {
         );
     }
 
-    const selectedTest = stats[selectedTestIdx];
+    const isOverall = selectedTestIdx === 'overall';
+    let selectedTest = isOverall ? null : stats[selectedTestIdx];
+
+    if (isOverall && stats.length > 0) {
+        selectedTest = {
+            Test: 'OVERALL',
+            avg_bot: stats.reduce((acc, s) => acc + (Number(s.avg_bot) || 0), 0) / stats.length,
+            avg_zoo: stats.reduce((acc, s) => acc + (Number(s.avg_zoo) || 0), 0) / stats.length,
+            avg_phy: stats.reduce((acc, s) => acc + (Number(s.avg_phy) || 0), 0) / stats.length,
+            avg_che: stats.reduce((acc, s) => acc + (Number(s.avg_che) || 0), 0) / stats.length,
+            avg_tot: stats.reduce((acc, s) => acc + (Number(s.avg_tot) || 0), 0) / stats.length
+        };
+    }
+
     const maxMarks = 180;
 
     const computeSubject = (avg) => {
@@ -424,7 +440,7 @@ const TestWiseImprovements = ({ filters }) => {
                                     <td className="category-label">{cat.label}</td>
                                     {stats.map((test, idx) => (
                                         <td key={idx}>
-                                            <span style={{ fontWeight: '700', color: cat.isSpecial ? '#4f46e5' : '#334155' }}>
+                                            <span style={{ fontWeight: cat.isSpecial ? '700' : '600', color: cat.isSpecial ? '#4f46e5' : '#334155' }}>
                                                 {cat.isSpecial ? Math.round(test[cat.key]) : test[cat.key]}
                                             </span>
                                             {idx > 0 && formatDiff(test[cat.key], stats[idx - 1][cat.key])}
@@ -446,7 +462,13 @@ const TestWiseImprovements = ({ filters }) => {
                     </div>
                 </div>
 
-                <div className="test-selector" style={{ marginBottom: '1rem' }}>
+                <div className="test-selector" style={{ marginBottom: '1.5rem' }}>
+                    <div
+                        className={`test-pill ${selectedTestIdx === 'overall' ? 'active' : ''}`}
+                        onClick={() => setSelectedTestIdx('overall')}
+                    >
+                        OVERALL
+                    </div>
                     {stats.map((test, idx) => (
                         <div
                             key={idx}
@@ -459,14 +481,16 @@ const TestWiseImprovements = ({ filters }) => {
                 </div>
 
                 {selectedTest && (
-                    <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ marginBottom: '2rem', padding: '1.25rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                            <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Overall Average</span>
-                            <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1e293b' }}>{totAvg} <span style={{ fontSize: '1rem', color: '#6366f1' }}>/ 720</span></div>
+                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overall average</span>
+                            <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b' }}>
+                                {totAvg} <span style={{ fontSize: '1rem', color: '#6366f1', opacity: 0.8 }}>/ 720</span>
+                            </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                            <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Success Rate</span>
-                            <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#10b981' }}>{totPct}%</div>
+                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Success rate</span>
+                            <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#10b981' }}>{totPct}%</div>
                         </div>
                     </div>
                 )}
@@ -570,7 +594,7 @@ const TestWiseImprovements = ({ filters }) => {
                                 disabled={downloading}
                             >
                                 <Download size={20} />
-                                {downloading ? 'Generating Excel...' : `Download ${selectedTest.Test} Target Students`}
+                                {downloading ? 'Generating Excel...' : `Download ${isOverall ? 'Overall' : selectedTest.Test} Target Students`}
                             </button>
                         </div>
                     </>
