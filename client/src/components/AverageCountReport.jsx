@@ -51,9 +51,9 @@ const AverageCountReport = ({ filters }) => {
                                 acc[campus] = {
                                     Campus: campus, Section: currentStream, Strength: 0, Mark: 0, Rank: Infinity,
                                     T_350: 0, T_650: 0, T_600: 0, T_580: 0, T_530: 0, T_490: 0, T_450: 0, T_400: 0, T_360: 0, T_320: 0, T_280: 0, T_L200: 0,
-                                    B_175: 0, B_170: 0, B_160: 0, B_160_170: 0, B_150: 0, B_130: 0,
-                                    Z_175: 0, Z_170: 0, Z_160: 0, Z_160_170: 0, Z_150: 0, Z_130: 0,
-                                    P_70: 0, P_50_70: 0, P_L50: 0, P_L20: 0,
+                                    B_175: 0, B_170: 0, B_160: 0, B_170_180: 0, B_150: 0, B_130: 0,
+                                    Z_175: 0, Z_170: 0, Z_160: 0, Z_170_180: 0, Z_150: 0, Z_130: 0,
+                                    P_70: 0, P_50_70: 0, P_L50: 0, P_L30: 0,
                                     C_100: 0, C_70_100: 0, C_50_70: 0, C_L50: 0, C_L20: 0,
                                 };
                             }
@@ -81,19 +81,19 @@ const AverageCountReport = ({ filters }) => {
                             if (bot >= 175) acc[campus].B_175++;
                             if (bot >= 170) acc[campus].B_170++;
                             if (bot >= 160) acc[campus].B_160++;
-                            if (bot >= 160 && bot < 170) acc[campus].B_160_170++;
+                            if (bot >= 170 && bot <= 180) acc[campus].B_170_180++;
                             if (bot >= 150) acc[campus].B_150++;
                             if (bot >= 130) acc[campus].B_130++;
                             if (zoo >= 175) acc[campus].Z_175++;
                             if (zoo >= 170) acc[campus].Z_170++;
                             if (zoo >= 160) acc[campus].Z_160++;
-                            if (zoo >= 160 && zoo < 170) acc[campus].Z_160_170++;
+                            if (zoo >= 170 && zoo <= 180) acc[campus].Z_170_180++;
                             if (zoo >= 150) acc[campus].Z_150++;
                             if (zoo >= 130) acc[campus].Z_130++;
                             if (phy >= 70) acc[campus].P_70++;
                             if (phy >= 50 && phy < 70) acc[campus].P_50_70++;
                             if (phy <= 50) acc[campus].P_L50++;
-                            if (phy <= 20) acc[campus].P_L20++;
+                            if (phy <= 30) acc[campus].P_L30++;
                             if (che >= 100) acc[campus].C_100++;
                             if (che >= 70 && che < 100) acc[campus].C_70_100++;
                             if (che >= 50 && che < 70) acc[campus].C_50_70++;
@@ -143,9 +143,9 @@ const AverageCountReport = ({ filters }) => {
             Rank: Math.min(...examStats.filter(s => s.Rank !== Infinity).map(s => Number(s.Rank))),
             T_350: sum('T_350'), T_650: sum('T_650'), T_600: sum('T_600'), T_580: sum('T_580'), T_530: sum('T_530'), T_490: sum('T_490'),
             T_450: sum('T_450'), T_400: sum('T_400'), T_360: sum('T_360'), T_320: sum('T_320'), T_280: sum('T_280'), T_L200: sum('T_L200'),
-            B_175: sum('B_175'), B_170: sum('B_170'), B_160: sum('B_160'), B_160_170: sum('B_160_170'), B_150: sum('B_150'), B_130: sum('B_130'),
-            Z_175: sum('Z_175'), Z_170: sum('Z_170'), Z_160: sum('Z_160'), Z_160_170: sum('Z_160_170'), Z_150: sum('Z_150'), Z_130: sum('Z_130'),
-            P_70: sum('P_70'), P_50_70: sum('P_50_70'), P_L50: sum('P_L50'), P_L20: sum('P_L20'),
+            B_175: sum('B_175'), B_170: sum('B_170'), B_160: sum('B_160'), B_170_180: sum('B_170_180'), B_150: sum('B_150'), B_130: sum('B_130'),
+            Z_175: sum('Z_175'), Z_170: sum('Z_170'), Z_160: sum('Z_160'), Z_170_180: sum('Z_170_180'), Z_150: sum('Z_150'), Z_130: sum('Z_130'),
+            P_70: sum('P_70'), P_50_70: sum('P_50_70'), P_L50: sum('P_L50'), P_L30: sum('P_L30'),
             C_100: sum('C_100'), C_70_100: sum('C_70_100'), C_50_70: sum('C_50_70'), C_L50: sum('C_L50'), C_L20: sum('C_L20'),
         };
     };
@@ -163,38 +163,130 @@ const AverageCountReport = ({ filters }) => {
         worksheet.columns = Array(38).fill({ width: 10 });
         worksheet.columns[0] = { width: 35 };
 
-        // ROW 1: Detailed Numerical Totals (Grand Total)
-        const gtRow = worksheet.addRow(['Grand Total', '', totals?.Strength || 0, Number(totals?.Mark || 0).toFixed(2), (totals?.Rank === Infinity ? '-' : Number(totals?.Rank || 0).toFixed(2)),
-            totals?.T_350, totals?.T_650, totals?.T_600, totals?.T_580, totals?.T_530, totals?.T_490,
-            totals?.T_450, totals?.T_400, totals?.T_360, totals?.T_320, totals?.T_280, totals?.T_L200,
-            totals?.B_175, totals?.B_170, totals?.B_160, totals?.B_160_170, totals?.B_150, totals?.B_130,
-            totals?.Z_175, totals?.Z_170, totals?.Z_160, totals?.Z_160_170, totals?.Z_150, totals?.Z_130,
-            totals?.P_70, totals?.P_50_70, totals?.P_L50, totals?.P_L20,
-            totals?.C_100, totals?.C_70_100, totals?.C_50_70, totals?.C_L50, totals?.C_L20
-        ]);
-        worksheet.mergeCells('A1:B1');
-        gtRow.eachCell(cell => {
-            cell.font = { bold: true };
-            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        // --- ROW 1: Logo and Organization Name ---
+        worksheet.mergeCells('A1:AL1');
+        const row1 = worksheet.getCell('A1');
+        row1.value = { richText: [{ text: '          Sri Chaitanya ', font: { name: 'Impact', size: 32, color: { argb: 'FF00B0F0' } } }, { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 32, color: { argb: 'FF00B0F0' } } }] };
+        row1.alignment = { horizontal: 'center', vertical: 'middle' }; row1.border = borderStyle; worksheet.getRow(1).height = 50;
+        try {
+            const response = await fetch('/logo.png');
+            if (response.ok) {
+                const blob = await response.blob(); const arrayBuffer = await blob.arrayBuffer();
+                const imageId = workbook.addImage({ buffer: arrayBuffer, extension: 'png' });
+                worksheet.addImage(imageId, { tl: { col: 0.1, row: 0.1 }, ext: { width: 65, height: 60 }, editAs: 'oneCell' });
+            }
+        } catch (e) { console.error("Failed to add logo:", e); }
+
+        // --- ROW 2: Detailed Numerical Totals (Grand Total) ---
+        const gtLabels = ['Total', '', totals?.Strength || 0, 'All India\nBest', '', totals?.T_350, totals?.T_650, totals?.T_600, totals?.T_580, totals?.T_530, totals?.T_490, totals?.T_450, totals?.T_400, totals?.T_360, totals?.T_320, totals?.T_280, totals?.T_L200, totals?.B_175, totals?.B_170, totals?.B_160, totals?.B_170_180, totals?.B_150, totals?.B_130, totals?.Z_175, totals?.Z_170, totals?.Z_160, totals?.Z_170_180, totals?.Z_150, totals?.Z_130, totals?.P_70, totals?.P_50_70, totals?.P_L50, totals?.P_L30, totals?.C_100, totals?.C_70_100, totals?.C_50_70, totals?.C_L50, totals?.C_L20];
+
+        const gtRow = worksheet.addRow(gtLabels);
+        worksheet.mergeCells('A2:B2');
+        worksheet.mergeCells('D2:E2');
+
+        gtRow.eachCell((cell, colNumber) => {
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
             cell.border = borderStyle;
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
+            // 2nd row Candara 13 for "Total", strength(col 3), "All india best"(col 4)
+            if (colNumber === 1 || colNumber === 2 || colNumber === 3 || colNumber === 4 || colNumber === 5) {
+                cell.font = { name: 'Candara', size: 13, bold: true };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // Adjust if need specific BG
+            } else {
+                cell.font = { name: 'Comic Sans MS', size: 12, bold: true };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
+            }
         });
 
-        // ROW 2: Category Headers
-        const h1 = worksheet.addRow(['CAMPUS', 'SECTION', 'STRENGTH', 'TOP MARK / RANK', '', 'TOT', 'TOTAL', ...Array(10).fill(''), 'BOTANY', ...Array(5).fill(''), 'ZOOLOGY', ...Array(5).fill(''), 'PHYSICS', ...Array(3).fill(''), 'CHEMISTRY', ...Array(4).fill('')]);
-        worksheet.mergeCells('A2:A3'); worksheet.mergeCells('B2:B3'); worksheet.mergeCells('C2:C3'); worksheet.mergeCells('D2:E2');
-        worksheet.mergeCells('F2:F3'); worksheet.mergeCells('G2:Q2'); worksheet.mergeCells('R2:W2'); worksheet.mergeCells('X2:AC2'); worksheet.mergeCells('AD2:AG2'); worksheet.mergeCells('AH2:AL2');
+        // --- ROW 3: Category Headers ---
+        // Need to add 3rd and 4th row headers as requested.
+        const h1 = worksheet.addRow(['Campus', 'Section', 'Strength', 'Mark', 'Rank', 'TOT', 'TOTAL', '', '', '', '', '', '', '', '', '', '', 'Botany(>170M)', '', '', '', '', '', 'Zoology(>170M)', '', '', '', '', '', 'Physics (>70M)', '', '', '', 'Chemistry ( >100M)', '', '', '', '']);
 
-        // ROW 3: Detail Labels
-        const h2 = worksheet.addRow(['', '', '', 'MARK', 'RANK', '', '>=650', '>=600', '>=580', '>=530', '>=490', '>=450', '>=400', '>=360', '>=320', '>=280', '<=200', '>=175', '>=170', '>=160', '160-170', '>=150', '>=130', '>=175', '>=170', '>=160', '160-170', '>=150', '>=130', '>=70', '50-70', '<=50', '<=20', '>=100', '70-100', '50-70', '<=50', '<=20']);
-        [h1, h2].forEach(row => row.eachCell(cell => {
-            cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = borderStyle; cell.font = { bold: true, size: 9 };
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE9ECEF' } };
-        }));
+        // Merge 3rd & 4th row for these specific columns
+        worksheet.mergeCells('A3:A4');
+        worksheet.mergeCells('B3:B4');
+        worksheet.mergeCells('C3:C4');
+        worksheet.mergeCells('D3:D4');
+        worksheet.mergeCells('E3:E4');
+
+        // Merging others in 3rd row
+        worksheet.mergeCells('F3:Q3'); // TOT, TOTAL ... 
+        worksheet.mergeCells('R3:W3'); // Botany
+        worksheet.mergeCells('X3:AC3'); // Zoology
+        worksheet.mergeCells('AD3:AG3'); // Physics
+        worksheet.mergeCells('AH3:AL3'); // Chemistry
+
+        // --- ROW 4: Detail Labels ---
+        const h2 = worksheet.addRow(['', '', '', '', '', '<=350', '>=650', '>=600', '>=580', '>=530', '>=490', '>=450', '>=400', '>=360', '>=320', '>=280', '<=200', '>=175', '>=170', '>=160', '180-170', '>=150', '>=130', '>=175', '>=170', '>=160', '180-170', '>=150', '>=130', '>=70', '50-70', '<=50', '<=30', '>=100', '70-100', '50-70', '<=50', '<=20']);
+
+        // Styling ROW 3
+        h1.eachCell((cell, colNumber) => {
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = borderStyle;
+
+            if (colNumber === 1 || colNumber === 2 || colNumber === 3) {
+                cell.font = { name: 'Candara', size: 13, bold: true };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+            } else if (colNumber === 4 || colNumber === 5) {
+                cell.font = { name: 'Candara', size: 11, bold: true };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+            } else if (colNumber === 6) { // TOT cell in combined merged area (starts F3)
+            } else if (colNumber === 7) { // TOTAL cell in combined merged area (starts G3, but Wait, F:Q is merged! Let's handle formatting manually after loop for merges)
+            }
+        });
+
+        // Explicit formatting for Merged Cells in Row 3
+        // F3 (TOT, TOTAL)
+        const cellF3 = worksheet.getCell('F3');
+        cellF3.value = { richText: [{ text: 'TOT', font: { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FF000000' } } }, { text: ' ', font: { name: 'Calibri', size: 13, bold: true } }, { text: 'TOTAL', font: { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF000000' } } }] };
+        cellF3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } }; // #FFFFCC
+
+        // R3 (Botany)
+        const cellR3 = worksheet.getCell('R3');
+        cellR3.value = 'Botany(>170M)';
+        cellR3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
+        cellR3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE9D9' } }; // #FDE9D9
+
+        // X3 (Zoology)
+        const cellX3 = worksheet.getCell('X3');
+        cellX3.value = 'Zoology(>170M)';
+        cellX3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
+        cellX3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDAEEF3' } }; // #DAEEF3
+
+        // AD3 (Physics)
+        const cellAD3 = worksheet.getCell('AD3');
+        cellAD3.value = 'Physics (>70M)';
+        cellAD3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
+        cellAD3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEBF1DE' } }; // #EBF1DE
+
+        // AH3 (Chemistry)
+        const cellAH3 = worksheet.getCell('AH3');
+        cellAH3.value = 'Chemistry ( >100M)';
+        cellAH3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
+        cellAH3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2DCDB' } }; // #F2DCDB
+
+
+        // Styling ROW 4
+        h2.eachCell((cell, colNumber) => {
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = borderStyle;
+            cell.font = { name: 'Comic Sans MS', size: 12, bold: true };
+
+            if (colNumber >= 6 && colNumber <= 17) { // TOT / TOTAL area
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFF0' } }; // #FFFFF0
+            } else if (colNumber >= 18 && colNumber <= 23) { // Botany
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // white
+            } else if (colNumber >= 24 && colNumber <= 29) { // Zoology
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; // #F5F5F5
+            } else if (colNumber >= 30 && colNumber <= 33) { // Physics
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // white
+            } else if (colNumber >= 34 && colNumber <= 38) { // Chemistry
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; // #F5F5F5
+            }
+        });
 
         // Data Rows
         sortedExamStats.forEach(row => {
-            const r = worksheet.addRow([row.Campus, row.Section, row.Strength, Number(row.Mark).toFixed(2), (row.Rank === Infinity ? '-' : Number(row.Rank).toFixed(2)), row.T_350, row.T_650, row.T_600, row.T_580, row.T_530, row.T_490, row.T_450, row.T_400, row.T_360, row.T_320, row.T_280, row.T_L200, row.B_175, row.B_170, row.B_160, row.B_160_170, row.B_150, row.B_130, row.Z_175, row.Z_170, row.Z_160, row.Z_160_170, row.Z_150, row.Z_130, row.P_70, row.P_50_70, row.P_L50, row.P_L20, row.C_100, row.C_70_100, row.C_50_70, row.C_L50, row.C_L20]);
+            const r = worksheet.addRow([row.Campus, row.Section, row.Strength, Number(row.Mark).toFixed(2), (row.Rank === Infinity ? '-' : Number(row.Rank).toFixed(2)), row.T_350, row.T_650, row.T_600, row.T_580, row.T_530, row.T_490, row.T_450, row.T_400, row.T_360, row.T_320, row.T_280, row.T_L200, row.B_175, row.B_170, row.B_160, row.B_170_180, row.B_150, row.B_130, row.Z_175, row.Z_170, row.Z_160, row.Z_170_180, row.Z_150, row.Z_130, row.P_70, row.P_50_70, row.P_L50, row.P_L30, row.C_100, row.C_70_100, row.C_50_70, row.C_L50, row.C_L20]);
             r.eachCell(cell => { cell.border = borderStyle; cell.alignment = { horizontal: 'center' }; cell.font = { size: 9 }; });
         });
 
@@ -237,7 +329,7 @@ const AverageCountReport = ({ filters }) => {
         } catch (e) { console.error("Failed to add logo:", e); }
 
         worksheet.mergeCells('A2:R2');
-        const row2 = worksheet.getCell('A2'); row2.value = 'Central Office, Madhapur-Hyd.'; row2.font = { bold: true, size: 14 };
+        const row2 = worksheet.getCell('A2'); row2.value = 'Central Office, Bangalore'; row2.font = { bold: true, size: 14 };
         row2.alignment = { horizontal: 'center', vertical: 'middle' }; row2.border = borderStyle; worksheet.getRow(2).height = 25;
 
         worksheet.mergeCells('A3:E4');
@@ -250,18 +342,19 @@ const AverageCountReport = ({ filters }) => {
         cellF3.value = { richText: [{ text: `Over All Sr.Inter (Revi) NEET Avg's : \n`, font: { color: { argb: 'FFFF0000' }, name: 'Arial', size: 10, bold: true } }, { text: `Dates :- ${datesStrWrap}`, font: { color: { argb: 'FF000000' }, name: 'Arial', size: 10 } }] };
         cellF3.alignment = { horizontal: 'left', vertical: 'top', wrapText: true }; cellF3.border = borderStyle; worksheet.getRow(3).height = 20; worksheet.getRow(4).height = 30;
 
-        const headerLabels = ['RANK', 'Stud_ID', 'Name', 'CAMPUS NAME', 'Prog. Name', 'BOT 180', 'B_R', 'ZOO 180', 'Z_R', 'BIO', 'PHY 180', 'P_R', 'CHE 180', 'C_R', 'TOT 720', 'AIR', 'T_App', 'T_Cnt'];
+        const headerLabels = ['RANK', 'Stud_ID', 'Name', 'CAMPUS NAME', 'Prog. Name', 'BOT 180', 'B_R', 'ZOO 180', 'Z_R', 'BIO', 'PHY 180', 'P_R', 'CHE 180', 'C_R', '≤350', 'AIR', 'T_App', 'T_Cnt'];
         const row5 = worksheet.addRow(headerLabels); row5.height = 35;
         row5.eachCell((cell, colNumber) => {
             if (colNumber <= 5) cell.style = getHeaderBaseStyle('FFFFFFCC');
-            else if (colNumber <= 7) cell.style = getHeaderBaseStyle('FFCCFFFF');
+            else if (colNumber <= 7) cell.style = getHeaderBaseStyle('FFFFFFCC');
             else if (colNumber <= 9) cell.style = getHeaderBaseStyle('FFFDE9D9');
-            else if (colNumber === 10) cell.style = getHeaderBaseStyle('FFE4DFEC');
-            else if (colNumber <= 12) cell.style = getHeaderBaseStyle('FFD9D9D9');
+            else if (colNumber === 10) cell.style = getHeaderBaseStyle('F2F2F2F2');
+            else if (colNumber <= 12) cell.style = getHeaderBaseStyle('FFE4DFEC');
             else if (colNumber <= 14) cell.style = getHeaderBaseStyle('FFDDD9C4');
             else if (colNumber === 15) cell.style = getHeaderBaseStyle('FF002060', 'FFFFFF00');
             else if (colNumber === 16) cell.style = getHeaderBaseStyle('FFFFFF00', 'FF0000FF');
-            else cell.style = getHeaderBaseStyle('FFFFFF00', 'FF0000FF');
+            else if (colNumber === 17) cell.style = getHeaderBaseStyle('FFFCD5B4');
+            else cell.style = getHeaderBaseStyle('FFD9D9D9');
         });
 
         sortedStudentList.forEach((s, idx) => {
@@ -269,8 +362,19 @@ const AverageCountReport = ({ filters }) => {
             const rowData = [idx + 1, s.STUD_ID || '', (s.name || ''), (s.campus || ''), stream, Number(s.bot || 0).toFixed(1), Number(s.b_rank || 0).toFixed(1), Number(s.zoo || 0).toFixed(1), Number(s.z_rank || 0).toFixed(1), bio, Number(s.phy || 0).toFixed(1), Number(s.p_rank || 0).toFixed(1), Number(s.che || 0).toFixed(1), Number(s.c_rank || 0).toFixed(1), Number(s.tot || 0).toFixed(1), Number(s.air || 0).toFixed(1), s.t_app || 0, totalConducted];
             const dataRow = worksheet.addRow(rowData);
             dataRow.eachCell((cell, colNumber) => {
-                cell.border = borderStyle; cell.alignment = { vertical: 'middle', horizontal: colNumber <= 4 ? 'left' : 'center' }; cell.font = { name: 'Arial', size: 9 };
-                if (colNumber === 15) cell.font = { name: 'Arial Black', size: 10, bold: true, color: { argb: 'FF0070C0' } };
+                cell.border = borderStyle; cell.alignment = { vertical: 'middle', horizontal: colNumber <= 4 ? 'left' : 'center' };
+
+                if ([15].includes(colNumber)) {
+                    cell.font = { name: 'Arial Black', size: 10, bold: true, color: { argb: 'FF0070C0' } };
+                } else if ([6, 8, 10, 11, 13].includes(colNumber)) {
+                    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF7030A0' } };
+                } else if ([7, 9, 12, 14].includes(colNumber)) {
+                    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFF0000' } };
+                } else if (colNumber === 16) {
+                    cell.font = { name: 'Arial', size: 12, bold: true, italic: true, color: { argb: 'FF0000FF' } };
+                } else {
+                    cell.font = { name: 'Arial', size: 9, color: { argb: 'FF000000' } };
+                }
             });
         });
 
@@ -315,9 +419,9 @@ const AverageCountReport = ({ filters }) => {
                                         <th className="bg-yellow">{totals.T_530}</th><th className="bg-yellow">{totals.T_490}</th><th className="bg-yellow">{totals.T_450}</th>
                                         <th className="bg-yellow">{totals.T_400}</th><th className="bg-yellow">{totals.T_360}</th><th className="bg-yellow">{totals.T_320}</th>
                                         <th className="bg-yellow">{totals.T_280}</th><th className="bg-yellow">{totals.T_L200}</th>
-                                        <th className="bg-orange">{totals.B_175}</th><th className="bg-orange">{totals.B_170}</th><th className="bg-orange">{totals.B_160}</th><th className="bg-orange">{totals.B_160_170}</th><th className="bg-orange">{totals.B_150}</th><th className="bg-orange">{totals.B_130}</th>
-                                        <th className="bg-blue">{totals.Z_175}</th><th className="bg-blue">{totals.Z_170}</th><th className="bg-blue">{totals.Z_160}</th><th className="bg-blue">{totals.Z_160_170}</th><th className="bg-blue">{totals.Z_150}</th><th className="bg-blue">{totals.Z_130}</th>
-                                        <th className="bg-green">{totals.P_70}</th><th className="bg-green">{totals.P_50_70}</th><th className="bg-green">{totals.P_L50}</th><th className="bg-green">{totals.P_L20}</th>
+                                        <th className="bg-orange">{totals.B_175}</th><th className="bg-orange">{totals.B_170}</th><th className="bg-orange">{totals.B_160}</th><th className="bg-orange">{totals.B_170_180}</th><th className="bg-orange">{totals.B_150}</th><th className="bg-orange">{totals.B_130}</th>
+                                        <th className="bg-blue">{totals.Z_175}</th><th className="bg-blue">{totals.Z_170}</th><th className="bg-blue">{totals.Z_160}</th><th className="bg-blue">{totals.Z_170_180}</th><th className="bg-blue">{totals.Z_150}</th><th className="bg-blue">{totals.Z_130}</th>
+                                        <th className="bg-green">{totals.P_70}</th><th className="bg-green">{totals.P_50_70}</th><th className="bg-green">{totals.P_L50}</th><th className="bg-green">{totals.P_L30}</th>
                                         <th className="bg-pink">{totals.C_100}</th><th className="bg-pink">{totals.C_70_100}</th><th className="bg-pink">{totals.C_50_70}</th><th className="bg-pink">{totals.C_L50}</th><th className="bg-pink">{totals.C_L20}</th>
                                     </tr>
                                 )}
@@ -326,7 +430,7 @@ const AverageCountReport = ({ filters }) => {
                                     <th rowSpan="2">SECTION</th>
                                     <th rowSpan="2" onClick={() => requestSort(setStatsSortConfig, 'Strength')} className="sortable">STRENGTH <SortIcon config={statsSortConfig} columnKey="Strength" /></th>
                                     <th colSpan="2">TOP MARK / RANK</th>
-                                    <th rowSpan="2" className="bg-yellow">TOT</th>
+                                    <th rowSpan="2" className="bg-yellow">≤350</th>
                                     <th colSpan="11" className="bg-yellow">TOTAL</th>
                                     <th colSpan="6" className="bg-orange">BOTANY</th>
                                     <th colSpan="6" className="bg-blue">ZOOLOGY</th>
@@ -336,9 +440,9 @@ const AverageCountReport = ({ filters }) => {
                                 <tr>
                                     <th>MARK</th><th>RANK</th>
                                     <th className="bg-yellow">{'>='}650</th><th className="bg-yellow">{'>='}600</th><th className="bg-yellow">{'>='}580</th><th className="bg-yellow">{'>='}530</th><th className="bg-yellow">{'>='}490</th><th className="bg-yellow">{'>='}450</th><th className="bg-yellow">{'>='}400</th><th className="bg-yellow">{'>='}360</th><th className="bg-yellow">{'>='}320</th><th className="bg-yellow">{'>='}280</th><th className="bg-yellow">{'<='}200</th>
-                                    <th className="bg-orange">{'>='}175</th><th className="bg-orange">{'>='}170</th><th className="bg-orange">{'>='}160</th><th className="bg-orange">160-170</th><th className="bg-orange">{'>='}150</th><th className="bg-orange">{'>='}130</th>
-                                    <th className="bg-blue">{'>='}175</th><th className="bg-blue">{'>='}170</th><th className="bg-blue">{'>='}160</th><th className="bg-blue">160-170</th><th className="bg-blue">{'>='}150</th><th className="bg-blue">{'>='}130</th>
-                                    <th className="bg-green">{'>='}70</th><th className="bg-green">50-70</th><th className="bg-green">{'<='}50</th><th className="bg-green">{'<='}20</th>
+                                    <th className="bg-orange">{'>='}175</th><th className="bg-orange">{'>='}170</th><th className="bg-orange">{'>='}160</th><th className="bg-orange">180-170</th><th className="bg-orange">{'>='}150</th><th className="bg-orange">{'>='}130</th>
+                                    <th className="bg-blue">{'>='}175</th><th className="bg-blue">{'>='}170</th><th className="bg-blue">{'>='}160</th><th className="bg-blue">180-170</th><th className="bg-blue">{'>='}150</th><th className="bg-blue">{'>='}130</th>
+                                    <th className="bg-green">{'>='}70</th><th className="bg-green">50-70</th><th className="bg-green">{'<='}50</th><th className="bg-green">{'<='}30</th>
                                     <th className="bg-pink">{'>='}100</th><th className="bg-pink">70-100</th><th className="bg-pink">50-70</th><th className="bg-pink">{'<='}50</th><th className="bg-pink">{'<='}20</th>
                                 </tr>
                             </thead>
@@ -352,9 +456,9 @@ const AverageCountReport = ({ filters }) => {
                                         <td className="bold">{row.Rank === Infinity ? '-' : Number(row.Rank).toFixed(2)}</td>
                                         <td className="bg-light-yellow bold">{row.T_350}</td>
                                         <td>{row.T_650}</td><td>{row.T_600}</td><td>{row.T_580}</td><td>{row.T_530}</td><td>{row.T_490}</td><td>{row.T_450}</td><td>{row.T_400}</td><td>{row.T_360}</td><td>{row.T_320}</td><td>{row.T_280}</td><td>{row.T_L200}</td>
-                                        <td className="bg-light-orange">{row.B_175}</td><td>{row.B_170}</td><td>{row.B_160}</td><td>{row.B_160_170}</td><td>{row.B_150}</td><td>{row.B_130}</td>
-                                        <td className="bg-light-blue">{row.Z_175}</td><td>{row.Z_170}</td><td>{row.Z_160}</td><td>{row.Z_160_170}</td><td>{row.Z_150}</td><td>{row.Z_130}</td>
-                                        <td className="bg-light-green">{row.P_70}</td><td>{row.P_50_70}</td><td>{row.P_L50}</td><td>{row.P_L20}</td>
+                                        <td className="bg-light-orange">{row.B_175}</td><td>{row.B_170}</td><td>{row.B_160}</td><td>{row.B_170_180}</td><td>{row.B_150}</td><td>{row.B_130}</td>
+                                        <td className="bg-light-blue">{row.Z_175}</td><td>{row.Z_170}</td><td>{row.Z_160}</td><td>{row.Z_170_180}</td><td>{row.Z_150}</td><td>{row.Z_130}</td>
+                                        <td className="bg-light-green">{row.P_70}</td><td>{row.P_50_70}</td><td>{row.P_L50}</td><td>{row.P_L30}</td>
                                         <td className="bg-light-pink">{row.C_100}</td><td>{row.C_70_100}</td><td>{row.C_50_70}</td><td>{row.C_L50}</td><td>{row.C_L20}</td>
                                     </tr>
                                 ))}
