@@ -341,8 +341,8 @@ const TestWiseImprovements = ({ filters }) => {
                 .test-improvements-wrapper {
                     display: flex;
                     flex-direction: column;
-                    gap: 2rem;
-                    padding: 1rem 0;
+                    gap: 1rem;
+                    padding: 0.5rem 0;
                     animation: fadeIn 0.5s ease-out;
                 }
                 @keyframes fadeIn {
@@ -354,22 +354,22 @@ const TestWiseImprovements = ({ filters }) => {
                     backdrop-filter: blur(16px);
                     -webkit-backdrop-filter: blur(16px);
                     border: 1px solid rgba(255, 255, 255, 0.3);
-                    border-radius: 16px;
-                    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.07);
-                    padding: 1.5rem;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 20px rgba(31, 38, 135, 0.05);
+                    padding: 1rem;
                     overflow: hidden;
                     transition: all 0.3s ease;
                 }
                 .glass-header {
-                    font-size: 1.25rem;
+                    font-size: 1.1rem;
                     font-weight: 700;
                     color: #1e293b;
-                    margin-bottom: 1.5rem;
+                    margin-bottom: 0.75rem;
                     display: flex;
                     align-items: center;
                     gap: 0.5rem;
                     border-bottom: 2px solid rgba(99, 102, 241, 0.2);
-                    padding-bottom: 0.75rem;
+                    padding-bottom: 0.5rem;
                 }
                 
                 .modern-table-container {
@@ -383,7 +383,7 @@ const TestWiseImprovements = ({ filters }) => {
                     background: rgba(255, 255, 255, 0.5);
                 }
                 .modern-table th, .modern-table td {
-                    padding: 1rem;
+                    padding: 0.6rem 0.75rem;
                     text-align: center;
                     border-bottom: 1px solid rgba(226, 232, 240, 0.8);
                 }
@@ -407,8 +407,8 @@ const TestWiseImprovements = ({ filters }) => {
                 .test-selector {
                     display: flex;
                     flex-wrap: wrap;
-                    gap: 0.75rem;
-                    margin-bottom: 1.5rem;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
                 }
                 .test-pill {
                     padding: 0.5rem 1.25rem;
@@ -433,23 +433,33 @@ const TestWiseImprovements = ({ filters }) => {
                 }
 
                 .subjects-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                    gap: 1.5rem;
-                    margin-bottom: 1.5rem;
+                    display: flex;
+                    gap: 1rem;
+                    overflow-x: auto;
+                    padding-bottom: 1rem;
+                    margin-bottom: 1rem;
+                    scrollbar-width: thin;
+                    scrollbar-color: #cbd5e1 transparent;
+                }
+                .subjects-grid::-webkit-scrollbar {
+                    height: 6px;
+                }
+                .subjects-grid::-webkit-scrollbar-thumb {
+                    background-color: #cbd5e1;
+                    border-radius: 10px;
                 }
                 .subject-card {
                     background: rgba(255, 255, 255, 0.9);
-                    border-radius: 16px;
-                    padding: 1.5rem;
+                    border-radius: 12px;
+                    padding: 1rem;
                     border: 1px solid rgba(226, 232, 240, 0.8);
                     position: relative;
-                    overflow: hidden;
+                    min-width: 240px;
+                    flex: 1;
                     transition: transform 0.3s ease, box-shadow 0.3s ease;
                 }
                 .subject-card:hover {
-                    transform: translateY(-5px);
-                    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
                 }
                 .subject-card::before {
                     content: '';
@@ -487,7 +497,7 @@ const TestWiseImprovements = ({ filters }) => {
                     margin-bottom: 0.25rem;
                 }
                 .metric-value {
-                    font-size: 1.8rem;
+                    font-size: 1.4rem;
                     font-weight: 800;
                     line-height: 1;
                 }
@@ -626,16 +636,16 @@ const TestWiseImprovements = ({ filters }) => {
                 </div>
 
                 {selectedTest && (
-                    <div style={{ marginBottom: '2rem', padding: '1.25rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
-                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overall average</span>
-                            <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b' }}>
-                                {totAvg} <span style={{ fontSize: '1rem', color: '#6366f1', opacity: 0.8 }}>/ 720</span>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Overall average</span>
+                            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#1e293b' }}>
+                                {totAvg} <span style={{ fontSize: '0.85rem', color: '#6366f1', opacity: 0.8 }}>/ 720</span>
                             </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                            <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Success rate</span>
-                            <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#10b981' }}>{totPct}%</div>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Success rate</span>
+                            <div style={{ fontSize: '1.4rem', fontWeight: '800', color: '#10b981' }}>{totPct}%</div>
                         </div>
                     </div>
                 )}
