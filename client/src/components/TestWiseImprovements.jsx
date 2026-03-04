@@ -68,13 +68,19 @@ const TestWiseImprovements = ({ filters }) => {
                 { header: 'Campus Name', key: 'campus', width: 20 },
                 { header: 'Stream', key: 'stream', width: 20 },
                 { header: 'Botany Marks', key: 'bot', width: 15 },
+                { header: 'Botany %', key: 'bot_pct', width: 12 },
                 { header: 'Botany Improve', key: 'bot_imp', width: 17 },
                 { header: 'Zoology Marks', key: 'zoo', width: 15 },
+                { header: 'Zoology %', key: 'zoo_pct', width: 12 },
                 { header: 'Zoology Improve', key: 'zoo_imp', width: 18 },
                 { header: 'Physics Marks', key: 'phy', width: 15 },
+                { header: 'Physics %', key: 'phy_pct', width: 12 },
                 { header: 'Physics Improve', key: 'phy_imp', width: 18 },
                 { header: 'Chemistry Marks', key: 'che', width: 18 },
-                { header: 'Chemistry Improve', key: 'che_imp', width: 20 }
+                { header: 'Chemistry %', key: 'che_pct', width: 12 },
+                { header: 'Chemistry Improve', key: 'che_imp', width: 20 },
+                { header: 'Total Marks', key: 'tot', width: 15 },
+                { header: 'Total %', key: 'tot_pct', width: 12 }
             ];
 
             // Add Header Row Styling
@@ -98,22 +104,28 @@ const TestWiseImprovements = ({ filters }) => {
                     campus: s.campus || 'N/A',
                     stream: s.stream || '-',
                     bot: bot,
+                    bot_pct: `${Math.round((bot / 180) * 100)}%`,
                     bot_imp: Math.max(0, 180 - bot),
                     zoo: zoo,
+                    zoo_pct: `${Math.round((zoo / 180) * 100)}%`,
                     zoo_imp: Math.max(0, 180 - zoo),
                     phy: phy,
+                    phy_pct: `${Math.round((phy / 180) * 100)}%`,
                     phy_imp: Math.max(0, 180 - phy),
                     che: che,
-                    che_imp: Math.max(0, 180 - che)
+                    che_pct: `${Math.round((che / 180) * 100)}%`,
+                    che_imp: Math.max(0, 180 - che),
+                    tot: Number(s.tot) || 0,
+                    tot_pct: `${Math.round((Number(s.tot) / 720) * 100)}%`
                 });
             });
 
             // Auto-format numeric columns to center
             worksheet.eachRow((row, rowNumber) => {
                 if (rowNumber > 1) {
-                    [1, 6, 7, 8, 9, 10, 11, 12, 13].forEach(colIndex => {
+                    [1, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].forEach(colIndex => {
                         const cell = row.getCell(colIndex);
-                        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                        if (cell) cell.alignment = { vertical: 'middle', horizontal: 'center' };
                     });
                 }
             });
@@ -121,6 +133,13 @@ const TestWiseImprovements = ({ filters }) => {
             const buffer = await workbook.xlsx.writeBuffer();
             saveAs(new Blob([buffer]), `Improvement_List_${testName}.xlsx`);
             logActivity(userData, 'Exported Student Improvements List', { test: testName });
+
+            // Add total count footer to worksheet
+            const footerRowIdx = students.length + 3;
+            const footerRow = worksheet.getRow(footerRowIdx);
+            footerRow.getCell(2).value = `Total Exams in Record: ${students.length}`;
+            footerRow.getCell(2).font = { bold: true };
+            footerRow.commit();
 
         } catch (err) {
             console.error("Error downloading student list:", err);
@@ -131,7 +150,7 @@ const TestWiseImprovements = ({ filters }) => {
     };
 
     const formatDiff = (current, prev) => {
-        const diff = current - prev;
+        const diff = Math.round((current - prev) * 10) / 10;
         if (diff > 0) return <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '0.9em' }}> (+{diff})</span>;
         if (diff < 0) return <span style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '0.9em' }}> ({diff})</span>;
         return <span style={{ color: '#6b7280', fontSize: '0.9em' }}> (0)</span>;
@@ -143,6 +162,7 @@ const TestWiseImprovements = ({ filters }) => {
         { label: '400 - 449', key: 'cat3' },
         { label: '350 - 399', key: 'cat4' },
         { label: '< 350', key: 'cat5' },
+        { label: 'Overall Average', key: 'avg_tot', isSpecial: true },
     ];
 
     if (loading) {
@@ -172,6 +192,8 @@ const TestWiseImprovements = ({ filters }) => {
     const zooData = computeSubject(selectedTest?.avg_zoo);
     const phyData = computeSubject(selectedTest?.avg_phy);
     const cheData = computeSubject(selectedTest?.avg_che);
+    const totAvg = Math.round(selectedTest?.avg_tot || 0);
+    const totPct = Math.round((totAvg / 720) * 100);
 
     return (
         <div className="test-improvements-wrapper">
@@ -398,11 +420,13 @@ const TestWiseImprovements = ({ filters }) => {
                         </thead>
                         <tbody>
                             {categories.map((cat, catIdx) => (
-                                <tr key={catIdx}>
+                                <tr key={catIdx} style={cat.isSpecial ? { background: 'rgba(99, 102, 241, 0.05)', borderTop: '2px solid rgba(99, 102, 241, 0.2)' } : {}}>
                                     <td className="category-label">{cat.label}</td>
                                     {stats.map((test, idx) => (
                                         <td key={idx}>
-                                            <span style={{ fontWeight: '600', color: '#334155' }}>{test[cat.key]}</span>
+                                            <span style={{ fontWeight: '700', color: cat.isSpecial ? '#4f46e5' : '#334155' }}>
+                                                {cat.isSpecial ? Math.round(test[cat.key]) : test[cat.key]}
+                                            </span>
                                             {idx > 0 && formatDiff(test[cat.key], stats[idx - 1][cat.key])}
                                         </td>
                                     ))}
@@ -422,7 +446,7 @@ const TestWiseImprovements = ({ filters }) => {
                     </div>
                 </div>
 
-                <div className="test-selector">
+                <div className="test-selector" style={{ marginBottom: '1rem' }}>
                     {stats.map((test, idx) => (
                         <div
                             key={idx}
@@ -435,6 +459,19 @@ const TestWiseImprovements = ({ filters }) => {
                 </div>
 
                 {selectedTest && (
+                    <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Overall Average</span>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1e293b' }}>{totAvg} <span style={{ fontSize: '1rem', color: '#6366f1' }}>/ 720</span></div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                            <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Success Rate</span>
+                            <div style={{ fontSize: '1.5rem', fontWeight: '800', color: '#10b981' }}>{totPct}%</div>
+                        </div>
+                    </div>
+                )}
+
+                {selectedTest && (
                     <>
                         <div className="subjects-grid">
                             {/* BOTANY */}
@@ -443,7 +480,10 @@ const TestWiseImprovements = ({ filters }) => {
                                 <div className="subj-metrics">
                                     <div className="metric-block">
                                         <span className="metric-label">Current Average</span>
-                                        <span className="metric-value avg">{botData.avg}</span>
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                                            <span className="metric-value avg">{botData.avg}</span>
+                                            <span style={{ fontSize: '0.9rem', color: '#10b981', fontWeight: '700' }}>({botData.percent}%)</span>
+                                        </div>
                                     </div>
                                     <ArrowRight size={20} color="#cbd5e1" />
                                     <div className="metric-block" style={{ alignItems: 'flex-end' }}>
@@ -462,7 +502,10 @@ const TestWiseImprovements = ({ filters }) => {
                                 <div className="subj-metrics">
                                     <div className="metric-block">
                                         <span className="metric-label">Current Average</span>
-                                        <span className="metric-value avg">{zooData.avg}</span>
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                                            <span className="metric-value avg">{zooData.avg}</span>
+                                            <span style={{ fontSize: '0.9rem', color: '#3b82f6', fontWeight: '700' }}>({zooData.percent}%)</span>
+                                        </div>
                                     </div>
                                     <ArrowRight size={20} color="#cbd5e1" />
                                     <div className="metric-block" style={{ alignItems: 'flex-end' }}>
@@ -481,7 +524,10 @@ const TestWiseImprovements = ({ filters }) => {
                                 <div className="subj-metrics">
                                     <div className="metric-block">
                                         <span className="metric-label">Current Average</span>
-                                        <span className="metric-value avg">{phyData.avg}</span>
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                                            <span className="metric-value avg">{phyData.avg}</span>
+                                            <span style={{ fontSize: '0.9rem', color: '#f59e0b', fontWeight: '700' }}>({phyData.percent}%)</span>
+                                        </div>
                                     </div>
                                     <ArrowRight size={20} color="#cbd5e1" />
                                     <div className="metric-block" style={{ alignItems: 'flex-end' }}>
@@ -500,7 +546,10 @@ const TestWiseImprovements = ({ filters }) => {
                                 <div className="subj-metrics">
                                     <div className="metric-block">
                                         <span className="metric-label">Current Average</span>
-                                        <span className="metric-value avg">{cheData.avg}</span>
+                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                                            <span className="metric-value avg">{cheData.avg}</span>
+                                            <span style={{ fontSize: '0.9rem', color: '#ef4444', fontWeight: '700' }}>({cheData.percent}%)</span>
+                                        </div>
                                     </div>
                                     <ArrowRight size={20} color="#cbd5e1" />
                                     <div className="metric-block" style={{ alignItems: 'flex-end' }}>
