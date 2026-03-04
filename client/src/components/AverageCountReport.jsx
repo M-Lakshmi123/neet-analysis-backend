@@ -186,7 +186,7 @@ const AverageCountReport = ({ filters }) => {
             worksheet.mergeCells('D2:E2');
 
             gtRow.eachCell((cell, colNumber) => {
-                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' }; // Wrap text removed for auto-fit, except handling \n implicitly if Excel allows
                 cell.border = borderStyle;
                 // 2nd row Candara 13 for "Total", strength(col 3), "All india best"(col 4)
                 if (colNumber === 1 || colNumber === 2 || colNumber === 3 || colNumber === 4 || colNumber === 5) {
@@ -221,7 +221,7 @@ const AverageCountReport = ({ filters }) => {
 
             // Styling ROW 3
             h1.eachCell((cell, colNumber) => {
-                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
                 cell.border = borderStyle;
 
                 if (colNumber === 1 || colNumber === 2 || colNumber === 3) {
@@ -268,7 +268,7 @@ const AverageCountReport = ({ filters }) => {
 
             // Styling ROW 4
             h2.eachCell((cell, colNumber) => {
-                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
                 cell.border = borderStyle;
                 cell.font = { name: 'Comic Sans MS', size: 12, bold: true };
 
@@ -290,7 +290,7 @@ const AverageCountReport = ({ filters }) => {
                 const r = worksheet.addRow([row.Campus, row.Section, row.Strength, Number(row.Mark).toFixed(2), (row.Rank === Infinity ? '-' : Number(row.Rank).toFixed(2)), row.T_350, row.T_650, row.T_600, row.T_580, row.T_530, row.T_490, row.T_450, row.T_400, row.T_360, row.T_320, row.T_280, row.T_L200, row.B_175, row.B_170, row.B_160, row.B_170_180, row.B_150, row.B_130, row.Z_175, row.Z_170, row.Z_160, row.Z_170_180, row.Z_150, row.Z_130, row.P_70, row.P_50_70, row.P_L50, row.P_L30, row.C_100, row.C_70_100, row.C_50_70, row.C_L50, row.C_L20]);
                 r.eachCell((cell, colNumber) => {
                     cell.border = borderStyle;
-                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    cell.alignment = { horizontal: colNumber === 1 ? 'left' : 'center', vertical: 'middle' };
 
                     if (colNumber >= 1 && colNumber <= 3) {
                         cell.font = { name: 'Candara', size: 13, bold: false };
