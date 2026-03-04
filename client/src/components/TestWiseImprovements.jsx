@@ -380,7 +380,7 @@ const TestWiseImprovements = ({ filters }) => {
         const val = Math.round(avg || 0);
         const max = currentCutoff[subKey];
         const failCount = selectedTest ? selectedTest[`${subKey}_fail`] : 0;
-        return { avg: val, improve: Math.max(0, max - val), percent: Math.round((val / max) * 100), failCount };
+        return { avg: val, improve: Math.max(0, max - val), percent: Math.round((val / max) * 100), failCount, cutoff: max };
     };
 
     const botData = computeSubject(selectedTest?.avg_bot, 'bot');
@@ -764,7 +764,7 @@ const TestWiseImprovements = ({ filters }) => {
                         <div className="subjects-grid">
                             {/* BOTANY */}
                             <div className="subject-card botany">
-                                <div className="subj-header">Botany</div>
+                                <div className="subj-header">Botany <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>[{botData.cutoff}]</span></div>
                                 <div className="subj-metrics">
                                     <div className="metric-block">
                                         <span className="metric-label">Current Average</span>
@@ -791,7 +791,7 @@ const TestWiseImprovements = ({ filters }) => {
 
                             {/* ZOOLOGY */}
                             <div className="subject-card zoology">
-                                <div className="subj-header">Zoology</div>
+                                <div className="subj-header">Zoology <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>[{zooData.cutoff}]</span></div>
                                 <div className="subj-metrics">
                                     <div className="metric-block">
                                         <span className="metric-label">Current Average</span>
@@ -818,7 +818,7 @@ const TestWiseImprovements = ({ filters }) => {
 
                             {/* PHYSICS */}
                             <div className="subject-card physics">
-                                <div className="subj-header">Physics</div>
+                                <div className="subj-header">Physics <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>[{phyData.cutoff}]</span></div>
                                 <div className="subj-metrics">
                                     <div className="metric-block">
                                         <span className="metric-label">Current Average</span>
@@ -845,7 +845,7 @@ const TestWiseImprovements = ({ filters }) => {
 
                             {/* CHEMISTRY */}
                             <div className="subject-card chemistry">
-                                <div className="subj-header">Chemistry</div>
+                                <div className="subj-header">Chemistry <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>[{cheData.cutoff}]</span></div>
                                 <div className="subj-metrics">
                                     <div className="metric-block">
                                         <span className="metric-label">Current Average</span>
