@@ -216,12 +216,14 @@ const TestWiseImprovements = ({ filters }) => {
             subjects.forEach(sub => {
                 const round2 = (num) => Math.round((Number(num) || 0) * 100) / 100;
 
-                // Sort students for this specific subject
-                const sortedSubStudents = [...students].sort((a, b) => {
-                    const impA = 180 - (Number(a[sub.key]) || 0);
-                    const impB = 180 - (Number(b[sub.key]) || 0);
-                    return impA - impB;
-                });
+                // Only include those who need improvement
+                const sortedSubStudents = [...students]
+                    .filter(s => (Number(s[sub.key]) || 0) < sub.max)
+                    .sort((a, b) => {
+                        const impA = sub.max - (Number(a[sub.key]) || 0);
+                        const impB = sub.max - (Number(b[sub.key]) || 0);
+                        return impA - impB;
+                    });
 
                 sortedSubStudents.forEach((s, idx) => {
                     const marks = round2(s[sub.key]);
@@ -366,14 +368,19 @@ const TestWiseImprovements = ({ filters }) => {
             avg_phy: averages.avg_phy,
             avg_che: averages.avg_che,
             avg_tot: averages.avg_tot,
-            student_count: averages.student_count
+            student_count: averages.student_count,
+            bot_fail: averages.bot_fail,
+            zoo_fail: averages.zoo_fail,
+            phy_fail: averages.phy_fail,
+            che_fail: averages.che_fail
         };
     }
 
     const computeSubject = (avg, subKey) => {
         const val = Math.round(avg || 0);
         const max = currentCutoff[subKey];
-        return { avg: val, improve: Math.max(0, max - val), percent: Math.round((val / max) * 100) };
+        const failCount = selectedTest ? selectedTest[`${subKey}_fail`] : 0;
+        return { avg: val, improve: Math.max(0, max - val), percent: Math.round((val / max) * 100), failCount };
     };
 
     const botData = computeSubject(selectedTest?.avg_bot, 'bot');
@@ -770,6 +777,11 @@ const TestWiseImprovements = ({ filters }) => {
                                     <div className="metric-block" style={{ alignItems: 'flex-end' }}>
                                         <span className="metric-label" style={{ color: '#ef4444' }}>Improvement Needed</span>
                                         <span className="metric-value improve">+{botData.improve}</span>
+                                        {botData.failCount > 0 && (
+                                            <div style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: '800', fontStyle: 'italic', marginTop: '2px' }}>
+                                                {botData.failCount} students below target
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="progress-bg">
@@ -792,6 +804,11 @@ const TestWiseImprovements = ({ filters }) => {
                                     <div className="metric-block" style={{ alignItems: 'flex-end' }}>
                                         <span className="metric-label" style={{ color: '#ef4444' }}>Improvement Needed</span>
                                         <span className="metric-value improve">+{zooData.improve}</span>
+                                        {zooData.failCount > 0 && (
+                                            <div style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: '800', fontStyle: 'italic', marginTop: '2px' }}>
+                                                {zooData.failCount} students below target
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="progress-bg">
@@ -814,6 +831,11 @@ const TestWiseImprovements = ({ filters }) => {
                                     <div className="metric-block" style={{ alignItems: 'flex-end' }}>
                                         <span className="metric-label" style={{ color: '#ef4444' }}>Improvement Needed</span>
                                         <span className="metric-value improve">+{phyData.improve}</span>
+                                        {phyData.failCount > 0 && (
+                                            <div style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: '800', fontStyle: 'italic', marginTop: '2px' }}>
+                                                {phyData.failCount} students below target
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="progress-bg">
@@ -836,6 +858,11 @@ const TestWiseImprovements = ({ filters }) => {
                                     <div className="metric-block" style={{ alignItems: 'flex-end' }}>
                                         <span className="metric-label" style={{ color: '#ef4444' }}>Improvement Needed</span>
                                         <span className="metric-value improve">+{cheData.improve}</span>
+                                        {cheData.failCount > 0 && (
+                                            <div style={{ fontSize: '0.65rem', color: '#ef4444', fontWeight: '800', fontStyle: 'italic', marginTop: '2px' }}>
+                                                {cheData.failCount} students below target
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="progress-bg">

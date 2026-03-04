@@ -685,6 +685,26 @@ app.get('/api/test-improvements/averages', async (req, res) => {
             else if (cat === 'cat15') categoryClause = "avg_tot >= 350 AND avg_tot < 400";
         }
 
+        const THRESHOLD_CUTOFFS = {
+            all: { bot: 180, zoo: 180, phy: 180, che: 180, tot: 720 },
+            cat1: { bot: 180, zoo: 180, phy: 180, che: 180, tot: 710 },
+            cat2: { bot: 180, zoo: 180, phy: 168, che: 170, tot: 700 },
+            cat3: { bot: 175, zoo: 175, phy: 165, che: 170, tot: 685 },
+            cat4: { bot: 170, zoo: 170, phy: 150, che: 165, tot: 655 },
+            cat5: { bot: 170, zoo: 165, phy: 145, che: 160, tot: 640 },
+            cat6: { bot: 165, zoo: 165, phy: 125, che: 140, tot: 595 },
+            cat7: { bot: 160, zoo: 160, phy: 120, che: 130, tot: 570 },
+            cat8: { bot: 160, zoo: 160, phy: 110, che: 120, tot: 550 },
+            cat9: { bot: 160, zoo: 160, phy: 100, che: 110, tot: 530 },
+            cat10: { bot: 150, zoo: 150, phy: 80, che: 110, tot: 490 },
+            cat11: { bot: 140, zoo: 140, phy: 70, che: 100, tot: 450 },
+            cat12: { bot: 155, zoo: 155, phy: 90, che: 110, tot: 530 },
+            cat13: { bot: 145, zoo: 145, phy: 75, che: 105, tot: 490 },
+            cat14: { bot: 135, zoo: 135, phy: 65, che: 95, tot: 450 },
+            cat15: { bot: 125, zoo: 125, phy: 60, che: 80, tot: 400 },
+        };
+        const currentCutoff = THRESHOLD_CUTOFFS[cat] || THRESHOLD_CUTOFFS.all;
+
         const query = `
             SELECT 
                 AVG(avg_bot) as avg_bot,
@@ -692,7 +712,11 @@ app.get('/api/test-improvements/averages', async (req, res) => {
                 AVG(avg_phy) as avg_phy,
                 AVG(avg_che) as avg_che,
                 AVG(avg_tot) as avg_tot,
-                COUNT(*) as student_count
+                COUNT(*) as student_count,
+                SUM(CASE WHEN avg_bot < ${currentCutoff.bot} THEN 1 ELSE 0 END) as bot_fail,
+                SUM(CASE WHEN avg_zoo < ${currentCutoff.zoo} THEN 1 ELSE 0 END) as zoo_fail,
+                SUM(CASE WHEN avg_phy < ${currentCutoff.phy} THEN 1 ELSE 0 END) as phy_fail,
+                SUM(CASE WHEN avg_che < ${currentCutoff.che} THEN 1 ELSE 0 END) as che_fail
             FROM (
                 SELECT 
                     STUD_ID,
