@@ -1,0 +1,69 @@
+const ExcelJS = require('exceljs');
+
+async function test() {
+    try {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Count Summary');
+
+        const borderStyle = {
+            top: { style: 'thin', color: { argb: 'FF40E0D0' } },
+            left: { style: 'thin', color: { argb: 'FF40E0D0' } },
+            bottom: { style: 'thin', color: { argb: 'FF40E0D0' } },
+            right: { style: 'thin', color: { argb: 'FF40E0D0' } }
+        };
+
+        worksheet.columns = Array(38).fill({ width: 10 });
+        worksheet.columns[0] = { width: 35 };
+
+        worksheet.mergeCells('A1:AL1');
+        const row1 = worksheet.getCell('A1');
+        row1.value = 'Logo Row';
+
+        const gtLabels = ['Total', '', 100, 'All India\nBest', '', 1, 1, 1, 1, 1];
+        const gtRow = worksheet.addRow(gtLabels);
+        worksheet.mergeCells('A2:B2');
+        worksheet.mergeCells('D2:E2');
+
+        const h1 = worksheet.addRow(['Campus', 'Section', 'Strength', 'Mark', 'Rank', 'TOT', 'TOTAL', '', '', '', '', '', '', '', '', '', '', 'Botany(>170M)', '', '', '', '', '', 'Zoology(>170M)', '', '', '', '', '', 'Physics (>70M)', '', '', '', 'Chemistry ( >100M)', '', '', '', '']);
+
+        worksheet.mergeCells('A3:A4');
+        worksheet.mergeCells('B3:B4');
+        worksheet.mergeCells('C3:C4');
+        worksheet.mergeCells('D3:D4');
+        worksheet.mergeCells('E3:E4');
+        worksheet.mergeCells('F3:Q3');
+        worksheet.mergeCells('R3:W3');
+        worksheet.mergeCells('X3:AC3');
+        worksheet.mergeCells('AD3:AG3');
+        worksheet.mergeCells('AH3:AL3');
+
+        const h2 = worksheet.addRow(['', '', '', '', '', '<=350', '>=650', '>=600']);
+
+        // add a dummy row
+        worksheet.addRow(['Campus1', 'A', 50, 100, 1, 0, 0, 0]);
+
+        for (let i = 1; i <= 38; i++) {
+            const column = worksheet.getColumn(i);
+            let maxLength = 8;
+            column.eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+                if (rowNumber >= 4) {
+                    let cellVal = cell.value;
+                    if (cellVal && typeof cellVal === 'object' && cellVal.richText) {
+                        cellVal = cellVal.richText.map(rt => rt.text).join('');
+                    }
+                    const columnLength = cellVal ? cellVal.toString().length : 0;
+                    if (columnLength > maxLength) {
+                        maxLength = columnLength;
+                    }
+                }
+            });
+            column.width = Math.min(maxLength + 2, 40);
+        }
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        console.log("Success! buffer size:", buffer.length);
+    } catch (e) {
+        console.error("Error creating excel:", e);
+    }
+}
+test();

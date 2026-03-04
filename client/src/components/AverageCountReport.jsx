@@ -152,150 +152,125 @@ const AverageCountReport = ({ filters }) => {
     const totals = calculateTotals();
 
     const downloadCountExcel = async () => {
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Count Summary');
-        const borderStyle = {
-            top: { style: 'thin', color: { argb: 'FF40E0D0' } },
-            left: { style: 'thin', color: { argb: 'FF40E0D0' } },
-            bottom: { style: 'thin', color: { argb: 'FF40E0D0' } },
-            right: { style: 'thin', color: { argb: 'FF40E0D0' } }
-        };
-        worksheet.columns = Array(38).fill({ width: 10 });
-        worksheet.columns[0] = { width: 35 };
-
-        // --- ROW 1: Logo and Organization Name ---
-        worksheet.mergeCells('A1:AL1');
-        const row1 = worksheet.getCell('A1');
-        row1.value = { richText: [{ text: '          Sri Chaitanya ', font: { name: 'Impact', size: 32, color: { argb: 'FF00B0F0' } } }, { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 32, color: { argb: 'FF00B0F0' } } }] };
-        row1.alignment = { horizontal: 'center', vertical: 'middle' }; row1.border = borderStyle; worksheet.getRow(1).height = 50;
         try {
-            const response = await fetch('/logo.png');
-            if (response.ok) {
-                const blob = await response.blob(); const arrayBuffer = await blob.arrayBuffer();
-                const imageId = workbook.addImage({ buffer: arrayBuffer, extension: 'png' });
-                worksheet.addImage(imageId, { tl: { col: 0.1, row: 0.1 }, ext: { width: 65, height: 60 }, editAs: 'oneCell' });
-            }
-        } catch (e) { console.error("Failed to add logo:", e); }
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Count Summary');
+            const borderStyle = {
+                top: { style: 'thin', color: { argb: 'FF40E0D0' } },
+                left: { style: 'thin', color: { argb: 'FF40E0D0' } },
+                bottom: { style: 'thin', color: { argb: 'FF40E0D0' } },
+                right: { style: 'thin', color: { argb: 'FF40E0D0' } }
+            };
+            worksheet.columns = Array.from({ length: 38 }, () => ({ width: 15 }));
+            worksheet.columns[0] = { width: 35 };
 
-        // --- ROW 2: Detailed Numerical Totals (Grand Total) ---
-        const gtLabels = ['Total', '', totals?.Strength || 0, 'All India\nBest', '', totals?.T_350, totals?.T_650, totals?.T_600, totals?.T_580, totals?.T_530, totals?.T_490, totals?.T_450, totals?.T_400, totals?.T_360, totals?.T_320, totals?.T_280, totals?.T_L200, totals?.B_175, totals?.B_170, totals?.B_160, totals?.B_170_180, totals?.B_150, totals?.B_130, totals?.Z_175, totals?.Z_170, totals?.Z_160, totals?.Z_170_180, totals?.Z_150, totals?.Z_130, totals?.P_70, totals?.P_50_70, totals?.P_L50, totals?.P_L30, totals?.C_100, totals?.C_70_100, totals?.C_50_70, totals?.C_L50, totals?.C_L20];
-
-        const gtRow = worksheet.addRow(gtLabels);
-        worksheet.mergeCells('A2:B2');
-        worksheet.mergeCells('D2:E2');
-
-        gtRow.eachCell((cell, colNumber) => {
-            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-            cell.border = borderStyle;
-            // 2nd row Candara 13 for "Total", strength(col 3), "All india best"(col 4)
-            if (colNumber === 1 || colNumber === 2 || colNumber === 3 || colNumber === 4 || colNumber === 5) {
-                cell.font = { name: 'Candara', size: 13, bold: true };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // Adjust if need specific BG
-            } else {
-                cell.font = { name: 'Comic Sans MS', size: 12, bold: true };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
-            }
-        });
-
-        // --- ROW 3: Category Headers ---
-        // Need to add 3rd and 4th row headers as requested.
-        const h1 = worksheet.addRow(['Campus', 'Section', 'Strength', 'Mark', 'Rank', 'TOT', 'TOTAL', '', '', '', '', '', '', '', '', '', '', 'Botany(>170M)', '', '', '', '', '', 'Zoology(>170M)', '', '', '', '', '', 'Physics (>70M)', '', '', '', 'Chemistry ( >100M)', '', '', '', '']);
-
-        // Merge 3rd & 4th row for these specific columns
-        worksheet.mergeCells('A3:A4');
-        worksheet.mergeCells('B3:B4');
-        worksheet.mergeCells('C3:C4');
-        worksheet.mergeCells('D3:D4');
-        worksheet.mergeCells('E3:E4');
-
-        // Merging others in 3rd row
-        worksheet.mergeCells('F3:Q3'); // TOT, TOTAL ... 
-        worksheet.mergeCells('R3:W3'); // Botany
-        worksheet.mergeCells('X3:AC3'); // Zoology
-        worksheet.mergeCells('AD3:AG3'); // Physics
-        worksheet.mergeCells('AH3:AL3'); // Chemistry
-
-        // --- ROW 4: Detail Labels ---
-        const h2 = worksheet.addRow(['', '', '', '', '', '<=350', '>=650', '>=600', '>=580', '>=530', '>=490', '>=450', '>=400', '>=360', '>=320', '>=280', '<=200', '>=175', '>=170', '>=160', '180-170', '>=150', '>=130', '>=175', '>=170', '>=160', '180-170', '>=150', '>=130', '>=70', '50-70', '<=50', '<=30', '>=100', '70-100', '50-70', '<=50', '<=20']);
-
-        // Styling ROW 3
-        h1.eachCell((cell, colNumber) => {
-            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-            cell.border = borderStyle;
-
-            if (colNumber === 1 || colNumber === 2 || colNumber === 3) {
-                cell.font = { name: 'Candara', size: 13, bold: true };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
-            } else if (colNumber === 4 || colNumber === 5) {
-                cell.font = { name: 'Candara', size: 11, bold: true };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
-            } else if (colNumber === 6) { // TOT cell in combined merged area (starts F3)
-            } else if (colNumber === 7) { // TOTAL cell in combined merged area (starts G3, but Wait, F:Q is merged! Let's handle formatting manually after loop for merges)
-            }
-        });
-
-        // Explicit formatting for Merged Cells in Row 3
-        // F3 (TOT, TOTAL)
-        const cellF3 = worksheet.getCell('F3');
-        cellF3.value = { richText: [{ text: 'TOT', font: { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FF000000' } } }, { text: ' ', font: { name: 'Calibri', size: 13, bold: true } }, { text: 'TOTAL', font: { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF000000' } } }] };
-        cellF3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } }; // #FFFFCC
-
-        // R3 (Botany)
-        const cellR3 = worksheet.getCell('R3');
-        cellR3.value = 'Botany(>170M)';
-        cellR3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
-        cellR3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE9D9' } }; // #FDE9D9
-
-        // X3 (Zoology)
-        const cellX3 = worksheet.getCell('X3');
-        cellX3.value = 'Zoology(>170M)';
-        cellX3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
-        cellX3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDAEEF3' } }; // #DAEEF3
-
-        // AD3 (Physics)
-        const cellAD3 = worksheet.getCell('AD3');
-        cellAD3.value = 'Physics (>70M)';
-        cellAD3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
-        cellAD3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEBF1DE' } }; // #EBF1DE
-
-        // AH3 (Chemistry)
-        const cellAH3 = worksheet.getCell('AH3');
-        cellAH3.value = 'Chemistry ( >100M)';
-        cellAH3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
-        cellAH3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2DCDB' } }; // #F2DCDB
-
-
-        // Styling ROW 4
-        h2.eachCell((cell, colNumber) => {
-            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-            cell.border = borderStyle;
-            cell.font = { name: 'Comic Sans MS', size: 12, bold: true };
-
-            if (colNumber >= 6 && colNumber <= 17) { // TOT / TOTAL area
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFF0' } }; // #FFFFF0
-            } else if (colNumber >= 18 && colNumber <= 23) { // Botany
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // white
-            } else if (colNumber >= 24 && colNumber <= 29) { // Zoology
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; // #F5F5F5
-            } else if (colNumber >= 30 && colNumber <= 33) { // Physics
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // white
-            } else if (colNumber >= 34 && colNumber <= 38) { // Chemistry
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; // #F5F5F5
-            }
-        });
-
-        // Data Rows
-        sortedExamStats.forEach(row => {
-            const r = worksheet.addRow([row.Campus, row.Section, row.Strength, Number(row.Mark).toFixed(2), (row.Rank === Infinity ? '-' : Number(row.Rank).toFixed(2)), row.T_350, row.T_650, row.T_600, row.T_580, row.T_530, row.T_490, row.T_450, row.T_400, row.T_360, row.T_320, row.T_280, row.T_L200, row.B_175, row.B_170, row.B_160, row.B_170_180, row.B_150, row.B_130, row.Z_175, row.Z_170, row.Z_160, row.Z_170_180, row.Z_150, row.Z_130, row.P_70, row.P_50_70, row.P_L50, row.P_L30, row.C_100, row.C_70_100, row.C_50_70, row.C_L50, row.C_L20]);
-            r.eachCell((cell, colNumber) => {
-                cell.border = borderStyle;
-                cell.alignment = { horizontal: 'center', vertical: 'middle' };
-
-                if (colNumber >= 1 && colNumber <= 3) {
-                    cell.font = { name: 'Candara', size: 13, bold: false };
-                } else {
-                    cell.font = { name: 'Comic Sans MS', size: 12, bold: false };
+            // --- ROW 1: Logo and Organization Name ---
+            worksheet.mergeCells('A1:AL1');
+            const row1 = worksheet.getCell('A1');
+            row1.value = { richText: [{ text: '          Sri Chaitanya ', font: { name: 'Impact', size: 32, color: { argb: 'FF00B0F0' } } }, { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 32, color: { argb: 'FF00B0F0' } } }] };
+            row1.alignment = { horizontal: 'center', vertical: 'middle' }; row1.border = borderStyle; worksheet.getRow(1).height = 50;
+            try {
+                const response = await fetch('/logo.png');
+                if (response.ok) {
+                    const blob = await response.blob(); const arrayBuffer = await blob.arrayBuffer();
+                    const imageId = workbook.addImage({ buffer: arrayBuffer, extension: 'png' });
+                    worksheet.addImage(imageId, { tl: { col: 0.1, row: 0.1 }, ext: { width: 65, height: 60 }, editAs: 'oneCell' });
                 }
+            } catch (e) { console.error("Failed to add logo:", e); }
+
+            // --- ROW 2: Detailed Numerical Totals (Grand Total) ---
+            const gtLabels = ['Total', '', totals?.Strength || 0, 'All India\nBest', '', totals?.T_350, totals?.T_650, totals?.T_600, totals?.T_580, totals?.T_530, totals?.T_490, totals?.T_450, totals?.T_400, totals?.T_360, totals?.T_320, totals?.T_280, totals?.T_L200, totals?.B_175, totals?.B_170, totals?.B_160, totals?.B_170_180, totals?.B_150, totals?.B_130, totals?.Z_175, totals?.Z_170, totals?.Z_160, totals?.Z_170_180, totals?.Z_150, totals?.Z_130, totals?.P_70, totals?.P_50_70, totals?.P_L50, totals?.P_L30, totals?.C_100, totals?.C_70_100, totals?.C_50_70, totals?.C_L50, totals?.C_L20];
+
+            const gtRow = worksheet.addRow(gtLabels);
+            worksheet.mergeCells('A2:B2');
+            worksheet.mergeCells('D2:E2');
+
+            gtRow.eachCell((cell, colNumber) => {
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.border = borderStyle;
+                // 2nd row Candara 13 for "Total", strength(col 3), "All india best"(col 4)
+                if (colNumber === 1 || colNumber === 2 || colNumber === 3 || colNumber === 4 || colNumber === 5) {
+                    cell.font = { name: 'Candara', size: 13, bold: true };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // Adjust if need specific BG
+                } else {
+                    cell.font = { name: 'Comic Sans MS', size: 12, bold: true };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
+                }
+            });
+
+            // --- ROW 3: Category Headers ---
+            // Need to add 3rd and 4th row headers as requested.
+            const h1 = worksheet.addRow(['Campus', 'Section', 'Strength', 'Mark', 'Rank', 'TOT', 'TOTAL', '', '', '', '', '', '', '', '', '', '', 'Botany(>170M)', '', '', '', '', '', 'Zoology(>170M)', '', '', '', '', '', 'Physics (>70M)', '', '', '', 'Chemistry ( >100M)', '', '', '', '']);
+
+            // Merge 3rd & 4th row for these specific columns
+            worksheet.mergeCells('A3:A4');
+            worksheet.mergeCells('B3:B4');
+            worksheet.mergeCells('C3:C4');
+            worksheet.mergeCells('D3:D4');
+            worksheet.mergeCells('E3:E4');
+
+            // Merging others in 3rd row
+            worksheet.mergeCells('F3:Q3'); // TOT, TOTAL ... 
+            worksheet.mergeCells('R3:W3'); // Botany
+            worksheet.mergeCells('X3:AC3'); // Zoology
+            worksheet.mergeCells('AD3:AG3'); // Physics
+            worksheet.mergeCells('AH3:AL3'); // Chemistry
+
+            // --- ROW 4: Detail Labels ---
+            const h2 = worksheet.addRow(['', '', '', '', '', '<=350', '>=650', '>=600', '>=580', '>=530', '>=490', '>=450', '>=400', '>=360', '>=320', '>=280', '<=200', '>=175', '>=170', '>=160', '180-170', '>=150', '>=130', '>=175', '>=170', '>=160', '180-170', '>=150', '>=130', '>=70', '50-70', '<=50', '<=30', '>=100', '70-100', '50-70', '<=50', '<=20']);
+
+            // Styling ROW 3
+            h1.eachCell((cell, colNumber) => {
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.border = borderStyle;
+
+                if (colNumber === 1 || colNumber === 2 || colNumber === 3) {
+                    cell.font = { name: 'Candara', size: 13, bold: true };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+                } else if (colNumber === 4 || colNumber === 5) {
+                    cell.font = { name: 'Candara', size: 11, bold: true };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+                } else if (colNumber === 6) { // TOT cell in combined merged area (starts F3)
+                } else if (colNumber === 7) { // TOTAL cell in combined merged area (starts G3, but Wait, F:Q is merged! Let's handle formatting manually after loop for merges)
+                }
+            });
+
+            // Explicit formatting for Merged Cells in Row 3
+            // F3 (TOT, TOTAL)
+            const cellF3 = worksheet.getCell('F3');
+            cellF3.value = { richText: [{ text: 'TOT', font: { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FF000000' } } }, { text: ' ', font: { name: 'Calibri', size: 13, bold: true } }, { text: 'TOTAL', font: { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF000000' } } }] };
+            cellF3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } }; // #FFFFCC
+
+            // R3 (Botany)
+            const cellR3 = worksheet.getCell('R3');
+            cellR3.value = 'Botany(>170M)';
+            cellR3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
+            cellR3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE9D9' } }; // #FDE9D9
+
+            // X3 (Zoology)
+            const cellX3 = worksheet.getCell('X3');
+            cellX3.value = 'Zoology(>170M)';
+            cellX3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
+            cellX3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDAEEF3' } }; // #DAEEF3
+
+            // AD3 (Physics)
+            const cellAD3 = worksheet.getCell('AD3');
+            cellAD3.value = 'Physics (>70M)';
+            cellAD3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
+            cellAD3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEBF1DE' } }; // #EBF1DE
+
+            // AH3 (Chemistry)
+            const cellAH3 = worksheet.getCell('AH3');
+            cellAH3.value = 'Chemistry ( >100M)';
+            cellAH3.font = { name: 'Comic Sans MS', size: 12, bold: true, color: { argb: 'FFFF0066' } }; // #FF0066
+            cellAH3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2DCDB' } }; // #F2DCDB
+
+
+            // Styling ROW 4
+            h2.eachCell((cell, colNumber) => {
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.border = borderStyle;
+                cell.font = { name: 'Comic Sans MS', size: 12, bold: true };
 
                 if (colNumber >= 6 && colNumber <= 17) { // TOT / TOTAL area
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFF0' } }; // #FFFFF0
@@ -307,36 +282,65 @@ const AverageCountReport = ({ filters }) => {
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // white
                 } else if (colNumber >= 34 && colNumber <= 38) { // Chemistry
                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; // #F5F5F5
-                } else {
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // White for A-E and default
                 }
             });
-        });
 
-        // Auto-fit columns based on data from row 4 onwards
-        for (let i = 1; i <= 38; i++) {
-            const column = worksheet.getColumn(i);
-            let maxLength = 8;
-            column.eachCell({ includeEmpty: true }, (cell, rowNumber) => {
-                if (rowNumber >= 4) {
-                    let cellVal = cell.value;
-                    if (cellVal && typeof cellVal === 'object' && cellVal.richText) {
-                        cellVal = cellVal.richText.map(rt => rt.text).join('');
+            // Data Rows
+            sortedExamStats.forEach(row => {
+                const r = worksheet.addRow([row.Campus, row.Section, row.Strength, Number(row.Mark).toFixed(2), (row.Rank === Infinity ? '-' : Number(row.Rank).toFixed(2)), row.T_350, row.T_650, row.T_600, row.T_580, row.T_530, row.T_490, row.T_450, row.T_400, row.T_360, row.T_320, row.T_280, row.T_L200, row.B_175, row.B_170, row.B_160, row.B_170_180, row.B_150, row.B_130, row.Z_175, row.Z_170, row.Z_160, row.Z_170_180, row.Z_150, row.Z_130, row.P_70, row.P_50_70, row.P_L50, row.P_L30, row.C_100, row.C_70_100, row.C_50_70, row.C_L50, row.C_L20]);
+                r.eachCell((cell, colNumber) => {
+                    cell.border = borderStyle;
+                    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                    if (colNumber >= 1 && colNumber <= 3) {
+                        cell.font = { name: 'Candara', size: 13, bold: false };
+                    } else {
+                        cell.font = { name: 'Comic Sans MS', size: 12, bold: false };
                     }
-                    const columnLength = cellVal ? cellVal.toString().length : 0;
-                    if (columnLength > maxLength) {
-                        maxLength = columnLength;
+
+                    if (colNumber >= 6 && colNumber <= 17) { // TOT / TOTAL area
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFF0' } }; // #FFFFF0
+                    } else if (colNumber >= 18 && colNumber <= 23) { // Botany
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // white
+                    } else if (colNumber >= 24 && colNumber <= 29) { // Zoology
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; // #F5F5F5
+                    } else if (colNumber >= 30 && colNumber <= 33) { // Physics
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // white
+                    } else if (colNumber >= 34 && colNumber <= 38) { // Chemistry
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } }; // #F5F5F5
+                    } else {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }; // White for A-E and default
                     }
-                }
+                });
             });
-            column.width = Math.min(maxLength + 2, 40);
+
+            // Auto-fit columns based on data from row 4 onwards
+            for (let i = 1; i <= 38; i++) {
+                let maxLength = 8;
+                worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+                    if (rowNumber >= 4) {
+                        const cell = row.getCell(i);
+                        let cellVal = cell.value;
+                        if (cellVal && typeof cellVal === 'object' && cellVal.richText) {
+                            cellVal = cellVal.richText.map(rt => rt.text).join('');
+                        }
+                        const columnLength = cellVal ? cellVal.toString().length : 0;
+                        if (columnLength > maxLength) {
+                            maxLength = columnLength;
+                        }
+                    }
+                });
+                worksheet.getColumn(i).width = Math.min(maxLength + 2, 40);
+            }
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const rawFileName = `Count_Summary_${getStreamLabel()}`;
+            const cleanFileName = rawFileName.replace(/[^a-z0-9\-_]/gi, '_');
+            saveAs(new Blob([buffer]), `${cleanFileName}.xlsx`);
+        } catch (error) {
+            alert("Excel Download Error: " + error.message);
+            console.error("Excel generation error:", error);
         }
-
-        const buffer = await workbook.xlsx.writeBuffer();
-        const rawFileName = `Count_Summary_${getStreamLabel()}`;
-        const cleanFileName = rawFileName.replace(/[^a-z0-9\-_]/gi, '_');
-        const blobType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8';
-        saveAs(new Blob([buffer], { type: blobType }), `${cleanFileName}.xlsx`);
     };
 
     const downloadListExcel = async () => {
