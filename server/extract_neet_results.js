@@ -2,6 +2,7 @@ const XLSX = require('xlsx');
 const path = require('path');
 const { connectToDb } = require('./db');
 const fs = require('fs');
+const readline = require('readline-sync');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'Uploader_Config.xlsx');
 const RESULT_DIR = path.join(__dirname, '..', 'Result');
@@ -9,8 +10,11 @@ const LOG_PATH = path.join(__dirname, '..', 'Missing_Columns_Log.txt');
 
 async function run() {
     try {
-        const pool = await connectToDb();
-        console.log("Connected to TiDB (NEET).");
+        const yearResponse = readline.question(`Enter Academic Year (2025/2026) [Default 2025]: `, { defaultInput: '2025' });
+        const year = yearResponse.trim();
+
+        const pool = await connectToDb(year);
+        console.log(`Connected to TiDB (NEET ${year}).`);
 
         fs.writeFileSync(LOG_PATH, `=== NEET UPLOADER LOG: ${new Date().toLocaleString()} ===\n\n`);
 
@@ -57,7 +61,7 @@ async function run() {
         let totalUploaded = 0;
         for (const fileObj of files) {
             console.log(`\nProcessing: ${path.basename(fileObj.path)} [Folder: ${fileObj.folder}]`);
-            const count = await processResultFile(fileObj.path, fileObj.folder, pool, topConfigMaps, allowedCampuses);
+            const count = await processResultFile(fileObj.path, fileObj.folder, pool, topConfigMaps, allowedCampuses, year);
             totalUploaded += count || 0;
         }
 
@@ -120,7 +124,7 @@ function isKarnatakaCampus(name, allowedCampuses) {
     return keywords.some(k => upper.includes(k));
 }
 
-async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps, allowedCampuses) {
+async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps, allowedCampuses, year) {
     const wb = XLSX.readFile(filePath);
 
     // 1. Marks List Sheet
@@ -282,7 +286,7 @@ async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps
             Chemistry: row[colMap.CHE],
             C_Rank: row[colMap.C_Rank],
             Stream: dbStream,
-            Year: '2025',
+            Year: year,
             Top_ALL: topAll,
             Errors_Bot: errors.bot,
             Errors_Zoo: errors.zoo,

@@ -68,8 +68,12 @@ async function connectToDb(year = '2026') {
                 request: () => ({
                     query: async (sqlQuery) => {
                         try {
-                            const [rows] = await poolRaw.query(sqlQuery);
-                            return { recordset: rows };
+                            const [res, fields] = await poolRaw.query(sqlQuery);
+                            // If it's a SELECT, res is an array of rows. 
+                            // If it's DML (INSERT/UPDATE), res is a ResultSetHeader.
+                            const recordset = Array.isArray(res) ? res : [];
+                            const rowsAffected = !Array.isArray(res) ? [res.affectedRows] : [res.length];
+                            return { recordset, rowsAffected };
                         } catch (err) {
                             console.error(`SQL Error (${targetYear}):`, err.message);
                             throw err;

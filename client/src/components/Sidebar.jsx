@@ -12,25 +12,32 @@ const Sidebar = ({ activePage, setActivePage }) => {
     const { isAdmin, isCoAdmin } = useAuth();
     const canSeeErrorTop = isAdmin || isCoAdmin;
 
-    const menuItems = [
-        { id: 'analysis', label: 'Analysis Report', icon: <BarChart3 size={18} />, roles: ['principal', 'admin', 'co_admin'] },
-        { id: 'test_improvements', label: 'Test Wise Improvements', icon: <Activity size={18} />, roles: ['principal', 'admin', 'co_admin'] },
-        { id: 'averages', label: 'Average Marks Report', icon: <ClipboardList size={18} />, roles: ['principal', 'admin'] },
-        { id: 'average_count', label: 'Average Count Report', icon: <ClipboardList size={18} />, roles: ['admin', 'principal'] },
-        { id: 'target_vs_achieved', label: 'Target Vs Achieved', icon: <ClipboardList size={18} />, roles: ['principal', 'admin'] },
-        { id: 'progress', label: 'Progress Report', icon: <Users size={18} />, roles: ['principal', 'admin'] },
-        { id: 'errors', label: 'Error Report', icon: <FileWarning size={18} />, roles: ['principal', 'admin'] },
-        { id: 'error_count', label: 'Error Count Report', icon: <ClipboardList size={18} />, roles: ['principal', 'admin', 'co_admin'] },
-        { id: 'student_performance', label: 'Student Performance', icon: <Activity size={18} />, roles: ['principal', 'admin', 'co_admin'] }
+    // Determine base items everyone sees, following exact required order
+    const baseItems = [
+        { id: 'analysis', label: 'Analysis Report', icon: <BarChart3 size={18} /> },
+        { id: 'test_improvements', label: 'Test Wise Improvements', icon: <Activity size={18} /> },
+        { id: 'progress', label: 'Progress Report', icon: <Users size={18} /> },
+        { id: 'averages', label: 'Average Marks Report', icon: <ClipboardList size={18} /> },
+        { id: 'errors', label: 'Error Report', icon: <FileWarning size={18} /> },
+        { id: 'target_vs_achieved', label: 'Target Vs Achieved', icon: <ClipboardList size={18} /> },
+        { id: 'average_count', label: 'Average Count Report', icon: <ClipboardList size={18} /> },
+        { id: 'error_count', label: 'Error Count Report', icon: <ClipboardList size={18} /> },
+        { id: 'student_performance', label: 'Student Performance', icon: <Activity size={18} /> }
     ];
 
-    const adminItems = [
-        { id: 'error_top', label: 'Error Top 100%', icon: <FileWarning size={18} />, roles: ['admin', 'co_admin'] },
-        { id: 'approvals', label: 'User Approvals', icon: <Users size={18} />, roles: ['admin'] },
-        { id: 'logs', label: 'Activity Logs', icon: <Activity size={18} />, roles: ['admin'] }
-    ];
+    let currentItems = [...baseItems];
 
-    const currentItems = [...menuItems, ...(canSeeErrorTop ? adminItems.filter(item => item.roles.includes(isCoAdmin ? 'co_admin' : 'admin')) : [])];
+    // 'Error Top 100%' is for Admins and Co-Admins, requested to be placed directly after 'Error Report'
+    if (isAdmin || isCoAdmin) {
+        const insertIdx = currentItems.findIndex(i => i.id === 'errors') + 1;
+        currentItems.splice(insertIdx, 0, { id: 'error_top', label: 'Error Top 100%', icon: <FileWarning size={18} /> });
+    }
+
+    // Only Admins get User Approvals and Activity Logs
+    if (isAdmin) {
+        currentItems.push({ id: 'approvals', label: 'User Approvals', icon: <Users size={18} /> });
+        currentItems.push({ id: 'logs', label: 'Activity Logs', icon: <Activity size={18} /> });
+    }
 
     return (
         <aside className="sidebar">
