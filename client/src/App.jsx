@@ -314,34 +314,16 @@ const Dashboard = () => {
                                                             activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
-                    <div className="year-toggle-container">
-                        <button
-                            className={`year-btn ${academicYear === '2025' ? 'active' : 'inactive'}`}
-                            onClick={() => {
-                                setAcademicYear('2025');
-                                // Reset filters when year changes
-                                setPageFilters({});
-                            }}
-                        >
-                            <span style={{ fontSize: '1.2rem' }}>📅</span>
-                            Academic Year 2025
-                        </button>
-                        <button
-                            className={`year-btn ${academicYear === '2026' ? 'active' : 'inactive'}`}
-                            onClick={() => {
-                                setAcademicYear('2026');
-                                // Reset filters when year changes
-                                setPageFilters({});
-                            }}
-                        >
-                            <span style={{ fontSize: '1.2rem' }}>🎯</span>
-                            Academic Year 2026
-                        </button>
-                    </div>
+
                     {showFilterBar && (
                         <FilterBar
                             filters={globalFilters}
                             setFilters={setGlobalFilters}
+                            academicYear={academicYear}
+                            onYearChange={(year) => {
+                                setAcademicYear(year);
+                                setPageFilters({});
+                            }}
                             restrictedCampus={isRestricted ? userAllowedCampuses : null}
                             apiEndpoints={
                                 ['errors', 'error_top', 'error_count'].includes(activePage)

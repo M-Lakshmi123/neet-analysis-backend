@@ -1,14 +1,19 @@
 const mysql = require('mysql2/promise');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const createConfig = (year) => {
-    const suffix = year === '2025' ? '' : '_2026';
-    return {
-        host: process.env[`DB_HOST${suffix}`] || process.env.DB_SERVER || process.env.DB_HOST,
-        user: process.env[`DB_USER${suffix}`] || process.env.DB_USER,
-        password: process.env[`DB_PASSWORD${suffix}`] || process.env.DB_PASSWORD,
-        database: process.env[`DB_NAME${suffix}`] || process.env.DB_NAME,
+    // Current cluster is 2025, New cluster is 2026
+    const is2026 = year === '2026';
+    const suffix = is2026 ? '_2026' : '';
+
+    // Explicitly select based on year. NEVER fall back to 2025 cluster if 2026 is requested.
+    const config = {
+        host: process.env[`DB_HOST${suffix}`],
+        user: process.env[`DB_USER${suffix}`],
+        password: process.env[`DB_PASSWORD${suffix}`],
+        database: process.env[`DB_NAME${suffix}`],
         port: process.env[`DB_PORT${suffix}`] ? parseInt(process.env[`DB_PORT${suffix}`]) : 4000,
         waitForConnections: true,
         connectionLimit: 10,
@@ -17,6 +22,28 @@ const createConfig = (year) => {
             rejectUnauthorized: true
         }
     };
+
+    // If variables for the specific year are missing, we should know about it.
+    if (!config.host || !config.user || !config.password) {
+        console.warn(`[DB][WARNING] Missing environment variables for academic year ${year}! Falling back to raw defaults if possible...`);
+        // We only fall back to one generic set if the specific ones are absent, 
+        // but prefer being explicit.
+        config.host = config.host || process.env.DB_HOST;
+        config.user = config.user || process.env.DB_USER;
+        config.password = config.password || process.env.DB_PASSWORD;
+        config.database = config.database || process.env.DB_NAME;
+    }
+
+    // Log for debugging (especially useful in Render logs)
+    const logInfo = `[${new Date().toISOString()}] DB Config Selection - Year: ${year}, Host: ${config.host}, User: ${config.user}, DB: ${config.database}`;
+    console.log(logInfo);
+
+    // Also append to a local file for history
+    try {
+        fs.appendFileSync(path.join(__dirname, 'db_debug.log'), logInfo + '\n');
+    } catch (e) { }
+
+    return config;
 };
 
 const pools = {};

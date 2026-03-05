@@ -318,7 +318,7 @@ body {
     width: fit-content;
     border-radius: 16px;
     border: 1px solid var(--border-light);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
 }
 
 .year-btn {
@@ -353,6 +353,46 @@ body {
     background: #eff6ff;
     border-color: var(--medicon-navy);
     transform: translateY(-1px);
+}
+
+/* Inline Year Selector (Space Saving) */
+.year-selector-filters {
+    display: flex;
+    gap: 0.25rem;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    height: 40px;
+    align-items: center;
+}
+
+.year-filter-btn {
+    padding: 4px 12px;
+    border-radius: 7px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.year-filter-btn.active {
+    background: white;
+    color: #1e3a8a;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.year-filter-btn:not(.active):hover {
+    background: rgba(0, 0, 0, 0.03);
+    color: #475569;
 }
 
 /* Compact Filter Bar */

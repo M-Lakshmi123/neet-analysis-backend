@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import Select from 'react-select';
 import AsyncSelect from 'react-select/async';
 import { buildQueryParams, API_URL } from '../utils/apiHelper';
+import { useAuth } from './auth/AuthProvider';
+import { logActivity } from '../utils/activityLogger';
 
-const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} }) => {
+const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restrictedCampus, apiEndpoints = {} }) => {
+    const { userData } = useAuth();
     // Normalize restriction to array for uniform handling
     const allowedCampuses = Array.isArray(restrictedCampus) ? restrictedCampus : (restrictedCampus ? [restrictedCampus] : []);
     const isRestricted = allowedCampuses.length > 0;
@@ -87,7 +90,8 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                 stream: filters.stream,
                 testType: filters.testType,
                 test: filters.test,
-                topAll: filters.topAll
+                topAll: filters.topAll,
+                academicYear: filters.academicYear
             });
             const urlOptions = `${API_URL}${endpoints.filters}?${paramsOptions.toString()}`;
 
@@ -201,7 +205,8 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                 stream: filters.stream,
                 testType: filters.testType,
                 test: filters.test,
-                topAll: filters.topAll
+                topAll: filters.topAll,
+                academicYear: filters.academicYear
             });
 
             // If restricted and no campus selected, enforce allowed campuses
@@ -350,11 +355,10 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                         cacheOptions
                         loadOptions={loadStudentOptions}
                         defaultOptions={[]}
-                        placeholder="Search Student Name or ID..."
+                        placeholder="Search Student..."
                         onChange={(opt) => {
                             if (opt) {
                                 // STRICT ENFORCEMENT: Ensure the student belongs to an allowed campus
-                                // This is a safety check as loadStudentOptions already filters
                                 const finalCampus = isRestricted
                                     ? (allowedCampuses.includes(opt.campus) ? [opt.campus] : allowedCampuses)
                                     : (opt.campus ? [opt.campus] : []);
@@ -375,7 +379,6 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                                     ...prev,
                                     studentSearch: [],
                                     quickSearch: '',
-                                    // Reset campus to restricted list if active
                                     campus: isRestricted ? allowedCampuses : []
                                 }));
                             }
@@ -386,7 +389,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                             control: (base, state) => ({
                                 ...customStyles.control(base, state),
                                 border: 'none',
-                                height: '42px',
+                                height: '40px',
                                 background: 'transparent'
                             })
                         }}
@@ -397,10 +400,35 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                         value={filters.studentSearch && filters.studentSearch.length > 0 ? { value: filters.studentSearch[0], label: filters.quickSearch } : null}
                     />
                 </div>
+
+                {/* Academic Year Selector in the same row */}
+                <div className="year-selector-filters">
+                    <button
+                        title="Acacdemic Year 2025"
+                        className={`year-filter-btn ${academicYear === '2025' ? 'active' : ''}`}
+                        onClick={() => {
+                            onYearChange('2025');
+                            if (userData) logActivity(userData, 'Switched to Academic Year 2025');
+                        }}
+                    >
+                        2025
+                    </button>
+                    <button
+                        title="Acacdemic Year 2026"
+                        className={`year-filter-btn ${academicYear === '2026' ? 'active' : ''}`}
+                        onClick={() => {
+                            onYearChange('2026');
+                            if (userData) logActivity(userData, 'Switched to Academic Year 2026');
+                        }}
+                    >
+                        2026
+                    </button>
+                </div>
+
                 <button
                     onClick={resetFilters}
                     className="btn-primary reset-btn"
-                    style={{ marginLeft: '10px', height: '42px', whiteSpace: 'nowrap' }}
+                    style={{ height: '40px', whiteSpace: 'nowrap' }}
                 >
                     Clear All
                 </button>
