@@ -242,95 +242,77 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         control: (base, state) => ({
             ...base,
             background: 'white',
-            borderColor: state.isFocused ? '#6366f1' : '#e2e8f0',
-            minHeight: '38px',
-            height: '38px', // Fixed height to prevent enlarging
+            borderColor: state.isFocused ? '#172554' : '#e2e8f0',
+            minHeight: '35px',
+            height: '35px',
             borderRadius: '8px',
             boxShadow: 'none',
-            '&:hover': {
-                borderColor: '#6366f1'
-            },
+            '&:hover': { borderColor: '#172554' },
             overflow: 'hidden'
-        }),
-        menu: (base) => ({
-            ...base,
-            backgroundColor: 'white',
-            border: '1px solid #e2e8f0',
-            zIndex: 1000,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
         }),
         valueContainer: (base) => ({
             ...base,
-            maxHeight: '38px',
+            height: '35px',
+            padding: '0 8px',
+            display: 'flex',
+            flexWrap: 'nowrap',
             overflowX: 'auto',
             overflowY: 'hidden',
-            flexWrap: 'nowrap',
-            padding: '0 8px',
-            scrollbarWidth: 'none', // Firefox
-            '&::-webkit-scrollbar': { display: 'none' }, // Chrome/Safari
-            maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
         }),
-
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '35px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
         placeholder: (base) => ({
             ...base,
-            fontSize: '0.82rem',
+            fontSize: '0.75rem',
             color: '#94a3b8',
             whiteSpace: 'nowrap'
         }),
-        multiValue: (base, state) => {
-            const isAll = state.data.value === 'SELECT_ALL';
-            return {
-                ...base,
-                backgroundColor: isAll ? '#172554' : '#eff6ff',
-                borderRadius: '4px',
-                margin: '2px',
-                minWidth: isAll ? '100px' : 'auto'
-            };
-        },
-        multiValueLabel: (base, state) => ({
+        multiValue: (base) => ({
             ...base,
-            color: state.data.value === 'SELECT_ALL' ? 'white' : '#1e40af',
-            fontSize: '0.7rem',
+            backgroundColor: '#eff6ff',
+            borderRadius: '4px',
+            margin: '2px 2px 2px 0',
+            flexShrink: 0, // Prevent chips from shrinking
+        }),
+        multiValueLabel: (base) => ({
+            ...base,
+            color: '#1e40af',
+            fontSize: '0.65rem',
             fontWeight: '700',
-            padding: '2px 6px'
+            padding: '1px 4px'
         }),
         multiValueRemove: (base) => ({
             ...base,
-            display: 'flex',
-            color: '#ef4444',
-            ':hover': {
-                backgroundColor: '#ef4444',
-                color: 'white',
-            },
+            padding: '0 2px',
+            ':hover': { backgroundColor: '#ef4444', color: 'white' },
         })
     };
 
-    // Compact styles for the row filters
     const compactStyles = {
         ...customStyles,
         control: (base, state) => ({
             ...customStyles.control(base, state),
             minHeight: '32px',
             height: '32px',
-            fontSize: '0.75rem',
         }),
         valueContainer: (base) => ({
             ...customStyles.valueContainer(base),
-            maxHeight: '32px',
+            height: '32px',
         }),
-        placeholder: (base) => ({
-            ...customStyles.placeholder(base),
-            fontSize: '0.75rem',
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
         }),
-        multiValue: (base, state) => ({
-            ...customStyles.multiValue(base, state),
-            margin: '1px',
-        }),
-        multiValueLabel: (base, state) => ({
-            ...customStyles.multiValueLabel(base, state),
-            fontSize: '0.65rem',
-            padding: '1px 4px',
-        })
     };
 
     const resetFilters = () => {
