@@ -154,14 +154,15 @@ app.get('/api/filters', async (req, res) => {
                     'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
                 };
                 valArray.forEach(v => {
-                    if (groups[v]) {
-                        selection = [...new Set([...selection, ...groups[v]])];
+                    const upperV = v ? v.toString().trim().toUpperCase() : '';
+                    if (groups[upperV]) {
+                        selection = [...new Set([...selection, ...groups[upperV]])];
                     }
                 });
             }
 
             const cleanValues = selection
-                .map(v => v ? v.toString().trim() : '')
+                .map(v => v ? v.toString().trim().toUpperCase() : '')
                 .filter(v => v !== '' && v !== '__ALL__')
                 .map(v => v.replace(/'/g, "''"));
 
@@ -808,14 +809,31 @@ app.get('/api/erp/filters', async (req, res) => {
         const buildOptionClause = (column, values) => {
             if (!values || values === 'All' || values === '__ALL__') return null;
             const valArray = Array.isArray(values) ? values : [values];
-            const cleanValues = valArray
-                .map(v => v ? v.toString().trim() : '')
+
+            // --- STREAM GROUPING LOGIC ---
+            let selection = [...valArray];
+            if (column === 'Stream') {
+                const groups = {
+                    'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
+                    'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
+                    'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
+                };
+                valArray.forEach(v => {
+                    const upperV = v ? v.toString().trim().toUpperCase() : '';
+                    if (groups[upperV]) {
+                        selection = [...new Set([...selection, ...groups[upperV]])];
+                    }
+                });
+            }
+
+            const cleanValues = selection
+                .map(v => v ? v.toString().trim().toUpperCase() : '')
                 .filter(v => v !== '' && v !== '__ALL__')
                 .map(v => v.replace(/'/g, "''"));
 
             if (cleanValues.length === 0) return null;
             const list = cleanValues.map(v => `'${v}'`).join(',');
-            return `${column} IN(${list})`;
+            return `${column} IN (${list})`;
         };
 
         const branchClause = buildOptionClause('Branch', activeBranch);

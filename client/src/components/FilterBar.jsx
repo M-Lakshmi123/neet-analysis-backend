@@ -86,7 +86,8 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
                 campus: filters.campus,
                 stream: filters.stream,
                 testType: filters.testType,
-                test: filters.test
+                test: filters.test,
+                topAll: filters.topAll
             });
             const urlOptions = `${API_URL}${endpoints.filters}?${paramsOptions.toString()}`;
 
@@ -193,12 +194,18 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
         if (!inputValue || inputValue.length < 1) return []; // Search from 1 character
 
         try {
-            // Build query strictly
-            const searchParams = new URLSearchParams();
-            searchParams.append('quickSearch', inputValue);
+            // Start with base search params
+            const searchParams = buildQueryParams({
+                quickSearch: inputValue,
+                campus: filters.campus,
+                stream: filters.stream,
+                testType: filters.testType,
+                test: filters.test,
+                topAll: filters.topAll
+            });
 
-            // Enforce restricted campuses in search
-            if (isRestricted) {
+            // If restricted and no campus selected, enforce allowed campuses
+            if (isRestricted && (!filters.campus || filters.campus.length === 0)) {
                 allowedCampuses.forEach(c => {
                     searchParams.append('campus', c);
                 });
