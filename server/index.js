@@ -137,9 +137,10 @@ const buildWhereClause = (req, options = {}) => {
 // Get Filter Options
 app.get('/api/filters', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const { campus, stream, testType, test } = req.query;
-        console.log(`[Filters] Request: campus=${campus}, stream=${stream}, testType=${testType}, test=${test}`);
+        console.log(`[Filters][${year}] Request: campus=${campus}, stream=${stream}, testType=${testType}, test=${test}`);
 
         const buildOptionClause = (column, values) => {
             if (!values || values === 'All' || values === '__ALL__') return null;
@@ -202,10 +203,10 @@ app.get('/api/filters', async (req, res) => {
         console.log(`[Filters] Tests Query: ${testsQuery}`);
         console.log(`[Filters] Top_ALL Query: ${topQuery}`);
 
-        const cacheKey = `filters_${JSON.stringify(req.query)}`;
+        const cacheKey = `filters_${year}_${JSON.stringify(req.query)}`;
         const cachedData = cache.get(cacheKey);
         if (cachedData) {
-            console.log("[Filters] Cache Hit");
+            console.log(`[Filters][${year}] Cache Hit`);
             return res.json(cachedData);
         }
 
@@ -219,15 +220,26 @@ app.get('/api/filters', async (req, res) => {
             pool.request().query(topQuery)
         ]);
 
+        // SMART PRUNING: Data in DB can be messy (e.g. SR streams sometimes have JR top categories).
+        // If user has filtered by Stream, we prune the Top_ALL results to match the level.
+        let prunedTopAll = (topRes.recordset || []).map(r => r.Top_ALL).filter(Boolean);
+
+        const streamStr = JSON.stringify(stream || '').toUpperCase();
+        if (streamStr.includes('SR') || streamStr.includes('SENIOR')) {
+            prunedTopAll = prunedTopAll.filter(t => !t.toUpperCase().includes('JR ') && !t.toUpperCase().includes('JUNIOR'));
+        } else if (streamStr.includes('JR') || streamStr.includes('JUNIOR')) {
+            prunedTopAll = prunedTopAll.filter(t => !t.toUpperCase().includes('SR ') && !t.toUpperCase().includes('SENIOR'));
+        }
+
         const responseData = {
             campuses: (campusesRes.recordset || []).map(r => r.CAMPUS_NAME).filter(Boolean),
             streams: (streamsRes.recordset || []).map(r => r.Stream).filter(Boolean),
             testTypes: (testTypesRes.recordset || []).map(r => r.Test_Type).filter(Boolean),
             tests: (testsRes.recordset || []).map(r => r.Test).filter(Boolean),
-            topAll: (topRes.recordset || []).map(r => r.Top_ALL).filter(Boolean)
+            topAll: prunedTopAll
         };
 
-        console.log(`[Filters] Success (${Date.now() - start}ms): ${responseData.campuses.length} campuses, ${responseData.streams.length} streams`);
+        console.log(`[Filters] Success (${Date.now() - start}ms): ${responseData.campuses.length} campuses, ${responseData.topAll.length} topAll options`);
 
         // Cache for only 10 seconds to allow quick updates during data upload
         cache.set(cacheKey, responseData, 10);
@@ -241,9 +253,10 @@ app.get('/api/filters', async (req, res) => {
 // Health Check
 app.get('/api/health', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         await pool.request().query('SELECT 1');
-        res.json({ status: 'ok', message: 'Database connected' });
+        res.json({ status: 'ok', message: `Database (${year}) connected` });
     } catch (err) {
         res.status(500).json({ status: 'error', message: err.message });
     }
@@ -257,8 +270,9 @@ app.get('/', (req, res) => {
 // Get All Students with Name, ID, Total Marks, and Rank
 app.get('/api/students', async (req, res) => {
     try {
-        console.log("Attempting to connect to DB for /api/students...");
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        console.log(`Attempting to connect to DB (${year}) for /api/students...`);
+        const pool = await connectToDb(year);
         console.log("Connected. Querying MEDICAL_RESULT...");
 
         const whereClause = buildWhereClause(req);
@@ -289,9 +303,10 @@ app.get('/api/students', async (req, res) => {
 // Get Top 10 Students
 app.get('/api/top10', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const whereClause = buildWhereClause(req);
-        console.log(`[top10] Generated WHERE clause: "${whereClause}"`);
+        console.log(`[top10][${year}] Generated WHERE clause: "${whereClause}"`);
 
         const result = await pool.request().query(`
             SELECT 
@@ -311,9 +326,10 @@ app.get('/api/top10', async (req, res) => {
 // Get Performance Stats
 app.get('/api/performance', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const whereClause = buildWhereClause(req);
-        console.log(`[Performance] Generated WHERE clause: "${whereClause}"`);
+        console.log(`[Performance][${year}] Generated WHERE clause: "${whereClause}"`);
 
         // Calculate Pass/Fail (Assuming 50% of 720 which is 360 is pass, or generic 50%)
         // Let's assume total mark is 720 for NEET.
@@ -352,7 +368,8 @@ app.get('/api/performance', async (req, res) => {
 // Get Student History (Average Report)
 app.get('/api/history', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const { id, name, campus, includeExams } = req.query; // Search params
 
         let whereClause = '';
@@ -448,7 +465,8 @@ app.get('/api/history', async (req, res) => {
 // New endpoint: fetch student list based on current filters (cascading)
 app.get('/api/studentsByCampus', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         // Allow filters to apply (especially Campus for security context)
         // If frontend sends specific filters (like restricted campus), we must respect them.
         const where = buildWhereClause(req);
@@ -481,11 +499,12 @@ app.get('/api/studentsByCampus', async (req, res) => {
 // Endpoint for Table 1: Statistics of current selected exam(s)
 app.get('/api/exam-stats', async (req, res) => {
     try {
-        const pool = await connectToDb();
-        const cacheKey = `exam_stats_${JSON.stringify(req.query)} `;
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+        const cacheKey = `exam_stats_${year}_${JSON.stringify(req.query)} `;
         const cached = cache.get(cacheKey);
         if (cached) {
-            console.log("[Exam Stats] Cache Hit");
+            console.log(`[Exam Stats][${year}] Cache Hit`);
             return res.json(cached);
         }
 
@@ -548,11 +567,12 @@ app.get('/api/exam-stats', async (req, res) => {
 // Endpoint for Table 2: Student marks of selected exam(s) with Averaging
 app.get('/api/analysis-report', async (req, res) => {
     try {
-        const pool = await connectToDb();
-        const cacheKey = `analysis_report_${JSON.stringify(req.query)} `;
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+        const cacheKey = `analysis_report_${year}_${JSON.stringify(req.query)} `;
         const cached = cache.get(cacheKey);
         if (cached) {
-            console.log("[Analysis Report] Cache Hit");
+            console.log(`[Analysis Report][${year}] Cache Hit`);
             return res.json(cached);
         }
 
@@ -612,7 +632,8 @@ app.get('/api/analysis-report', async (req, res) => {
 // Get TARGETS data
 app.get('/api/targets', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const result = await pool.request().query('SELECT * FROM TARGETS ORDER BY NAME_OF_THE_CAMPUS, Stream');
         res.json(result.recordset);
     } catch (err) {
@@ -624,7 +645,8 @@ app.get('/api/targets', async (req, res) => {
 // --- TEST WISE IMPROVEMENTS ENDPOINTS ---
 app.get('/api/test-improvements/stats', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const where = buildWhereClause(req);
 
         const isValid = "Test IS NOT NULL AND Test != ''";
@@ -671,7 +693,8 @@ app.get('/api/test-improvements/stats', async (req, res) => {
 
 app.get('/api/test-improvements/averages', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const baseWhere = buildWhereClause(req, { ignoreCategory: true });
         const cat = req.query.category;
 
@@ -750,7 +773,8 @@ app.get('/api/test-improvements/averages', async (req, res) => {
 
 app.get('/api/test-improvements/students', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const where = buildWhereClause(req);
         const groupByStudent = req.query.groupByStudent === 'true';
 
@@ -803,7 +827,8 @@ app.get('/api/test-improvements/students', async (req, res) => {
 // Get ERP Filter Options
 app.get('/api/erp/filters', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         // Frontend sends 'campus', but we use 'Branch' in ERP_REPORT table.
         // We handle both for compatibility.
         const { branch, campus, stream, testType, test } = req.query;
@@ -886,12 +911,21 @@ app.get('/api/erp/filters', async (req, res) => {
             pool.request().query(topQuery)
         ]);
 
+        // SMART PRUNING for Admin Dashboard
+        let prunedTopAll = (topRes.recordset || []).map(r => r.Top_ALL).filter(Boolean);
+        const streamStr = JSON.stringify(stream || '').toUpperCase();
+        if (streamStr.includes('SR') || streamStr.includes('SENIOR')) {
+            prunedTopAll = prunedTopAll.filter(t => !t.toUpperCase().includes('JR ') && !t.toUpperCase().includes('JUNIOR'));
+        } else if (streamStr.includes('JR') || streamStr.includes('JUNIOR')) {
+            prunedTopAll = prunedTopAll.filter(t => !t.toUpperCase().includes('SR ') && !t.toUpperCase().includes('SENIOR'));
+        }
+
         res.json({
             campuses: (branchesRes.recordset || []).map(r => r.Branch).filter(Boolean),
             streams: (streamsRes.recordset || []).map(r => r.Stream).filter(Boolean),
             testTypes: (testTypesRes.recordset || []).map(r => r.Test_Type).filter(Boolean),
             tests: (testsRes.recordset || []).map(r => r.Test).filter(Boolean),
-            topAll: (topRes.recordset || []).map(r => r.Top_ALL).filter(Boolean)
+            topAll: prunedTopAll
         });
     } catch (err) {
         console.error("[ERP Filters] ERROR:", err);
@@ -902,7 +936,8 @@ app.get('/api/erp/filters', async (req, res) => {
 // Get ERP Data Report
 app.get('/api/erp/report', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
 
         let clauses = [];
@@ -986,7 +1021,8 @@ app.get('/api/erp/report', async (req, res) => {
 // New endpoint: Error Count report (Test wise counts)
 app.get('/api/erp/error-count-report', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
 
         let clauses = [];
@@ -1119,7 +1155,8 @@ app.get('/api/erp/error-count-report', async (req, res) => {
 
 app.get('/api/erp/participants', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const { test, studentNames } = req.query;
 
         const sNames = Array.isArray(studentNames) ? studentNames : [];
@@ -1214,7 +1251,8 @@ app.post('/api/notify-registration', async (req, res) => {
 // Get ERP Students for Search with Cascading Filters
 app.get('/api/erp/students', async (req, res) => {
     try {
-        const pool = await connectToDb();
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
         const { quickSearch, campus, stream, test, testType, topAll, TOP_ALL } = req.query;
 
         // Helper to add clauses
@@ -1291,10 +1329,11 @@ app.get('/api/erp/students', async (req, res) => {
 (async () => {
     try {
         console.log("----------------------------------------");
-        console.log("STARTUP: Testing Database Connection...");
-        const pool = await connectToDb();
-        await pool.request().query('SELECT 1');
-        console.log("STARTUP: Database Connection Verified! ✅");
+        console.log("STARTUP: Testing Database Connections...");
+        await connectToDb('2025');
+        console.log("STARTUP: 2025 Database Connection Verified! ✅");
+        await connectToDb('2026');
+        console.log("STARTUP: 2026 Database Connection Verified! ✅");
         console.log("----------------------------------------");
     } catch (err) {
         console.error("STARTUP: Database Connection FAILED! ❌");

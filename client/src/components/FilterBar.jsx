@@ -141,7 +141,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
         }, 300); // 300ms debounce
 
         return () => clearTimeout(timeoutId);
-    }, [filters.campus, filters.stream, filters.testType, filters.test]);
+    }, [filters.campus, filters.stream, filters.testType, filters.test, filters.academicYear]);
 
     useEffect(() => {
         const fetchStudents = async () => {
@@ -173,7 +173,7 @@ const FilterBar = ({ filters, setFilters, restrictedCampus, apiEndpoints = {} })
         }, 400); // slightly longer debounce for students list
 
         return () => clearTimeout(timeoutId);
-    }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll]);
+    }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.academicYear]);
 
     // Helper to wrap options with Select All
     const withSelectAll = (arr, labelPrefix = "Options") => [

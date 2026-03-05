@@ -66,6 +66,14 @@ const Dashboard = () => {
         return stored || 'analysis';
     });
 
+    const [academicYear, setAcademicYear] = useState(() => {
+        return sessionStorage.getItem('academic_year') || '2026';
+    });
+
+    useEffect(() => {
+        sessionStorage.setItem('academic_year', academicYear);
+    }, [academicYear]);
+
     // Ensure non-admins are redirected from admin pages if state changes
     useEffect(() => {
         if (!isAdmin && ['approvals', 'logs'].includes(activePage)) {
@@ -113,7 +121,13 @@ const Dashboard = () => {
     }, [pageFilters]);
 
     // Current page's filters with fallback to initial filters
-    const baseFilters = pageFilters[activePage] || initialFilters;
+    const rawBaseFilters = pageFilters[activePage] || initialFilters;
+
+    // Inject academicYear into filters so it is sent with every request
+    const baseFilters = React.useMemo(() => ({
+        ...rawBaseFilters,
+        academicYear: academicYear
+    }), [rawBaseFilters, academicYear]);
 
     // Helper to check if two campus arrays are logically identical
     const areCampusesSame = (arr1, arr2) => {
@@ -300,6 +314,30 @@ const Dashboard = () => {
                                                             activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
                 } />
                 <div className="content-inner">
+                    <div className="year-toggle-container">
+                        <button
+                            className={`year-btn ${academicYear === '2025' ? 'active' : 'inactive'}`}
+                            onClick={() => {
+                                setAcademicYear('2025');
+                                // Reset filters when year changes
+                                setPageFilters({});
+                            }}
+                        >
+                            <span style={{ fontSize: '1.2rem' }}>📅</span>
+                            Academic Year 2025
+                        </button>
+                        <button
+                            className={`year-btn ${academicYear === '2026' ? 'active' : 'inactive'}`}
+                            onClick={() => {
+                                setAcademicYear('2026');
+                                // Reset filters when year changes
+                                setPageFilters({});
+                            }}
+                        >
+                            <span style={{ fontSize: '1.2rem' }}>🎯</span>
+                            Academic Year 2026
+                        </button>
+                    </div>
                     {showFilterBar && (
                         <FilterBar
                             filters={globalFilters}

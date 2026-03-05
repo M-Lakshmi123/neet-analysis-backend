@@ -308,6 +308,53 @@ body {
     margin: 0;
 }
 
+/* Year Selection Buttons */
+.year-toggle-container {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding: 0.5rem;
+    background: white;
+    width: fit-content;
+    border-radius: 16px;
+    border: 1px solid var(--border-light);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+}
+
+.year-btn {
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.year-btn.active {
+    background: var(--medicon-navy);
+    color: white;
+    box-shadow: 0 10px 15px -3px rgba(23, 37, 84, 0.2);
+    transform: translateY(-2px);
+}
+
+.year-btn.inactive {
+    background: #f8fafc;
+    color: var(--medicon-navy);
+    border-color: var(--border-light);
+}
+
+.year-btn.inactive:hover {
+    background: #eff6ff;
+    border-color: var(--medicon-navy);
+    transform: translateY(-1px);
+}
+
 /* Compact Filter Bar */
 .filter-bar {
     display: flex;
