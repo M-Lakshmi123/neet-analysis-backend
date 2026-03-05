@@ -1857,12 +1857,20 @@ body {
 /* Main App Header */
 .main-header {
     background: white;
-    height: 70px;
+    height: 60px;
+    /* Fixed height to prevent jumping */
+    min-height: 60px;
+    max-height: 60px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 2rem;
+    padding: 0 1.5rem;
     border-bottom: 1px solid var(--border-light);
+    flex-wrap: nowrap;
+    overflow: hidden;
+    position: sticky;
+    top: 0;
+    z-index: 1001;
 }
 
 .header-left-area h1 {
@@ -1875,7 +1883,8 @@ body {
 .user-profile-compact {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 1.25rem;
+    flex-wrap: nowrap;
 }
 
 .header-user-info {
@@ -1888,12 +1897,18 @@ body {
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
+    /* Slightly smaller for density */
     font-weight: 700;
     color: var(--medicon-navy);
+    white-space: nowrap;
 }
 
 .user-name-text {
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--medicon-navy);
 }
 
@@ -1909,18 +1924,18 @@ body {
 .header-logout-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.6rem;
+    gap: 0.5rem;
     background: #fef2f2;
     color: #dc2626;
     border: 1.5px solid #fee2e2;
-    padding: 0.6rem 1.2rem;
+    padding: 0.4rem 1rem;
     border-radius: 8px;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    transition: all 0.2s;
+    height: 38px;
+    white-space: nowrap;
 }
 
 .header-logout-btn:hover {
