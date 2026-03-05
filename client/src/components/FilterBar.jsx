@@ -346,85 +346,37 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
     };
 
     return (
-        <div className="filter-bar-container ultra-compact">
-            <div className="filter-main-row">
-                {/* Academic Year Selector - First */}
-                <div className="year-selector-filters">
+        <div className="filter-bar-container compact-mode">
+            {/* Top Action Row: Years, Search, Clear */}
+            <div className="filter-top-row">
+                <div className="year-selector-nav">
                     <button
-                        className={`year-filter-btn ${academicYear === '2025' ? 'active' : ''}`}
+                        className={`year-nav-btn ${academicYear === '2025' ? 'active' : ''}`}
                         onClick={() => {
                             onYearChange('2025');
                             if (userData) logActivity(userData, 'Switched to Academic Year 2025');
                         }}
                     >
-                        2025
+                        ACADEMIC YEAR 2025
                     </button>
                     <button
-                        className={`year-filter-btn ${academicYear === '2026' ? 'active' : ''}`}
+                        className={`year-nav-btn ${academicYear === '2026' ? 'active' : ''}`}
                         onClick={() => {
                             onYearChange('2026');
                             if (userData) logActivity(userData, 'Switched to Academic Year 2026');
                         }}
                     >
-                        2026
+                        ACADEMIC YEAR 2026
                     </button>
                 </div>
 
-                {/* Vertical Divider */}
-                <div className="compact-divider"></div>
-
-                {/* Campus Select */}
-                <div className={`compact-filter campus-filter ${isRestricted && allowedCampuses.length === 1 ? 'disabled' : ''}`}>
-                    <Select
-                        isMulti
-                        name="campus"
-                        options={withSelectAll(options.campuses, "Campuses")}
-                        value={getValue('campus')}
-                        onChange={(opts, meta) => handleSelectChange('campus', opts, meta)}
-                        isLoading={loadingFilters}
-                        placeholder="CAMPUS"
-                        styles={compactStyles}
-                        isDisabled={isRestricted && allowedCampuses.length === 1}
-                    />
-                </div>
-
-                {/* Stream Select */}
-                <div className={`compact-filter ${loadingFilters || (!isRestricted && filters.campus.length === 0) ? 'disabled-logic' : ''}`}>
-                    <Select
-                        isMulti
-                        name="stream"
-                        options={withSelectAll(options.streams, "Streams")}
-                        value={getValue('stream')}
-                        onChange={(opts, meta) => handleSelectChange('stream', opts, meta)}
-                        isLoading={loadingFilters}
-                        placeholder="STREAM"
-                        styles={compactStyles}
-                        isDisabled={loadingFilters || (!isRestricted && filters.campus.length === 0)}
-                    />
-                </div>
-
-                {/* Test Type Select */}
-                <div className={`compact-filter ${loadingFilters || (filters.stream.length === 0) ? 'disabled-logic' : ''}`}>
-                    <Select
-                        isMulti
-                        name="testType"
-                        options={withSelectAll(options.testTypes, "Types")}
-                        value={getValue('testType')}
-                        onChange={(opts, meta) => handleSelectChange('testType', opts, meta)}
-                        isLoading={loadingFilters}
-                        placeholder="TYPE"
-                        styles={compactStyles}
-                        isDisabled={loadingFilters || filters.stream.length === 0}
-                    />
-                </div>
-
-                {/* Search Box */}
-                <div className="search-box-autocomplete compact">
+                <div className="search-engine-compact">
+                    <div className="engine-icon">🔍</div>
                     <AsyncSelect
                         cacheOptions
                         loadOptions={loadStudentOptions}
                         defaultOptions={[]}
-                        placeholder="STUDENT SEARCH..."
+                        placeholder="Search Student..."
                         onChange={(opt) => {
                             if (opt) {
                                 const finalCampus = isRestricted
@@ -436,6 +388,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                                     quickSearch: opt.label,
                                     campus: finalCampus,
                                     stream: opt.streams && opt.streams.length > 0 ? opt.streams : [],
+                                    testType: [],
+                                    test: [],
+                                    topAll: []
                                 }));
                             } else {
                                 setFilters(prev => ({ ...prev, studentSearch: [], quickSearch: '', campus: isRestricted ? allowedCampuses : [] }));
@@ -455,9 +410,102 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                     />
                 </div>
 
-                <button onClick={resetFilters} className="btn-primary clear-btn-compact">
-                    CLEAR
+                <button onClick={resetFilters} className="btn-primary reset-compact">
+                    CLEAR ALL
                 </button>
+            </div>
+
+            {/* Bottom Filter Row: Detailed Drilling */}
+            <div className="filter-bottom-grid">
+                <div className={`filter-item ${isRestricted && allowedCampuses.length === 1 ? 'disabled' : ''}`}>
+                    <label>CAMPUS</label>
+                    <Select
+                        isMulti
+                        name="campus"
+                        options={withSelectAll(options.campuses, "Campuses")}
+                        value={getValue('campus')}
+                        onChange={(opts, meta) => handleSelectChange('campus', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        placeholder="Select..."
+                        isDisabled={isRestricted && allowedCampuses.length === 1}
+                    />
+                </div>
+
+                <div className={`filter-item ${loadingFilters || (!isRestricted && filters.campus.length === 0) ? 'disabled-logic' : ''}`}>
+                    <label>STREAM</label>
+                    <Select
+                        isMulti
+                        name="stream"
+                        options={withSelectAll(options.streams, "Streams")}
+                        value={getValue('stream')}
+                        onChange={(opts, meta) => handleSelectChange('stream', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        placeholder="Select..."
+                        isDisabled={loadingFilters || (!isRestricted && filters.campus.length === 0)}
+                    />
+                </div>
+
+                <div className={`filter-item ${loadingFilters || filters.stream.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>TYPE</label>
+                    <Select
+                        isMulti
+                        name="testType"
+                        options={withSelectAll(options.testTypes, "Types")}
+                        value={getValue('testType')}
+                        onChange={(opts, meta) => handleSelectChange('testType', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        placeholder="Select..."
+                        isDisabled={loadingFilters || filters.stream.length === 0}
+                    />
+                </div>
+
+                <div className={`filter-item ${loadingFilters || filters.testType.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>TEST</label>
+                    <Select
+                        isMulti
+                        name="test"
+                        options={withSelectAll(options.tests, "Tests")}
+                        value={getValue('test')}
+                        onChange={(opts, meta) => handleSelectChange('test', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        placeholder="Select..."
+                        isDisabled={loadingFilters || filters.testType.length === 0}
+                    />
+                </div>
+
+                <div className={`filter-item ${loadingFilters || filters.test.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>TOP_ALL</label>
+                    <Select
+                        isMulti
+                        name="topAll"
+                        options={withSelectAll(options.topAll || [], "Top_ALL")}
+                        value={getValue('topAll')}
+                        onChange={(opts, meta) => handleSelectChange('topAll', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        placeholder="Select..."
+                        isDisabled={loadingFilters || filters.test.length === 0}
+                    />
+                </div>
+
+                <div className={`filter-item wide-item ${loadingStudents || filters.test.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>STUDENT LIST</label>
+                    <Select
+                        isMulti
+                        name="studentSearch"
+                        options={studentOptions}
+                        value={getValue('studentSearch')}
+                        onChange={(opts, meta) => handleSelectChange('studentSearch', opts, meta)}
+                        isLoading={loadingStudents}
+                        styles={compactStyles}
+                        placeholder="Select Students..."
+                        isDisabled={loadingStudents || filters.test.length === 0}
+                    />
+                </div>
             </div>
         </div>
     );
