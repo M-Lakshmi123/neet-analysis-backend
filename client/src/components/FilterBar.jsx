@@ -349,6 +349,28 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         <div className="filter-bar-container compact-view">
             {/* 0. Global Student Search - Autocomplete */}
             <div className="global-search-wrapper">
+                {/* Academic Year Selector - First in row */}
+                <div className="year-selector-filters">
+                    <button
+                        className={`year-filter-btn ${academicYear === '2025' ? 'active' : ''}`}
+                        onClick={() => {
+                            onYearChange('2025');
+                            if (userData) logActivity(userData, 'Switched to Academic Year 2025');
+                        }}
+                    >
+                        ACADEMIC YEAR 2025
+                    </button>
+                    <button
+                        className={`year-filter-btn ${academicYear === '2026' ? 'active' : ''}`}
+                        onClick={() => {
+                            onYearChange('2026');
+                            if (userData) logActivity(userData, 'Switched to Academic Year 2026');
+                        }}
+                    >
+                        ACADEMIC YEAR 2026
+                    </button>
+                </div>
+
                 <div className="search-box-autocomplete">
                     <div className="search-icon">🔍</div>
                     <AsyncSelect
@@ -358,7 +380,6 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         placeholder="Search Student..."
                         onChange={(opt) => {
                             if (opt) {
-                                // STRICT ENFORCEMENT: Ensure the student belongs to an allowed campus
                                 const finalCampus = isRestricted
                                     ? (allowedCampuses.includes(opt.campus) ? [opt.campus] : allowedCampuses)
                                     : (opt.campus ? [opt.campus] : []);
@@ -374,7 +395,6 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                                     topAll: []
                                 }));
                             } else {
-                                // Cleared
                                 setFilters(prev => ({
                                     ...prev,
                                     studentSearch: [],
@@ -401,36 +421,12 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                     />
                 </div>
 
-                {/* Academic Year Selector in the same row */}
-                <div className="year-selector-filters">
-                    <button
-                        title="Acacdemic Year 2025"
-                        className={`year-filter-btn ${academicYear === '2025' ? 'active' : ''}`}
-                        onClick={() => {
-                            onYearChange('2025');
-                            if (userData) logActivity(userData, 'Switched to Academic Year 2025');
-                        }}
-                    >
-                        2025
-                    </button>
-                    <button
-                        title="Acacdemic Year 2026"
-                        className={`year-filter-btn ${academicYear === '2026' ? 'active' : ''}`}
-                        onClick={() => {
-                            onYearChange('2026');
-                            if (userData) logActivity(userData, 'Switched to Academic Year 2026');
-                        }}
-                    >
-                        2026
-                    </button>
-                </div>
-
                 <button
                     onClick={resetFilters}
                     className="btn-primary reset-btn"
                     style={{ height: '40px', whiteSpace: 'nowrap' }}
                 >
-                    Clear All
+                    CLEAR ALL
                 </button>
             </div>
 
