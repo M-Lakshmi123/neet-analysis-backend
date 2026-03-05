@@ -390,10 +390,13 @@ app.get('/api/history', async (req, res) => {
         // Deduplicate history (student results)
         const historyMap = new Map();
         result.recordset.forEach(row => {
+            const sid = row.STUD_ID ? row.STUD_ID.toString().trim() : 'Unknown';
             const testKey = row.Test ? row.Test.trim() : 'Unknown';
-            // If duplicate, prefer 4-digit year dates if available
-            if (!historyMap.has(testKey) || (row.DATE && row.DATE.length > (historyMap.get(testKey).DATE?.length || 0))) {
-                historyMap.set(testKey, row);
+            const compositeKey = `${sid}_${testKey}`;
+
+            // If duplicate for SAME student and SAME test, prefer 4-digit year dates if available
+            if (!historyMap.has(compositeKey) || (row.DATE && row.DATE.length > (historyMap.get(compositeKey).DATE?.length || 0))) {
+                historyMap.set(compositeKey, row);
             }
         });
         const deduplicatedHistory = Array.from(historyMap.values());
