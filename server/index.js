@@ -84,7 +84,7 @@ const buildWhereClause = (req, options = {}) => {
             .map(v => v.replace(/'/g, "''"));
         if (cleanValues.length === 0) return;
         const list = cleanValues.map(v => `'${v}'`).join(',');
-        clauses.push(`${field} IN (${list})`);
+        clauses.push(`UPPER(TRIM(${field})) IN (${list})`);
     };
 
     if (!options.ignoreCampus) addClause('CAMPUS_NAME', campus);
@@ -151,10 +151,10 @@ app.get('/api/filters', async (req, res) => {
                 const groups = {
                     'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
                     'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
-                    'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
+                    'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02', 'SR-ELITE', 'SR ELITE-SET-01', 'SR ELITE-SET-02']
                 };
                 valArray.forEach(v => {
-                    const upperV = v ? v.toString().trim().toUpperCase() : '';
+                    const upperV = v ? v.toString().trim().toUpperCase().replace(/-/g, '_') : '';
                     if (groups[upperV]) {
                         selection = [...new Set([...selection, ...groups[upperV]])];
                     }
@@ -168,7 +168,7 @@ app.get('/api/filters', async (req, res) => {
 
             if (cleanValues.length === 0) return null;
             const list = cleanValues.map(v => `'${v}'`).join(',');
-            return `${column} IN (${list})`;
+            return `UPPER(TRIM(${column})) IN (${list})`;
         };
 
         const campusClause = buildOptionClause('CAMPUS_NAME', campus);
@@ -196,6 +196,11 @@ app.get('/api/filters', async (req, res) => {
         if (testClause) topClauses.push(testClause);
         const topWhere = topClauses.length > 0 ? `WHERE ${topClauses.join(' AND ')}` : 'WHERE 1=1';
         const topQuery = `SELECT DISTINCT TRIM(Top_ALL) as Top_ALL FROM MEDICAL_RESULT ${topWhere} AND Top_ALL IS NOT NULL AND Top_ALL != '' ORDER BY Top_ALL`;
+
+        console.log(`[Filters] Streams Query: ${streamsQuery}`);
+        console.log(`[Filters] TestTypes Query: ${testTypesQuery}`);
+        console.log(`[Filters] Tests Query: ${testsQuery}`);
+        console.log(`[Filters] Top_ALL Query: ${topQuery}`);
 
         const cacheKey = `filters_${JSON.stringify(req.query)}`;
         const cachedData = cache.get(cacheKey);
@@ -816,10 +821,10 @@ app.get('/api/erp/filters', async (req, res) => {
                 const groups = {
                     'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
                     'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
-                    'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
+                    'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02', 'SR-ELITE', 'SR ELITE-SET-01', 'SR ELITE-SET-02']
                 };
                 valArray.forEach(v => {
-                    const upperV = v ? v.toString().trim().toUpperCase() : '';
+                    const upperV = v ? v.toString().trim().toUpperCase().replace(/-/g, '_') : '';
                     if (groups[upperV]) {
                         selection = [...new Set([...selection, ...groups[upperV]])];
                     }
@@ -833,7 +838,7 @@ app.get('/api/erp/filters', async (req, res) => {
 
             if (cleanValues.length === 0) return null;
             const list = cleanValues.map(v => `'${v}'`).join(',');
-            return `${column} IN (${list})`;
+            return `UPPER(TRIM(${column})) IN (${list})`;
         };
 
         const branchClause = buildOptionClause('Branch', activeBranch);
@@ -867,6 +872,11 @@ app.get('/api/erp/filters', async (req, res) => {
         if (testClause) topClauses.push(testClause);
         const topWhere = topClauses.length > 0 ? `WHERE ${topClauses.join(' AND ')} ` : 'WHERE 1=1';
         const topQuery = `SELECT DISTINCT TRIM(Top_ALL) as Top_ALL FROM ERP_REPORT ${topWhere} AND Top_ALL IS NOT NULL AND Top_ALL != '' ORDER BY Top_ALL`;
+
+        console.log(`[ERP Filters] Streams Query: ${streamsQuery}`);
+        console.log(`[ERP Filters] TestTypes Query: ${testTypesQuery}`);
+        console.log(`[ERP Filters] Tests Query: ${testsQuery}`);
+        console.log(`[ERP Filters] Top_ALL Query: ${topQuery}`);
 
         const [branchesRes, streamsRes, testTypesRes, testsRes, topRes] = await Promise.all([
             pool.request().query(branchesQuery),
