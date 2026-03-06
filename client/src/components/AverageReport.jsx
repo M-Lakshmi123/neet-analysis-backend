@@ -380,7 +380,7 @@ const AverageReport = ({ filters }) => {
                 textColor: [0, 0, 0]
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 48 }, // Test Name
+                0: { halign: 'center', cellWidth: 48, fontSize: 10, fontStyle: 'bold' }, // Test Name
                 1: { cellWidth: 28 }, // Date
                 2: { cellWidth: 18, fillColor: [255, 255, 204] }, // Total
                 3: { cellWidth: 16 }, // AIR
