@@ -220,7 +220,7 @@ const AverageReport = ({ filters }) => {
         // 4. Line
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.4);
-        doc.line(5, currentY, 205, currentY);
+        doc.line(15, currentY, 195, currentY);
         currentY += 4; // Further reduced gap below line (was 6)
 
         // 5. Details Header - Pastel Background
@@ -229,7 +229,7 @@ const AverageReport = ({ filters }) => {
             doc.setFillColor(239, 246, 255); // Pastel Blue
             doc.setDrawColor(0, 0, 0); // Black border
             doc.setLineWidth(0.1);
-            doc.roundedRect(5, currentY, 200, 24, 1, 1, 'FD'); // FD = Fill then Draw
+            doc.roundedRect(15, currentY, 180, 24, 1, 1, 'FD'); // Centered with table, width 180
 
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
@@ -237,7 +237,7 @@ const AverageReport = ({ filters }) => {
             doc.setTextColor(0, 0, 0);
 
             const textYStart = currentY + 8;
-            const col1X = 10;
+            const col1X = 20; // 15 + 5 padding
             const col2X = 110;
 
             // Student Name
@@ -362,11 +362,11 @@ const AverageReport = ({ filters }) => {
                 halign: 'center',
                 valign: 'middle',
                 lineWidth: 0.2,
-                fontSize: 10 // Reduced to 10 as requested
+                fontSize: 12 // Back to 12
             },
             styles: {
                 font: bookmanFont ? "Bookman" : "helvetica", // Use Bookman
-                fontSize: 10, // Reduced to 10 as requested
+                fontSize: 12, // Back to 12
                 cellPadding: 1, // Reduced to save space for printing
                 overflow: 'ellipsize', // dont text wrap
                 halign: 'center',
@@ -380,13 +380,13 @@ const AverageReport = ({ filters }) => {
                 1: { cellWidth: 26 }, // Date
                 2: { cellWidth: 16, fillColor: [255, 255, 204] }, // Total
                 3: { cellWidth: 16 }, // AIR
-                4: { cellWidth: 14, fillColor: [253, 233, 217] }, // Bot
-                5: { cellWidth: 14, fillColor: [218, 238, 243] }, // Zoo
-                6: { cellWidth: 14, fillColor: [224, 231, 255] }, // Bio
-                7: { cellWidth: 14, fillColor: [235, 241, 222] }, // Phy
-                8: { cellWidth: 14, fillColor: [242, 220, 219] }  // Chem
+                4: { cellWidth: 14.4, fillColor: [253, 233, 217] }, // Bot
+                5: { cellWidth: 14.4, fillColor: [218, 238, 243] }, // Zoo
+                6: { cellWidth: 14.4, fillColor: [224, 231, 255] }, // Bio
+                7: { cellWidth: 14.4, fillColor: [235, 241, 222] }, // Phy
+                8: { cellWidth: 14.4, fillColor: [242, 220, 219] }  // Chem
             },
-            margin: { left: 5, right: 5, bottom: 15 },
+            margin: { left: 15, right: 15, bottom: 15 },
             didParseCell: (data) => {
                 if (data.row.index === tableRows.length - 1) {
                     // Start of Average Row Styling
