@@ -279,7 +279,7 @@ const AverageReport = ({ filters }) => {
             else doc.setFont("helvetica", "normal");
             doc.text(normalizedStream, col2X + 22, row2Y);
 
-            currentY += 28;
+            currentY += 24; // Reach exactly the bottom of the roundedRect (height is 24)
         }
 
         const tableColumn = ["Test Name", "Date", "Total\n720", "AIR", "Bot\n180", "Zoo\n180", "Bio\n360", "Phy\n180", "Chem\n180"];
@@ -352,7 +352,7 @@ const AverageReport = ({ filters }) => {
         autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
-            startY: currentY + 10, // Start closer to detail header
+            startY: currentY + 4, // Start closer to detail header
             theme: 'grid',
             headStyles: {
                 fillColor: [0, 0, 0], // Pure Black headers
@@ -362,11 +362,11 @@ const AverageReport = ({ filters }) => {
                 halign: 'center',
                 valign: 'middle',
                 lineWidth: 0.2,
-                fontSize: 14 // Increased to 14
+                fontSize: 12 // Reduced to 12
             },
             styles: {
                 font: bookmanFont ? "Bookman" : "helvetica", // Use Bookman
-                fontSize: 14, // Increased to 14
+                fontSize: 12, // Reduced to 12
                 cellPadding: 1, // Reduced to save space for printing
                 overflow: 'ellipsize', // dont text wrap
                 halign: 'center',
@@ -376,15 +376,15 @@ const AverageReport = ({ filters }) => {
                 textColor: [0, 0, 0]
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 60 }, // Test Name
-                1: { cellWidth: 28 }, // Date
-                2: { cellWidth: 16, fillColor: [255, 255, 204] }, // Total
-                3: { cellWidth: 16 }, // AIR
-                4: { cellWidth: 16, fillColor: [253, 233, 217] }, // Bot
-                5: { cellWidth: 16, fillColor: [218, 238, 243] }, // Zoo
-                6: { cellWidth: 16, fillColor: [224, 231, 255] }, // Bio
-                7: { cellWidth: 16, fillColor: [235, 241, 222] }, // Phy
-                8: { cellWidth: 16, fillColor: [242, 220, 219] }  // Chem
+                0: { halign: 'center', cellWidth: 54 }, // Test Name
+                1: { cellWidth: 26 }, // Date
+                2: { cellWidth: 17, fillColor: [255, 255, 204] }, // Total
+                3: { cellWidth: 17 }, // AIR
+                4: { cellWidth: 14, fillColor: [253, 233, 217] }, // Bot
+                5: { cellWidth: 14, fillColor: [218, 238, 243] }, // Zoo
+                6: { cellWidth: 14, fillColor: [224, 231, 255] }, // Bio
+                7: { cellWidth: 14, fillColor: [235, 241, 222] }, // Phy
+                8: { cellWidth: 14, fillColor: [242, 220, 219] }  // Chem
             },
             margin: { left: 5, right: 5, bottom: 15 },
             didParseCell: (data) => {
@@ -548,24 +548,24 @@ const AverageReport = ({ filters }) => {
                     <>
                         {previewRows.length > 0 && (
                             <div className="table-container">
-                                <table className="analysis-table merit-style" style={{ fontFamily: 'Bookman, serif' }}>
+                                <table className="analysis-table merit-style" style={{ fontFamily: 'Bookman, serif', fontSize: '12px' }}>
                                     <thead style={{ fontWeight: 'bold' }}>
                                         <tr className="grouped-header">
-                                            <th colSpan={3} className="header-group-blue">
-                                                <div className="header-label">CAMPUS</div>
-                                                <div className="header-value">{previewRows[0].CAMPUS_NAME}</div>
+                                            <th colSpan={3} className="header-group-blue" style={{ fontSize: '12px' }}>
+                                                <div className="header-label" style={{ fontSize: '0.75rem' }}>CAMPUS</div>
+                                                <div className="header-value" style={{ fontSize: '1rem' }}>{previewRows[0].CAMPUS_NAME}</div>
                                             </th>
-                                            <th colSpan={1} className="header-group-blue">
-                                                <div className="header-label">STUD ID</div>
-                                                <div className="header-value">{previewRows[0].STUD_ID}</div>
+                                            <th colSpan={1} className="header-group-blue" style={{ fontSize: '12px' }}>
+                                                <div className="header-label" style={{ fontSize: '0.75rem' }}>STUD ID</div>
+                                                <div className="header-value" style={{ fontSize: '1rem' }}>{previewRows[0].STUD_ID}</div>
                                             </th>
-                                            <th colSpan={2} className="header-group-blue">
-                                                <div className="header-label">STREAM</div>
-                                                <div className="header-value">{getNormalizedStream(previewRows)}</div>
+                                            <th colSpan={2} className="header-group-blue" style={{ fontSize: '12px' }}>
+                                                <div className="header-label" style={{ fontSize: '0.75rem' }}>STREAM</div>
+                                                <div className="header-value" style={{ fontSize: '1rem' }}>{getNormalizedStream(previewRows)}</div>
                                             </th>
-                                            <th colSpan={3} className="header-group-blue">
-                                                <div className="header-label">NAME OF THE STUDENT</div>
-                                                <div className="header-value">
+                                            <th colSpan={3} className="header-group-blue" style={{ fontSize: '12px' }}>
+                                                <div className="header-label" style={{ fontSize: '0.75rem' }}>NAME OF THE STUDENT</div>
+                                                <div className="header-value" style={{ fontSize: '1rem' }}>
                                                     {previewRows[0].NAME_OF_THE_STUDENT}
                                                 </div>
                                             </th>
