@@ -94,7 +94,8 @@ body {
     background: transparent;
     padding: 1.5rem 0.5rem;
     margin-bottom: 0.5rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    position: relative;
 }
 
 .brand-container {
@@ -106,66 +107,113 @@ body {
 
 .sidebar-logo {
     width: 80px;
-    /* Bigger logo as requested */
     height: 80px;
     margin-bottom: 1rem;
     object-fit: contain;
-    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+    filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.15));
+    transition: transform 0.3s ease;
+}
+
+.sidebar-logo:hover {
+    transform: scale(1.05) rotate(2deg);
 }
 
 .logo-text {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     font-family: 'ImpactCustom', 'Impact', 'Arial Black', sans-serif;
     font-weight: 500;
     margin: 0;
     color: #FF0000;
     letter-spacing: 0.5px;
+    text-shadow: 0 2px 4px rgba(255, 0, 0, 0.2);
 }
 
 .logo-subtext {
-    font-size: 0.6rem;
+    font-size: 0.65rem;
     font-family: "Gill Sans MT", "Gill Sans", "Trebuchet MS", sans-serif;
     color: #0066CC;
     margin: 0.3rem 0 0 0;
     letter-spacing: 0px;
     text-transform: uppercase;
-    font-weight: 700;
-    opacity: 1;
+    font-weight: 800;
+    opacity: 0.9;
     white-space: nowrap;
 }
 
 .menu-items {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.6rem;
 }
 
 .menu-btn {
-    background: transparent;
-    border: none;
-    color: #64748b;
-    padding: 0.8rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid transparent;
+    color: #475569;
+    padding: 0.85rem 1rem;
     text-align: left;
     cursor: pointer;
-    border-radius: 10px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     font-weight: 600;
     font-size: 0.85rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
     width: 100%;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.menu-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    transition: left 0.5s ease;
+    z-index: 0;
+}
+
+.menu-btn>* {
+    position: relative;
+    z-index: 1;
 }
 
 .menu-btn:hover {
-    background: #f1f5f9;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.8);
     color: var(--medicon-navy);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
+}
+
+.menu-btn:hover::before {
+    left: 100%;
 }
 
 .menu-btn.active {
-    background: #eff6ff;
-    color: var(--medicon-navy);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(240, 249, 255, 0.7));
+    border: 1px solid rgba(255, 255, 255, 1);
+    color: var(--accent);
     font-weight: 700;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
+}
+
+.menu-btn.active .btn-icon {
+    color: var(--accent);
+    filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.5));
+}
+
+.btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.3s ease;
 }
 
 /* Dashboard Layout */
@@ -177,17 +225,19 @@ body {
 }
 
 .sidebar {
-    width: 195px;
-    /* Compact modern width */
-    background: white;
-    border-right: 1px solid var(--border-light);
+    width: 250px;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-right: 1px solid rgba(255, 255, 255, 0.7);
     display: flex;
     flex-direction: column;
     padding: 0;
     position: relative;
     z-index: 50;
     height: 100vh;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+    box-shadow: 4px 0 24px rgba(31, 38, 135, 0.07);
+    transition: width 0.3s ease-in-out;
 }
 
 .sidebar-content {
@@ -197,6 +247,15 @@ body {
     justify-content: space-between;
     padding: 1.25rem 0.75rem;
     overflow-y: auto;
+}
+
+.sidebar-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
 }
 
 .group-label {
