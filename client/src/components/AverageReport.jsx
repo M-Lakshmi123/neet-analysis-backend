@@ -362,11 +362,11 @@ const AverageReport = ({ filters }) => {
                 halign: 'center',
                 valign: 'middle',
                 lineWidth: 0.2,
-                fontSize: 12 // Reduced to 12
+                fontSize: 10 // Reduced to 10 as requested
             },
             styles: {
                 font: bookmanFont ? "Bookman" : "helvetica", // Use Bookman
-                fontSize: 12, // Reduced to 12
+                fontSize: 10, // Reduced to 10 as requested
                 cellPadding: 1, // Reduced to save space for printing
                 overflow: 'ellipsize', // dont text wrap
                 halign: 'center',
@@ -376,10 +376,10 @@ const AverageReport = ({ filters }) => {
                 textColor: [0, 0, 0]
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 54 }, // Test Name
+                0: { halign: 'center', cellWidth: 50 }, // Test Name
                 1: { cellWidth: 26 }, // Date
-                2: { cellWidth: 17, fillColor: [255, 255, 204] }, // Total
-                3: { cellWidth: 17 }, // AIR
+                2: { cellWidth: 16, fillColor: [255, 255, 204] }, // Total
+                3: { cellWidth: 16 }, // AIR
                 4: { cellWidth: 14, fillColor: [253, 233, 217] }, // Bot
                 5: { cellWidth: 14, fillColor: [218, 238, 243] }, // Zoo
                 6: { cellWidth: 14, fillColor: [224, 231, 255] }, // Bio
