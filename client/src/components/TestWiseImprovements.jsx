@@ -269,8 +269,22 @@ const TestWiseImprovements = ({ filters }) => {
             }
 
             const buffer = await workbook.xlsx.writeBuffer();
-            saveAs(new Blob([buffer]), isOverall ? `Overall_Improvement_Report.xlsx` : `Improvement_Report_${testName}.xlsx`);
-            logActivity(userData, 'Exported Multi-Sheet Improvement Report', { test: isOverall ? 'Overall' : testName });
+
+            let fileName = isOverall ? `Overall_Improvement_Report.xlsx` : `Improvement_Report_${testName}.xlsx`;
+            const singleCampus = filters.campus && filters.campus.length === 1 ? filters.campus[0] : null;
+
+            if (singleCampus) {
+                // If single campus, use pattern: CAMPUS_Stream_Threshold_Target Students List
+                const streamName = filters.stream && filters.stream.length === 1 ? filters.stream[0] : 'All_Streams';
+                const thresholdLabel = categories.find(c => c.key === selectedCategory)?.label || 'All';
+                // Remove >= and spaces for cleaner filename, or leave it roughly alone (Windows might replace invalid chars)
+                const safeThreshold = thresholdLabel.replace(/>=\s*/g, '');
+
+                fileName = `${singleCampus}_${streamName}_${safeThreshold}_Target Students List.xlsx`;
+            }
+
+            saveAs(new Blob([buffer]), fileName);
+            logActivity(userData, 'Exported Multi-Sheet Improvement Report', { test: isOverall ? 'Overall' : testName, fileName });
 
         } catch (err) {
             console.error("Error downloading student list:", err);

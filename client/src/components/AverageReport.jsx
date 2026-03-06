@@ -220,7 +220,7 @@ const AverageReport = ({ filters }) => {
         // 4. Line
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.4);
-        doc.line(15, currentY, 195, currentY);
+        doc.line(5, currentY, 205, currentY);
         currentY += 4; // Further reduced gap below line (was 6)
 
         // 5. Details Header - Pastel Background
@@ -229,16 +229,16 @@ const AverageReport = ({ filters }) => {
             doc.setFillColor(239, 246, 255); // Pastel Blue
             doc.setDrawColor(0, 0, 0); // Black border
             doc.setLineWidth(0.1);
-            doc.roundedRect(15, currentY, 180, 20, 1, 1, 'FD'); // FD = Fill then Draw
+            doc.roundedRect(5, currentY, 200, 24, 1, 1, 'FD'); // FD = Fill then Draw
 
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
-            doc.setFontSize(10);
+            doc.setFontSize(11);
             doc.setTextColor(0, 0, 0);
 
             const textYStart = currentY + 8;
-            const col1X = 20;
-            const col2X = 115;
+            const col1X = 10;
+            const col2X = 110;
 
             // Student Name
             if (bookmanFont) doc.setFont("Bookman", "bold");
@@ -258,7 +258,7 @@ const AverageReport = ({ filters }) => {
             else doc.setFont("helvetica", "normal");
             doc.text(student.CAMPUS_NAME || '', col2X + 22, textYStart);
 
-            const row2Y = textYStart + 7;
+            const row2Y = textYStart + 9;
 
             // Student ID
             if (bookmanFont) doc.setFont("Bookman", "bold");
@@ -279,7 +279,7 @@ const AverageReport = ({ filters }) => {
             else doc.setFont("helvetica", "normal");
             doc.text(normalizedStream, col2X + 22, row2Y);
 
-            currentY += 18;
+            currentY += 28;
         }
 
         const tableColumn = ["Test Name", "Date", "Total\n720", "AIR", "Bot\n180", "Zoo\n180", "Bio\n360", "Phy\n180", "Chem\n180"];
@@ -362,13 +362,13 @@ const AverageReport = ({ filters }) => {
                 halign: 'center',
                 valign: 'middle',
                 lineWidth: 0.2,
-                fontSize: 10 // Increased by 1 point (was default or smaller)
+                fontSize: 14 // Increased to 14
             },
             styles: {
                 font: bookmanFont ? "Bookman" : "helvetica", // Use Bookman
-                fontSize: 9,
-                cellPadding: 1.2, // Reduced to save space for printing
-                overflow: 'linebreak',
+                fontSize: 14, // Increased to 14
+                cellPadding: 1, // Reduced to save space for printing
+                overflow: 'ellipsize', // dont text wrap
                 halign: 'center',
                 valign: 'middle',
                 lineColor: [0, 0, 0],
@@ -376,17 +376,17 @@ const AverageReport = ({ filters }) => {
                 textColor: [0, 0, 0]
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 52 }, // Test Name
-                1: { cellWidth: 26 }, // Date
-                2: { cellWidth: 17, fillColor: [255, 255, 204] }, // Total
-                3: { cellWidth: 17 }, // AIR
-                4: { cellWidth: 13.6, fillColor: [253, 233, 217] }, // Bot
-                5: { cellWidth: 13.6, fillColor: [218, 238, 243] }, // Zoo
-                6: { cellWidth: 13.6, fillColor: [224, 231, 255] }, // Bio
-                7: { cellWidth: 13.6, fillColor: [235, 241, 222] }, // Phy
-                8: { cellWidth: 13.6, fillColor: [242, 220, 219] }  // Chem
+                0: { halign: 'center', cellWidth: 60 }, // Test Name
+                1: { cellWidth: 28 }, // Date
+                2: { cellWidth: 16, fillColor: [255, 255, 204] }, // Total
+                3: { cellWidth: 16 }, // AIR
+                4: { cellWidth: 16, fillColor: [253, 233, 217] }, // Bot
+                5: { cellWidth: 16, fillColor: [218, 238, 243] }, // Zoo
+                6: { cellWidth: 16, fillColor: [224, 231, 255] }, // Bio
+                7: { cellWidth: 16, fillColor: [235, 241, 222] }, // Phy
+                8: { cellWidth: 16, fillColor: [242, 220, 219] }  // Chem
             },
-            margin: { left: 15, right: 15, bottom: 15 },
+            margin: { left: 5, right: 5, bottom: 15 },
             didParseCell: (data) => {
                 if (data.row.index === tableRows.length - 1) {
                     // Start of Average Row Styling

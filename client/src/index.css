@@ -120,12 +120,11 @@ body {
 
 .logo-text {
     font-size: 1.4rem;
-    font-family: 'ImpactCustom', 'Impact', 'Arial Black', sans-serif;
-    font-weight: 500;
+    font-family: 'ImpactCustom', Impact, sans-serif;
+    font-weight: bold;
     margin: 0;
     color: #FF0000;
     letter-spacing: 0.5px;
-    text-shadow: 0 2px 4px rgba(255, 0, 0, 0.2);
 }
 
 .logo-subtext {
