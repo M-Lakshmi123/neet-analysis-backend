@@ -121,7 +121,7 @@ body {
 .logo-text {
     font-size: 1.4rem;
     font-family: 'ImpactCustom', Impact, sans-serif;
-    font-weight: bold;
+    font-weight: 600;
     margin: 0;
     color: #FF0000;
     letter-spacing: 0.5px;
