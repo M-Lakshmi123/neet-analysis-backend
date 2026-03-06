@@ -366,11 +366,11 @@ const AverageReport = ({ filters }) => {
                 halign: 'center',
                 valign: 'middle',
                 lineWidth: 0.2,
-                fontSize: 12
+                fontSize: 11
             },
             styles: {
                 font: bookmanFont ? "Bookman" : "helvetica",
-                fontSize: 12,
+                fontSize: 11,
                 cellPadding: 1.5,
                 overflow: 'ellipsize',
                 halign: 'center',
