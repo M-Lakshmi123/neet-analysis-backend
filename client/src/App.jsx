@@ -67,7 +67,7 @@ const Dashboard = () => {
     });
 
     const [academicYear, setAcademicYear] = useState(() => {
-        return sessionStorage.getItem('academic_year') || '2026';
+        return sessionStorage.getItem('academic_year') || '2025';
     });
 
     useEffect(() => {
