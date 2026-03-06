@@ -380,15 +380,15 @@ const AverageReport = ({ filters }) => {
                 textColor: [0, 0, 0]
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 48, fontSize: 10, fontStyle: 'bold' }, // Test Name
+                0: { halign: 'center', cellWidth: 55, fontSize: 10, fontStyle: 'bold' }, // Test Name
                 1: { cellWidth: 28 }, // Date
-                2: { cellWidth: 18, fillColor: [255, 255, 204] }, // Total
-                3: { cellWidth: 16 }, // AIR
-                4: { cellWidth: 16, fillColor: [253, 233, 217] }, // Bot
-                5: { cellWidth: 16, fillColor: [218, 238, 243] }, // Zoo
-                6: { cellWidth: 16, fillColor: [224, 231, 255] }, // Bio
-                7: { cellWidth: 16, fillColor: [235, 241, 222] }, // Phy
-                8: { cellWidth: 16, fillColor: [242, 220, 219] }  // Chem
+                2: { cellWidth: 17, fillColor: [255, 255, 204] }, // Total
+                3: { cellWidth: 15 }, // AIR
+                4: { cellWidth: 15, fillColor: [253, 233, 217] }, // Bot
+                5: { cellWidth: 15, fillColor: [218, 238, 243] }, // Zoo
+                6: { cellWidth: 15, fillColor: [224, 231, 255] }, // Bio
+                7: { cellWidth: 15, fillColor: [235, 241, 222] }, // Phy
+                8: { cellWidth: 15, fillColor: [242, 220, 219] }  // Chem
             },
             margin: { left: marginX, right: marginX, bottom: 15 },
             didParseCell: (data) => {
