@@ -271,17 +271,31 @@ const TestWiseImprovements = ({ filters }) => {
             const buffer = await workbook.xlsx.writeBuffer();
 
             let fileName = isOverall ? `Overall_Improvement_Report.xlsx` : `Improvement_Report_${testName}.xlsx`;
-            const singleCampus = filters.campus && filters.campus.length === 1 ? filters.campus[0] : null;
 
-            if (singleCampus) {
-                // If single campus, use pattern: CAMPUS_Stream_Threshold_Target Students List
-                const streamName = filters.stream && filters.stream.length === 1 ? filters.stream[0] : 'All_Streams';
-                const thresholdLabel = categories.find(c => c.key === selectedCategory)?.label || 'All';
-                // Remove >= and spaces for cleaner filename, or leave it roughly alone (Windows might replace invalid chars)
-                const safeThreshold = thresholdLabel.replace(/>=\s*/g, '');
-
-                fileName = `${singleCampus}_${streamName}_${safeThreshold}_Target Students List.xlsx`;
+            // Format Campus Name
+            let campusName = 'ALL_CAMPUSES';
+            if (filters.campus && filters.campus.length > 0) {
+                if (filters.campus.length === 1) {
+                    campusName = filters.campus[0] === '__ALL__' ? 'ALL_CAMPUSES' : filters.campus[0];
+                } else {
+                    campusName = 'MULTIPLE_CAMPUSES';
+                }
             }
+
+            // Format Stream Name
+            let streamName = 'ALL_STREAMS';
+            if (filters.stream && filters.stream.length > 0) {
+                if (filters.stream.length === 1) {
+                    streamName = filters.stream[0] === '__ALL__' ? 'ALL_STREAMS' : filters.stream[0];
+                } else {
+                    streamName = 'MULTIPLE_STREAMS';
+                }
+            }
+
+            const thresholdLabel = categories.find(c => c.key === selectedCategory)?.label || 'All';
+            const safeThreshold = thresholdLabel.replace(/>=\s*/g, '');
+
+            fileName = `${campusName}_${streamName}_${safeThreshold}_Target Students List.xlsx`;
 
             saveAs(new Blob([buffer]), fileName);
             logActivity(userData, 'Exported Multi-Sheet Improvement Report', { test: isOverall ? 'Overall' : testName, fileName });
