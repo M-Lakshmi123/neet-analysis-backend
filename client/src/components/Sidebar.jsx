@@ -39,6 +39,12 @@ const Sidebar = ({ activePage, setActivePage }) => {
         currentItems.push({ id: 'logs', label: 'Activity Logs', icon: <Activity size={18} /> });
     }
 
+    // Special access for yenjarappa.s@varsitymgmt.com
+    const isSuperAdmin = useAuth().currentUser?.email === 'yenjarappa.s@varsitymgmt.com';
+    if (isSuperAdmin) {
+        currentItems.push({ id: 'file_management', label: 'Schedules & Timetable & Files', icon: <ClipboardList size={18} /> });
+    }
+
     return (
         <aside className="sidebar">
             <div className="branding-wrapper">

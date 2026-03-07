@@ -24,6 +24,7 @@ import { AuthProvider, useAuth, AuthContext } from './components/auth/AuthProvid
 import Sidebar from './components/Sidebar';
 import UserApprovals from './components/admin/UserApprovals';
 import ActivityLogs from './components/admin/ActivityLogs';
+import FileManagement from './components/FileManagement';
 import { logActivity } from './utils/activityLogger';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
@@ -289,6 +290,8 @@ const Dashboard = () => {
                 return isAdmin ? <UserApprovals /> : <div className="p-4">Access Denied</div>;
             case 'logs':
                 return isAdmin ? <ActivityLogs /> : <div className="p-4">Access Denied</div>;
+            case 'file_management':
+                return userData?.email === 'yenjarappa.s@varsitymgmt.com' ? <FileManagement academicYear={academicYear} /> : <div className="p-4">Access Denied</div>;
             default:
                 return <div>Select a page from the sidebar</div>;
         }
@@ -311,7 +314,8 @@ const Dashboard = () => {
                                                 activePage === 'error_count' ? 'Error Count Report' :
                                                     activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
                                                         activePage === 'student_performance' ? 'Student Performance' :
-                                                            activePage === 'approvals' ? 'User Approvals' : 'Activity Logs'
+                                                            activePage === 'approvals' ? 'User Approvals' :
+                                                                activePage === 'file_management' ? 'Schedules & Timetable & Files' : 'Activity Logs'
                 } />
                 <div className="content-inner">
 

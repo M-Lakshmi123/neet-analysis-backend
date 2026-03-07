@@ -21,7 +21,101 @@ app.use(express.json());
 
 // SERVE FRONTEND STATIC FILES
 const clientDistPath = path.join(__dirname, '../client/dist');
+const uploadPath = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath);
+
+app.use('/uploads', express.static(uploadPath));
 app.use(express.static(clientDistPath));
+
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        cb(null, `${uuidv4()}${ext}`);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+});
+
+// File Management Routes
+app.post('/api/files/upload', upload.single('file'), async (req, res) => {
+    try {
+        const { category } = req.body;
+        const file = req.file;
+        if (!file) return res.status(400).json({ error: 'No file uploaded' });
+
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+
+        const fileType = path.extname(file.originalname).substring(1).toLowerCase(); // 'pdf' or 'xlsx' etc.
+
+        await pool.request().query(`
+            INSERT INTO uploaded_files (filename, original_name, category, file_type)
+            VALUES ('${file.filename}', '${file.originalname.replace(/'/g, "''")}', '${category}', '${fileType}')
+        `);
+
+        res.json({ message: 'File uploaded successfully', file: file.filename });
+    } catch (err) {
+        console.error('[FileUpload] ERROR:', err);
+        res.status(500).json({ error: 'Failed to upload file' });
+    }
+});
+
+app.get('/api/files', async (req, res) => {
+    try {
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+        const { category } = req.query;
+
+        let query = 'SELECT * FROM uploaded_files';
+        if (category) {
+            query += ` WHERE category = '${category}'`;
+        }
+        query += ' ORDER BY upload_date DESC';
+
+        const result = await pool.request().query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('[FileList] ERROR:', err);
+        res.status(500).json({ error: 'Failed to fetch files' });
+    }
+});
+
+app.delete('/api/files/:id', async (req, res) => {
+    try {
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+        const { id } = req.params;
+
+        // 1. Get file details
+        const result = await pool.request().query(`SELECT filename FROM uploaded_files WHERE id = ${id}`);
+        if (result.recordset.length === 0) return res.status(404).json({ error: 'File not found' });
+
+        const filename = result.recordset[0].filename;
+        const filePath = path.join(uploadPath, filename);
+
+        // 2. Delete from disk
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        // 3. Delete from database
+        await pool.request().query(`DELETE FROM uploaded_files WHERE id = ${id}`);
+
+        res.json({ message: 'File deleted successfully' });
+    } catch (err) {
+        console.error('[FileDelete] ERROR:', err);
+        res.status(500).json({ error: 'Failed to delete file' });
+    }
+});
 
 // Simple In-Memory Cache
 const cache = {
