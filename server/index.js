@@ -69,8 +69,8 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
 
                 const params = [filename, file.originalname, category, fileType, file.buffer];
 
-                // USE .execute() for more robust binary handling (Prepared Statements)
-                await pool.rawPool.execute(insertQuery, params);
+                // Switching back to .query() - TiDB sometimes has protocol issues with large BLOBs in .execute()
+                await pool.rawPool.query(insertQuery, params);
                 successCount++;
             } catch (fileErr) {
                 console.error(`[BulkUpload] FAILED: ${file.originalname}`, fileErr);
