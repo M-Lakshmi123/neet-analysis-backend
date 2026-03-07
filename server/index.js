@@ -1466,9 +1466,12 @@ app.get('/api/erp/students', async (req, res) => {
 
 const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    // Auto-open browser
-    // require('child_process').exec('start http://localhost:5000');
 });
+
+// CRITICAL: Set timeouts to 5 minutes to prevent Network Errors during large binary uploads
+server.timeout = 300000;
+server.keepAliveTimeout = 300000 + 1000;
+server.headersTimeout = 300000 + 2000;
 
 server.on('error', (err) => {
     console.error("SERVER ERROR:", err);
