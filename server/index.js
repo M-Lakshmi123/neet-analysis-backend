@@ -38,6 +38,7 @@ const upload = multer({
 
 // File Management Routes (TiDB BLOB Storage)
 app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
+    console.log(`[ROUTE] /api/files/upload HIT - Files: ${req.files?.length || 0}, Body:`, req.body);
     try {
         const { category } = req.body;
         const uploadedFiles = req.files;
