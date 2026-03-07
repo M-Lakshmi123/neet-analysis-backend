@@ -59,22 +59,37 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
         let failDetails = [];
 
         for (const file of uploadedFiles) {
+            let connection;
             try {
+                const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                console.log(`[BulkUpload] Preparing file: ${file.originalname} (${fileSizeMB} MB)`);
+
                 const ext = path.extname(file.originalname);
                 const fileType = ext ? ext.substring(1).toLowerCase() : 'bin';
 
-                // Sanitize filename for system storage
                 const safeBaseName = file.originalname.replace(/[^a-z0-9.]/gi, '_');
                 const filename = `${Date.now()}-${Math.floor(Math.random() * 1000)}-${safeBaseName}`;
 
                 const params = [filename, file.originalname, category, fileType, file.buffer];
 
-                // Switching back to .query() - TiDB sometimes has protocol issues with large BLOBs in .execute()
-                await pool.rawPool.query(insertQuery, params);
+                // Get dedicated connection to set session variables
+                connection = await pool.rawPool.getConnection();
+
+                // CRITICAL: Raise session packet limit for this specific file transfer
+                try {
+                    await connection.query("SET SESSION max_allowed_packet=104857600");
+                } catch (settErr) {
+                    console.warn(`[BulkUpload] Note: Could not raise session packet limit: ${settErr.message}`);
+                }
+
+                await connection.query(insertQuery, params);
                 successCount++;
+                console.log(`[BulkUpload] Success: ${file.originalname}`);
             } catch (fileErr) {
                 console.error(`[BulkUpload] FAILED: ${file.originalname}`, fileErr);
                 failDetails.push({ name: file.originalname, error: fileErr.message });
+            } finally {
+                if (connection) connection.release();
             }
         }
 

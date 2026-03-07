@@ -18,8 +18,6 @@ const createConfig = (year) => {
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
-        connectTimeout: 60000, // 60 seconds
-        acquireTimeout: 60000, // 60 seconds
         ssl: {
             rejectUnauthorized: true
         }
