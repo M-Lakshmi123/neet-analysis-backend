@@ -60,14 +60,17 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
 
         for (const file of uploadedFiles) {
             try {
-                const fileType = path.extname(file.originalname).substring(1).toLowerCase();
-                // Sanitize filename for the system but keep original_name as is
+                const ext = path.extname(file.originalname);
+                const fileType = ext ? ext.substring(1).toLowerCase() : 'bin';
+
+                // Sanitize filename for system storage
                 const safeBaseName = file.originalname.replace(/[^a-z0-9.]/gi, '_');
-                const filename = `${new Date().getTime()}-${Math.floor(Math.random() * 1000)}-${safeBaseName}`;
+                const filename = `${Date.now()}-${Math.floor(Math.random() * 1000)}-${safeBaseName}`;
 
                 const params = [filename, file.originalname, category, fileType, file.buffer];
 
-                await pool.rawPool.query(insertQuery, params);
+                // USE .execute() for more robust binary handling (Prepared Statements)
+                await pool.rawPool.execute(insertQuery, params);
                 successCount++;
             } catch (fileErr) {
                 console.error(`[BulkUpload] FAILED: ${file.originalname}`, fileErr);
@@ -79,11 +82,12 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
             message: `Processed ${uploadedFiles.length} files. Success: ${successCount}`,
             total: uploadedFiles.length,
             success: successCount,
-            errors: failDetails
+            errors: failDetails,
+            isSuccess: successCount > 0 && failDetails.length === 0
         });
     } catch (err) {
         console.error('[FileUpload][FATAL] ERROR:', err);
-        res.status(500).json({ error: 'Failed to process bulk upload to Database' });
+        res.status(500).json({ error: 'System error during upload processing' });
     }
 });
 
