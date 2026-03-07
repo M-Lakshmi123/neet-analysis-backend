@@ -1480,10 +1480,10 @@ const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
 
-// CRITICAL: Set timeouts to 5 minutes to prevent Network Errors during large binary uploads
-server.timeout = 300000;
-server.keepAliveTimeout = 300000 + 1000;
-server.headersTimeout = 300000 + 2000;
+// CRITICAL: Set timeouts to 10 minutes to prevent Network Errors during large binary uploads
+server.timeout = 600000;
+server.keepAliveTimeout = 601000;
+server.headersTimeout = 602000;
 
 server.on('error', (err) => {
     console.error("SERVER ERROR:", err);

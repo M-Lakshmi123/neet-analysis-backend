@@ -18,6 +18,7 @@ const createConfig = (year) => {
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
+        maxAllowedPacket: 104857600, // 100MB to prevent MALFORM PACKET error with large BLOBs
         ssl: {
             rejectUnauthorized: true
         }
