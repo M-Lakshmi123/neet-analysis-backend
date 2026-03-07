@@ -65,6 +65,7 @@ async function connectToDb(year = '2026') {
 
             // Create a wrapper to mimic strict MSSQL interface
             pools[targetYear] = {
+                rawPool: poolRaw,
                 request: () => ({
                     query: async (sqlQuery) => {
                         try {

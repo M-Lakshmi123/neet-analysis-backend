@@ -28,24 +28,14 @@ app.use('/uploads', express.static(uploadPath));
 app.use(express.static(clientDistPath));
 
 const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, `${uuidv4()}${ext}`);
-    }
-});
+const storage = multer.memoryStorage(); // Store in memory to save to DB as BLOB
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
 });
 
-// File Management Routes
+// File Management Routes (TiDB BLOB Storage)
 app.post('/api/files/upload', upload.single('file'), async (req, res) => {
     try {
         const { category } = req.body;
@@ -55,17 +45,18 @@ app.post('/api/files/upload', upload.single('file'), async (req, res) => {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
-        const fileType = path.extname(file.originalname).substring(1).toLowerCase(); // 'pdf' or 'xlsx' etc.
+        const fileType = path.extname(file.originalname).substring(1).toLowerCase();
+        const filename = `${new Date().getTime()}-${file.originalname}`;
 
-        await pool.request().query(`
-            INSERT INTO uploaded_files (filename, original_name, category, file_type)
-            VALUES ('${file.filename}', '${file.originalname.replace(/'/g, "''")}', '${category}', '${fileType}')
-        `);
+        const query = "INSERT INTO uploaded_files (filename, original_name, category, file_type, file_data) VALUES (?, ?, ?, ?, ?)";
+        const params = [filename, file.originalname, category, fileType, file.buffer];
 
-        res.json({ message: 'File uploaded successfully', file: file.filename });
+        await pool.rawPool.query(query, params);
+
+        res.json({ message: 'File uploaded successfully' });
     } catch (err) {
         console.error('[FileUpload] ERROR:', err);
-        res.status(500).json({ error: 'Failed to upload file' });
+        res.status(500).json({ error: 'Failed to upload file to Database' });
     }
 });
 
@@ -75,7 +66,7 @@ app.get('/api/files', async (req, res) => {
         const pool = await connectToDb(year);
         const { category } = req.query;
 
-        let query = 'SELECT * FROM uploaded_files';
+        let query = 'SELECT id, filename, original_name, category, file_type, upload_date FROM uploaded_files';
         if (category) {
             query += ` WHERE category = '${category}'`;
         }
@@ -89,28 +80,41 @@ app.get('/api/files', async (req, res) => {
     }
 });
 
+app.get('/api/files/view/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+
+        const [rows] = await pool.rawPool.query('SELECT file_data, file_type, original_name FROM uploaded_files WHERE id = ?', [id]);
+        if (rows.length === 0) return res.status(404).send('File not found');
+
+        const file = rows[0];
+        const contentType = file.file_type === 'pdf' ? 'application/pdf' :
+            (file.file_type === 'xlsx' || file.file_type === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+                'application/octet-stream';
+
+        res.setHeader('Content-Type', contentType);
+        if (req.query.download === 'true') {
+            res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+        } else {
+            res.setHeader('Content-Disposition', `inline; filename="${file.original_name}"`);
+        }
+
+        res.send(file.file_data);
+    } catch (err) {
+        console.error('[FileView] ERROR:', err);
+        res.status(500).send('Error retrieving file');
+    }
+});
+
 app.delete('/api/files/:id', async (req, res) => {
     try {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
         const { id } = req.params;
-
-        // 1. Get file details
-        const result = await pool.request().query(`SELECT filename FROM uploaded_files WHERE id = ${id}`);
-        if (result.recordset.length === 0) return res.status(404).json({ error: 'File not found' });
-
-        const filename = result.recordset[0].filename;
-        const filePath = path.join(uploadPath, filename);
-
-        // 2. Delete from disk
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
-
-        // 3. Delete from database
         await pool.request().query(`DELETE FROM uploaded_files WHERE id = ${id}`);
-
-        res.json({ message: 'File deleted successfully' });
+        res.json({ message: 'File deleted from database' });
     } catch (err) {
         console.error('[FileDelete] ERROR:', err);
         res.status(500).json({ error: 'Failed to delete file' });
