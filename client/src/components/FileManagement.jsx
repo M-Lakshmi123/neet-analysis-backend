@@ -14,13 +14,17 @@ import {
     FileSearch,
     Files,
     CheckCircle,
-    AlertCircle
+    AlertCircle,
+    Eye
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import { motion, AnimatePresence } from 'framer-motion';
-import { API_URL } from '../utils/apiHelper'; // CRITICAL: Use the correct production backend URL
+import { API_URL } from '../utils/apiHelper';
 
-const FileManagement = ({ academicYear, setAcademicYear }) => {
+const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
+    // Permission: Only the Main Admin (Yenjarappa) can Upload/Download/Delete
+    const isMainAdmin = userData?.email === 'yenjarappa.s@varsitymgmt.com';
+
     const [activeCategory, setActiveCategory] = useState('schedules');
     const categories = [
         { id: 'schedules', label: 'Schedules & Time Tables', icon: <Calendar size={16} />, color: '#172554' },
@@ -46,7 +50,8 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
     const fetchFiles = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${API_URL}/api/files?academicYear=${academicYear}&category=${activeCategory}`);
+            // Add timestamp _t to bypass all caching layers (Browser/Proxy/Server)
+            const response = await fetch(`${API_URL}/api/files?academicYear=${academicYear}&category=${activeCategory}&_t=${Date.now()}`);
             if (!response.ok) throw new Error('Server unreachable');
             const data = await response.json();
             setFiles(Array.isArray(data) ? data : []);
@@ -59,6 +64,7 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
     };
 
     const handleUpload = async () => {
+        if (!isMainAdmin) return;
         const input = document.createElement('input');
         input.type = 'file';
         input.multiple = true;
@@ -81,23 +87,26 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
                         method: 'POST',
                         body: formData
                     });
-                    if (response.ok) {
+                    const result = await response.json();
+
+                    if (response.ok && result.success > 0) {
                         successCount++;
                     } else {
                         failCount++;
                     }
                 } catch (err) {
-                    console.error('Upload error for ' + file.name, err);
                     failCount++;
                 }
             }
 
             if (successCount > 0) {
-                showStatus('success', `Completed: ${successCount} saved`);
+                showStatus('success', `Saved ${successCount} files`);
+                // Wait 1 second for database indexing to settle before refresh
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 fetchFiles();
             }
             if (failCount > 0) {
-                showStatus('error', `Rejected: ${failCount} files failed`);
+                showStatus('error', failCount === 1 ? '1 file rejected by server' : `${failCount} files failed`);
             }
 
             setUploading(false);
@@ -108,6 +117,7 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
     const handleDelete = async (e, id) => {
         e.preventDefault();
         e.stopPropagation();
+        if (!isMainAdmin) return;
         if (!window.confirm('Delete this file?')) return;
 
         try {
@@ -152,6 +162,7 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
 
     return (
         <div className="file-mgmt-clean">
+            {/* COMPACT TOP BAR */}
             <div className="top-control-row">
                 <div className="button-group-flat">
                     <button className={`flat-btn ${academicYear === '2025' ? 'active' : ''}`} onClick={() => setAcademicYear('2025')}>2025</button>
@@ -173,10 +184,14 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
                             </motion.div>
                         )}
                     </AnimatePresence>
-                    <button className="upload-btn-compact" onClick={handleUpload} disabled={uploading}>
-                        {uploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-                        {uploading ? 'PROCESSING...' : 'UPLOAD FILES'}
-                    </button>
+
+                    {/* ONLY MAIN ADMIN SEES UPLOAD */}
+                    {isMainAdmin && (
+                        <button className="upload-btn-compact" onClick={handleUpload} disabled={uploading}>
+                            {uploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+                            {uploading ? 'UPLOADING...' : 'UPLOAD FILES'}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -184,19 +199,18 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
                 {loading ? (
                     <div className="p-12 text-center text-slate-400">
                         <Loader2 className="animate-spin mx-auto mb-2" size={24} />
-                        <p className="text-[10px] uppercase tracking-widest font-bold">Syncing...</p>
+                        <p className="text-[10px] uppercase font-bold tracking-widest">Syncing Vault...</p>
                     </div>
                 ) : files.length === 0 ? (
                     <div className="p-20 text-center">
                         <Search size={40} className="mx-auto mb-4 text-slate-200" />
                         <h3 className="text-lg font-bold text-slate-300">No Records Found</h3>
-                        <p className="text-[10px] uppercase text-slate-400 mt-2">Check Year & Category</p>
                     </div>
                 ) : (
                     <table className="clean-table">
                         <thead>
                             <tr>
-                                <th className="w-12 text-center">FORMAT</th>
+                                <th className="w-12 text-center">MODE</th>
                                 <th>FILE NAME</th>
                                 <th className="w-48">UPLOAD DATE</th>
                                 <th className="w-32 text-right">ACTION</th>
@@ -210,8 +224,15 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
                                     <td className="date-text">{new Date(file.upload_date).toLocaleString()}</td>
                                     <td className="text-right">
                                         <div className="flex items-center justify-end gap-3" onClick={e => e.stopPropagation()}>
-                                            <a href={`${API_URL}/api/files/view/${file.id}?academicYear=${academicYear}&download=true`} className="icon-link download" download><Download size={16} /></a>
-                                            <button onClick={(e) => handleDelete(e, file.id)} className="icon-link delete"><Trash2 size={16} /></button>
+                                            <button onClick={() => openPreview(file)} className="icon-link view" title="View Preview"><Eye size={16} /></button>
+
+                                            {/* ONLY MAIN ADMIN SEES DOWNLOAD/DELETE */}
+                                            {isMainAdmin && (
+                                                <>
+                                                    <a href={`${API_URL}/api/files/view/${file.id}?academicYear=${academicYear}&download=true`} className="icon-link download" download><Download size={16} /></a>
+                                                    <button onClick={(e) => handleDelete(e, file.id)} className="icon-link delete"><Trash2 size={16} /></button>
+                                                </>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -221,6 +242,7 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
                 )}
             </div>
 
+            {/* PREVIEW MODAL */}
             <AnimatePresence>
                 {previewFile && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay">
@@ -231,14 +253,22 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
                                     <h2 className="modal-title">{previewFile.original_name}</h2>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <a href={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&download=true`} className="modal-action-btn" download><Download size={18} /></a>
-                                    <button onClick={() => setPreviewFile(null)} className="modal-close-btn"><X size={20} /></button>
+                                    {isMainAdmin && (
+                                        <a href={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&download=true`} className="modal-action-btn" download><Download size={18} /></a>
+                                    )}
+                                    <button onClick={() => setPreviewFile(null)} className="modal-close-btn-top"><X size={20} /></button>
                                 </div>
                             </div>
                             <div className="modal-content">
                                 {previewFile.file_type === 'pdf' ? <iframe src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0`} className="full-iframe" /> :
                                     excelData ? <div className="excel-view"><table className="excel-table"><thead><tr>{excelData[0]?.map((c, i) => <th key={i}>{c}</th>)}</tr></thead><tbody>{excelData.slice(1).map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c?.toString() || ''}</td>)}</tr>)}</tbody></table></div> :
                                         <div className="loading-state">Transferring...</div>}
+                            </div>
+                            {/* NEW BOTTOM CLOSE BUTTON */}
+                            <div className="modal-footer">
+                                <button onClick={() => setPreviewFile(null)} className="modal-footer-close-btn">
+                                    <X size={16} /> CLOSE PREVIEW WINDOW
+                                </button>
                             </div>
                         </motion.div>
                     </motion.div>
@@ -247,43 +277,58 @@ const FileManagement = ({ academicYear, setAcademicYear }) => {
 
             <style jsx>{`
                 .file-mgmt-clean { padding: 0; }
-                .top-control-row { display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
-                .button-group-flat { display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 4px; border-radius: 8px; border: 1px solid #f1f5f9; }
+                .top-control-row { display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 20px; border-radius: 12px; margin-bottom: 16px; border: 1px solid #e2e8f0; }
+                .button-group-flat { display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid #f1f5f9; }
                 .flat-btn { padding: 8px 14px; font-size: 10px; font-weight: 800; color: #64748b; border: none; background: transparent; border-radius: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
                 .flat-btn.active { background: #172554; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
                 .v-divider { width: 1px; height: 16px; background: #cbd5e1; margin: 0 4px; }
-                .upload-btn-compact { background: #172554; color: white; padding: 8px 16px; border-radius: 8px; border: none; font-size: 10px; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+                .upload-btn-compact { background: #172554; color: white; padding: 8px 18px; border-radius: 8px; border: none; font-size: 10px; font-weight: 900; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; }
+                .upload-btn-compact:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+                
                 .inline-feedback { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 6px 12px; border-radius: 6px; }
                 .inline-feedback.success { color: #059669; border: 1px solid #d1fae5; background: #f0fdf4; }
                 .inline-feedback.error { color: #dc2626; border: 1px solid #fee2e2; background: #fef2f2; }
-                .compact-table-container { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+
+                .compact-table-container { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
                 .clean-table { width: 100%; border-collapse: collapse; }
-                .clean-table th { text-align: left; padding: 12px 20px; background: #f8fafc; font-size: 9px; font-weight: 800; color: #94a3b8; border-bottom: 2px solid #f1f5f9; text-transform: uppercase; }
+                .clean-table th { text-align: left; padding: 12px 20px; background: #f8fafc; font-size: 9px; font-weight: 800; color: #94a3b8; border-bottom: 2px solid #f1f5f9; text-transform: uppercase; letter-spacing: 0.05em; }
                 .clean-table td { padding: 12px 20px; border-bottom: 1px solid #f8fafc; cursor: pointer; }
+                .clean-table tr:last-child td { border-bottom: none; }
                 .clean-table tr:hover td { background: #f8fafc; }
                 .file-name-text { font-weight: 700; color: #1e293b; font-size: 12px; }
-                .date-text { font-size: 10.5px; color: #94a3b8; font-weight: 600; }
+                .date-text { font-size: 10px; color: #94a3b8; font-weight: 600; }
+                
                 .icon-link { color: #cbd5e1; transition: all 0.2s; border: none; background: transparent; cursor: pointer; padding: 6px; border-radius: 6px; }
                 .icon-link:hover { background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+                .icon-link.view:hover { color: #172554; }
                 .icon-link.download:hover { color: #3b82f6; }
                 .icon-link.delete:hover { color: #ef4444; }
+
                 .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 24px; }
-                .modal-body { width: 100%; max-width: 1400px; height: 92vh; background: white; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; }
-                .modal-head { padding: 16px 32px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
-                .modal-title { font-size: 15px; font-weight: 900; color: #1e293b; }
+                .modal-body { width: 100%; max-width: 1400px; height: 92vh; background: white; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); }
+                .modal-head { padding: 14px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; }
+                .modal-title { font-size: 14px; font-weight: 900; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
                 .modal-content { flex: 1; background: #f1f5f9; overflow: hidden; }
                 .full-iframe { width: 100%; height: 100%; border: none; }
                 .excel-view { height: 100%; overflow: auto; padding: 24px; }
-                .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; }
-                .excel-table th { padding: 10px; background: #1e293b; color: white; font-size: 11px; text-align: left; }
-                .excel-table td { padding: 8px 10px; border: 1px solid #f1f5f9; font-size: 12px; color: #334155; }
+                .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+                .excel-table th { padding: 10px; background: #1e293b; color: white; font-size: 11px; text-align: left; position: sticky; top: 0; }
+                .excel-table td { padding: 8px 10px; border: 1px solid #f1f5f9; font-size: 11px; color: #334155; }
                 .loading-state { height: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-weight: 800; font-size: 11px; text-transform: uppercase; }
-                .modal-action-btn { background: #f8fafc; color: #1e293b; padding: 8px; border-radius: 8px; }
-                .modal-close-btn { color: #94a3b8; }
+                .modal-action-btn { background: #f8fafc; color: #1e293b; padding: 8px; border-radius: 8px; transition: all 0.2s; }
+                .modal-action-btn:hover { background: #172554; color: white; }
+                .modal-close-btn-top { color: #94a3b8; transition: all 0.2s; padding: 4px; }
+                .modal-close-btn-top:hover { color: #ef4444; transform: rotate(90deg); }
+                
+                .modal-footer { padding: 12px 24px; border-top: 1px solid #f1f5f9; display: flex; justify-content: center; background: white; }
+                .modal-footer-close-btn { background: #ef4444; color: white; padding: 10px 24px; border-radius: 8px; border: none; font-size: 11px; font-weight: 900; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2); }
+                .modal-footer-close-btn:hover { background: #dc2626; transform: translateY(-1px); box-shadow: 0 6px 12px rgba(239, 68, 68, 0.3); }
+
                 .flex { display: flex; }
                 .items-center { align-items: center; }
                 .gap-3 { gap: 12px; }
                 .gap-4 { gap: 16px; }
+                .justify-center { justify-content: center; }
             `}</style>
         </div>
     );

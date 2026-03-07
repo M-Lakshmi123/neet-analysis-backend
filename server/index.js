@@ -56,23 +56,30 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
 
         // Execute inserts sequentially for reliability with BLOBs
         let successCount = 0;
+        let failDetails = [];
+
         for (const file of uploadedFiles) {
             try {
                 const fileType = path.extname(file.originalname).substring(1).toLowerCase();
-                const filename = `${new Date().getTime()}-${Math.floor(Math.random() * 1000)}-${file.originalname}`;
+                // Sanitize filename for the system but keep original_name as is
+                const safeBaseName = file.originalname.replace(/[^a-z0-9.]/gi, '_');
+                const filename = `${new Date().getTime()}-${Math.floor(Math.random() * 1000)}-${safeBaseName}`;
+
                 const params = [filename, file.originalname, category, fileType, file.buffer];
 
                 await pool.rawPool.query(insertQuery, params);
                 successCount++;
             } catch (fileErr) {
-                console.error(`[BulkUpload] Failed to insert file ${file.originalname}:`, fileErr.message);
+                console.error(`[BulkUpload] FAILED: ${file.originalname}`, fileErr);
+                failDetails.push({ name: file.originalname, error: fileErr.message });
             }
         }
 
         res.json({
-            message: `Successfully uploaded ${successCount} files to database`,
+            message: `Processed ${uploadedFiles.length} files. Success: ${successCount}`,
             total: uploadedFiles.length,
-            success: successCount
+            success: successCount,
+            errors: failDetails
         });
     } catch (err) {
         console.error('[FileUpload][FATAL] ERROR:', err);

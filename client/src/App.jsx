@@ -291,7 +291,17 @@ const Dashboard = () => {
             case 'logs':
                 return isAdmin ? <ActivityLogs /> : <div className="p-4">Access Denied</div>;
             case 'file_management':
-                return userData?.email === 'yenjarappa.s@varsitymgmt.com' ? <FileManagement academicYear={academicYear} setAcademicYear={setAcademicYear} /> : <div className="p-4">Access Denied</div>;
+                const isSuperAdminEmail = userData?.email === 'yenjarappa.s@varsitymgmt.com';
+                const isUserPrincipal = (userData?.role || '').toLowerCase() === 'principal';
+                const hasFileAccess = isSuperAdminEmail || isAdmin || isCoAdmin || isUserPrincipal;
+
+                return hasFileAccess ?
+                    <FileManagement
+                        academicYear={academicYear}
+                        setAcademicYear={setAcademicYear}
+                        userData={userData}
+                    /> :
+                    <div className="p-4">Access Denied</div>;
             default:
                 return <div>Select a page from the sidebar</div>;
         }

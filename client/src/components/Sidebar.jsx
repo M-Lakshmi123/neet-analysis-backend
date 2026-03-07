@@ -39,10 +39,22 @@ const Sidebar = ({ activePage, setActivePage }) => {
         currentItems.push({ id: 'logs', label: 'Activity Logs', icon: <Activity size={18} /> });
     }
 
-    // Special access for yenjarappa.s@varsitymgmt.com
+    // Higher-level access: File Management
+    const { userData } = useAuth();
+    const isPrincipal = (userData?.role || '').toLowerCase() === 'principal';
     const isSuperAdmin = useAuth().currentUser?.email === 'yenjarappa.s@varsitymgmt.com';
-    if (isSuperAdmin) {
-        currentItems.push({ id: 'file_management', label: 'Schedules & Timetable & Files', icon: <ClipboardList size={18} /> });
+
+    if (isSuperAdmin || isAdmin || isCoAdmin || isPrincipal) {
+        const avgIdx = currentItems.findIndex(i => i.id === 'averages');
+        if (avgIdx !== -1) {
+            currentItems.splice(avgIdx + 1, 0, {
+                id: 'file_management',
+                label: 'Schedules & Timetable & Files',
+                icon: <ClipboardList size={18} />
+            });
+        } else {
+            currentItems.push({ id: 'file_management', label: 'Schedules & Timetable & Files', icon: <ClipboardList size={18} /> });
+        }
     }
 
     return (
