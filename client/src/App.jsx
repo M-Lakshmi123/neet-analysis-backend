@@ -291,7 +291,7 @@ const Dashboard = () => {
             case 'logs':
                 return isAdmin ? <ActivityLogs /> : <div className="p-4">Access Denied</div>;
             case 'file_management':
-                return userData?.email === 'yenjarappa.s@varsitymgmt.com' ? <FileManagement academicYear={academicYear} /> : <div className="p-4">Access Denied</div>;
+                return userData?.email === 'yenjarappa.s@varsitymgmt.com' ? <FileManagement academicYear={academicYear} setAcademicYear={setAcademicYear} /> : <div className="p-4">Access Denied</div>;
             default:
                 return <div>Select a page from the sidebar</div>;
         }

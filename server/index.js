@@ -36,27 +36,45 @@ const upload = multer({
 });
 
 // File Management Routes (TiDB BLOB Storage)
-app.post('/api/files/upload', upload.single('file'), async (req, res) => {
+app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
     try {
         const { category } = req.body;
-        const file = req.file;
-        if (!file) return res.status(400).json({ error: 'No file uploaded' });
+        const uploadedFiles = req.files;
+
+        if (!uploadedFiles || uploadedFiles.length === 0) {
+            return res.status(400).json({ error: 'No files provided for upload' });
+        }
 
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
-        const fileType = path.extname(file.originalname).substring(1).toLowerCase();
-        const filename = `${new Date().getTime()}-${file.originalname}`;
+        console.log(`[BulkUpload][${year}] Processing ${uploadedFiles.length} files for category: ${category}`);
 
-        const query = "INSERT INTO uploaded_files (filename, original_name, category, file_type, file_data) VALUES (?, ?, ?, ?, ?)";
-        const params = [filename, file.originalname, category, fileType, file.buffer];
+        const insertQuery = "INSERT INTO uploaded_files (filename, original_name, category, file_type, file_data) VALUES (?, ?, ?, ?, ?)";
 
-        await pool.rawPool.query(query, params);
+        // Execute inserts sequentially for reliability with BLOBs
+        let successCount = 0;
+        for (const file of uploadedFiles) {
+            try {
+                const fileType = path.extname(file.originalname).substring(1).toLowerCase();
+                const filename = `${new Date().getTime()}-${Math.floor(Math.random() * 1000)}-${file.originalname}`;
+                const params = [filename, file.originalname, category, fileType, file.buffer];
 
-        res.json({ message: 'File uploaded successfully' });
+                await pool.rawPool.query(insertQuery, params);
+                successCount++;
+            } catch (fileErr) {
+                console.error(`[BulkUpload] Failed to insert file ${file.originalname}:`, fileErr.message);
+            }
+        }
+
+        res.json({
+            message: `Successfully uploaded ${successCount} files to database`,
+            total: uploadedFiles.length,
+            success: successCount
+        });
     } catch (err) {
-        console.error('[FileUpload] ERROR:', err);
-        res.status(500).json({ error: 'Failed to upload file to Database' });
+        console.error('[FileUpload][FATAL] ERROR:', err);
+        res.status(500).json({ error: 'Failed to process bulk upload to Database' });
     }
 });
 
@@ -67,16 +85,21 @@ app.get('/api/files', async (req, res) => {
         const { category } = req.query;
 
         let query = 'SELECT id, filename, original_name, category, file_type, upload_date FROM uploaded_files';
+        const params = [];
+
         if (category) {
-            query += ` WHERE category = '${category}'`;
+            query += ' WHERE category = ?';
+            params.push(category);
         }
+
         query += ' ORDER BY upload_date DESC';
 
-        const result = await pool.request().query(query);
-        res.json(result.recordset);
+        // Using rawPool.query for consistency and safety
+        const [rows] = await pool.rawPool.query(query, params);
+        res.json(rows);
     } catch (err) {
-        console.error('[FileList] ERROR:', err);
-        res.status(500).json({ error: 'Failed to fetch files' });
+        console.error(`[FileList][${req.query.academicYear}] ERROR:`, err);
+        res.status(500).json({ error: 'Failed to fetch files from database' });
     }
 });
 
@@ -113,10 +136,11 @@ app.delete('/api/files/:id', async (req, res) => {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
         const { id } = req.params;
-        await pool.request().query(`DELETE FROM uploaded_files WHERE id = ${id}`);
-        res.json({ message: 'File deleted from database' });
+
+        await pool.rawPool.query('DELETE FROM uploaded_files WHERE id = ?', [id]);
+        res.json({ message: 'File deleted successfully from database' });
     } catch (err) {
-        console.error('[FileDelete] ERROR:', err);
+        console.error(`[FileDelete][${req.query.academicYear}] ERROR:`, err);
         res.status(500).json({ error: 'Failed to delete file' });
     }
 });
