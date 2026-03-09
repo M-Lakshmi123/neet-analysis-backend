@@ -77,7 +77,19 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
             let failCount = 0;
             let serverErrorMessage = null;
 
-            for (const file of selectedFiles) {
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                const fileSizeMB = file.size / (1024 * 1024);
+
+                // UX: Update status with progress
+                showStatus('loading', `Uploading ${i + 1}/${selectedFiles.length}: ${file.name}`);
+
+                if (fileSizeMB > 250) {
+                    failCount++;
+                    serverErrorMessage = `File too large (${fileSizeMB.toFixed(1)}MB). Max 250MB.`;
+                    continue;
+                }
+
                 const formData = new FormData();
                 formData.append('files', file);
                 formData.append('category', activeCategory);
@@ -87,16 +99,28 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                         method: 'POST',
                         body: formData
                     });
-                    const result = await response.json();
+
+                    let result;
+                    try {
+                        result = await response.json();
+                    } catch (e) {
+                        throw new Error('Server returned invalid response');
+                    }
 
                     if (response.ok && result.success > 0) {
                         successCount++;
                     } else {
                         failCount++;
-                        if (result.errors?.[0]?.error) serverErrorMessage = result.errors[0].error;
+                        if (result.errors?.[0]?.error) {
+                            serverErrorMessage = result.errors[0].error;
+                        } else if (result.error) {
+                            serverErrorMessage = result.error;
+                        }
                     }
                 } catch (err) {
+                    console.error('Upload Error:', err);
                     failCount++;
+                    serverErrorMessage = err.message;
                 }
             }
 
@@ -144,10 +168,24 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 await workbook.xlsx.load(buffer);
                 const worksheet = workbook.worksheets[0];
                 const data = [];
-                worksheet.eachRow(row => data.push(row.values.slice(1)));
+                let rowCount = 0;
+
+                // Optimization: Limit to first 500 rows to prevent browser crash on large files
+                worksheet.eachRow((row) => {
+                    if (rowCount < 500) {
+                        data.push(row.values.slice(1));
+                    }
+                    rowCount++;
+                });
+
+                if (rowCount > 500) {
+                    data.push(['... (Showing first 500 rows only)']);
+                }
+
                 setExcelData(data);
             } catch (err) {
-                setExcelData([['Data unreachable']]);
+                console.error('Preview Error:', err);
+                setExcelData([['Data unreachable or too large for preview']]);
             }
         }
     };
@@ -278,6 +316,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .inline-feedback { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 6px 12px; border-radius: 6px; }
                 .inline-feedback.success { color: #059669; border: 1px solid #d1fae5; background: #f0fdf4; }
                 .inline-feedback.error { color: #dc2626; border: 1px solid #fee2e2; background: #fef2f2; }
+                .inline-feedback.loading { color: #0f172a; border: 1px solid #e2e8f0; background: #f8fafc; }
 
                 .compact-table-container { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
                 .clean-table { width: 100%; border-collapse: collapse; }

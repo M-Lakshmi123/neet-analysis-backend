@@ -29,11 +29,19 @@ app.use('/uploads', express.static(uploadPath));
 app.use(express.static(clientDistPath));
 
 const multer = require('multer');
-const storage = multer.memoryStorage(); // Store in memory to save to DB as BLOB
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        const safeBaseName = file.originalname.replace(/[^a-z0-9.]/gi, '_');
+        cb(null, `${Date.now()}-${Math.floor(Math.random() * 1000)}-${safeBaseName}`);
+    }
+});
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit for bulk
+    limits: { fileSize: 250 * 1024 * 1024 } // Increased to 250MB for bulk
 });
 
 // File Management Routes (TiDB BLOB Storage)
@@ -67,17 +75,17 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 const ext = path.extname(file.originalname);
                 const fileType = ext ? ext.substring(1).toLowerCase() : 'bin';
 
-                const safeBaseName = file.originalname.replace(/[^a-z0-9.]/gi, '_');
-                const filename = `${Date.now()}-${Math.floor(Math.random() * 1000)}-${safeBaseName}`;
+                // Read file from disk into buffer for DB storage
+                const fileBuffer = fs.readFileSync(file.path);
 
-                const params = [filename, file.originalname, category, fileType, file.buffer];
+                const params = [file.filename, file.originalname, category, fileType, fileBuffer];
 
                 // Get dedicated connection to set session variables
                 connection = await pool.rawPool.getConnection();
 
-                // CRITICAL: Raise session packet limit for this specific file transfer
+                // CRITICAL: Raise session packet limit for this specific file transfer (256MB)
                 try {
-                    await connection.query("SET SESSION max_allowed_packet=104857600");
+                    await connection.query("SET SESSION max_allowed_packet=268435456");
                 } catch (settErr) {
                     console.warn(`[BulkUpload] Note: Could not raise session packet limit: ${settErr.message}`);
                 }
@@ -85,9 +93,15 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 await connection.query(insertQuery, params);
                 successCount++;
                 console.log(`[BulkUpload] Success: ${file.originalname}`);
+
+                // Clean up temporary file
+                try { fs.unlinkSync(file.path); } catch (e) { }
+
             } catch (fileErr) {
                 console.error(`[BulkUpload] FAILED: ${file.originalname}`, fileErr);
                 failDetails.push({ name: file.originalname, error: fileErr.message });
+                // Attempt cleanup even on failure
+                try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch (e) { }
             } finally {
                 if (connection) connection.release();
             }
