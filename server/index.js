@@ -70,27 +70,46 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
             let connection;
             try {
                 const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                console.log(`[BulkUpload] Preparing file: ${file.originalname} (${fileSizeMB} MB)`);
+                console.log(`[BulkUpload] Processing: ${file.originalname} (${fileSizeMB} MB)`);
 
                 const ext = path.extname(file.originalname);
                 const fileType = ext ? ext.substring(1).toLowerCase() : 'bin';
 
-                // Read file from disk into buffer for DB storage
-                const fileBuffer = fs.readFileSync(file.path);
-
-                const params = [file.filename, file.originalname, category, fileType, fileBuffer];
-
-                // Get dedicated connection to set session variables
+                // Get dedicated connection
                 connection = await pool.rawPool.getConnection();
 
-                // CRITICAL: Raise session packet limit for this specific file transfer (256MB)
-                try {
-                    await connection.query("SET SESSION max_allowed_packet=268435456");
-                } catch (settErr) {
-                    console.warn(`[BulkUpload] Note: Could not raise session packet limit: ${settErr.message}`);
-                }
+                // Raise packet limit for the session
+                try { await connection.query("SET SESSION max_allowed_packet=268435456"); } catch (e) { }
 
-                await connection.query(insertQuery, params);
+                // STEP 1: Insert metadata with empty BLOB
+                const [insertResult] = await connection.query(
+                    "INSERT INTO uploaded_files (filename, original_name, category, file_type, file_data) VALUES (?, ?, ?, ?, '')",
+                    [file.filename, file.originalname, category, fileType]
+                );
+                const insertId = insertResult.insertId;
+
+                // STEP 2: Stream file from disk to DB in chunks to keep RAM < 50MB
+                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+                const fd = fs.openSync(file.path, 'r');
+                const buffer = Buffer.alloc(CHUNK_SIZE);
+                let bytesRead;
+                let position = 0;
+
+                while ((bytesRead = fs.readSync(fd, buffer, 0, CHUNK_SIZE, position)) > 0) {
+                    const chunk = bytesRead < CHUNK_SIZE ? buffer.subarray(0, bytesRead) : buffer;
+                    // Append chunk to the BLOB column using SQL CONCAT
+                    await connection.query(
+                        "UPDATE uploaded_files SET file_data = CONCAT(file_data, ?) WHERE id = ?",
+                        [chunk, insertId]
+                    );
+                    position += bytesRead;
+                    // Optional: Log progress for very large files
+                    if (position % (CHUNK_SIZE * 5) === 0) {
+                        console.log(`[BulkUpload] Progress: ${file.originalname} -> ${((position / file.size) * 100).toFixed(0)}%`);
+                    }
+                }
+                fs.closeSync(fd);
+
                 successCount++;
                 console.log(`[BulkUpload] Success: ${file.originalname}`);
 
@@ -100,7 +119,6 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
             } catch (fileErr) {
                 console.error(`[BulkUpload] FAILED: ${file.originalname}`, fileErr);
                 failDetails.push({ name: file.originalname, error: fileErr.message });
-                // Attempt cleanup even on failure
                 try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch (e) { }
             } finally {
                 if (connection) connection.release();
@@ -151,25 +169,49 @@ app.get('/api/files/view/:id', async (req, res) => {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
-        const [rows] = await pool.rawPool.query('SELECT file_data, file_type, original_name FROM uploaded_files WHERE id = ?', [id]);
-        if (rows.length === 0) return res.status(404).send('File not found');
+        // STEP 1: Get metadata first
+        const [meta] = await pool.rawPool.query(
+            'SELECT original_name, file_type, LENGTH(file_data) as fileSize FROM uploaded_files WHERE id = ?',
+            [id]
+        );
+        if (meta.length === 0) return res.status(404).send('File not found');
 
-        const file = rows[0];
+        const file = meta[0];
+        const totalSize = file.fileSize;
         const contentType = file.file_type === 'pdf' ? 'application/pdf' :
             (file.file_type === 'xlsx' || file.file_type === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
                 'application/octet-stream';
 
         res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Length', totalSize);
         if (req.query.download === 'true') {
             res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
         } else {
             res.setHeader('Content-Disposition', `inline; filename="${file.original_name}"`);
         }
 
-        res.send(file.file_data);
+        // STEP 2: Stream the data in 8MB chunks using SQL SUBSTRING
+        // This prevents the 512MB RAM limit from being hit even for 200MB files
+        const CHUNK_SIZE = 8 * 1024 * 1024;
+        for (let offset = 0; offset < totalSize; offset += CHUNK_SIZE) {
+            // SUBSTRING(blob, start, len) is 1-indexed in MySQL/TiDB
+            const [chunkData] = await pool.rawPool.query(
+                `SELECT SUBSTRING(file_data, ${offset + 1}, ${CHUNK_SIZE}) as chunk FROM uploaded_files WHERE id = ?`,
+                [id]
+            );
+            if (chunkData[0] && chunkData[0].chunk) {
+                res.write(chunkData[0].chunk);
+            }
+        }
+        res.end();
+
     } catch (err) {
         console.error('[FileView] ERROR:', err);
-        res.status(500).send('Error retrieving file');
+        if (!res.headersSent) {
+            res.status(500).send('Error retrieving file');
+        } else {
+            res.end();
+        }
     }
 });
 
