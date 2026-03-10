@@ -37,6 +37,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
     const [excelData, setExcelData] = useState(null);
+    const [availableSheets, setAvailableSheets] = useState([]);
+    const [activeSheetIndex, setActiveSheetIndex] = useState(0);
+    const [workbookInstance, setWorkbookInstance] = useState(null);
 
     useEffect(() => {
         fetchFiles();
@@ -120,7 +123,12 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 } catch (err) {
                     console.error('Upload Error:', err);
                     failCount++;
-                    serverErrorMessage = err.message;
+                    // Map network errors to clearer messages
+                    if (err.message.includes('fetch')) {
+                        serverErrorMessage = `Network error (possible file size timeout).`;
+                    } else {
+                        serverErrorMessage = err.message;
+                    }
                 }
             }
 
@@ -160,33 +168,52 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
     const openPreview = async (file) => {
         setPreviewFile(file);
+        setExcelData(null);
+        setAvailableSheets([]);
+        setActiveSheetIndex(0);
+
         if (file.file_type === 'xlsx' || file.file_type === 'xls') {
             try {
                 const response = await fetch(`${API_URL}/api/files/view/${file.id}?academicYear=${academicYear}`);
                 const buffer = await response.arrayBuffer();
                 const workbook = new ExcelJS.Workbook();
                 await workbook.xlsx.load(buffer);
-                const worksheet = workbook.worksheets[0];
-                const data = [];
-                let rowCount = 0;
+                setWorkbookInstance(workbook);
 
-                // Optimization: Limit to first 500 rows to prevent browser crash on large files
-                worksheet.eachRow((row) => {
-                    if (rowCount < 500) {
-                        data.push(row.values.slice(1));
-                    }
-                    rowCount++;
-                });
+                // Get all sheet names
+                const sheets = workbook.worksheets.map((ws, index) => ({ name: ws.name, index }));
+                setAvailableSheets(sheets);
 
-                if (rowCount > 500) {
-                    data.push(['... (Showing first 500 rows only)']);
-                }
-
-                setExcelData(data);
+                // Show first sheet initially
+                loadSheetData(workbook, 0);
             } catch (err) {
                 console.error('Preview Error:', err);
                 setExcelData([['Data unreachable or too large for preview']]);
             }
+        }
+    };
+
+    const loadSheetData = (workbook, index) => {
+        try {
+            const worksheet = workbook.worksheets[index];
+            const data = [];
+            let rCount = 0;
+            worksheet.eachRow((row) => {
+                if (rCount < 500) data.push(row.values.slice(1));
+                rCount++;
+            });
+            if (rCount > 500) data.push(['... (Showing first 500 rows only)']);
+            setExcelData(data);
+            setActiveSheetIndex(index);
+        } catch (e) {
+            console.error('Sheet Load Error:', e);
+            setExcelData([['Error loading sheet']]);
+        }
+    };
+
+    const handleSheetChange = (idx) => {
+        if (workbookInstance) {
+            loadSheetData(workbookInstance, idx);
         }
     };
 
@@ -295,7 +322,35 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                             </div>
                             <div className="modal-content">
                                 {previewFile.file_type === 'pdf' ? <iframe src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0`} className="full-iframe" /> :
-                                    excelData ? <div className="excel-view"><table className="excel-table"><thead><tr>{excelData[0]?.map((c, i) => <th key={i}>{c}</th>)}</tr></thead><tbody>{excelData.slice(1).map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c?.toString() || ''}</td>)}</tr>)}</tbody></table></div> :
+                                    excelData ? (
+                                        <div className="excel-view">
+                                            {availableSheets.length > 1 && (
+                                                <div className="sheet-selector-tabs">
+                                                    {availableSheets.map((s, i) => (
+                                                        <button
+                                                            key={i}
+                                                            className={`sheet-tab-btn ${activeSheetIndex === i ? 'active' : ''}`}
+                                                            onClick={() => handleSheetChange(i)}
+                                                        >
+                                                            {s.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className="table-flow-container">
+                                                <table className="excel-table">
+                                                    <thead>
+                                                        <tr>{excelData[0]?.map((c, i) => <th key={i}>{c}</th>)}</tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {excelData.slice(1).map((r, i) => (
+                                                            <tr key={i}>{r.map((c, j) => <td key={j}>{c?.toString() || ''}</td>)}</tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ) :
                                         <div className="loading-state">Transferring...</div>}
                             </div>
                         </motion.div>
@@ -347,6 +402,11 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .modal-action-btn { background: white; color: #1e293b; padding: 6px; border-radius: 8px; border: 1px solid #e2e8f0; }
                 .modal-close-btn-top { color: #1e293b; background: #fee2e2; border-radius: 4px; padding: 4px; transition: all 0.2s; }
                 .modal-close-btn-top:hover { background: #ef4444; color: white; }
+
+                .sheet-selector-tabs { display: flex; gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 8px 8px 0 0; overflow-x: auto; sticky: top; top: 0; z-index: 10; }
+                .sheet-tab-btn { padding: 6px 12px; font-size: 9px; font-weight: 800; border: none; background: transparent; color: #475569; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+                .sheet-tab-btn.active { background: white; color: #172554; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+                .table-flow-container { background: white; border-radius: 0 0 8px 8px; overflow: hidden; }
 
                 .flex { display: flex; }
                 .items-center { align-items: center; }
