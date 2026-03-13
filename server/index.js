@@ -219,7 +219,8 @@ app.get('/api/files/view/:id', async (req, res) => {
         const driveId = file.filename; // filename is storing the driveID
         
         const contentType = file.file_type === 'pdf' ? 'application/pdf' :
-            (file.file_type === 'xlsx' || file.file_type === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+            (file.file_type === 'xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+            (file.file_type === 'xls') ? 'application/vnd.ms-excel' :
                 'application/octet-stream';
 
         res.setHeader('Content-Type', contentType);
