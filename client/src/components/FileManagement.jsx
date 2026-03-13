@@ -338,7 +338,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                      <iframe src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0`} className="full-iframe" />
                                  ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                      <iframe 
-                                         src={`https://docs.google.com/viewer?url=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}&embedded=true`} 
+                                         src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}`} 
                                          className="full-iframe" 
                                          style={{ background: 'white' }}
                                      />
