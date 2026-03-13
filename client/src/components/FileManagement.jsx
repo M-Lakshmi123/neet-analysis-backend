@@ -36,10 +36,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [uploading, setUploading] = useState(false);
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
-    const [excelData, setExcelData] = useState(null);
-    const [availableSheets, setAvailableSheets] = useState([]);
-    const [activeSheetIndex, setActiveSheetIndex] = useState(0);
-    const [workbookInstance, setWorkbookInstance] = useState(null);
 
     useEffect(() => {
         fetchFiles();
@@ -170,42 +166,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         setPreviewFile(file);
     };
 
-    const loadSheetData = (workbook, index) => {
-        try {
-            const worksheet = workbook.worksheets[index];
-            const data = [];
-            let rCount = 0;
-            worksheet.eachRow((row) => {
-                if (rCount < 500) {
-                    const rowValues = row.values.slice(1).map(v => {
-                        if (v === null || v === undefined) return '';
-                        // Handle ExcelJS RichText objects or other objects
-                        if (typeof v === 'object') {
-                            if (v.text) return String(v.text);
-                            if (v.richText) return v.richText.map(rt => rt.text).join('');
-                            if (v.result !== undefined) return String(v.result); // Formulas
-                            return JSON.stringify(v);
-                        }
-                        return String(v);
-                    });
-                    data.push(rowValues);
-                }
-                rCount++;
-            });
-            if (rCount > 500) data.push(['... (Showing first 500 rows only)']);
-            setExcelData(data);
-            setActiveSheetIndex(index);
-        } catch (e) {
-            console.error('Sheet Load Error:', e);
-            setExcelData([['Error loading sheet']]);
-        }
-    };
-
-    const handleSheetChange = (idx) => {
-        if (workbookInstance) {
-            loadSheetData(workbookInstance, idx);
-        }
-    };
 
     const getFileIcon = (type) => {
         switch (type) {
@@ -313,43 +273,13 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                             <div className="modal-content">
                                  {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls' || previewFile.file_type === 'pdf') ? (
                                      <iframe 
-                                         src={`https://drive.google.com/file/d/${previewFile.filename}/preview`} 
+                                         src={`https://docs.google.com/viewer?url=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}&embedded=true`} 
                                          className="full-iframe" 
                                          style={{ background: 'white' }}
                                      />
                                  ) : (
-                                     excelData ? (
-                                        <div className="excel-view">
-                                            {availableSheets.length > 1 && (
-                                                <div className="sheet-selector-tabs">
-                                                    {availableSheets.map((s, i) => (
-                                                        <button
-                                                            key={i}
-                                                            className={`sheet-tab-btn ${activeSheetIndex === i ? 'active' : ''}`}
-                                                            onClick={() => handleSheetChange(i)}
-                                                        >
-                                                            {s.name}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            <div className="table-flow-container">
-                                                <table className="excel-table">
-                                                    <thead>
-                                                        <tr>{excelData[0]?.map((c, i) => <th key={i}>{String(c || '')}</th>)}</tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {excelData.slice(1).map((r, i) => (
-                                                            <tr key={i}>{r.map((c, j) => <td key={j}>{String(c || '')}</td>)}</tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="loading-state">Transferring...</div>
-                                    )
-                                )}
+                                     <div className="loading-state">Unsupported file type</div>
+                                 )}
                             </div>
                         </motion.div>
                     </motion.div>
