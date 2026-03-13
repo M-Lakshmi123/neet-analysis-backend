@@ -199,7 +199,20 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
             const data = [];
             let rCount = 0;
             worksheet.eachRow((row) => {
-                if (rCount < 500) data.push(row.values.slice(1));
+                if (rCount < 500) {
+                    const rowValues = row.values.slice(1).map(v => {
+                        if (v === null || v === undefined) return '';
+                        // Handle ExcelJS RichText objects or other objects
+                        if (typeof v === 'object') {
+                            if (v.text) return String(v.text);
+                            if (v.richText) return v.richText.map(rt => rt.text).join('');
+                            if (v.result !== undefined) return String(v.result); // Formulas
+                            return JSON.stringify(v);
+                        }
+                        return String(v);
+                    });
+                    data.push(rowValues);
+                }
                 rCount++;
             });
             if (rCount > 500) data.push(['... (Showing first 500 rows only)']);
@@ -340,11 +353,11 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                             <div className="table-flow-container">
                                                 <table className="excel-table">
                                                     <thead>
-                                                        <tr>{excelData[0]?.map((c, i) => <th key={i}>{c}</th>)}</tr>
+                                                        <tr>{excelData[0]?.map((c, i) => <th key={i}>{String(c || '')}</th>)}</tr>
                                                     </thead>
                                                     <tbody>
                                                         {excelData.slice(1).map((r, i) => (
-                                                            <tr key={i}>{r.map((c, j) => <td key={j}>{c?.toString() || ''}</td>)}</tr>
+                                                            <tr key={i}>{r.map((c, j) => <td key={j}>{String(c || '')}</td>)}</tr>
                                                         ))}
                                                     </tbody>
                                                 </table>
