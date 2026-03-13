@@ -132,7 +132,19 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 const driveId = driveFile.data.id;
                 console.log(`[DriveUpload] Uploaded to Drive successfully. ID: ${driveId}`);
 
-                // 2. Insert metadata into TiDB (using 'filename' column to store the Drive ID)
+                // 2. Make the file viewable by anyone with the link (required for iFrame preview)
+                try {
+                    await drive.permissions.create({
+                        fileId: driveId,
+                        resource: { role: 'reader', type: 'anyone' },
+                        supportsAllDrives: true
+                    });
+                    console.log(`[DriveUpload] Permissions updated for ID: ${driveId}`);
+                } catch (permErr) {
+                    console.error(`[DriveUpload] Failed to set permissions for ID: ${driveId}`, permErr);
+                }
+
+                // 3. Insert metadata into TiDB (using 'filename' column to store the Drive ID)
                 await pool.rawPool.query(
                     "INSERT INTO uploaded_files (filename, original_name, category, file_type) VALUES (?, ?, ?, ?)",
                     [driveId, file.originalname, category || 'schedules', fileType]

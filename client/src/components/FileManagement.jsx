@@ -333,39 +333,50 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                     <button onClick={() => setPreviewFile(null)} className="modal-close-btn-top"><X size={20} /></button>
                                 </div>
                             </div>
-                            <div className="modal-content">
-                                {previewFile.file_type === 'pdf' ? <iframe src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0`} className="full-iframe" /> :
-                                    excelData ? (
-                                        <div className="excel-view">
-                                            {availableSheets.length > 1 && (
-                                                <div className="sheet-selector-tabs">
-                                                    {availableSheets.map((s, i) => (
-                                                        <button
-                                                            key={i}
-                                                            className={`sheet-tab-btn ${activeSheetIndex === i ? 'active' : ''}`}
-                                                            onClick={() => handleSheetChange(i)}
-                                                        >
-                                                            {s.name}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            <div className="table-flow-container">
-                                                <table className="excel-table">
-                                                    <thead>
-                                                        <tr>{excelData[0]?.map((c, i) => <th key={i}>{String(c || '')}</th>)}</tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {excelData.slice(1).map((r, i) => (
-                                                            <tr key={i}>{r.map((c, j) => <td key={j}>{String(c || '')}</td>)}</tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    ) :
-                                        <div className="loading-state">Transferring...</div>}
-                            </div>
+                             <div className="modal-content">
+                                 {previewFile.file_type === 'pdf' ? (
+                                     <iframe src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0`} className="full-iframe" />
+                                 ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
+                                     <iframe 
+                                         src={`https://drive.google.com/file/d/${previewFile.filename}/preview`} 
+                                         className="full-iframe" 
+                                         allow="autoplay"
+                                         style={{ background: 'white' }}
+                                     />
+                                 ) : (
+                                     excelData ? (
+                                         <div className="excel-view">
+                                             {availableSheets.length > 1 && (
+                                                 <div className="sheet-selector-tabs">
+                                                     {availableSheets.map((s, i) => (
+                                                         <button
+                                                             key={i}
+                                                             className={`sheet-tab-btn ${activeSheetIndex === i ? 'active' : ''}`}
+                                                             onClick={() => handleSheetChange(i)}
+                                                         >
+                                                             {s.name}
+                                                         </button>
+                                                     ))}
+                                                 </div>
+                                             )}
+                                             <div className="table-flow-container">
+                                                 <table className="excel-table">
+                                                     <thead>
+                                                         <tr>{excelData[0]?.map((c, i) => <th key={i}>{String(c || '')}</th>)}</tr>
+                                                     </thead>
+                                                     <tbody>
+                                                         {excelData.slice(1).map((r, i) => (
+                                                             <tr key={i}>{r.map((c, j) => <td key={j}>{String(c || '')}</td>)}</tr>
+                                                         ))}
+                                                     </tbody>
+                                                 </table>
+                                             </div>
+                                         </div>
+                                     ) : (
+                                         <div className="loading-state">Transferring...</div>
+                                     )
+                                 )}
+                             </div>
                         </motion.div>
                     </motion.div>
                 )}
