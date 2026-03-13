@@ -122,7 +122,8 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 const driveFile = await drive.files.create({
                     resource: fileMetadata,
                     media: media,
-                    fields: 'id'
+                    fields: 'id',
+                    supportsAllDrives: true
                 });
                 
                 const driveId = driveFile.data.id;
