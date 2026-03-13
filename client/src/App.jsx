@@ -19,7 +19,6 @@ import StudentPerformance from './components/StudentPerformance';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import AdminDashboard from './components/admin/AdminDashboard';
-import PrincipalDashboard from './components/PrincipalDashboard';
 import { AuthProvider, useAuth, AuthContext } from './components/auth/AuthProvider';
 
 import Sidebar from './components/Sidebar';
@@ -67,9 +66,8 @@ const Dashboard = () => {
         const stored = sessionStorage.getItem('dashboard_active_page');
         // Security check: If stored page is admin-only but user is not admin, default to analysis
         if (stored && ['approvals', 'logs'].includes(stored) && !isAdmin) {
-            return (userData?.role === 'principal') ? 'principal_dashboard' : 'analysis';
+            return 'analysis';
         }
-        if (!stored && userData?.role === 'principal') return 'principal_dashboard';
         return stored || 'analysis';
     });
 

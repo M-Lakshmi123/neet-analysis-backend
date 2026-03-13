@@ -27,11 +27,6 @@ const Sidebar = ({ activePage, setActivePage }) => {
 
     let currentItems = [...baseItems];
 
-    // Principal Dashboard for Principals and Admins
-    if (isAdmin || isCoAdmin || isPrincipal) {
-        currentItems.unshift({ id: 'principal_dashboard', label: 'Principal Dashboard', icon: <BarChart3 size={18} /> });
-    }
-
     // 'Error Top 100%' is for Admins and Co-Admins, requested to be placed directly after 'Error Report'
     if (isAdmin || isCoAdmin) {
         const insertIdx = currentItems.findIndex(i => i.id === 'errors') + 1;
