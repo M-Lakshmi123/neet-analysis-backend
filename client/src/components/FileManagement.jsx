@@ -264,19 +264,22 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                     <h2 className="modal-title">{previewFile.original_name}</h2>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {isMainAdmin && (
-                                        <a href={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&download=true`} className="modal-action-btn" download><Download size={18} /></a>
-                                    )}
-                                    <button onClick={() => setPreviewFile(null)} className="modal-close-btn-top"><X size={20} /></button>
+                                     {isMainAdmin && (
+                                         <a href={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&download=true`} className="modal-action-btn" download title="Download"><Download size={18} /></a>
+                                     )}
+                                     <a href={`https://drive.google.com/file/d/${previewFile.filename}/view?usp=sharing`} target="_blank" rel="noopener noreferrer" className="modal-action-btn" title="Open Original in New Tab">
+                                         <Eye size={18} />
+                                     </a>
+                                     <button onClick={() => setPreviewFile(null)} className="modal-close-btn-top"><X size={20} /></button>
                                 </div>
                             </div>
                             <div className="modal-content">
                                  {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls' || previewFile.file_type === 'pdf') ? (
-                                     <iframe 
-                                         src={`https://docs.google.com/viewer?url=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}&embedded=true`} 
-                                         className="full-iframe" 
-                                         style={{ background: 'white' }}
-                                     />
+                                      <iframe 
+                                          src={`https://docs.google.com/viewer?srcid=${previewFile.filename}&pid=explorer&efh=false&a=v&chrome=false&embedded=true`} 
+                                          className="full-iframe" 
+                                          style={{ background: 'white' }}
+                                      />
                                  ) : (
                                      <div className="loading-state">Unsupported file type</div>
                                  )}
