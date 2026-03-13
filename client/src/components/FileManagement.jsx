@@ -36,7 +36,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [uploading, setUploading] = useState(false);
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
-    const [previewMode, setPreviewMode] = useState('data'); // 'data' or 'original'
+    const [previewMode, setPreviewMode] = useState('data'); // 'data', 'microsoft', or 'google'
     const [excelData, setExcelData] = useState(null);
     const [availableSheets, setAvailableSheets] = useState([]);
     const [activeSheetIndex, setActiveSheetIndex] = useState(0);
@@ -328,8 +328,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                  <div className="flex items-center gap-2">
                                      {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
                                          <div className="mode-switcher">
-                                             <button className={`mode-btn ${previewMode === 'original' ? 'active' : ''}`} onClick={() => setPreviewMode('original')}>Original View</button>
-                                             <button className={`mode-btn ${previewMode === 'data' ? 'active' : ''}`} onClick={() => setPreviewMode('data')}>Data View</button>
+                                             <button className={`mode-btn ${previewMode === 'data' ? 'active' : ''}`} onClick={() => setPreviewMode('data')}>Luxury Grid</button>
+                                             <button className={`mode-btn ${previewMode === 'microsoft' ? 'active' : ''}`} onClick={() => setPreviewMode('microsoft')}>MS Office</button>
+                                             <button className={`mode-btn ${previewMode === 'google' ? 'active' : ''}`} onClick={() => setPreviewMode('google')}>Google View</button>
                                          </div>
                                      )}
                                      {isMainAdmin && (
@@ -343,9 +344,15 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                             </div>
                             <div className="modal-content">
                                  {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls' || previewFile.file_type === 'pdf') ? (
-                                     previewMode === 'original' ? (
+                                     previewMode === 'google' ? (
                                         <iframe 
-                                            src={`https://drive.google.com/file/d/${previewFile.filename}/preview?rm=minimal`} 
+                                            src={`https://docs.google.com/viewer?srcid=${previewFile.filename}&pid=explorer&efh=false&a=v&chrome=false&embedded=true`} 
+                                            className="full-iframe" 
+                                            style={{ background: 'white' }}
+                                        />
+                                     ) : previewMode === 'microsoft' ? (
+                                         <iframe 
+                                            src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&token=true&ext=.xlsx`)}`} 
                                             className="full-iframe" 
                                             style={{ background: 'white' }}
                                         />
@@ -354,41 +361,51 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                              {loadingData ? (
                                                  <div className="loading-state">
                                                      <div className="spinner"></div>
-                                                     <p>Scanning Large File...</p>
+                                                     <p>Building Luxury View...</p>
                                                  </div>
                                              ) : excelData ? (
                                                  <div className="excel-data-layout">
-                                                     {availableSheets.length > 1 && (
-                                                         <div className="sheet-tabs-bottom">
-                                                             {availableSheets.map((s, i) => (
-                                                                 <button key={i} className={`sheet-tab ${activeSheetIndex === i ? 'active' : ''}`} title="Fast preview limited to primary sheet">
-                                                                     {typeof s === 'string' ? s : s.name}
-                                                                 </button>
-                                                             ))}
-                                                         </div>
-                                                     )}
                                                      <div className="grid-scroll">
                                                          <table className="excel-grid">
                                                              <thead>
                                                                  <tr>
                                                                      <th className="corner"></th>
-                                                                     {excelData[0]?.map((_, i) => <th key={i}>{String.fromCharCode(65 + i)}</th>)}
+                                                                     {Array.from({ length: Math.max(...excelData.map(r => r.length), 0) }).map((_, i) => (
+                                                                         <th key={i}>{String.fromCharCode(65 + i)}</th>
+                                                                     ))}
                                                                  </tr>
                                                              </thead>
                                                              <tbody>
                                                                  {excelData.map((row, i) => (
                                                                      <tr key={i}>
                                                                          <td className="row-num">{i + 1}</td>
-                                                                         {row.map((cell, j) => <td key={j}>{cell}</td>)}
+                                                                         {row.map((cell, j) => (
+                                                                             <td key={j} style={{ 
+                                                                                 backgroundColor: cell?.style?.bg ? `#${cell.style.bg}` : 'transparent',
+                                                                                 color: cell?.style?.fg ? `#${cell.style.fg}` : 'inherit',
+                                                                                 fontWeight: cell?.style?.bold ? '700' : '400'
+                                                                             }}>
+                                                                                 {cell?.value || ''}
+                                                                             </td>
+                                                                         ))}
                                                                      </tr>
                                                                  ))}
                                                              </tbody>
                                                          </table>
                                                      </div>
+                                                     {availableSheets.length > 1 && (
+                                                         <div className="sheet-tabs-bottom">
+                                                             {availableSheets.map((s, i) => (
+                                                                 <button key={i} className={`sheet-tab ${activeSheetIndex === i ? 'active' : ''}`} onClick={() => handleSheetChange(i, s)}>
+                                                                     {typeof s === 'string' ? s : s.name}
+                                                                 </button>
+                                                             ))}
+                                                         </div>
+                                                     )}
                                                  </div>
                                              ) : (
-                                                 <div className="loading-state">Click 'Original View' if this fails</div>
-                                             )
+                                                 <div className="loading-state">File ready. Switch engine if grid is empty.</div>
+                                             )}
                                          </div>
                                      )
                                  ) : (

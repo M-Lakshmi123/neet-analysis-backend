@@ -281,17 +281,28 @@ app.get('/api/files/excel-preview-data/:id', async (req, res) => {
         // Limit to 500 rows for instant preview
         worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
             if (rowNumber <= 500) {
-                const values = Array.isArray(row.values) ? row.values.slice(1) : [];
-                const cleanValues = values.map(v => {
-                    if (v && typeof v === 'object') {
-                        if (v.text) return String(v.text);
-                        if (v.richText) return v.richText.map(rt => rt.text).join('');
-                        if (v.result !== undefined) return String(v.result);
-                        return '';
+                const cellData = [];
+                row.eachCell({ includeEmpty: true }, (cell) => {
+                    let val = cell.value;
+                    if (val && typeof val === 'object') {
+                        if (val.text) val = val.text;
+                        else if (val.result !== undefined) val = val.result;
+                        else if (val.richText) val = val.richText.map(rt => rt.text).join('');
+                        else val = '';
                     }
-                    return v === null || v === undefined ? '' : String(v);
+
+                    const style = {};
+                    if (cell.fill && cell.fill.fgColor && cell.fill.fgColor.argb) {
+                        style.bg = cell.fill.fgColor.argb.substring(2); // Remove Alpha
+                    }
+                    if (cell.font) {
+                        if (cell.font.color && cell.font.color.argb) style.fg = cell.font.color.argb.substring(2);
+                        if (cell.font.bold) style.bold = true;
+                    }
+
+                    cellData.push({ value: val === null || val === undefined ? '' : String(val), style });
                 });
-                previewRows.push(cleanValues);
+                previewRows.push(cellData);
             }
         });
 
