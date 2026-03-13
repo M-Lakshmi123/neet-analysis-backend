@@ -33,36 +33,39 @@ const { google } = require('googleapis');
 
 // --- GOOGLE DRIVE INTEGRATION SETUP ---
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
-let authConfig = { scopes: SCOPES };
 
-// 1. Try to read from Environment Variable (if user pasted JSON string)
-if (process.env.GOOGLE_CREDENTIALS) {
-    try {
-        authConfig.credentials = typeof process.env.GOOGLE_CREDENTIALS === 'string' 
-            ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
-            : process.env.GOOGLE_CREDENTIALS;
-        console.log("Drive Auth: Loaded from GOOGLE_CREDENTIALS environment variable.");
-    } catch (e) {
-        console.error("Drive Auth: Failed to parse GOOGLE_CREDENTIALS environment variable.");
-    }
-} 
-// 2. Try Render's default "Secret Files" path (with .json)
-else if (fs.existsSync('/etc/secrets/google_credentials.json')) {
-    authConfig.keyFile = '/etc/secrets/google_credentials.json';
-    console.log("Drive Auth: Loaded from /etc/secrets/google_credentials.json.");
-} 
-// 3. Try Render's default "Secret Files" path (without .json, as shown in user screenshot)
-else if (fs.existsSync('/etc/secrets/google_credentials')) {
-    authConfig.keyFile = '/etc/secrets/google_credentials';
-    console.log("Drive Auth: Loaded from /etc/secrets/google_credentials.");
-} 
-// 4. Fallback to local codebase file (development)
-else {
-    authConfig.keyFile = path.join(__dirname, 'google_credentials.json');
-    console.log("Drive Auth: Loaded from local google_credentials.json.");
+let auth;
+
+// NEW METHOD: Personal Account OAuth Domain
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN) {
+    auth = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        'http://localhost'
+    );
+    auth.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+    console.log("Drive Auth: Using Personal Account (OAuth2 Refresh Token)!");
 }
+// OLD METHOD: Service Account Bot (often crashes from 0 bytes quota)
+else {
+    let authConfig = { scopes: SCOPES };
 
-const auth = new google.auth.GoogleAuth(authConfig);
+    if (process.env.GOOGLE_CREDENTIALS) {
+        try {
+            authConfig.credentials = typeof process.env.GOOGLE_CREDENTIALS === 'string' 
+                ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
+                : process.env.GOOGLE_CREDENTIALS;
+        } catch (e) { }
+    } else if (fs.existsSync('/etc/secrets/google_credentials.json')) {
+        authConfig.keyFile = '/etc/secrets/google_credentials.json';
+    } else if (fs.existsSync('/etc/secrets/google_credentials')) {
+        authConfig.keyFile = '/etc/secrets/google_credentials';
+    } else {
+        authConfig.keyFile = path.join(__dirname, 'google_credentials.json');
+    }
+
+    auth = new google.auth.GoogleAuth(authConfig);
+}
 const drive = google.drive({ version: 'v3', auth });
 const DRIVE_FOLDER_ID = '1-5nfYudiGGsI-g7nUwgBmWXnaLvA2CrE';
 // --------------------------------------
