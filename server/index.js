@@ -46,12 +46,17 @@ if (process.env.GOOGLE_CREDENTIALS) {
         console.error("Drive Auth: Failed to parse GOOGLE_CREDENTIALS environment variable.");
     }
 } 
-// 2. Try Render's default "Secret Files" path
+// 2. Try Render's default "Secret Files" path (with .json)
 else if (fs.existsSync('/etc/secrets/google_credentials.json')) {
     authConfig.keyFile = '/etc/secrets/google_credentials.json';
     console.log("Drive Auth: Loaded from /etc/secrets/google_credentials.json.");
 } 
-// 3. Fallback to local codebase file (development)
+// 3. Try Render's default "Secret Files" path (without .json, as shown in user screenshot)
+else if (fs.existsSync('/etc/secrets/google_credentials')) {
+    authConfig.keyFile = '/etc/secrets/google_credentials';
+    console.log("Drive Auth: Loaded from /etc/secrets/google_credentials.");
+} 
+// 4. Fallback to local codebase file (development)
 else {
     authConfig.keyFile = path.join(__dirname, 'google_credentials.json');
     console.log("Drive Auth: Loaded from local google_credentials.json.");
