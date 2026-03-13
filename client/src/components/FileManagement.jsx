@@ -166,31 +166,8 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         }
     };
 
-    const openPreview = async (file) => {
+    const openPreview = (file) => {
         setPreviewFile(file);
-        setExcelData(null);
-        setAvailableSheets([]);
-        setActiveSheetIndex(0);
-
-        if (file.file_type === 'xlsx' || file.file_type === 'xls') {
-            try {
-                const response = await fetch(`${API_URL}/api/files/view/${file.id}?academicYear=${academicYear}`);
-                const buffer = await response.arrayBuffer();
-                const workbook = new ExcelJS.Workbook();
-                await workbook.xlsx.load(buffer);
-                setWorkbookInstance(workbook);
-
-                // Get all sheet names
-                const sheets = workbook.worksheets.map((ws, index) => ({ name: ws.name, index }));
-                setAvailableSheets(sheets);
-
-                // Show first sheet initially
-                loadSheetData(workbook, 0);
-            } catch (err) {
-                console.error('Preview Error:', err);
-                setExcelData([['Data unreachable or too large for preview']]);
-            }
-        }
     };
 
     const loadSheetData = (workbook, index) => {
@@ -334,10 +311,14 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                 </div>
                             </div>
                             <div className="modal-content">
-                                {previewFile.file_type === 'pdf' ? (
-                                    <iframe src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0`} className="full-iframe" />
-                                ) : (
-                                    excelData ? (
+                                 {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls' || previewFile.file_type === 'pdf') ? (
+                                     <iframe 
+                                         src={`https://drive.google.com/file/d/${previewFile.filename}/preview`} 
+                                         className="full-iframe" 
+                                         style={{ background: 'white' }}
+                                     />
+                                 ) : (
+                                     excelData ? (
                                         <div className="excel-view">
                                             {availableSheets.length > 1 && (
                                                 <div className="sheet-selector-tabs">
