@@ -135,26 +135,52 @@ async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps
     }
     const marksData = XLSX.utils.sheet_to_json(marksWs, { header: 1 });
 
-    // Extract Metadata from row 2
-    const row2Cell = marksData[1] && marksData[1][0];
-    if (!row2Cell) {
-        console.log("  [ERROR] Row 2 Metadata missing.");
-        return;
+    // Extract Metadata dynamically (usually row 2, but safely searches top 4 rows)
+    let metaStr = '';
+    for (let i = 0; i < 4; i++) {
+        const cell = marksData[i] && marksData[i][0];
+        if (cell && /\d{2}-\d{2}-\d{4}/.test(String(cell))) {
+            metaStr = String(cell).trim();
+            break;
+        }
     }
-    const row2Str = String(row2Cell).trim();
-    // Format Example: 23-02-2026_KA & TN_Jr ELITE_MT-05_All India_Marks_Analysis
-    const parts = row2Str.split('_');
-    if (parts.length < 4) {
-        console.log("  [ERROR] Row 2 format unrecognized: " + row2Str);
+    
+    if (!metaStr) {
+        console.log("  [ERROR] Metadata row containing date missing.");
         return;
     }
 
-    // Format date to DD/MM/YYYY
-    let rawDate = parts[0].trim();
-    let dateStr = rawDate.replace(/-/g, '/');
+    let dateStr = '';
+    let testName = '';
+    let testType = '';
 
-    const testName = parts[3].trim();
-    const testType = testName.split('-')[0].trim();
+    // 1. Extract Date using Regex
+    const dateMatch = metaStr.match(/\b(\d{2}-\d{2}-\d{4})\b/);
+    if (dateMatch) {
+         dateStr = dateMatch[1].replace(/-/g, '/');
+    } else {
+         const parts = metaStr.split(/_+/); // fallback split
+         dateStr = String(parts[0]).trim().replace(/-/g, '/');
+    }
+
+    // 2. Extract Test Name using Regex (e.g. MT-07, WT_05, SGT-01)
+    // We intentionally omit word boundaries (\b) because the test name
+    // could be sandwiched between underscores like __MT-07_
+    const testMatch = metaStr.match(/([a-zA-Z]{1,5}[-_]\d{1,3}[a-zA-Z]*)/);
+    if (testMatch) {
+        testName = testMatch[1];
+        testType = testName.split(/[-_]/)[0].trim();
+    } else {
+        // Fallback: If no regex match, split by '__'
+        const parts = metaStr.split('__');
+        if (parts.length >= 4) {
+            testName = parts[3].trim();
+            testType = testName.split(/[-_]/)[0].trim();
+        } else {
+            console.log("  [ERROR] Metadata test format unrecognized: " + metaStr);
+            return;
+        }
+    }
 
     console.log(`  Metadata: Date=[${dateStr}], StreamFolder=[${streamFromFolder}], Test=[${testName}], Type=[${testType}]`);
 
