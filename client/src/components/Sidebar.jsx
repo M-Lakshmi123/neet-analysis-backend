@@ -12,7 +12,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     const { isAdmin, isCoAdmin } = useAuth();
     const canSeeErrorTop = isAdmin || isCoAdmin;
 
-    // Determine base items everyone sees, following exact required order
+    // Base items everyone sees
     const baseItems = [
         { id: 'analysis', label: 'Analysis Report', icon: <BarChart3 size={18} /> },
         { id: 'test_improvements', label: 'Test Wise Improvements', icon: <Activity size={18} /> },
@@ -26,6 +26,11 @@ const Sidebar = ({ activePage, setActivePage }) => {
     ];
 
     let currentItems = [...baseItems];
+
+    // Principal Dashboard for Principals and Admins
+    if (isAdmin || isCoAdmin || isPrincipal) {
+        currentItems.unshift({ id: 'principal_dashboard', label: 'Principal Dashboard', icon: <BarChart3 size={18} /> });
+    }
 
     // 'Error Top 100%' is for Admins and Co-Admins, requested to be placed directly after 'Error Report'
     if (isAdmin || isCoAdmin) {

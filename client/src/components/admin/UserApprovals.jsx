@@ -14,6 +14,9 @@ const UserApprovals = () => {
 
     const [allCampuses, setAllCampuses] = useState([]);
     const [approvalModal, setApprovalModal] = useState({ isOpen: false, user: null, selectedCampuses: [] });
+    const [isAddingStaff, setIsAddingStaff] = useState(false);
+    const [newStaff, setNewStaff] = useState({ name: '', email: '', password: '', phone: '', role: 'principal', campus: '' });
+    const [creationLoading, setCreationLoading] = useState(false);
 
     useEffect(() => {
         fetchUsers();
@@ -156,8 +159,67 @@ const UserApprovals = () => {
         }
     };
 
+    const handleManualCreate = async (e) => {
+        e.preventDefault();
+        setCreationLoading(true);
+        try {
+            // We use the register endpoint or firebase directly? 
+            // Better to use a dedicated backend route if we want "Pure TiDB" eventually, 
+            // but for now let's mirror RegisterPage.jsx logic.
+            const { createUserWithEmailAndPassword } = await import('firebase/auth');
+            const { auth } = await import('../../firebase');
+            const { setDoc, doc } = await import('firebase/firestore');
+
+            const userCredential = await createUserWithEmailAndPassword(auth, newStaff.email, newStaff.password);
+            const user = userCredential.user;
+
+            await setDoc(doc(db, "users", user.uid), {
+                uid: user.uid,
+                name: newStaff.name,
+                email: newStaff.email,
+                phone: newStaff.phone,
+                role: newStaff.role,
+                campus: newStaff.campus,
+                isApproved: true, // Auto-approved since created by Admin
+                approvedAt: new Date().toISOString(),
+                createdAt: new Date().toISOString(),
+                allowedCampuses: [newStaff.campus].filter(Boolean)
+            });
+
+            setModal({
+                isOpen: true,
+                type: 'success',
+                title: 'Staff Created',
+                message: `Account for ${newStaff.name} created and approved successfully.`,
+                onClose: () => { setModal(prev => ({ ...prev, isOpen: false })); setIsAddingStaff(false); }
+            });
+            fetchUsers();
+            setNewStaff({ name: '', email: '', password: '', phone: '', role: 'principal', campus: '' });
+        } catch (err) {
+            setModal({
+                isOpen: true,
+                type: 'danger',
+                title: 'Creation Failed',
+                message: err.message,
+                onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
+            });
+        } finally {
+            setCreationLoading(false);
+        }
+    };
+
     return (
         <div className="tab-pane">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-slate-800">Staff Access Management</h2>
+                <button
+                    onClick={() => setIsAddingStaff(true)}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors"
+                >
+                    <Users size={18} /> Add New Staff
+                </button>
+            </div>
+
             <div className="admin-grid">
                 <section className="admin-card">
                     <div className="card-header">
@@ -444,6 +506,104 @@ const UserApprovals = () => {
                                 <CheckCircle size={16} strokeWidth={2.5} /> Confirm Approval
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Manual Staff Creation Modal */}
+            {isAddingStaff && (
+                <div style={{
+                    position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1.5rem'
+                }}>
+                    <div style={{
+                        backgroundColor: '#ffffff', borderRadius: '16px',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        width: '100%', maxWidth: '500px', padding: '24px'
+                    }}>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-slate-800">Create New Staff ID</h3>
+                            <button onClick={() => setIsAddingStaff(false)} className="text-slate-400 hover:text-slate-600"><XCircle size={24} /></button>
+                        </div>
+
+                        <form onSubmit={handleManualCreate} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>Full Name</label>
+                                <input
+                                    type="text"
+                                    required
+                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                    value={newStaff.name}
+                                    onChange={e => setNewStaff({ ...newStaff, name: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>Email ID</label>
+                                <input
+                                    type="email"
+                                    required
+                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                    value={newStaff.email}
+                                    onChange={e => setNewStaff({ ...newStaff, email: e.target.value })}
+                                />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                        value={newStaff.password}
+                                        onChange={e => setNewStaff({ ...newStaff, password: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>Phone</label>
+                                    <input
+                                        type="tel"
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                        value={newStaff.phone}
+                                        onChange={e => setNewStaff({ ...newStaff, phone: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>Role</label>
+                                <select
+                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                    value={newStaff.role}
+                                    onChange={e => setNewStaff({ ...newStaff, role: e.target.value })}
+                                >
+                                    <option value="principal">Principal</option>
+                                    <option value="co_admin">Co-Admin</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b', marginBottom: '6px' }}>Primary Campus</label>
+                                <select
+                                    required
+                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                                    value={newStaff.campus}
+                                    onChange={e => setNewStaff({ ...newStaff, campus: e.target.value })}
+                                >
+                                    <option value="">Select Campus</option>
+                                    {allCampuses.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                </select>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={creationLoading}
+                                style={{
+                                    marginTop: '12px', padding: '12px', borderRadius: '10px',
+                                    background: '#0f172a', color: 'white', fontWeight: '700',
+                                    border: 'none', cursor: creationLoading ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                {creationLoading ? 'Creating...' : 'Create & Approve Staff'}
+                            </button>
+                        </form>
                     </div>
                 </div>
             )}

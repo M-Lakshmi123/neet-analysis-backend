@@ -40,7 +40,7 @@ async function initialize() {
 
             console.log(`🛠  Ensuring 'uploaded_files' table exists...`);
 
-            // Create table if not exists with LONGBLOB
+            // Create table for metadata
             const createTableQuery = `
                 CREATE TABLE IF NOT EXISTS uploaded_files (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -48,7 +48,6 @@ async function initialize() {
                     original_name VARCHAR(255) NOT NULL,
                     category VARCHAR(100) NOT NULL,
                     file_type VARCHAR(10) NOT NULL,
-                    file_data LONGBLOB NOT NULL,
                     upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_category (category),
                     INDEX idx_upload_date (upload_date)
@@ -56,20 +55,28 @@ async function initialize() {
             `;
             await connection.query(createTableQuery);
 
-            // Double check if file_data column is LONGBLOB (in case table already existed with different type)
+            // Create table for segments (essential for TiDB Serverless 6MB limit)
+            const createChunksTableQuery = `
+                CREATE TABLE IF NOT EXISTS file_chunks (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    file_id INT NOT NULL,
+                    chunk_index INT NOT NULL,
+                    chunk_data LONGBLOB NOT NULL,
+                    INDEX idx_file (file_id),
+                    FOREIGN KEY (file_id) REFERENCES uploaded_files(id) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            `;
+            await connection.query(createChunksTableQuery);
+
+            // Double check and remove old BLOB column if it exists to avoid row size limit issues
             try {
                 const [columns] = await connection.query(`SHOW COLUMNS FROM uploaded_files LIKE 'file_data'`);
                 if (columns.length > 0) {
-                    if (columns[0].Type.toLowerCase() !== 'longblob') {
-                        console.log(`⚠️  Column 'file_data' is ${columns[0].Type}, converting to LONGBLOB...`);
-                        await connection.query(`ALTER TABLE uploaded_files MODIFY COLUMN file_data LONGBLOB NOT NULL`);
-                    }
-                } else {
-                    console.log(`➕ Adding 'file_data' column...`);
-                    await connection.query(`ALTER TABLE uploaded_files ADD COLUMN file_data LONGBLOB NOT NULL`);
+                    console.log(`🗑  Dropping legacy 'file_data' column from 'uploaded_files' to ensure compatibility...`);
+                    await connection.query(`ALTER TABLE uploaded_files DROP COLUMN file_data`);
                 }
             } catch (colErr) {
-                console.warn(`⚠️  Could not verify/modify column: ${colErr.message}`);
+                console.warn(`⚠️  Column migration note: ${colErr.message}`);
             }
 
             console.log(`✅ Cluster ${cluster.name} initialized successfully.`);

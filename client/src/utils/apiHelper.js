@@ -1,5 +1,15 @@
-const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-export const API_URL = isLocal ? 'http://localhost:5000' : 'https://neet-backend-3oxu.onrender.com';
+const getBaseUrl = () => {
+    const hostname = window.location.hostname;
+    const isLocal = hostname === 'localhost' || 
+                   hostname === '127.0.0.1' || 
+                   hostname.startsWith('192.168.') || 
+                   hostname.startsWith('10.') || 
+                   hostname === '0.0.0.0';
+    
+    return isLocal ? `http://${hostname}:5000` : 'https://neet-backend-3oxu.onrender.com';
+};
+
+export const API_URL = getBaseUrl();
 
 
 export const ADMIN_WHATSAPP = '9281425210';

@@ -29,6 +29,20 @@ app.use('/uploads', express.static(uploadPath));
 app.use(express.static(clientDistPath));
 
 const multer = require('multer');
+const { google } = require('googleapis');
+
+// --- GOOGLE DRIVE INTEGRATION SETUP ---
+const KEYFILEPATH = path.join(__dirname, 'google_credentials.json');
+const SCOPES = ['https://www.googleapis.com/auth/drive'];
+
+const auth = new google.auth.GoogleAuth({
+    keyFile: KEYFILEPATH,
+    scopes: SCOPES,
+});
+const drive = google.drive({ version: 'v3', auth });
+const DRIVE_FOLDER_ID = '1-5nfYudiGGsI-g7nUwgBmWXnaLvA2CrE';
+// --------------------------------------
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, uploadPath);
@@ -41,10 +55,10 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 250 * 1024 * 1024 } // Increased to 250MB for bulk
+    limits: { fileSize: 250 * 1024 * 1024 } // 250MB size limit
 });
 
-// File Management Routes (TiDB BLOB Storage)
+// File Management Routes (Google Drive Storage)
 app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
     console.log(`[ROUTE] /api/files/upload HIT - Files: ${req.files?.length || 0}, Body:`, req.body);
     try {
@@ -58,73 +72,58 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
-        console.log(`[BulkUpload][${year}] Processing ${uploadedFiles.length} files for category: ${category}`);
+        console.log(`[DriveUpload][${year}] Processing ${uploadedFiles.length} files for category: ${category}`);
 
-        const insertQuery = "INSERT INTO uploaded_files (filename, original_name, category, file_type, file_data) VALUES (?, ?, ?, ?, ?)";
-
-        // Execute inserts sequentially for reliability with BLOBs
         let successCount = 0;
         let failDetails = [];
 
         for (const file of uploadedFiles) {
-            let connection;
             try {
                 const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                console.log(`[BulkUpload] Processing: ${file.originalname} (${fileSizeMB} MB)`);
+                console.log(`[DriveUpload] Processing: ${file.originalname} (${fileSizeMB} MB)`);
 
                 const ext = path.extname(file.originalname);
                 const fileType = ext ? ext.substring(1).toLowerCase() : 'bin';
 
-                // Get dedicated connection
-                connection = await pool.rawPool.getConnection();
+                // 1. Upload to Google Drive directly
+                const fileMetadata = {
+                    name: file.originalname,
+                    parents: [DRIVE_FOLDER_ID]
+                };
+                const media = {
+                    mimeType: file.mimetype,
+                    body: fs.createReadStream(file.path)
+                };
 
-                // Raise packet limit for the session
-                try { await connection.query("SET SESSION max_allowed_packet=268435456"); } catch (e) { }
+                const driveFile = await drive.files.create({
+                    resource: fileMetadata,
+                    media: media,
+                    fields: 'id'
+                });
+                
+                const driveId = driveFile.data.id;
+                console.log(`[DriveUpload] Uploaded to Drive successfully. ID: ${driveId}`);
 
-                // STEP 1: Insert metadata with empty BLOB
-                const [insertResult] = await connection.query(
-                    "INSERT INTO uploaded_files (filename, original_name, category, file_type, file_data) VALUES (?, ?, ?, ?, '')",
-                    [file.filename, file.originalname, category, fileType]
+                // 2. Insert metadata into TiDB (using 'filename' column to store the Drive ID)
+                await pool.rawPool.query(
+                    "INSERT INTO uploaded_files (filename, original_name, category, file_type) VALUES (?, ?, ?, ?)",
+                    [driveId, file.originalname, category || 'schedules', fileType]
                 );
-                const insertId = insertResult.insertId;
-
-                // STEP 2: Stream file from disk to DB in chunks to keep RAM < 50MB
-                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
-                const fd = fs.openSync(file.path, 'r');
-                const buffer = Buffer.alloc(CHUNK_SIZE);
-                let bytesRead;
-                let position = 0;
-
-                while ((bytesRead = fs.readSync(fd, buffer, 0, CHUNK_SIZE, position)) > 0) {
-                    const chunk = bytesRead < CHUNK_SIZE ? buffer.subarray(0, bytesRead) : buffer;
-                    // Append chunk to the BLOB column using SQL CONCAT
-                    await connection.query(
-                        "UPDATE uploaded_files SET file_data = CONCAT(file_data, ?) WHERE id = ?",
-                        [chunk, insertId]
-                    );
-                    position += bytesRead;
-                    // Optional: Log progress for very large files
-                    if (position % (CHUNK_SIZE * 5) === 0) {
-                        console.log(`[BulkUpload] Progress: ${file.originalname} -> ${((position / file.size) * 100).toFixed(0)}%`);
-                    }
-                }
-                fs.closeSync(fd);
 
                 successCount++;
-                console.log(`[BulkUpload] Success: ${file.originalname}`);
+                console.log(`[DriveUpload] Success: ${file.originalname}`);
 
-                // Clean up temporary file
+                // Clean up temp file from Render server disk
                 try { fs.unlinkSync(file.path); } catch (e) { }
 
             } catch (fileErr) {
-                console.error(`[BulkUpload] FAILED: ${file.originalname}`, fileErr);
+                console.error(`[DriveUpload] FAILED: ${file.originalname}`, fileErr);
                 failDetails.push({ name: file.originalname, error: fileErr.message });
                 try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch (e) { }
-            } finally {
-                if (connection) connection.release();
             }
         }
 
+        console.log(`[DriveUpload] Finished. Success: ${successCount}, Failed: ${failDetails.length}`);
         res.json({
             message: `Processed ${uploadedFiles.length} files. Success: ${successCount}`,
             total: uploadedFiles.length,
@@ -133,7 +132,7 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
             isSuccess: successCount > 0 && failDetails.length === 0
         });
     } catch (err) {
-        console.error('[FileUpload][FATAL] ERROR:', err);
+        console.error('[DriveUpload][FATAL] ERROR:', err);
         res.status(500).json({ error: 'System error during upload processing' });
     }
 });
@@ -169,49 +168,46 @@ app.get('/api/files/view/:id', async (req, res) => {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
-        // STEP 1: Get metadata first
+        // 1. Get metadata (filename = Google Drive ID)
         const [meta] = await pool.rawPool.query(
-            'SELECT original_name, file_type, LENGTH(file_data) as fileSize FROM uploaded_files WHERE id = ?',
+            'SELECT filename, original_name, file_type FROM uploaded_files WHERE id = ?',
             [id]
         );
         if (meta.length === 0) return res.status(404).send('File not found');
 
         const file = meta[0];
-        const totalSize = file.fileSize;
+        const driveId = file.filename; // filename is storing the driveID
+        
         const contentType = file.file_type === 'pdf' ? 'application/pdf' :
             (file.file_type === 'xlsx' || file.file_type === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
                 'application/octet-stream';
 
         res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Length', totalSize);
         if (req.query.download === 'true') {
             res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
         } else {
             res.setHeader('Content-Disposition', `inline; filename="${file.original_name}"`);
         }
 
-        // STEP 2: Stream the data in 8MB chunks using SQL SUBSTRING
-        // This prevents the 512MB RAM limit from being hit even for 200MB files
-        const CHUNK_SIZE = 8 * 1024 * 1024;
-        for (let offset = 0; offset < totalSize; offset += CHUNK_SIZE) {
-            // SUBSTRING(blob, start, len) is 1-indexed in MySQL/TiDB
-            const [chunkData] = await pool.rawPool.query(
-                `SELECT SUBSTRING(file_data, ${offset + 1}, ${CHUNK_SIZE}) as chunk FROM uploaded_files WHERE id = ?`,
-                [id]
-            );
-            if (chunkData[0] && chunkData[0].chunk) {
-                res.write(chunkData[0].chunk);
-            }
-        }
-        res.end();
+        // 2. Stream directly from Google Drive to the Client
+        const driveRes = await drive.files.get(
+            { fileId: driveId, alt: 'media' },
+            { responseType: 'stream' }
+        );
+
+        driveRes.data
+            .on('end', () => res.end())
+            .on('error', err => {
+                console.error('[Drive View] Streaming Error:', err);
+                if (!res.headersSent) res.status(500).send('Error streaming file');
+                res.end();
+            })
+            .pipe(res);
 
     } catch (err) {
-        console.error('[FileView] ERROR:', err);
-        if (!res.headersSent) {
-            res.status(500).send('Error retrieving file');
-        } else {
-            res.end();
-        }
+        console.error('[Drive View] FATAL ERROR:', err);
+        if (!res.headersSent) res.status(500).send('Error retrieving file');
+        else res.end();
     }
 });
 
@@ -221,8 +217,26 @@ app.delete('/api/files/:id', async (req, res) => {
         const pool = await connectToDb(year);
         const { id } = req.params;
 
+        // 1. Get the drive file ID
+        const [meta] = await pool.rawPool.query('SELECT filename FROM uploaded_files WHERE id = ?', [id]);
+        if (meta.length > 0) {
+            const driveId = meta[0].filename;
+            try {
+                // Delete from Google Drive
+                await drive.files.delete({ fileId: driveId });
+                console.log(`[DriveDelete] Deleted file ${driveId} from Drive.`);
+            } catch (driveErr) {
+                console.error(`[DriveDelete] Failed to delete file ${driveId} from Drive. It might have already been removed.`, driveErr.message);
+            }
+        }
+
+        // 2. Clean up old TiDB chunks (if there are any left from before the Drive integration)
+        await pool.rawPool.query('DELETE FROM file_chunks WHERE file_id = ?', [id]);
+        
+        // 3. Delete metadata mapping in DB
         await pool.rawPool.query('DELETE FROM uploaded_files WHERE id = ?', [id]);
-        res.json({ message: 'File deleted successfully from database' });
+        
+        res.json({ message: 'File deleted successfully from Drive and Database' });
     } catch (err) {
         console.error(`[FileDelete][${req.query.academicYear}] ERROR:`, err);
         res.status(500).json({ error: 'Failed to delete file' });
@@ -805,6 +819,7 @@ app.get('/api/analysis-report', async (req, res) => {
             ${where}
             GROUP BY STUD_ID
             ORDER BY tot DESC
+            LIMIT 1000
             `;
 
         // 2. Get Metadata (Test Names, Dates, Total Count)
@@ -1212,6 +1227,7 @@ app.get('/api/erp/report', async (req, res) => {
             STR_TO_DATE(REPLACE(Exam_Date, '/', '-'), '%d-%m-%Y') DESC,
                 Subject,
                 Q_No ASC
+            LIMIT 3000
         `;
 
         logQuery(query, req.query);
@@ -1305,6 +1321,7 @@ app.get('/api/erp/error-count-report', async (req, res) => {
             ${where}
             GROUP BY STUD_ID, Test
             ORDER BY name, Test
+            LIMIT 2000
             `;
 
         logQuery(query, req.query);

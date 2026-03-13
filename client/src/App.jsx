@@ -19,6 +19,7 @@ import StudentPerformance from './components/StudentPerformance';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import AdminDashboard from './components/admin/AdminDashboard';
+import PrincipalDashboard from './components/PrincipalDashboard';
 import { AuthProvider, useAuth, AuthContext } from './components/auth/AuthProvider';
 
 import Sidebar from './components/Sidebar';
@@ -57,18 +58,19 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 
 const Dashboard = () => {
     const { userData, isAdmin, isCoAdmin } = useAuth();
-    // Initialize from sessionStorage or default to 'analysis'
+
+    const [academicYear, setAcademicYear] = useState(() => {
+        return sessionStorage.getItem('academic_year') || '2025';
+    });
+
     const [activePage, setActivePage] = useState(() => {
         const stored = sessionStorage.getItem('dashboard_active_page');
         // Security check: If stored page is admin-only but user is not admin, default to analysis
         if (stored && ['approvals', 'logs'].includes(stored) && !isAdmin) {
-            return 'analysis';
+            return (userData?.role === 'principal') ? 'principal_dashboard' : 'analysis';
         }
+        if (!stored && userData?.role === 'principal') return 'principal_dashboard';
         return stored || 'analysis';
-    });
-
-    const [academicYear, setAcademicYear] = useState(() => {
-        return sessionStorage.getItem('academic_year') || '2025';
     });
 
     useEffect(() => {
@@ -234,6 +236,8 @@ const Dashboard = () => {
 
     const renderPageContent = () => {
         switch (activePage) {
+            case 'principal_dashboard':
+                return <PrincipalDashboard filters={globalFilters} />;
             case 'analysis':
                 return (
                     <div className="report-sections">
@@ -307,13 +311,14 @@ const Dashboard = () => {
         }
     };
 
-    const showFilterBar = ['analysis', 'test_improvements', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
+    const showFilterBar = ['principal_dashboard', 'analysis', 'test_improvements', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
 
     return (
         <div className="dashboard-root">
             <Sidebar activePage={activePage} setActivePage={setActivePage} />
             <main className="dashboard-main-content">
                 <Header title={
+                    activePage === 'principal_dashboard' ? 'Principal Dashboard' :
                     activePage === 'analysis' ? 'Analysis Report' :
                         activePage === 'test_improvements' ? 'Test Wise Improvements' :
                             activePage === 'averages' ? 'Average Marks Report' :

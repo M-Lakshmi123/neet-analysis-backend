@@ -10,6 +10,7 @@ const CONFIG_FILE = 'f:\\Projects\\NEET Analysis\\Uploader_Config.xlsx';
 const DEFAULT_S_URL = 'https://i.ibb.co/p6D1ywtP/No-Name.png';
 
 const normalizeId = (id) => String(id || '').trim().replace(/[^0-9]/g, '');
+const normalizeForMatch = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 async function processErp() {
     let pool;
@@ -112,27 +113,37 @@ async function processErp() {
 
             // Auto-detect Stream and Test
             let streamFromMetadata = "UNKNOWN_STREAM";
-            let testName = "SGT-08"; // Fallback
+            let testName = "SGT-01"; // Generic fallback to a common name
 
             const picsBaseDir = path.join(ERP_BASE_DIR, 'PICS');
             if (fs.existsSync(picsBaseDir)) {
                 const streams = fs.readdirSync(picsBaseDir).filter(f => fs.statSync(path.join(picsBaseDir, f)).isDirectory());
 
                 // Match stream from metadata row or erpFile name
-                const searchString = (String(metadataRow) + " " + erpFile).toUpperCase().replace(/_/g, ' ');
-                const matchedStream = streams.find(s => searchString.includes(s.toUpperCase().replace(/_/g, ' ')));
+                const searchStringNorm = normalizeForMatch(String(metadataRow) + " " + erpFile);
+                const matchedStream = streams.find(s => searchStringNorm.includes(normalizeForMatch(s)));
 
                 if (matchedStream) {
                     streamFromMetadata = matchedStream;
                     const streamPath = path.join(picsBaseDir, streamFromMetadata);
                     const tests = fs.readdirSync(streamPath).filter(f => fs.statSync(path.join(streamPath, f)).isDirectory());
 
-                    // Match test name (e.g., SGT-08 or Grand Test 8)
-                    const matchedTest = tests.find(t => searchString.includes(t.toUpperCase().replace(/_/g, ' ')));
-                    if (matchedTest) testName = matchedTest;
-                    else if (tests.length > 0) testName = tests[0];
+                    // Match test name (e.g., SGT-01, Grand Test 1)
+                    const matchedTest = tests.find(t => searchStringNorm.includes(normalizeForMatch(t)));
+
+                    if (matchedTest) {
+                        testName = matchedTest;
+                    } else if (tests.length > 0) {
+                        // If no specific match, but we have test folders, pick the first one (usually SGT-01)
+                        // This prevents "UNKNOWN_TEST" from appearing
+                        testName = tests[0];
+                    }
                 } else if (streams.length > 0) {
+                    // Fallback to first stream if no match
                     streamFromMetadata = streams[0];
+                    const streamPath = path.join(picsBaseDir, streamFromMetadata);
+                    const tests = fs.readdirSync(streamPath).filter(f => fs.statSync(path.join(streamPath, f)).isDirectory());
+                    if (tests.length > 0) testName = tests[0];
                 }
             }
 

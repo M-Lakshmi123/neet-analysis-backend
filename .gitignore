@@ -29,3 +29,7 @@ logs/
 
 # Secrets
 medical-2025-*.json
+server/google_credentials.json
+google_credentials.json
+*google_credentials.json*
+neet-files-*.json
