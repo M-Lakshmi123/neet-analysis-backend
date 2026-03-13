@@ -36,6 +36,12 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [uploading, setUploading] = useState(false);
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
+    const [previewMode, setPreviewMode] = useState('original'); // 'original' or 'data'
+    const [excelData, setExcelData] = useState(null);
+    const [availableSheets, setAvailableSheets] = useState([]);
+    const [activeSheetIndex, setActiveSheetIndex] = useState(0);
+    const [workbookInstance, setWorkbookInstance] = useState(null);
+    const [loadingData, setLoadingData] = useState(false);
 
     useEffect(() => {
         fetchFiles();
@@ -162,8 +168,64 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         }
     };
 
-    const openPreview = (file) => {
+    const openPreview = async (file) => {
         setPreviewFile(file);
+        setPreviewMode('original');
+        setExcelData(null);
+        setAvailableSheets([]);
+        setActiveSheetIndex(0);
+        setWorkbookInstance(null);
+
+        if (file.file_type === 'xlsx' || file.file_type === 'xls') {
+            setLoadingData(true);
+            try {
+                const response = await fetch(`${API_URL}/api/files/view/${file.id}?academicYear=${academicYear}`);
+                const buffer = await response.arrayBuffer();
+                const workbook = new ExcelJS.Workbook();
+                await workbook.xlsx.load(buffer);
+                setWorkbookInstance(workbook);
+                const sheets = workbook.worksheets.map((ws, index) => ({ name: ws.name, index }));
+                setAvailableSheets(sheets);
+                loadSheetData(workbook, 0);
+            } catch (err) {
+                console.error('Data Load Error:', err);
+                setExcelData([['Data too large or unreachable for clean view']]);
+            } finally {
+                setLoadingData(false);
+            }
+        }
+    };
+
+    const loadSheetData = (workbook, index) => {
+        try {
+            const worksheet = workbook.worksheets[index];
+            const data = [];
+            let rCount = 0;
+            worksheet.eachRow((row) => {
+                if (rCount < 1000) {
+                    const rowValues = row.values.slice(1).map(v => {
+                        if (v === null || v === undefined) return '';
+                        if (typeof v === 'object') {
+                            if (v.text) return String(v.text);
+                            if (v.richText) return v.richText.map(rt => rt.text).join('');
+                            if (v.result !== undefined) return String(v.result);
+                            return '';
+                        }
+                        return String(v);
+                    });
+                    data.push(rowValues);
+                }
+                rCount++;
+            });
+            setExcelData(data);
+            setActiveSheetIndex(index);
+        } catch (e) {
+            setExcelData([['Error rendering sheet']]);
+        }
+    };
+
+    const handleSheetChange = (idx) => {
+        if (workbookInstance) loadSheetData(workbookInstance, idx);
     };
 
 
@@ -263,7 +325,13 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                     {getFileIcon(previewFile.file_type)}
                                     <h2 className="modal-title">{previewFile.original_name}</h2>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                 <div className="flex items-center gap-2">
+                                     {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
+                                         <div className="mode-switcher">
+                                             <button className={`mode-btn ${previewMode === 'original' ? 'active' : ''}`} onClick={() => setPreviewMode('original')}>Original View</button>
+                                             <button className={`mode-btn ${previewMode === 'data' ? 'active' : ''}`} onClick={() => setPreviewMode('data')}>Data View</button>
+                                         </div>
+                                     )}
                                      {isMainAdmin && (
                                          <a href={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&download=true`} className="modal-action-btn" download title="Download"><Download size={18} /></a>
                                      )}
@@ -271,15 +339,58 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                          <Eye size={18} />
                                      </a>
                                      <button onClick={() => setPreviewFile(null)} className="modal-close-btn-top"><X size={20} /></button>
-                                </div>
+                                 </div>
                             </div>
                             <div className="modal-content">
                                  {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls' || previewFile.file_type === 'pdf') ? (
-                                      <iframe 
-                                          src={`https://docs.google.com/viewer?srcid=${previewFile.filename}&pid=explorer&efh=false&a=v&chrome=false&embedded=true`} 
-                                          className="full-iframe" 
-                                          style={{ background: 'white' }}
-                                      />
+                                     previewMode === 'original' ? (
+                                        <iframe 
+                                            src={`https://drive.google.com/file/d/${previewFile.filename}/preview?rm=minimal`} 
+                                            className="full-iframe" 
+                                            style={{ background: 'white' }}
+                                        />
+                                     ) : (
+                                         <div className="excel-view-container">
+                                             {loadingData ? (
+                                                 <div className="loading-state">
+                                                     <div className="spinner"></div>
+                                                     <p>Scanning Large File...</p>
+                                                 </div>
+                                             ) : excelData ? (
+                                                 <div className="excel-data-layout">
+                                                     {availableSheets.length > 1 && (
+                                                         <div className="sheet-tabs-bottom">
+                                                             {availableSheets.map((s, i) => (
+                                                                 <button key={i} className={`sheet-tab ${activeSheetIndex === i ? 'active' : ''}`} onClick={() => handleSheetChange(i)}>
+                                                                     {s.name}
+                                                                 </button>
+                                                             ))}
+                                                         </div>
+                                                     )}
+                                                     <div className="grid-scroll">
+                                                         <table className="excel-grid">
+                                                             <thead>
+                                                                 <tr>
+                                                                     <th className="corner"></th>
+                                                                     {excelData[0]?.map((_, i) => <th key={i}>{String.fromCharCode(65 + i)}</th>)}
+                                                                 </tr>
+                                                             </thead>
+                                                             <tbody>
+                                                                 {excelData.map((row, i) => (
+                                                                     <tr key={i}>
+                                                                         <td className="row-num">{i + 1}</td>
+                                                                         {row.map((cell, j) => <td key={j}>{cell}</td>)}
+                                                                     </tr>
+                                                                 ))}
+                                                             </tbody>
+                                                         </table>
+                                                     </div>
+                                                 </div>
+                                             ) : (
+                                                 <div className="loading-state">Click 'Original View' if this fails</div>
+                                             )
+                                         </div>
+                                     )
                                  ) : (
                                      <div className="loading-state">Unsupported file type</div>
                                  )}
@@ -330,14 +441,29 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .excel-table th { padding: 10px; background: #1e293b; color: white; font-size: 11px; text-align: left; }
                 .excel-table td { padding: 8px 10px; border: 1px solid #f1f5f9; font-size: 11px; color: #334155; }
                 .loading-state { height: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-weight: 800; font-size: 11px; text-transform: uppercase; }
-                .modal-action-btn { background: white; color: #1e293b; padding: 6px; border-radius: 8px; border: 1px solid #e2e8f0; }
-                .modal-close-btn-top { color: #1e293b; background: #fee2e2; border-radius: 4px; padding: 4px; transition: all 0.2s; }
-                .modal-close-btn-top:hover { background: #ef4444; color: white; }
+                .modal-action-btn:hover { background: #f1f5f9; }
+                .mode-switcher { display: flex; background: #e2e8f0; padding: 3px; border-radius: 6px; margin-right: 10px; }
+                .mode-btn { border: none; background: transparent; padding: 4px 10px; font-size: 9px; font-weight: 800; border-radius: 4px; cursor: pointer; color: #64748b; transition: all 0.2s; }
+                .mode-btn.active { background: white; color: #172554; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
-                .sheet-selector-tabs { display: flex; gap: 4px; background: #e2e8f0; padding: 4px; border-radius: 8px 8px 0 0; overflow-x: auto; sticky: top; top: 0; z-index: 10; }
-                .sheet-tab-btn { padding: 6px 12px; font-size: 9px; font-weight: 800; border: none; background: transparent; color: #475569; border-radius: 6px; cursor: pointer; white-space: nowrap; }
-                .sheet-tab-btn.active { background: white; color: #172554; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-                .table-flow-container { background: white; border-radius: 0 0 8px 8px; overflow: hidden; }
+                /* Premium Excel Grid Style */
+                .excel-view-container { height: 100%; display: flex; flex-direction: column; background: #f1f5f9; }
+                .excel-data-layout { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+                .grid-scroll { flex: 1; overflow: auto; padding: 0; background: white; }
+                .excel-grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+                .excel-grid th, .excel-grid td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 6px 10px; font-size: 11px; white-space: nowrap; font-family: 'Inter', sans-serif; }
+                .excel-grid th { background: #f8fafc; color: #94a3b8; font-weight: 500; text-align: center; }
+                .excel-grid td { color: #334155; }
+                .excel-grid .row-num { background: #f8fafc; color: #94a3b8; text-align: center; width: 40px; position: sticky; left: 0; font-weight: 500; border-right: 2px solid #e2e8f0; }
+                .excel-grid thead th { position: sticky; top: 0; z-index: 20; border-bottom: 2px solid #e2e8f0; }
+                .excel-grid thead th.corner { position: sticky; left: 0; z-index: 30; }
+                
+                .sheet-tabs-bottom { display: flex; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 10px; }
+                .sheet-tab { border: none; background: transparent; padding: 4px 12px; font-size: 10px; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 4px; }
+                .sheet-tab.active { background: white; color: #172554; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+                .spinner { width: 24px; height: 24px; border: 3px solid #e2e8f0; border-top-color: #172554; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 10px; }
+                @keyframes spin { to { transform: rotate(360deg); } }
 
                 .flex { display: flex; }
                 .items-center { align-items: center; }
