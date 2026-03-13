@@ -32,13 +32,32 @@ const multer = require('multer');
 const { google } = require('googleapis');
 
 // --- GOOGLE DRIVE INTEGRATION SETUP ---
-const KEYFILEPATH = path.join(__dirname, 'google_credentials.json');
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
+let authConfig = { scopes: SCOPES };
 
-const auth = new google.auth.GoogleAuth({
-    keyFile: KEYFILEPATH,
-    scopes: SCOPES,
-});
+// 1. Try to read from Environment Variable (if user pasted JSON string)
+if (process.env.GOOGLE_CREDENTIALS) {
+    try {
+        authConfig.credentials = typeof process.env.GOOGLE_CREDENTIALS === 'string' 
+            ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
+            : process.env.GOOGLE_CREDENTIALS;
+        console.log("Drive Auth: Loaded from GOOGLE_CREDENTIALS environment variable.");
+    } catch (e) {
+        console.error("Drive Auth: Failed to parse GOOGLE_CREDENTIALS environment variable.");
+    }
+} 
+// 2. Try Render's default "Secret Files" path
+else if (fs.existsSync('/etc/secrets/google_credentials.json')) {
+    authConfig.keyFile = '/etc/secrets/google_credentials.json';
+    console.log("Drive Auth: Loaded from /etc/secrets/google_credentials.json.");
+} 
+// 3. Fallback to local codebase file (development)
+else {
+    authConfig.keyFile = path.join(__dirname, 'google_credentials.json');
+    console.log("Drive Auth: Loaded from local google_credentials.json.");
+}
+
+const auth = new google.auth.GoogleAuth(authConfig);
 const drive = google.drive({ version: 'v3', auth });
 const DRIVE_FOLDER_ID = '1-5nfYudiGGsI-g7nUwgBmWXnaLvA2CrE';
 // --------------------------------------
