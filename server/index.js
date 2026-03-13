@@ -252,6 +252,61 @@ app.get('/api/files/view/:id', async (req, res) => {
     }
 });
 
+const ExcelJS = require('exceljs');
+
+app.get('/api/files/excel-preview-data/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+
+        const [meta] = await pool.rawPool.query('SELECT filename FROM uploaded_files WHERE id = ?', [id]);
+        if (meta.length === 0) return res.status(404).json({ error: 'File not found' });
+        
+        const driveId = meta[0].filename;
+        console.log(`[FastPreview] Fetching ${driveId} from Drive...`);
+
+        const driveRes = await drive.files.get(
+            { fileId: driveId, alt: 'media' },
+            { responseType: 'arraybuffer' }
+        );
+
+        console.log(`[FastPreview] Parsing ${driveRes.data.byteLength} bytes...`);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(driveRes.data);
+        
+        const worksheet = workbook.worksheets[0];
+        const previewRows = [];
+        
+        // Limit to 500 rows for instant preview
+        worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+            if (rowNumber <= 500) {
+                const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+                const cleanValues = values.map(v => {
+                    if (v && typeof v === 'object') {
+                        if (v.text) return String(v.text);
+                        if (v.richText) return v.richText.map(rt => rt.text).join('');
+                        if (v.result !== undefined) return String(v.result);
+                        return '';
+                    }
+                    return v === null || v === undefined ? '' : String(v);
+                });
+                previewRows.push(cleanValues);
+            }
+        });
+
+        res.json({
+            rows: previewRows,
+            sheetName: worksheet.name,
+            sheetNames: workbook.worksheets.map(w => w.name),
+            totalRows: worksheet.rowCount
+        });
+    } catch (err) {
+        console.error('[FastPreview] ERROR:', err);
+        res.status(500).json({ error: 'Failed to process large excel file' });
+    }
+});
+
 app.delete('/api/files/:id', async (req, res) => {
     try {
         const year = req.query.academicYear || '2026';

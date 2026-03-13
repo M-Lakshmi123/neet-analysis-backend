@@ -36,11 +36,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [uploading, setUploading] = useState(false);
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
-    const [previewMode, setPreviewMode] = useState('original'); // 'original' or 'data'
+    const [previewMode, setPreviewMode] = useState('data'); // 'data' or 'original'
     const [excelData, setExcelData] = useState(null);
     const [availableSheets, setAvailableSheets] = useState([]);
     const [activeSheetIndex, setActiveSheetIndex] = useState(0);
-    const [workbookInstance, setWorkbookInstance] = useState(null);
     const [loadingData, setLoadingData] = useState(false);
 
     useEffect(() => {
@@ -170,29 +169,28 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
     const openPreview = async (file) => {
         setPreviewFile(file);
-        setPreviewMode('original');
         setExcelData(null);
         setAvailableSheets([]);
         setActiveSheetIndex(0);
-        setWorkbookInstance(null);
 
         if (file.file_type === 'xlsx' || file.file_type === 'xls') {
+            setPreviewMode('data'); // Auto-switch to fast data view
             setLoadingData(true);
             try {
-                const response = await fetch(`${API_URL}/api/files/view/${file.id}?academicYear=${academicYear}`);
-                const buffer = await response.arrayBuffer();
-                const workbook = new ExcelJS.Workbook();
-                await workbook.xlsx.load(buffer);
-                setWorkbookInstance(workbook);
-                const sheets = workbook.worksheets.map((ws, index) => ({ name: ws.name, index }));
-                setAvailableSheets(sheets);
-                loadSheetData(workbook, 0);
+                const response = await fetch(`${API_URL}/api/files/excel-preview-data/${file.id}?academicYear=${academicYear}`);
+                const result = await response.json();
+                if (result.rows) {
+                    setExcelData(result.rows);
+                    setAvailableSheets(result.sheetNames || [result.sheetName]);
+                }
             } catch (err) {
                 console.error('Data Load Error:', err);
-                setExcelData([['Data too large or unreachable for clean view']]);
+                setExcelData([['Failed to load preview data']]);
             } finally {
                 setLoadingData(false);
             }
+        } else {
+            setPreviewMode('original'); // Use native viewer for PDF
         }
     };
 
@@ -224,8 +222,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         }
     };
 
-    const handleSheetChange = (idx) => {
-        if (workbookInstance) loadSheetData(workbookInstance, idx);
+    const handleSheetChange = async (idx, name) => {
+        // For simplicity, we just notify it's limited to 1st sheet for speed
+        // but if they really need it we could add another endpoint param
+        setActiveSheetIndex(idx);
     };
 
 
@@ -361,8 +361,8 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                                      {availableSheets.length > 1 && (
                                                          <div className="sheet-tabs-bottom">
                                                              {availableSheets.map((s, i) => (
-                                                                 <button key={i} className={`sheet-tab ${activeSheetIndex === i ? 'active' : ''}`} onClick={() => handleSheetChange(i)}>
-                                                                     {s.name}
+                                                                 <button key={i} className={`sheet-tab ${activeSheetIndex === i ? 'active' : ''}`} title="Fast preview limited to primary sheet">
+                                                                     {typeof s === 'string' ? s : s.name}
                                                                  </button>
                                                              ))}
                                                          </div>
