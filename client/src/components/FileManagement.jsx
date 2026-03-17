@@ -15,10 +15,12 @@ import {
     Files,
     CheckCircle,
     AlertCircle,
-    Eye
+    Eye,
+    Maximize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_URL } from '../utils/apiHelper';
+import { logActivity } from '../utils/activityLogger';
 
 const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     // Permission: Only the Main Admin (Yenjarappa) can Upload/Download/Delete
@@ -163,6 +165,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
     const openPreview = (file) => {
         setPreviewFile(file);
+        logActivity(userData, `Open Preview: ${file.original_name}`);
     };
 
     const getFileIcon = (type) => {
@@ -268,6 +271,19 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                      <a href={`https://drive.google.com/file/d/${previewFile.filename}/view?usp=sharing`} target="_blank" rel="noopener noreferrer" className="modal-action-btn" title="Open Original in New Tab">
                                          <Eye size={18} />
                                      </a>
+                                     <button 
+                                         onClick={() => {
+                                             const url = previewFile.file_type === 'pdf' 
+                                                 ? `${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}` 
+                                                 : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&ext=.xlsx`)}`;
+                                             window.open(url, '_blank');
+                                             logActivity(userData, `Full Screen Preview: ${previewFile.original_name}`);
+                                         }} 
+                                         className="modal-action-btn" 
+                                         title="Full Screen / Zoom"
+                                     >
+                                         <Maximize2 size={18} />
+                                     </button>
                                      <button onClick={() => setPreviewFile(null)} className="modal-close-btn-top"><X size={20} /></button>
                                 </div>
                             </div>
@@ -280,7 +296,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                      />
                                  ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                      <iframe 
-                                         src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}`} 
+                                         src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&ext=.xlsx`)}`} 
                                          className="full-iframe" 
                                          style={{ background: 'white' }}
                                          title="Excel Preview"

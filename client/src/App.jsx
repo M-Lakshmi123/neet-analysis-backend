@@ -223,7 +223,11 @@ const Dashboard = () => {
                 'errors': 'Error Report',
                 'error_top': 'Error Top 100%',
                 'error_count': 'Error Count Report',
-                'student_performance': 'Student Performance'
+                'student_performance': 'Student Performance',
+                'target_vs_achieved': 'Target Vs Achieved',
+                'approvals': 'User Approvals',
+                'logs': 'Activity Logs',
+                'file_management': 'Schedules & Timetable & Files'
             };
             const pageName = pageNames[activePage] || activePage;
             logActivity(userData, `Opened ${pageName}`);
@@ -295,7 +299,7 @@ const Dashboard = () => {
             case 'file_management':
                 const isSuperAdminEmail = userData?.email === 'yenjarappa.s@varsitymgmt.com';
                 const isUserPrincipal = (userData?.role || '').toLowerCase() === 'principal';
-                const hasFileAccess = isSuperAdminEmail || isAdmin || isCoAdmin || isUserPrincipal;
+                const hasFileAccess = isSuperAdminEmail || isAdmin || isUserPrincipal;
 
                 return hasFileAccess ?
                     <FileManagement

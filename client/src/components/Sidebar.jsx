@@ -44,10 +44,10 @@ const Sidebar = ({ activePage, setActivePage }) => {
     const isPrincipal = (userData?.role || '').toLowerCase() === 'principal';
     const isSuperAdmin = useAuth().currentUser?.email === 'yenjarappa.s@varsitymgmt.com';
 
-    if (isSuperAdmin || isAdmin || isCoAdmin || isPrincipal) {
-        const avgIdx = currentItems.findIndex(i => i.id === 'averages');
-        if (avgIdx !== -1) {
-            currentItems.splice(avgIdx + 1, 0, {
+    if (isSuperAdmin || isAdmin || isPrincipal) {
+        const testIdx = currentItems.findIndex(i => i.id === 'test_improvements');
+        if (testIdx !== -1) {
+            currentItems.splice(testIdx + 1, 0, {
                 id: 'file_management',
                 label: 'Schedules & Timetable & Files',
                 icon: <ClipboardList size={18} />
