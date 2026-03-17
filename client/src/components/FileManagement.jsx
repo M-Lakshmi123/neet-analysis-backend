@@ -195,7 +195,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         setPreviewFile(file);
         setZoom(100);
         setIsFullScreen(false);
-        setPreviewMode('ms');
+        setPreviewMode('google');
         setExcelData(null);
         
         if (file.file_type === 'xlsx' || file.file_type === 'xls') {
@@ -207,12 +207,19 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
     const fetchExcelData = async (id) => {
         setExcelLoading(true);
+        setExcelData(null);
         try {
             const response = await fetch(`${API_URL}/api/files/excel-preview-data/${id}?academicYear=${academicYear}`);
             const data = await response.json();
-            setExcelData(data);
+            
+            if (!response.ok) {
+                setExcelData({ error: data.error || 'Failed to load preview' });
+            } else {
+                setExcelData(data);
+            }
         } catch (err) {
             console.error('Fast view failed:', err);
+            setExcelData({ error: 'Network error or server timeout. This file might be too large for internal parsing.' });
         } finally {
             setExcelLoading(false);
         }
@@ -355,18 +362,22 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                     </div>
 
 
-                                    {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
-                                        <>
-                                            <div className="toolbar-divider"></div>
-                                            <button 
-                                                onClick={() => setPreviewMode(previewMode === 'ms' ? 'fast' : 'ms')} 
-                                                className={`tool-btn-wide ${previewMode === 'fast' ? 'active' : ''}`}
-                                                title="Switch between Official MS View and Internal Fast View"
-                                            >
-                                                {previewMode === 'ms' ? 'USE FAST VIEW (INTERNAL)' : 'USE OFFICE VIEW'}
-                                            </button>
-                                        </>
-                                    )}
+                                     {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
+                                         <>
+                                             <div className="toolbar-divider"></div>
+                                             <button 
+                                                 onClick={() => {
+                                                     const modes = ['google', 'ms', 'fast'];
+                                                     const next = modes[(modes.indexOf(previewMode) + 1) % modes.length];
+                                                     setPreviewMode(next);
+                                                 }} 
+                                                 className={`tool-btn-wide ${previewMode !== 'google' ? 'active' : ''}`}
+                                                 title="Google View (Best), MS View (25MB limit), or Fast Table"
+                                             >
+                                                 {previewMode === 'google' ? 'GOOGLE DRIVE VIEW' : previewMode === 'ms' ? 'OFFICE VIEW' : 'FAST TABLE VIEW'}
+                                             </button>
+                                         </>
+                                     )}
 
                                     <div className="toolbar-divider"></div>
 
@@ -387,7 +398,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                          onClick={() => {
                                              const url = previewFile.file_type === 'pdf' 
                                                  ? `${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}` 
-                                                 : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&ext=.xlsx`)}`;
+                                                 : `https://drive.google.com/file/d/${previewFile.filename}/preview`;
                                              window.open(url, '_blank');
                                          }} 
                                          className="modal-action-btn" 
@@ -417,79 +428,91 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                          position: 'relative'
                                      }}
                                  >
-
-                                     {previewFile.file_type === 'pdf' ? (
-                                         <iframe 
-                                             src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0&navpanes=0&scrollbar=0`} 
-                                             className="full-iframe" 
-                                             title="PDF Preview"
-                                         />
-                                     ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
-                                         previewMode === 'ms' ? (
-                                             <iframe 
-                                                 src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(`${API_URL}/api/files/e/${previewFile.id}?academicYear=${academicYear}`)}&wdAllowInteractivity=True&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True`} 
-                                                 className="full-iframe" 
-                                                 style={{ background: 'white' }}
-                                                 title="Excel Preview"
-                                             />
-                                         ) : (
-                                             <div className="excel-preview-container">
-                                                 {excelLoading ? (
-                                                     <div className="p-12 text-center text-slate-400">
-                                                         <Loader2 className="animate-spin mx-auto mb-2" size={24} />
-                                                         <p className="text-[10px] uppercase font-bold tracking-widest">Building Table Layout...</p>
-                                                     </div>
-                                                 ) : excelData ? (
-                                                     <div className="excel-table-wrapper">
-                                                         <table className="excel-table">
-                                                             <thead>
-                                                                 <tr>
-                                                                     <th className="sticky-col row-num">#</th>
-                                                                     {Array.from({ length: excelData.rows[0]?.length || 10 }).map((_, i) => (
-                                                                         <th key={i} style={{ width: (excelData.columnWidths[i] * 8) || 120 }}>
-                                                                             {String.fromCharCode(65 + (i % 26))}{i >= 26 ? Math.floor(i / 26) : ''}
-                                                                         </th>
-                                                                     ))}
-                                                                 </tr>
-                                                             </thead>
-                                                             <tbody>
-                                                                 {excelData.rows.map((row, rid) => (
-                                                                     <tr key={rid}>
-                                                                         <td className="sticky-col row-num">{rid + 1}</td>
-                                                                         {row.map((cell, cid) => (
-                                                                             <td key={cid} style={{ 
-                                                                                 backgroundColor: cell.style?.bg ? `#${cell.style.bg}` : 'white',
-                                                                                 color: cell.style?.fg ? `#${cell.style.fg}` : 'inherit',
-                                                                                 fontWeight: cell.style?.bold ? 'bold' : 'normal',
-                                                                                 fontSize: cell.style?.fontSize ? `${cell.style.fontSize}px` : '11px',
-                                                                                 textAlign: cell.style?.align || 'left',
-                                                                                 padding: '2px 8px',
-                                                                                 border: '0.5px solid #e2e8f0',
-                                                                                 whiteSpace: 'nowrap'
-                                                                             }}>
-                                                                                 {cell.value}
-                                                                             </td>
-                                                                         ))}
-                                                                     </tr>
-                                                                 ))}
-                                                             </tbody>
-                                                         </table>
-                                                         {excelData.totalRows > 500 && (
-                                                             <div className="p-4 text-center text-slate-400 text-[10px] font-bold">
-                                                                 LIMIT REACHED: Showing first 500 of {excelData.totalRows} rows. Use Download for full file.
-                                                             </div>
-                                                         )}
-                                                     </div>
-                                                 ) : (
-                                                     <div className="loading-state">Could not parse data. File might be corrupted.</div>
-                                                 )
-                                                 }
-                                             </div>
-                                         )
-                                     ) : (
-                                         <div className="loading-state">Preview not supported for this file type.</div>
-                                     )}
-                                 </div>
+                                      {previewFile.file_type === 'pdf' ? (
+                                          <iframe 
+                                              src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0&navpanes=0&scrollbar=0`} 
+                                              className="full-iframe" 
+                                              title="PDF Preview"
+                                          />
+                                      ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
+                                          previewMode === 'google' ? (
+                                              <iframe 
+                                                  src={`https://drive.google.com/file/d/${previewFile.filename}/preview`} 
+                                                  className="full-iframe" 
+                                                  style={{ background: 'white' }}
+                                                  title="Google Drive Preview"
+                                              />
+                                          ) : previewMode === 'ms' ? (
+                                              <iframe 
+                                                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(`${API_URL}/api/files/e/${previewFile.id}?academicYear=${academicYear}`)}&wdAllowInteractivity=True&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True`} 
+                                                  className="full-iframe" 
+                                                  style={{ background: 'white' }}
+                                                  title="Excel Preview"
+                                                  onError={() => setPreviewMode('google')}
+                                              />
+                                          ) : (
+                                              <div className="excel-preview-container">
+                                                  {excelLoading ? (
+                                                      <div className="p-12 text-center text-slate-400">
+                                                          <Loader2 className="animate-spin mx-auto mb-2" size={24} />
+                                                          <p className="text-[10px] uppercase font-bold tracking-widest">Building Table Layout...</p>
+                                                      </div>
+                                                  ) : excelData?.error ? (
+                                                      <div className="p-12 text-center">
+                                                          <AlertCircle className="mx-auto mb-2 text-amber-500" size={32} />
+                                                          <p className="text-sm font-bold text-slate-600 mb-2">{excelData.error}</p>
+                                                          <button onClick={() => setPreviewMode('google')} className="px-4 py-2 bg-slate-800 text-white rounded text-xs font-bold">TRY GOOGLE DRIVE VIEW</button>
+                                                      </div>
+                                                  ) : excelData ? (
+                                                      <div className="excel-table-wrapper">
+                                                          <table className="excel-table">
+                                                              <thead>
+                                                                  <tr>
+                                                                      <th className="sticky-col row-num">#</th>
+                                                                      {Array.from({ length: excelData.rows?.[0]?.length || 10 }).map((_, i) => (
+                                                                          <th key={i} style={{ width: (excelData.columnWidths?.[i] * 8) || 120 }}>
+                                                                              {String.fromCharCode(65 + (i % 26))}{i >= 26 ? Math.floor(i / 26) : ''}
+                                                                          </th>
+                                                                      ))}
+                                                                  </tr>
+                                                              </thead>
+                                                              <tbody>
+                                                                  {excelData.rows?.map((row, rid) => (
+                                                                      <tr key={rid}>
+                                                                          <td className="sticky-col row-num">{rid + 1}</td>
+                                                                          {row.map((cell, cid) => (
+                                                                              <td key={cid} style={{ 
+                                                                                  backgroundColor: cell.style?.bg ? `#${cell.style.bg}` : 'white',
+                                                                                  color: cell.style?.fg ? `#${cell.style.fg}` : 'inherit',
+                                                                                  fontWeight: cell.style?.bold ? 'bold' : 'normal',
+                                                                                  fontSize: cell.style?.fontSize ? `${cell.style.fontSize}px` : '11px',
+                                                                                  textAlign: cell.style?.align || 'left',
+                                                                                  padding: '2px 8px',
+                                                                                  border: '0.5px solid #e2e8f0',
+                                                                                  whiteSpace: 'nowrap'
+                                                                              }}>
+                                                                                  {cell.value}
+                                                                              </td>
+                                                                          ))}
+                                                                      </tr>
+                                                                  ))}
+                                                              </tbody>
+                                                          </table>
+                                                          {excelData.totalRows > 500 && (
+                                                              <div className="p-4 text-center text-slate-400 text-[10px] font-bold">
+                                                                  LIMIT REACHED: Showing first 500 of {excelData.totalRows} rows. Use Download for full file.
+                                                              </div>
+                                                          )}
+                                                      </div>
+                                                  ) : (
+                                                       <div className="p-12 text-center">Could not parse data.</div>
+                                                  )}
+                                              </div>
+                                          )
+                                      ) : (
+                                          <div className="loading-state">Preview not supported for this file type.</div>
+                                      )}
+                                  </div>
                              </div>
                         </motion.div>
                     </motion.div>
