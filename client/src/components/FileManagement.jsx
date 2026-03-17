@@ -198,11 +198,18 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         setPreviewMode('google');
         setExcelData(null);
         
+        // Auto-fetch fast data always for fallback
         if (file.file_type === 'xlsx' || file.file_type === 'xls') {
             fetchExcelData(file.id);
         }
         
         logActivity(userData, `Open Preview: ${file.original_name}`);
+    };
+
+    const reloadPreview = () => {
+        const current = previewFile;
+        setPreviewFile(null);
+        setTimeout(() => setPreviewFile(current), 50);
     };
 
     const fetchExcelData = async (id) => {
@@ -376,6 +383,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                              >
                                                  {previewMode === 'google' ? 'GOOGLE DRIVE VIEW' : previewMode === 'ms' ? 'OFFICE VIEW' : 'FAST TABLE VIEW'}
                                              </button>
+                                             <button onClick={reloadPreview} className="tool-btn" title="Reload Preview if Stuck">
+                                                  <Loader2 size={14} />
+                                             </button>
                                          </>
                                      )}
 
@@ -398,7 +408,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                          onClick={() => {
                                              const url = previewFile.file_type === 'pdf' 
                                                  ? `${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}` 
-                                                 : `https://drive.google.com/file/d/${previewFile.filename}/preview`;
+                                                 : `https://docs.google.com/viewer?srcid=${previewFile.filename}&pid=explorer&efp=${previewFile.filename}&a=v&chrome=false&embedded=true`;
                                              window.open(url, '_blank');
                                          }} 
                                          className="modal-action-btn" 
@@ -437,7 +447,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                       ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                           previewMode === 'google' ? (
                                               <iframe 
-                                                  src={`https://drive.google.com/file/d/${previewFile.filename}/preview`} 
+                                                  src={`https://docs.google.com/viewer?srcid=${previewFile.filename}&pid=explorer&efp=${previewFile.filename}&a=v&chrome=false&embedded=true`} 
                                                   className="full-iframe" 
                                                   style={{ background: 'white' }}
                                                   title="Google Drive Preview"
