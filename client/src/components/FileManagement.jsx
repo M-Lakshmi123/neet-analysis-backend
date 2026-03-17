@@ -17,7 +17,6 @@ import {
     AlertCircle,
     Eye
 } from 'lucide-react';
-import ExcelJS from 'exceljs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_URL } from '../utils/apiHelper';
 
@@ -36,11 +35,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [uploading, setUploading] = useState(false);
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
-    const [previewMode, setPreviewMode] = useState('data'); // 'data', 'microsoft', or 'google'
-    const [excelData, setExcelData] = useState(null);
-    const [availableSheets, setAvailableSheets] = useState([]);
-    const [activeSheetIndex, setActiveSheetIndex] = useState(0);
-    const [loadingData, setLoadingData] = useState(false);
 
     useEffect(() => {
         fetchFiles();
@@ -167,67 +161,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         }
     };
 
-    const openPreview = async (file) => {
+    const openPreview = (file) => {
         setPreviewFile(file);
-        setExcelData(null);
-        setAvailableSheets([]);
-        setActiveSheetIndex(0);
-
-        if (file.file_type === 'xlsx' || file.file_type === 'xls') {
-            setPreviewMode('data'); // Auto-switch to fast data view
-            setLoadingData(true);
-            try {
-                const response = await fetch(`${API_URL}/api/files/excel-preview-data/${file.id}?academicYear=${academicYear}`);
-                const result = await response.json();
-                if (result.rows) {
-                    setExcelData(result.rows);
-                    setAvailableSheets(result.sheetNames || [result.sheetName]);
-                }
-            } catch (err) {
-                console.error('Data Load Error:', err);
-                setExcelData([['Failed to load preview data']]);
-            } finally {
-                setLoadingData(false);
-            }
-        } else {
-            setPreviewMode('original'); // Use native viewer for PDF
-        }
     };
-
-    const loadSheetData = (workbook, index) => {
-        try {
-            const worksheet = workbook.worksheets[index];
-            const data = [];
-            let rCount = 0;
-            worksheet.eachRow((row) => {
-                if (rCount < 1000) {
-                    const rowValues = row.values.slice(1).map(v => {
-                        if (v === null || v === undefined) return '';
-                        if (typeof v === 'object') {
-                            if (v.text) return String(v.text);
-                            if (v.richText) return v.richText.map(rt => rt.text).join('');
-                            if (v.result !== undefined) return String(v.result);
-                            return '';
-                        }
-                        return String(v);
-                    });
-                    data.push(rowValues);
-                }
-                rCount++;
-            });
-            setExcelData(data);
-            setActiveSheetIndex(index);
-        } catch (e) {
-            setExcelData([['Error rendering sheet']]);
-        }
-    };
-
-    const handleSheetChange = async (idx, name) => {
-        // For simplicity, we just notify it's limited to 1st sheet for speed
-        // but if they really need it we could add another endpoint param
-        setActiveSheetIndex(idx);
-    };
-
 
     const getFileIcon = (type) => {
         switch (type) {
@@ -325,14 +261,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                     {getFileIcon(previewFile.file_type)}
                                     <h2 className="modal-title">{previewFile.original_name}</h2>
                                 </div>
-                                 <div className="flex items-center gap-2">
-                                     {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
-                                         <div className="mode-switcher">
-                                             <button className={`mode-btn ${previewMode === 'data' ? 'active' : ''}`} onClick={() => setPreviewMode('data')}>Luxury Grid</button>
-                                             <button className={`mode-btn ${previewMode === 'microsoft' ? 'active' : ''}`} onClick={() => setPreviewMode('microsoft')}>MS Office</button>
-                                             <button className={`mode-btn ${previewMode === 'google' ? 'active' : ''}`} onClick={() => setPreviewMode('google')}>Google View</button>
-                                         </div>
-                                     )}
+                                <div className="flex items-center gap-2">
                                      {isMainAdmin && (
                                          <a href={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&download=true`} className="modal-action-btn" download title="Download"><Download size={18} /></a>
                                      )}
@@ -340,78 +269,26 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                          <Eye size={18} />
                                      </a>
                                      <button onClick={() => setPreviewFile(null)} className="modal-close-btn-top"><X size={20} /></button>
-                                 </div>
+                                </div>
                             </div>
                             <div className="modal-content">
-                                 {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls' || previewFile.file_type === 'pdf') ? (
-                                     previewMode === 'google' ? (
-                                        <iframe 
-                                            src={`https://docs.google.com/viewer?srcid=${previewFile.filename}&pid=explorer&efh=false&a=v&chrome=false&embedded=true`} 
-                                            className="full-iframe" 
-                                            style={{ background: 'white' }}
-                                        />
-                                     ) : previewMode === 'microsoft' ? (
-                                         <iframe 
-                                            src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&token=true&ext=.xlsx`)}`} 
-                                            className="full-iframe" 
-                                            style={{ background: 'white' }}
-                                        />
-                                     ) : (
-                                         <div className="excel-view-container">
-                                             {loadingData ? (
-                                                 <div className="loading-state">
-                                                     <div className="spinner"></div>
-                                                     <p>Building Luxury View...</p>
-                                                 </div>
-                                             ) : excelData ? (
-                                                 <div className="excel-data-layout">
-                                                     <div className="grid-scroll">
-                                                         <table className="excel-grid">
-                                                             <thead>
-                                                                 <tr>
-                                                                     <th className="corner"></th>
-                                                                     {Array.from({ length: Math.max(...excelData.map(r => r.length), 0) }).map((_, i) => (
-                                                                         <th key={i}>{String.fromCharCode(65 + i)}</th>
-                                                                     ))}
-                                                                 </tr>
-                                                             </thead>
-                                                             <tbody>
-                                                                 {excelData.map((row, i) => (
-                                                                     <tr key={i}>
-                                                                         <td className="row-num">{i + 1}</td>
-                                                                         {row.map((cell, j) => (
-                                                                             <td key={j} style={{ 
-                                                                                 backgroundColor: cell?.style?.bg ? `#${cell.style.bg}` : 'transparent',
-                                                                                 color: cell?.style?.fg ? `#${cell.style.fg}` : 'inherit',
-                                                                                 fontWeight: cell?.style?.bold ? '700' : '400'
-                                                                             }}>
-                                                                                 {cell?.value || ''}
-                                                                             </td>
-                                                                         ))}
-                                                                     </tr>
-                                                                 ))}
-                                                             </tbody>
-                                                         </table>
-                                                     </div>
-                                                     {availableSheets.length > 1 && (
-                                                         <div className="sheet-tabs-bottom">
-                                                             {availableSheets.map((s, i) => (
-                                                                 <button key={i} className={`sheet-tab ${activeSheetIndex === i ? 'active' : ''}`} onClick={() => handleSheetChange(i, s)}>
-                                                                     {typeof s === 'string' ? s : s.name}
-                                                                 </button>
-                                                             ))}
-                                                         </div>
-                                                     )}
-                                                 </div>
-                                             ) : (
-                                                 <div className="loading-state">File ready. Switch engine if grid is empty.</div>
-                                             )}
-                                         </div>
-                                     )
+                                 {previewFile.file_type === 'pdf' ? (
+                                     <iframe 
+                                         src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0`} 
+                                         className="full-iframe" 
+                                         title="PDF Preview"
+                                     />
+                                 ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
+                                     <iframe 
+                                         src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}`} 
+                                         className="full-iframe" 
+                                         style={{ background: 'white' }}
+                                         title="Excel Preview"
+                                     />
                                  ) : (
-                                     <div className="loading-state">Unsupported file type</div>
+                                     <div className="loading-state">Preview not supported for this file type.</div>
                                  )}
-                            </div>
+                             </div>
                         </motion.div>
                     </motion.div>
                 )}
@@ -453,34 +330,11 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .modal-title { font-size: 13px; font-weight: 900; color: #1e293b; }
                 .modal-content { flex: 1; background: #f1f5f9; overflow: hidden; }
                 .full-iframe { width: 100%; height: 100%; border: none; }
-                .excel-view { height: 100%; overflow: auto; padding: 24px; }
-                .excel-table { width: 100%; border-collapse: collapse; background: white; border-radius: 4px; overflow: hidden; }
-                .excel-table th { padding: 10px; background: #1e293b; color: white; font-size: 11px; text-align: left; }
-                .excel-table td { padding: 8px 10px; border: 1px solid #f1f5f9; font-size: 11px; color: #334155; }
                 .loading-state { height: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-weight: 800; font-size: 11px; text-transform: uppercase; }
                 .modal-action-btn:hover { background: #f1f5f9; }
                 .mode-switcher { display: flex; background: #e2e8f0; padding: 3px; border-radius: 6px; margin-right: 10px; }
                 .mode-btn { border: none; background: transparent; padding: 4px 10px; font-size: 9px; font-weight: 800; border-radius: 4px; cursor: pointer; color: #64748b; transition: all 0.2s; }
                 .mode-btn.active { background: white; color: #172554; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-
-                /* Premium Excel Grid Style */
-                .excel-view-container { height: 100%; display: flex; flex-direction: column; background: #f1f5f9; }
-                .excel-data-layout { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
-                .grid-scroll { flex: 1; overflow: auto; padding: 0; background: white; }
-                .excel-grid { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
-                .excel-grid th, .excel-grid td { border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 6px 10px; font-size: 11px; white-space: nowrap; font-family: 'Inter', sans-serif; }
-                .excel-grid th { background: #f8fafc; color: #94a3b8; font-weight: 500; text-align: center; }
-                .excel-grid td { color: #334155; }
-                .excel-grid .row-num { background: #f8fafc; color: #94a3b8; text-align: center; width: 40px; position: sticky; left: 0; font-weight: 500; border-right: 2px solid #e2e8f0; }
-                .excel-grid thead th { position: sticky; top: 0; z-index: 20; border-bottom: 2px solid #e2e8f0; }
-                .excel-grid thead th.corner { position: sticky; left: 0; z-index: 30; }
-                
-                .sheet-tabs-bottom { display: flex; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 4px 10px; }
-                .sheet-tab { border: none; background: transparent; padding: 4px 12px; font-size: 10px; font-weight: 700; color: #64748b; cursor: pointer; border-radius: 4px; }
-                .sheet-tab.active { background: white; color: #172554; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-
-                .spinner { width: 24px; height: 24px; border: 3px solid #e2e8f0; border-top-color: #172554; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 10px; }
-                @keyframes spin { to { transform: rotate(360deg); } }
 
                 .flex { display: flex; }
                 .items-center { align-items: center; }

@@ -213,11 +213,17 @@ app.get('/api/files/view/:id', async (req, res) => {
             'SELECT filename, original_name, file_type FROM uploaded_files WHERE id = ?',
             [id]
         );
-        if (meta.length === 0) return res.status(404).send('File not found');
+        
+        if (meta.length === 0) {
+            console.warn(`[Drive View] File ID ${id} not found in DB for year ${year}`);
+            return res.status(404).json({ error: 'File matching this ID was not found in our database records.' });
+        }
 
         const file = meta[0];
-        const driveId = file.filename; // filename is storing the driveID
+        const driveId = file.filename;
         
+        console.log(`[Drive View] Requesting file ${file.original_name} (Drive ID: ${driveId}) from year ${year}`);
+
         const contentType = file.file_type === 'pdf' ? 'application/pdf' :
             (file.file_type === 'xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
             (file.file_type === 'xls') ? 'application/vnd.ms-excel' :
@@ -230,25 +236,35 @@ app.get('/api/files/view/:id', async (req, res) => {
             res.setHeader('Content-Disposition', `inline; filename="${file.original_name}"`);
         }
 
-        // 2. Stream directly from Google Drive to the Client
-        const driveRes = await drive.files.get(
-            { fileId: driveId, alt: 'media' },
-            { responseType: 'stream' }
-        );
+        // 3. Stream directly from Google Drive to the Client
+        try {
+            // Check if file exists in Drive before streaming
+            const driveCheck = await drive.files.get({ fileId: driveId, fields: 'id, size' });
+            console.log(`[Drive View] Found in Drive. Size: ${(driveCheck.data.size / (1024 * 1024)).toFixed(2)} MB`);
 
-        driveRes.data
-            .on('end', () => res.end())
-            .on('error', err => {
-                console.error('[Drive View] Streaming Error:', err);
-                if (!res.headersSent) res.status(500).send('Error streaming file');
-                res.end();
-            })
-            .pipe(res);
+            const driveRes = await drive.files.get(
+                { fileId: driveId, alt: 'media' },
+                { responseType: 'stream' }
+            );
+
+            driveRes.data
+                .on('error', err => {
+                    console.error('[Drive View] Streaming Error:', err.message);
+                    if (!res.headersSent) res.status(500).send('Error streaming file - persistent network issue');
+                })
+                .pipe(res);
+
+        } catch (driveErr) {
+            console.error(`[Drive View] Google Drive Error for ID ${driveId}:`, driveErr.message);
+            if (driveErr.code === 404) {
+                return res.status(404).json({ error: 'File found in database but missing from Google Drive storage.' });
+            }
+            throw driveErr;
+        }
 
     } catch (err) {
         console.error('[Drive View] FATAL ERROR:', err);
-        if (!res.headersSent) res.status(500).send('Error retrieving file');
-        else res.end();
+        if (!res.headersSent) res.status(500).json({ error: 'System error retrieving file', details: err.message });
     }
 });
 
