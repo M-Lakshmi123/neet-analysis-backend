@@ -44,8 +44,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [isFullScreen, setIsFullScreen] = useState(false);
     
-    // Panning State
-    const [isDragging, setIsDragging] = useState(false);
+    // Excel Fast Preview
+    const [excelData, setExcelData] = useState(null);
+    const [excelLoading, setExcelLoading] = useState(false);
+    const [previewMode, setPreviewMode] = useState('ms'); // 'ms' or 'fast'
     const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
     const scrollContainerRef = useRef(null);
 
@@ -196,7 +198,27 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         setPanMode(false);
         setPanOffset({ x: 0, y: 0 });
         setIsFullScreen(false);
+        setPreviewMode('ms');
+        setExcelData(null);
+        
+        if (file.file_type === 'xlsx' || file.file_type === 'xls') {
+            fetchExcelData(file.id);
+        }
+        
         logActivity(userData, `Open Preview: ${file.original_name}`);
+    };
+
+    const fetchExcelData = async (id) => {
+        setExcelLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/api/files/excel-preview-data/${id}?academicYear=${academicYear}`);
+            const data = await response.json();
+            setExcelData(data);
+        } catch (err) {
+            console.error('Fast view failed:', err);
+        } finally {
+            setExcelLoading(false);
+        }
     };
 
     const handlePanStart = (e) => {
@@ -206,14 +228,12 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     };
 
     const handlePanMove = (e) => {
-        if (!isDragging || !panMode || !previewFile || previewFile.file_type !== 'pdf') return;
+        if (!isDragging || !panMode || !previewFile || previewFile.file_type !== 'pdf' || !scrollContainerRef.current) return;
         const dx = e.clientX - lastPos.x;
         const dy = e.clientY - lastPos.y;
         
-        setPanOffset(prev => ({
-            x: prev.x + dx,
-            y: prev.y + dy
-        }));
+        scrollContainerRef.current.scrollLeft -= dx;
+        scrollContainerRef.current.scrollTop -= dy;
         
         setLastPos({ x: e.clientX, y: e.clientY });
     };
@@ -372,6 +392,19 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                         </>
                                     )}
 
+                                    {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
+                                        <>
+                                            <div className="toolbar-divider"></div>
+                                            <button 
+                                                onClick={() => setPreviewMode(previewMode === 'ms' ? 'fast' : 'ms')} 
+                                                className={`tool-btn-wide ${previewMode === 'fast' ? 'active' : ''}`}
+                                                title="Switch between Official MS View and Internal Fast View"
+                                            >
+                                                {previewMode === 'ms' ? 'USE FAST VIEW (INTERNAL)' : 'USE OFFICE VIEW'}
+                                            </button>
+                                        </>
+                                    )}
+
                                     <div className="toolbar-divider"></div>
 
                                     <button 
@@ -411,7 +444,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                 onMouseUp={handlePanEnd}
                                 onMouseLeave={handlePanEnd}
                                 style={{
-                                    overflow: (zoom > 100 || panMode) ? 'auto' : 'hidden',
+                                    overflow: previewFile.file_type === 'pdf' ? 'auto' : 'hidden',
                                     backgroundColor: previewFile.file_type === 'pdf' ? '#525659' : '#ffffff'
                                 }}
                             >
@@ -419,12 +452,12 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                      className="preview-wrap"
                                      style={{
                                          width: previewFile.file_type === 'pdf' ? `${zoom}%` : '100%',
-                                         height: (previewFile.file_type === 'pdf' && zoom === 100) ? '100%' : 'auto',
+                                         height: previewFile.file_type === 'pdf' ? `${zoom}%` : '100%',
                                          minHeight: '100%',
                                          margin: '0 auto',
                                          position: 'relative',
-                                         transition: isDragging ? 'none' : 'transform 0.2s ease-out',
-                                         transform: (previewFile.file_type === 'pdf' && (panMode || zoom > 100)) ? `translate(${panOffset.x}px, ${panOffset.y}px)` : 'none',
+                                         transition: isDragging ? 'none' : 'width 0.2s ease-out, height 0.2s ease-out',
+                                         transform: 'none',
                                          transformOrigin: 'top center'
                                      }}
                                  >
@@ -439,12 +472,67 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                              style={{ pointerEvents: panMode ? 'none' : 'auto' }}
                                          />
                                      ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
-                                         <iframe 
-                                             src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/e/${previewFile.id}?academicYear=${academicYear}`)}`} 
-                                             className="full-iframe" 
-                                             style={{ background: 'white' }}
-                                             title="Excel Preview"
-                                         />
+                                         previewMode === 'ms' ? (
+                                             <iframe 
+                                                 src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/e/${previewFile.id}?academicYear=${academicYear}`)}`} 
+                                                 className="full-iframe" 
+                                                 style={{ background: 'white' }}
+                                                 title="Excel Preview"
+                                             />
+                                         ) : (
+                                             <div className="excel-preview-container">
+                                                 {excelLoading ? (
+                                                     <div className="p-12 text-center text-slate-400">
+                                                         <Loader2 className="animate-spin mx-auto mb-2" size={24} />
+                                                         <p className="text-[10px] uppercase font-bold tracking-widest">Building Table Layout...</p>
+                                                     </div>
+                                                 ) : excelData ? (
+                                                     <div className="excel-table-wrapper">
+                                                         <table className="excel-table">
+                                                             <thead>
+                                                                 <tr>
+                                                                     <th className="sticky-col row-num">#</th>
+                                                                     {Array.from({ length: excelData.rows[0]?.length || 10 }).map((_, i) => (
+                                                                         <th key={i} style={{ width: (excelData.columnWidths[i] * 8) || 120 }}>
+                                                                             {String.fromCharCode(65 + (i % 26))}{i >= 26 ? Math.floor(i / 26) : ''}
+                                                                         </th>
+                                                                     ))}
+                                                                 </tr>
+                                                             </thead>
+                                                             <tbody>
+                                                                 {excelData.rows.map((row, rid) => (
+                                                                     <tr key={rid}>
+                                                                         <td className="sticky-col row-num">{rid + 1}</td>
+                                                                         {row.map((cell, cid) => (
+                                                                             <td key={cid} style={{ 
+                                                                                 backgroundColor: cell.style?.bg ? `#${cell.style.bg}` : 'white',
+                                                                                 color: cell.style?.fg ? `#${cell.style.fg}` : 'inherit',
+                                                                                 fontWeight: cell.style?.bold ? 'bold' : 'normal',
+                                                                                 fontSize: cell.style?.fontSize ? `${cell.style.fontSize}px` : '11px',
+                                                                                 textAlign: cell.style?.align || 'left',
+                                                                                 padding: '2px 8px',
+                                                                                 border: '0.5px solid #e2e8f0',
+                                                                                 whiteSpace: 'nowrap'
+                                                                             }}>
+                                                                                 {cell.value}
+                                                                             </td>
+                                                                         ))}
+                                                                     </tr>
+                                                                 ))}
+                                                             </tbody>
+                                                         </table>
+                                                         {excelData.totalRows > 500 && (
+                                                             <div className="p-4 text-center text-slate-400 text-[10px] font-bold">
+                                                                 LIMIT REACHED: Showing first 500 of {excelData.totalRows} rows. Use Download for full file.
+                                                             </div>
+                                                         )}
+                                                     </div>
+                                                 ) : (
+                                                     <div className="loading-state">Could not parse data. File might be corrupted.</div>
+                                                 )
+                                                 }
+                                             </div>
+                                         )
                                      ) : (
                                          <div className="loading-state">Preview not supported for this file type.</div>
                                      )}
@@ -548,6 +636,24 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 }
                 .tool-btn:hover { background: #e2e8f0; color: #1e293b; }
                 .tool-btn.active { background: #172554; color: white; }
+                .tool-btn-wide {
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: none;
+                    background: #e2e8f0;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    color: #475569;
+                    transition: all 0.2s;
+                    font-weight: 900;
+                    padding: 0 12px;
+                    font-size: 8px;
+                    letter-spacing: 0.05em;
+                }
+                .tool-btn-wide:hover { background: #cbd5e1; color: #1e293b; }
+                .tool-btn-wide.active { background: #172554; color: white; }
                 
                 .zoom-value { font-size: 10px; font-weight: 800; min-width: 40px; text-align: center; color: #1e293b; }
                 .file-badge-mini { font-size: 8px; font-weight: 900; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; color: #64748b; }
@@ -558,6 +664,14 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 
                 .flat-btn-outline { border: 1px solid #172554; color: #172554; padding: 8px 14px; border-radius: 8px; font-size: 10px; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; background: transparent; }
                 .flat-btn-outline:hover { background: #f8fafc; }
+
+                .excel-preview-container { background: #e5e7eb; min-width: 100%; min-height: 100%; display: flex; flex-direction: column; overflow: auto; }
+                .excel-table-wrapper { padding: 20px; background: #e5e7eb; }
+                .excel-table { border-collapse: collapse; background: white; border: 1px solid #d1d5db; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+                .excel-table th { background: #f3f4f6; border: 1px solid #d1d5db; padding: 4px 10px; font-size: 11px; color: #4b5563; text-align: center; font-weight: normal; }
+                .excel-table td { font-family: 'Inter', system-ui, sans-serif; min-width: 60px; height: 24px; border: 0.5px solid #e2e8f0; }
+                .row-num { background: #f3f4f6; color: #6b7280; font-size: 10px; text-align: center; border: 1px solid #d1d5db; }
+                .sticky-col { position: sticky; left: 0; z-index: 10; width: 30px; }
             `}</style>
         </div>
     );
