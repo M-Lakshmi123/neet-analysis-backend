@@ -9,6 +9,9 @@ const { connectToDb, sql } = require('./db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 const fs = require('fs');
+const multer = require('multer');
+const { google } = require('googleapis');
+const ExcelJS = require('exceljs');
 
 const logQuery = (query, params) => {
     const logPath = path.join(__dirname, 'query_debug.log');
@@ -28,8 +31,7 @@ if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath);
 app.use('/uploads', express.static(uploadPath));
 app.use(express.static(clientDistPath));
 
-const multer = require('multer');
-const { google } = require('googleapis');
+// Requires moved to top for startup stability
 
 // --- GOOGLE DRIVE INTEGRATION SETUP ---
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
@@ -277,7 +279,7 @@ app.post('/api/files/sanitize-vault', async (req, res) => {
     }
 });
 
-const ExcelJS = require('exceljs');
+// Route removed: const ExcelJS = require('exceljs'); to the top for efficiency
 
 app.get('/api/files/excel-preview-data/:id', async (req, res) => {
     try {
@@ -285,18 +287,30 @@ app.get('/api/files/excel-preview-data/:id', async (req, res) => {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
-        const [meta] = await pool.rawPool.query('SELECT filename FROM uploaded_files WHERE id = ?', [id]);
+        const [meta] = await pool.rawPool.query('SELECT filename, original_name FROM uploaded_files WHERE id = ?', [id]);
         if (meta.length === 0) return res.status(404).json({ error: 'File not found' });
         
         const driveId = meta[0].filename;
-        console.log(`[FastPreview] Fetching ${driveId} from Drive...`);
+        
+        // 1. Fetch metadata first to check size
+        const driveMeta = await drive.files.get({ fileId: driveId, fields: 'size' });
+        const sizeBytes = parseInt(driveMeta.data.size || 0);
+        
+        if (sizeBytes > 20 * 1024 * 1024) { // 20MB limit for internal parsing
+            return res.status(400).json({ 
+                error: 'File too large for fast preview. Please use the default Office view.',
+                size: sizeBytes 
+            });
+        }
+
+        console.log(`[FastPreview] Fetching ${driveId} (${(sizeBytes/1024/1024).toFixed(2)} MB) from Drive...`);
 
         const driveRes = await drive.files.get(
             { fileId: driveId, alt: 'media' },
             { responseType: 'arraybuffer' }
         );
 
-        console.log(`[FastPreview] Parsing ${driveRes.data.byteLength} bytes...`);
+        console.log(`[FastPreview] Parsing buffer...`);
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(driveRes.data);
         
@@ -1739,11 +1753,19 @@ const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
 
 if (RENDER_EXTERNAL_URL) {
     setInterval(() => {
-        https.get(RENDER_EXTERNAL_URL, (res) => {
-            console.log(`[Keep-Alive] Pinged ${RENDER_EXTERNAL_URL} - Status: ${res.statusCode}`);
-        }).on('error', (err) => {
-            console.error(`[Keep-Alive] Ping failed: ${err.message}`);
-        });
+        try {
+            // Ensure URL starts with http to prevent protocol crash
+            const pingUrl = RENDER_EXTERNAL_URL.startsWith('http') ? RENDER_EXTERNAL_URL : `https://${RENDER_EXTERNAL_URL}`;
+            const client = pingUrl.startsWith('https') ? https : require('http');
+            
+            client.get(pingUrl, (res) => {
+                console.log(`[Keep-Alive] Pinged ${pingUrl} - Status: ${res.statusCode}`);
+            }).on('error', (err) => {
+                console.error(`[Keep-Alive] Ping failed: ${err.message}`);
+            });
+        } catch (pingErr) {
+            console.error(`[Keep-Alive] Critical Failure:`, pingErr.message);
+        }
     }, 14 * 60 * 1000); // 14 minutes
 } else {
     console.log("[Keep-Alive] RENDER_EXTERNAL_URL not found, self-pinging skipped.");
