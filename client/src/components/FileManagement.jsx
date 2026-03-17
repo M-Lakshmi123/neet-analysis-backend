@@ -24,7 +24,7 @@ import { logActivity } from '../utils/activityLogger';
 
 const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     // Permission: Only the Main Admin (Yenjarappa) can Upload/Download/Delete
-    const isMainAdmin = userData?.email === 'yenjarappa.s@varsitymgmt.com';
+    const isMainAdmin = userData?.email === 'yenjarappa.s@varsitymgmt.com' || (userData?.role || '').toLowerCase() === 'admin';
 
     const [activeCategory, setActiveCategory] = useState('schedules');
     const categories = [

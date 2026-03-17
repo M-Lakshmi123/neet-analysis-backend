@@ -44,7 +44,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     const isPrincipal = (userData?.role || '').toLowerCase() === 'principal';
     const isSuperAdmin = useAuth().currentUser?.email === 'yenjarappa.s@varsitymgmt.com';
 
-    if (isSuperAdmin || isAdmin || isPrincipal) {
+    if (isSuperAdmin || isAdmin || isCoAdmin || isPrincipal) {
         const testIdx = currentItems.findIndex(i => i.id === 'test_improvements');
         if (testIdx !== -1) {
             currentItems.splice(testIdx + 1, 0, {

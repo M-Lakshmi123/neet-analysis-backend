@@ -299,7 +299,7 @@ const Dashboard = () => {
             case 'file_management':
                 const isSuperAdminEmail = userData?.email === 'yenjarappa.s@varsitymgmt.com';
                 const isUserPrincipal = (userData?.role || '').toLowerCase() === 'principal';
-                const hasFileAccess = isSuperAdminEmail || isAdmin || isUserPrincipal;
+                const hasFileAccess = isSuperAdminEmail || isAdmin || isCoAdmin || isUserPrincipal;
 
                 return hasFileAccess ?
                     <FileManagement
