@@ -38,17 +38,16 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
 
-    // New Preview Features: Zoom, Pan
     const [zoom, setZoom] = useState(100);
-    const [panMode, setPanMode] = useState(false);
-    const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [isFullScreen, setIsFullScreen] = useState(false);
     
     // Excel Fast Preview
     const [excelData, setExcelData] = useState(null);
     const [excelLoading, setExcelLoading] = useState(false);
     const [previewMode, setPreviewMode] = useState('ms'); // 'ms' or 'fast'
-    const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
+    
+    // Stability States
+    const [isDragging, setIsDragging] = useState(false);
     const scrollContainerRef = useRef(null);
 
     useEffect(() => {
@@ -195,8 +194,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const openPreview = async (file) => {
         setPreviewFile(file);
         setZoom(100);
-        setPanMode(false);
-        setPanOffset({ x: 0, y: 0 });
         setIsFullScreen(false);
         setPreviewMode('ms');
         setExcelData(null);
@@ -221,26 +218,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         }
     };
 
-    const handlePanStart = (e) => {
-        if (!panMode || previewFile?.file_type !== 'pdf') return;
-        setIsDragging(true);
-        setLastPos({ x: e.clientX, y: e.clientY });
-    };
-
-    const handlePanMove = (e) => {
-        if (!isDragging || !panMode || !previewFile || previewFile.file_type !== 'pdf' || !scrollContainerRef.current) return;
-        const dx = e.clientX - lastPos.x;
-        const dy = e.clientY - lastPos.y;
-        
-        scrollContainerRef.current.scrollLeft -= dx;
-        scrollContainerRef.current.scrollTop -= dy;
-        
-        setLastPos({ x: e.clientX, y: e.clientY });
-    };
-
-    const handlePanEnd = () => {
-        setIsDragging(false);
-    };
+    const handlePanStart = (e) => {};
+    const handlePanMove = (e) => {};
+    const handlePanEnd = () => {};
 
     const getFileIcon = (type) => {
         switch (type) {
@@ -374,23 +354,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                         </button>
                                     </div>
 
-                                    {previewFile.file_type === 'pdf' && (
-                                        <>
-                                            <div className="toolbar-divider"></div>
-                                            <button 
-                                                onClick={() => setPanMode(!panMode)} 
-                                                className={`tool-btn ${panMode ? 'active' : ''}`}
-                                                title={panMode ? "Disable Hand Tool" : "Enable Hand Tool (Grab to Pan)"}
-                                            >
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={panMode ? 'fill-blue-500 text-white' : ''}>
-                                                    <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                                                    <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                                                    <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                                                    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
-                                                </svg>
-                                            </button>
-                                        </>
-                                    )}
 
                                     {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
                                         <>
@@ -437,14 +400,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                             </div>
                             
                             <div 
-                                className={`modal-content ${panMode ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
+                                className="modal-content"
                                 ref={scrollContainerRef}
-                                onMouseDown={handlePanStart}
-                                onMouseMove={handlePanMove}
-                                onMouseUp={handlePanEnd}
-                                onMouseLeave={handlePanEnd}
                                 style={{
-                                    overflow: previewFile.file_type === 'pdf' ? 'auto' : 'hidden',
+                                    overflow: 'auto',
                                     backgroundColor: previewFile.file_type === 'pdf' ? '#525659' : '#ffffff'
                                 }}
                             >
@@ -452,24 +411,18 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                      className="preview-wrap"
                                      style={{
                                          width: previewFile.file_type === 'pdf' ? `${zoom}%` : '100%',
-                                         height: previewFile.file_type === 'pdf' ? `${zoom}%` : '100%',
+                                         height: '100%',
                                          minHeight: '100%',
                                          margin: '0 auto',
-                                         position: 'relative',
-                                         transition: isDragging ? 'none' : 'width 0.2s ease-out, height 0.2s ease-out',
-                                         transform: 'none',
-                                         transformOrigin: 'top center'
+                                         position: 'relative'
                                      }}
                                  >
-                                     {/* Overlay to catch events when panning is ON */}
-                                     {panMode && previewFile.file_type === 'pdf' && <div className="panning-overlay"></div>}
 
                                      {previewFile.file_type === 'pdf' ? (
                                          <iframe 
-                                             src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0&navpanes=0&scrollbar=0`} 
+                                             src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`} 
                                              className="full-iframe" 
                                              title="PDF Preview"
-                                             style={{ pointerEvents: panMode ? 'none' : 'auto' }}
                                          />
                                      ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                          previewMode === 'ms' ? (
