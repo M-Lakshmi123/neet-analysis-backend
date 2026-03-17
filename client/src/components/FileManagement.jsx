@@ -420,14 +420,14 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
                                      {previewFile.file_type === 'pdf' ? (
                                          <iframe 
-                                             src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`} 
+                                             src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0&navpanes=0&scrollbar=0`} 
                                              className="full-iframe" 
                                              title="PDF Preview"
                                          />
                                      ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                          previewMode === 'ms' ? (
                                              <iframe 
-                                                 src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/e/${previewFile.id}?academicYear=${academicYear}`)}`} 
+                                                 src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(`${API_URL}/api/files/e/${previewFile.id}?academicYear=${academicYear}`)}&wdAllowInteractivity=True&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True`} 
                                                  className="full-iframe" 
                                                  style={{ background: 'white' }}
                                                  title="Excel Preview"
