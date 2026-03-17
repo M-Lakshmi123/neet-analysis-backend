@@ -229,11 +229,12 @@ app.get('/api/files/view/:id', async (req, res) => {
             (file.file_type === 'xls') ? 'application/vnd.ms-excel' :
                 'application/octet-stream';
 
+        const safeFileName = encodeURIComponent(file.original_name || 'file');
         res.setHeader('Content-Type', contentType);
         if (req.query.download === 'true') {
-            res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+            res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"; filename*=UTF-8''${safeFileName}`);
         } else {
-            res.setHeader('Content-Disposition', `inline; filename="${file.original_name}"`);
+            res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"; filename*=UTF-8''${safeFileName}`);
         }
 
         // 3. Stream directly from Google Drive to the Client
@@ -241,6 +242,11 @@ app.get('/api/files/view/:id', async (req, res) => {
             // Check if file exists in Drive before streaming
             const driveCheck = await drive.files.get({ fileId: driveId, fields: 'id, size' });
             console.log(`[Drive View] Found in Drive. Size: ${(driveCheck.data.size / (1024 * 1024)).toFixed(2)} MB`);
+
+            // Add Content-Length for viewers like Microsoft Office
+            if (driveCheck.data.size) {
+                res.setHeader('Content-Length', driveCheck.data.size);
+            }
 
             const driveRes = await drive.files.get(
                 { fileId: driveId, alt: 'media' },

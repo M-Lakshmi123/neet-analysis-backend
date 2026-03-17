@@ -290,7 +290,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                             <div className="modal-content">
                                  {previewFile.file_type === 'pdf' ? (
                                      <iframe 
-                                         src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0`} 
+                                         src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`} 
                                          className="full-iframe" 
                                          title="PDF Preview"
                                      />
