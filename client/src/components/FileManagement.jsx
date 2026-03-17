@@ -41,6 +41,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     // New Preview Features: Zoom, Pan
     const [zoom, setZoom] = useState(100);
     const [panMode, setPanMode] = useState(false);
+    const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
     const [isFullScreen, setIsFullScreen] = useState(false);
     
     // Panning State
@@ -67,6 +68,22 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         } catch (err) {
             console.error('Fetch error:', err);
             setFiles([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const sanitizeVault = async () => {
+        if (!window.confirm('This will rename all files in the database to remove commas and apostrophes to fix preview errors. Continue?')) return;
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/api/files/sanitize-vault?academicYear=${academicYear}`, { method: 'POST' });
+            if (response.ok) {
+                showStatus('success', 'Vault Sanitized! All files clickable now.');
+                fetchFiles();
+            }
+        } catch (err) {
+            showStatus('error', 'Cleanup failed');
         } finally {
             setLoading(false);
         }
@@ -177,22 +194,27 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         setPreviewFile(file);
         setZoom(100);
         setPanMode(false);
+        setPanOffset({ x: 0, y: 0 });
         setIsFullScreen(false);
         logActivity(userData, `Open Preview: ${file.original_name}`);
     };
 
     const handlePanStart = (e) => {
-        if (!panMode) return;
+        if (!panMode || previewFile?.file_type !== 'pdf') return;
         setIsDragging(true);
         setLastPos({ x: e.clientX, y: e.clientY });
     };
 
     const handlePanMove = (e) => {
-        if (!isDragging || !panMode || !scrollContainerRef.current) return;
+        if (!isDragging || !panMode || !previewFile || previewFile.file_type !== 'pdf') return;
         const dx = e.clientX - lastPos.x;
         const dy = e.clientY - lastPos.y;
-        scrollContainerRef.current.scrollLeft -= dx;
-        scrollContainerRef.current.scrollTop -= dy;
+        
+        setPanOffset(prev => ({
+            x: prev.x + dx,
+            y: prev.y + dy
+        }));
+        
         setLastPos({ x: e.clientX, y: e.clientY });
     };
 
@@ -234,10 +256,15 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                     </AnimatePresence>
 
                     {isMainAdmin && (
-                        <button className="upload-btn-compact" onClick={handleUpload} disabled={uploading}>
-                            {uploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
-                            {uploading ? 'UPLOADING...' : 'UPLOAD FILES'}
-                        </button>
+                        <>
+                            <button className="flat-btn-outline" onClick={sanitizeVault} title="Fix all comma/apostrophe errors in vault">
+                                <FileCode size={16} /> FIX NAMES
+                            </button>
+                            <button className="upload-btn-compact" onClick={handleUpload} disabled={uploading}>
+                                {uploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}
+                                {uploading ? 'UPLOADING...' : 'UPLOAD FILES'}
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -327,20 +354,23 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                         </button>
                                     </div>
 
-                                    <div className="toolbar-divider"></div>
-
-                                    <button 
-                                        onClick={() => setPanMode(!panMode)} 
-                                        className={`tool-btn ${panMode ? 'active' : ''}`}
-                                        title={panMode ? "Disable Hand Tool" : "Enable Hand Tool (Grab to Pan)"}
-                                    >
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={panMode ? 'fill-blue-500 text-white' : ''}>
-                                            <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                                            <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                                            <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-                                            <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
-                                        </svg>
-                                    </button>
+                                    {previewFile.file_type === 'pdf' && (
+                                        <>
+                                            <div className="toolbar-divider"></div>
+                                            <button 
+                                                onClick={() => setPanMode(!panMode)} 
+                                                className={`tool-btn ${panMode ? 'active' : ''}`}
+                                                title={panMode ? "Disable Hand Tool" : "Enable Hand Tool (Grab to Pan)"}
+                                            >
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={panMode ? 'fill-blue-500 text-white' : ''}>
+                                                    <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                                                    <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                                                    <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                                                    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                                                </svg>
+                                            </button>
+                                        </>
+                                    )}
 
                                     <div className="toolbar-divider"></div>
 
@@ -393,7 +423,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                          minHeight: '100%',
                                          margin: '0 auto',
                                          position: 'relative',
-                                         transition: isDragging ? 'none' : 'width 0.2s ease-out'
+                                         transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+                                         transform: (previewFile.file_type === 'pdf' && (panMode || zoom > 100)) ? `translate(${panOffset.x}px, ${panOffset.y}px)` : 'none',
+                                         transformOrigin: 'top center'
                                      }}
                                  >
                                      {/* Overlay to catch events when panning is ON */}
@@ -408,7 +440,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                          />
                                      ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                          <iframe 
-                                             src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/msview/${previewFile.id}/file.xlsx?academicYear=${academicYear}`)}`} 
+                                             src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/e/${previewFile.id}?academicYear=${academicYear}`)}`} 
                                              className="full-iframe" 
                                              style={{ background: 'white' }}
                                              title="Excel Preview"
@@ -520,21 +552,12 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .zoom-value { font-size: 10px; font-weight: 800; min-width: 40px; text-align: center; color: #1e293b; }
                 .file-badge-mini { font-size: 8px; font-weight: 900; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; color: #64748b; }
 
-                .cursor-grab { cursor: grab !important; }
+                 .cursor-grab { cursor: grab !important; }
                 .cursor-grabbing { cursor: grabbing !important; }
-                .panning-overlay { position: absolute; inset: 0; z-index: 50; }
+                .panning-overlay { position: absolute; inset: 0; z-index: 50; background: transparent; cursor: inherit; }
                 
-                .excel-preview-container { background: #e5e7eb; min-width: 100%; min-height: 100%; display: flex; flex-direction: column; overflow: auto; }
-                .excel-table-wrapper { padding: 20px; background: #e5e7eb; }
-                .excel-table { border-collapse: collapse; background: white; border: 1px solid #d1d5db; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-                .excel-table th { background: #f3f4f6; border: 1px solid #d1d5db; padding: 4px 10px; font-size: 11px; color: #4b5563; text-align: center; font-weight: normal; }
-                .excel-table td { font-family: 'Inter', system-ui, sans-serif; min-width: 60px; height: 24px; }
-                .row-num { background: #f3f4f6; color: #6b7280; font-size: 10px; text-align: center; border: 1px solid #d1d5db; }
-                .sticky-col { position: sticky; left: 0; z-index: 10; width: 30px; }
-                
-                .excel-meta-bar { display: flex; background: white; border-bottom: 1px solid #d1d5db; padding: 4px 20px; gap: 8px; position: sticky; top: 0; z-index: 20; }
-                .sheet-tab { padding: 4px 16px; font-size: 12px; font-weight: 600; color: #4b5563; border-bottom: 3px solid transparent; cursor: pointer; }
-                .sheet-tab.active { color: #172554; border-bottom-color: #172554; background: #f8fafc; }
+                .flat-btn-outline { border: 1px solid #172554; color: #172554; padding: 8px 14px; border-radius: 8px; font-size: 10px; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; background: transparent; }
+                .flat-btn-outline:hover { background: #f8fafc; }
             `}</style>
         </div>
     );

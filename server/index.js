@@ -240,40 +240,40 @@ app.get('/api/files/view/:id', async (req, res) => {
     }
 });
 
-/**
- * SPECIAL ROUTE FOR MS OFFICE VIEWER
- * Uses a path-based extension and hides problematic characters from the URL
- */
-app.get('/api/files/msview/:id/:safeName', async (req, res) => {
+app.get('/api/files/e/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
-
-        const [meta] = await pool.rawPool.query(
-            'SELECT filename, original_name, file_type FROM uploaded_files WHERE id = ?',
-            [id]
-        );
+        const [meta] = await pool.rawPool.query('SELECT filename FROM uploaded_files WHERE id = ?', [id]);
+        if (meta.length === 0) return res.status(404).send('No file');
         
-        if (meta.length === 0) return res.status(404).send('Not Found');
-
-        const file = meta[0];
-        const driveId = file.filename;
-        const contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-        // Set headers for MS Office
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `inline; filename="preview.xlsx"`);
-
-        const driveRes = await drive.files.get(
-            { fileId: driveId, alt: 'media' },
-            { responseType: 'stream' }
-        );
-
+        const driveId = meta[0].filename;
+        const driveRes = await drive.files.get({ fileId: driveId, alt: 'media' }, { responseType: 'stream' });
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'inline; filename="preview.xlsx"');
         driveRes.data.pipe(res);
     } catch (err) {
-        console.error('[MSView Error]', err);
         res.status(500).send('Error');
+    }
+});
+
+app.post('/api/files/sanitize-vault', async (req, res) => {
+    try {
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+        // Find all files with problematic characters
+        const [files] = await pool.rawPool.query("SELECT id, original_name FROM uploaded_files WHERE original_name LIKE '%,%' OR original_name LIKE \"%'%\"");
+        
+        for (const f of files) {
+            const clean = f.original_name.replace(/[,']/g, '');
+            await pool.rawPool.query("UPDATE uploaded_files SET original_name = ? WHERE id = ?", [clean, f.id]);
+        }
+        
+        res.json({ success: true, count: files.length });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to sanitize' });
     }
 });
 
