@@ -38,6 +38,16 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
 
+    // New Preview Features: Zoom, Pan
+    const [zoom, setZoom] = useState(100);
+    const [panMode, setPanMode] = useState(false);
+    const [isFullScreen, setIsFullScreen] = useState(false);
+    
+    // Panning State
+    const [isDragging, setIsDragging] = useState(false);
+    const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
+    const scrollContainerRef = useRef(null);
+
     useEffect(() => {
         fetchFiles();
     }, [academicYear, activeCategory]);
@@ -163,9 +173,31 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         }
     };
 
-    const openPreview = (file) => {
+    const openPreview = async (file) => {
         setPreviewFile(file);
+        setZoom(100);
+        setPanMode(false);
+        setIsFullScreen(false);
         logActivity(userData, `Open Preview: ${file.original_name}`);
+    };
+
+    const handlePanStart = (e) => {
+        if (!panMode) return;
+        setIsDragging(true);
+        setLastPos({ x: e.clientX, y: e.clientY });
+    };
+
+    const handlePanMove = (e) => {
+        if (!isDragging || !panMode || !scrollContainerRef.current) return;
+        const dx = e.clientX - lastPos.x;
+        const dy = e.clientY - lastPos.y;
+        scrollContainerRef.current.scrollLeft -= dx;
+        scrollContainerRef.current.scrollTop -= dy;
+        setLastPos({ x: e.clientX, y: e.clientY });
+    };
+
+    const handlePanEnd = () => {
+        setIsDragging(false);
     };
 
     const getFileIcon = (type) => {
@@ -227,7 +259,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                             <tr>
                                 <th className="w-12 text-center">MODE</th>
                                 <th>FILE NAME</th>
-                                <th className="w-48">UPLOAD DATE</th>
+                                {isMainAdmin && <th className="w-48">UPLOAD DATE</th>}
                                 <th className="w-32 text-right">ACTION</th>
                             </tr>
                         </thead>
@@ -236,7 +268,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                 <tr key={file.id} onClick={() => openPreview(file)}>
                                     <td className="text-center">{getFileIcon(file.file_type)}</td>
                                     <td><span className="file-name-text">{file.original_name}</span></td>
-                                    <td className="date-text">{new Date(file.upload_date).toLocaleString()}</td>
+                                    {isMainAdmin && <td className="date-text">{new Date(file.upload_date).toLocaleString()}</td>}
                                     <td className="text-right">
                                         <div className="flex items-center justify-end gap-3" onClick={e => e.stopPropagation()}>
                                             <button onClick={() => openPreview(file)} className="icon-link view" title="View Preview"><Eye size={16} /></button>
@@ -257,53 +289,134 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
             <AnimatePresence>
                 {previewFile && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="modal-overlay">
-                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="modal-body">
-                            <div className="modal-head">
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        exit={{ opacity: 0 }} 
+                        className={`modal-overlay ${isFullScreen ? 'immersive' : ''}`}
+                    >
+                        <motion.div 
+                            initial={{ scale: 0.95, opacity: 0 }} 
+                            animate={{ scale: 1, opacity: 1 }} 
+                            exit={{ scale: 0.95, opacity: 0 }} 
+                            className="modal-body"
+                        >
+                            <div className={`modal-head ${isFullScreen ? 'floating' : ''}`}>
                                 <div className="flex items-center gap-3">
                                     {getFileIcon(previewFile.file_type)}
                                     <h2 className="modal-title">{previewFile.original_name}</h2>
+                                    <span className="file-badge-mini">{previewFile.file_type.toUpperCase()}</span>
                                 </div>
+                                
+                                <div className="preview-toolbar">
+                                    <div className="toolbar-section">
+                                        <button 
+                                            onClick={() => setZoom(prev => Math.max(50, prev - 25))} 
+                                            className="tool-btn" 
+                                            title="Zoom Out"
+                                        >
+                                            <Search size={14} className="scale-x-[-1]" />-
+                                        </button>
+                                        <span className="zoom-value">{zoom}%</span>
+                                        <button 
+                                            onClick={() => setZoom(prev => Math.min(400, prev + 25))} 
+                                            className="tool-btn" 
+                                            title="Zoom In"
+                                        >
+                                            <Search size={14} />+
+                                        </button>
+                                    </div>
+
+                                    <div className="toolbar-divider"></div>
+
+                                    <button 
+                                        onClick={() => setPanMode(!panMode)} 
+                                        className={`tool-btn ${panMode ? 'active' : ''}`}
+                                        title={panMode ? "Disable Hand Tool" : "Enable Hand Tool (Grab to Pan)"}
+                                    >
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={panMode ? 'fill-blue-500 text-white' : ''}>
+                                            <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                                            <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                                            <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+                                            <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                                        </svg>
+                                    </button>
+
+                                    <div className="toolbar-divider"></div>
+
+                                    <button 
+                                        onClick={() => setIsFullScreen(!isFullScreen)} 
+                                        className={`tool-btn ${isFullScreen ? 'active' : ''}`}
+                                        title={isFullScreen ? "Exit Full View" : "Full View Mode"}
+                                    >
+                                        <Maximize2 size={16} />
+                                    </button>
+                                </div>
+
                                 <div className="flex items-center gap-2">
                                      {isMainAdmin && (
-                                         <a href={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&download=true`} className="modal-action-btn" download title="Download"><Download size={18} /></a>
+                                          <a href={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&download=true`} className="modal-action-btn" download title="Download"><Download size={18} /></a>
                                      )}
-                                     <a href={`https://drive.google.com/file/d/${previewFile.filename}/view?usp=sharing`} target="_blank" rel="noopener noreferrer" className="modal-action-btn" title="Open Original in New Tab">
-                                         <Eye size={18} />
-                                     </a>
                                      <button 
                                          onClick={() => {
                                              const url = previewFile.file_type === 'pdf' 
                                                  ? `${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}` 
                                                  : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&ext=.xlsx`)}`;
                                              window.open(url, '_blank');
-                                             logActivity(userData, `Full Screen Preview: ${previewFile.original_name}`);
                                          }} 
                                          className="modal-action-btn" 
-                                         title="Full Screen / Zoom"
+                                         title="Open in New Tab"
                                      >
-                                         <Maximize2 size={18} />
+                                         <Eye size={18} />
                                      </button>
                                      <button onClick={() => setPreviewFile(null)} className="modal-close-btn-top"><X size={20} /></button>
                                 </div>
                             </div>
-                            <div className="modal-content">
-                                 {previewFile.file_type === 'pdf' ? (
-                                     <iframe 
-                                         src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`} 
-                                         className="full-iframe" 
-                                         title="PDF Preview"
-                                     />
-                                 ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
-                                     <iframe 
-                                         src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&ext=.xlsx`)}`} 
-                                         className="full-iframe" 
-                                         style={{ background: 'white' }}
-                                         title="Excel Preview"
-                                     />
-                                 ) : (
-                                     <div className="loading-state">Preview not supported for this file type.</div>
-                                 )}
+                            
+                            <div 
+                                className={`modal-content ${panMode ? 'cursor-grab' : ''} ${isDragging ? 'cursor-grabbing' : ''}`}
+                                ref={scrollContainerRef}
+                                onMouseDown={handlePanStart}
+                                onMouseMove={handlePanMove}
+                                onMouseUp={handlePanEnd}
+                                onMouseLeave={handlePanEnd}
+                                style={{
+                                    overflow: (zoom > 100 || panMode) ? 'auto' : 'hidden',
+                                    backgroundColor: previewFile.file_type === 'pdf' ? '#525659' : '#ffffff'
+                                }}
+                            >
+                                 <div 
+                                     className="preview-wrap"
+                                     style={{
+                                         width: previewFile.file_type === 'pdf' ? `${zoom}%` : '100%',
+                                         height: (previewFile.file_type === 'pdf' && zoom === 100) ? '100%' : 'auto',
+                                         minHeight: '100%',
+                                         margin: '0 auto',
+                                         position: 'relative',
+                                         transition: isDragging ? 'none' : 'width 0.2s ease-out'
+                                     }}
+                                 >
+                                     {/* Overlay to catch events when panning is ON */}
+                                     {panMode && previewFile.file_type === 'pdf' && <div className="panning-overlay"></div>}
+
+                                     {previewFile.file_type === 'pdf' ? (
+                                         <iframe 
+                                             src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0&navpanes=0&scrollbar=0`} 
+                                             className="full-iframe" 
+                                             title="PDF Preview"
+                                             style={{ pointerEvents: panMode ? 'none' : 'auto' }}
+                                         />
+                                     ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
+                                         <iframe 
+                                             src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/msview/${previewFile.id}/file.xlsx?academicYear=${academicYear}`)}`} 
+                                             className="full-iframe" 
+                                             style={{ background: 'white' }}
+                                             title="Excel Preview"
+                                         />
+                                     ) : (
+                                         <div className="loading-state">Preview not supported for this file type.</div>
+                                     )}
+                                 </div>
                              </div>
                         </motion.div>
                     </motion.div>
@@ -341,7 +454,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
                 /* CRITICAL: Increased z-index to 9999 to cover global Logout/Header */
                 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 0px; }
-                .modal-body { width: 100%; height: 100%; background: white; display: flex; flex-direction: column; overflow: hidden; }
+                .modal-body { width: 100%; height: 100%; background: white; display: flex; flex-direction: column; overflow: hidden; position: relative; }
                 .modal-head { padding: 10px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
                 .modal-title { font-size: 13px; font-weight: 900; color: #1e293b; }
                 .modal-content { flex: 1; background: #f1f5f9; overflow: hidden; }
@@ -354,8 +467,74 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
                 .flex { display: flex; }
                 .items-center { align-items: center; }
+                .gap-2 { gap: 8px; }
                 .gap-3 { gap: 12px; }
                 .gap-4 { gap: 16px; }
+
+                /* Immersive Modal Styles */
+                .modal-overlay.immersive { background: #1a1a1a; padding: 0; }
+                .modal-head.floating { 
+                    position: absolute; 
+                    top: 10px; 
+                    left: 20px; 
+                    right: 20px; 
+                    z-index: 100; 
+                    background: rgba(255, 255, 255, 0.9); 
+                    backdrop-filter: blur(10px); 
+                    border-radius: 12px; 
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+                    border: 1px solid rgba(255,255,255,0.3);
+                    opacity: 0.1;
+                    transition: opacity 0.3s ease;
+                }
+                .modal-head.floating:hover { opacity: 1; }
+                
+                .preview-toolbar {
+                    display: flex;
+                    align-items: center;
+                    background: #f1f5f9;
+                    border-radius: 8px;
+                    padding: 2px 8px;
+                    gap: 4px;
+                }
+                .toolbar-section { border: none; display: flex; align-items: center; gap: 4px; }
+                .toolbar-divider { width: 1px; height: 16px; background: #cbd5e1; margin: 0 8px; }
+                
+                .tool-btn {
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: none;
+                    background: transparent;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    color: #475569;
+                    transition: all 0.2s;
+                    font-weight: bold;
+                }
+                .tool-btn:hover { background: #e2e8f0; color: #1e293b; }
+                .tool-btn.active { background: #172554; color: white; }
+                
+                .zoom-value { font-size: 10px; font-weight: 800; min-width: 40px; text-align: center; color: #1e293b; }
+                .file-badge-mini { font-size: 8px; font-weight: 900; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; color: #64748b; }
+
+                .cursor-grab { cursor: grab !important; }
+                .cursor-grabbing { cursor: grabbing !important; }
+                .panning-overlay { position: absolute; inset: 0; z-index: 50; }
+                
+                .excel-preview-container { background: #e5e7eb; min-width: 100%; min-height: 100%; display: flex; flex-direction: column; overflow: auto; }
+                .excel-table-wrapper { padding: 20px; background: #e5e7eb; }
+                .excel-table { border-collapse: collapse; background: white; border: 1px solid #d1d5db; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+                .excel-table th { background: #f3f4f6; border: 1px solid #d1d5db; padding: 4px 10px; font-size: 11px; color: #4b5563; text-align: center; font-weight: normal; }
+                .excel-table td { font-family: 'Inter', system-ui, sans-serif; min-width: 60px; height: 24px; }
+                .row-num { background: #f3f4f6; color: #6b7280; font-size: 10px; text-align: center; border: 1px solid #d1d5db; }
+                .sticky-col { position: sticky; left: 0; z-index: 10; width: 30px; }
+                
+                .excel-meta-bar { display: flex; background: white; border-bottom: 1px solid #d1d5db; padding: 4px 20px; gap: 8px; position: sticky; top: 0; z-index: 20; }
+                .sheet-tab { padding: 4px 16px; font-size: 12px; font-weight: 600; color: #4b5563; border-bottom: 3px solid transparent; cursor: pointer; }
+                .sheet-tab.active { color: #172554; border-bottom-color: #172554; background: #f8fafc; }
             `}</style>
         </div>
     );

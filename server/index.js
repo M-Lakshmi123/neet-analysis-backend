@@ -145,9 +145,12 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 }
 
                 // 3. Insert metadata into TiDB (using 'filename' column to store the Drive ID)
+                // Sanitizing original_name for database and MS Office compatibility
+                const sanitizedOriginalName = file.originalname.replace(/[,']/g, '');
+                
                 await pool.rawPool.query(
                     "INSERT INTO uploaded_files (filename, original_name, category, file_type) VALUES (?, ?, ?, ?)",
-                    [driveId, file.originalname, category || 'schedules', fileType]
+                    [driveId, sanitizedOriginalName, category || 'schedules', fileType]
                 );
 
                 successCount++;
@@ -203,33 +206,27 @@ app.get('/api/files', async (req, res) => {
 });
 
 app.get('/api/files/view/:id', async (req, res) => {
+    // ... same as before but uses a separate wrapper for clean logic if needed
+    // Actually we keep this for direct view/download
     try {
         const { id } = req.params;
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
-        // 1. Get metadata (filename = Google Drive ID)
-        const [meta] = await pool.rawPool.query(
-            'SELECT filename, original_name, file_type FROM uploaded_files WHERE id = ?',
-            [id]
-        );
-        
-        if (meta.length === 0) {
-            console.warn(`[Drive View] File ID ${id} not found in DB for year ${year}`);
-            return res.status(404).json({ error: 'File matching this ID was not found in our database records.' });
-        }
+        const [meta] = await pool.rawPool.query('SELECT filename, original_name, file_type FROM uploaded_files WHERE id = ?', [id]);
+        if (meta.length === 0) return res.status(404).json({ error: 'File not found' });
 
         const file = meta[0];
-        const driveId = file.filename;
-        
-        console.log(`[Drive View] Requesting file ${file.original_name} (Drive ID: ${driveId}) from year ${year}`);
-
         const contentType = file.file_type === 'pdf' ? 'application/pdf' :
-            (file.file_type === 'xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
-            (file.file_type === 'xls') ? 'application/vnd.ms-excel' :
-                'application/octet-stream';
+            (file.file_type === 'xlsx' || file.file_type === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+            'application/octet-stream';
 
         const safeFileName = encodeURIComponent(file.original_name || 'file');
+        
+        // STREAM LOGIC
+        const driveId = file.filename;
+        const driveRes = await drive.files.get({ fileId: driveId, alt: 'media' }, { responseType: 'stream' });
+
         res.setHeader('Content-Type', contentType);
         if (req.query.download === 'true') {
             res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"; filename*=UTF-8''${safeFileName}`);
@@ -237,40 +234,46 @@ app.get('/api/files/view/:id', async (req, res) => {
             res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"; filename*=UTF-8''${safeFileName}`);
         }
 
-        // 3. Stream directly from Google Drive to the Client
-        try {
-            // Check if file exists in Drive before streaming
-            const driveCheck = await drive.files.get({ fileId: driveId, fields: 'id, size' });
-            console.log(`[Drive View] Found in Drive. Size: ${(driveCheck.data.size / (1024 * 1024)).toFixed(2)} MB`);
-
-            // Add Content-Length for viewers like Microsoft Office
-            if (driveCheck.data.size) {
-                res.setHeader('Content-Length', driveCheck.data.size);
-            }
-
-            const driveRes = await drive.files.get(
-                { fileId: driveId, alt: 'media' },
-                { responseType: 'stream' }
-            );
-
-            driveRes.data
-                .on('error', err => {
-                    console.error('[Drive View] Streaming Error:', err.message);
-                    if (!res.headersSent) res.status(500).send('Error streaming file - persistent network issue');
-                })
-                .pipe(res);
-
-        } catch (driveErr) {
-            console.error(`[Drive View] Google Drive Error for ID ${driveId}:`, driveErr.message);
-            if (driveErr.code === 404) {
-                return res.status(404).json({ error: 'File found in database but missing from Google Drive storage.' });
-            }
-            throw driveErr;
-        }
-
+        driveRes.data.pipe(res);
     } catch (err) {
-        console.error('[Drive View] FATAL ERROR:', err);
-        if (!res.headersSent) res.status(500).json({ error: 'System error retrieving file', details: err.message });
+        res.status(500).json({ error: 'Failed' });
+    }
+});
+
+/**
+ * SPECIAL ROUTE FOR MS OFFICE VIEWER
+ * Uses a path-based extension and hides problematic characters from the URL
+ */
+app.get('/api/files/msview/:id/:safeName', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+
+        const [meta] = await pool.rawPool.query(
+            'SELECT filename, original_name, file_type FROM uploaded_files WHERE id = ?',
+            [id]
+        );
+        
+        if (meta.length === 0) return res.status(404).send('Not Found');
+
+        const file = meta[0];
+        const driveId = file.filename;
+        const contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+        // Set headers for MS Office
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="preview.xlsx"`);
+
+        const driveRes = await drive.files.get(
+            { fileId: driveId, alt: 'media' },
+            { responseType: 'stream' }
+        );
+
+        driveRes.data.pipe(res);
+    } catch (err) {
+        console.error('[MSView Error]', err);
+        res.status(500).send('Error');
     }
 });
 
@@ -300,6 +303,12 @@ app.get('/api/files/excel-preview-data/:id', async (req, res) => {
         const worksheet = workbook.worksheets[0];
         const previewRows = [];
         
+        // Capture Column Widths
+        const columnWidths = [];
+        worksheet.columns?.forEach((col, i) => {
+            columnWidths.push(col.width || 10);
+        });
+
         // Limit to 500 rows for instant preview
         worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
             if (rowNumber <= 500) {
@@ -315,11 +324,15 @@ app.get('/api/files/excel-preview-data/:id', async (req, res) => {
 
                     const style = {};
                     if (cell.fill && cell.fill.fgColor && cell.fill.fgColor.argb) {
-                        style.bg = cell.fill.fgColor.argb.substring(2); // Remove Alpha
+                        style.bg = cell.fill.fgColor.argb.substring(2);
                     }
                     if (cell.font) {
                         if (cell.font.color && cell.font.color.argb) style.fg = cell.font.color.argb.substring(2);
                         if (cell.font.bold) style.bold = true;
+                        if (cell.font.size) style.fontSize = cell.font.size;
+                    }
+                    if (cell.alignment) {
+                        style.align = cell.alignment.horizontal || 'left';
                     }
 
                     cellData.push({ value: val === null || val === undefined ? '' : String(val), style });
@@ -330,6 +343,7 @@ app.get('/api/files/excel-preview-data/:id', async (req, res) => {
 
         res.json({
             rows: previewRows,
+            columnWidths,
             sheetName: worksheet.name,
             sheetNames: workbook.worksheets.map(w => w.name),
             totalRows: worksheet.rowCount
