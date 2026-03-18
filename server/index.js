@@ -294,7 +294,23 @@ app.post('/api/files/sanitize-vault', async (req, res) => {
             await pool.rawPool.query("UPDATE uploaded_files SET original_name = ? WHERE id = ?", [clean, f.id]);
         }
         
-        res.json({ success: true, count: files.length, schemaUpdated: true });
+        // Populate missing sizes from Google Drive
+        const [sizeFiles] = await pool.rawPool.query("SELECT id, filename FROM uploaded_files WHERE size = 0 OR size IS NULL");
+        let sizeUpdated = 0;
+        for (const sf of sizeFiles) {
+            try {
+                const driveMeta = await drive.files.get({ fileId: sf.filename, fields: 'size' });
+                const s = parseInt(driveMeta.data.size || 0);
+                if (s > 0) {
+                    await pool.rawPool.query("UPDATE uploaded_files SET size = ? WHERE id = ?", [s, sf.id]);
+                    sizeUpdated++;
+                }
+            } catch (e) {
+                console.error(`[SchemaUpdate] Size sync failed for ${sf.filename}:`, e.message);
+            }
+        }
+        
+        res.json({ success: true, count: files.length, sizesSynced: sizeUpdated });
     } catch (err) {
         console.error(`[SanitizeVault][${req.query.academicYear}] ERROR:`, err);
         res.status(500).json({ error: 'Failed to sanitize vault' });

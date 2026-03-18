@@ -401,9 +401,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                           />
                                       ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                           <iframe 
-                                              src={(previewFile.size || 0) > 25 * 1000 * 1000 
-                                                  ? `https://docs.google.com/viewer?url=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}&embedded=true`
-                                                  : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}&action=embedview&wdHideSheetTabs=0&wdAllowInteractivity=1&wdHideHeaders=1`
+                                              src={Number(previewFile.size || 0) > 24 * 1024 * 1024 
+                                                  ? `https://drive.google.com/file/d/${previewFile.filename}/preview`
+                                                  : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&_t=${Date.now()}`)}&action=embedview&wdHideSheetTabs=0&wdAllowInteractivity=1&wdHideHeaders=1`
                                               } 
                                               className="full-iframe" 
                                               title="Excel Preview"
