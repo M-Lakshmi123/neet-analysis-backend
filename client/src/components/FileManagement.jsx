@@ -401,7 +401,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                           />
                                       ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                           <iframe 
-                                              src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}`} 
+                                              src={(previewFile.size || 0) > 25 * 1000 * 1000 
+                                                  ? `https://docs.google.com/viewer?url=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}&embedded=true`
+                                                  : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}&action=embedview&wdHideSheetTabs=0&wdAllowInteractivity=1&wdHideHeaders=1`
+                                              } 
                                               className="full-iframe" 
                                               title="Excel Preview"
                                               frameBorder="0"
@@ -418,12 +421,12 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
             <style jsx>{`
                 .file-mgmt-clean { padding: 0; }
-                .top-control-row { display: flex; justify-content: space-between; align-items: center; background: white; padding: 10px 20px; border-radius: 12px; margin-bottom: 16px; border: 1px solid #e2e8f0; }
-                .button-group-flat { display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid #f1f5f9; }
-                .flat-btn { padding: 8px 14px; font-size: 10px; font-weight: 800; color: #64748b; border: none; background: transparent; border-radius: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+                .top-control-row { display: flex; justify-content: space-between; align-items: center; background: white; padding: 6px 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #e2e8f0; min-height: fit-content; }
+                .button-group-flat { display: flex; align-items: center; gap: 4px; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid #f1f5f9; height: fit-content; }
+                .flat-btn { padding: 6px 12px; font-size: 10px; font-weight: 800; color: #64748b; border: none; background: transparent; border-radius: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
                 .flat-btn.active { background: #172554; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                .v-divider { width: 1px; height: 166px; background: #cbd5e1; margin: 0 4px; }
-                .upload-btn-compact { background: #172554; color: white; padding: 8px 18px; border-radius: 8px; border: none; font-size: 10px; font-weight: 900; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; }
+                .v-divider { width: 1px; height: 16px; background: #cbd5e1; margin: 0 4px; }
+                .upload-btn-compact { background: #172554; color: white; padding: 6px 14px; border-radius: 8px; border: none; font-size: 10px; font-weight: 900; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; }
                 .upload-btn-compact:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
                 
                 .inline-feedback { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 6px 12px; border-radius: 6px; }
@@ -431,10 +434,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .inline-feedback.error { color: #dc2626; border: 1px solid #fee2e2; background: #fef2f2; }
                 .inline-feedback.loading { color: #0f172a; border: 1px solid #e2e8f0; background: #f8fafc; }
 
-                .compact-table-container { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
-                .clean-table { width: 100%; border-collapse: collapse; }
-                .clean-table th { text-align: left; padding: 12px 20px; background: #f8fafc; font-size: 9px; font-weight: 800; color: #94a3b8; border-bottom: 2px solid #f1f5f9; text-transform: uppercase; letter-spacing: 0.05em; }
-                .clean-table td { padding: 12px 20px; border-bottom: 1px solid #f8fafc; cursor: pointer; }
+                .compact-table-container { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); font-family: Arial, sans-serif; }
+                .clean-table { width: 100%; border-collapse: collapse; font-family: Arial, Helvetica, sans-serif; }
+                .clean-table th { text-align: left; padding: 10px 20px; background: #f8fafc; font-size: 9px; font-weight: 800; color: #94a3b8; border-bottom: 2px solid #f1f5f9; text-transform: uppercase; letter-spacing: 0.05em; font-family: Arial, sans-serif; }
+                .clean-table td { padding: 10px 20px; border-bottom: 1px solid #f8fafc; cursor: pointer; font-family: Arial, sans-serif; }
                 .clean-table tr:hover td { background: #f8fafc; }
                 .file-name-text { font-weight: 700; color: #1e293b; font-size: 12px; }
                 .date-text { font-size: 10px; color: #94a3b8; font-weight: 600; }
@@ -446,10 +449,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .icon-link.delete:hover { color: #ef4444; }
 
                 /* CRITICAL: Increased z-index to 9999 to cover global Logout/Header */
-                .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 0px; }
-                .modal-body { width: 100%; height: 100%; background: white; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-                .modal-head { padding: 10px 24px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
-                .modal-title { font-size: 13px; font-weight: 900; color: #1e293b; }
+                .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.98); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 0px; }
+                .modal-body { width: 100vw; height: 100vh; background: white; display: flex; flex-direction: column; overflow: hidden; position: relative; border-radius: 0; }
+                .modal-head { padding: 6px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
+                .modal-title { font-size: 11px; font-weight: 800; color: #0f172a; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .modal-content { flex: 1; background: #f1f5f9; overflow: hidden; }
                 .full-iframe { width: 100%; height: 100%; border: none; }
                 .loading-state { height: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-weight: 800; font-size: 11px; text-transform: uppercase; }
@@ -485,6 +488,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 
                 .zoom-value { font-size: 10px; font-weight: 800; min-width: 40px; text-align: center; color: #1e293b; }
                 .file-badge-mini { font-size: 8px; font-weight: 900; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; color: #64748b; }
+                
+                .flat-btn-outline { border: 1px solid #172554; color: #172554; padding: 6px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; background: transparent; }
+                .flat-btn-outline:hover { background: #f8fafc; }
             `}</style>
         </div>
     );

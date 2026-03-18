@@ -151,8 +151,8 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 const sanitizedOriginalName = file.originalname.replace(/[,']/g, '');
                 
                 await pool.rawPool.query(
-                    "INSERT INTO uploaded_files (filename, original_name, category, file_type) VALUES (?, ?, ?, ?)",
-                    [driveId, sanitizedOriginalName, category || 'schedules', fileType]
+                    "INSERT INTO uploaded_files (filename, original_name, category, file_type, size) VALUES (?, ?, ?, ?, ?)",
+                    [driveId, sanitizedOriginalName, category || 'schedules', fileType, file.size]
                 );
 
                 successCount++;
@@ -188,7 +188,7 @@ app.get('/api/files', async (req, res) => {
         const pool = await connectToDb(year);
         const { category } = req.query;
 
-        let query = 'SELECT id, filename, original_name, category, file_type, upload_date FROM uploaded_files';
+        let query = 'SELECT id, filename, original_name, category, file_type, upload_date, size FROM uploaded_files';
         const params = [];
 
         if (category) {
@@ -267,6 +267,15 @@ app.post('/api/files/sanitize-vault', async (req, res) => {
     try {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
+        
+        // Ensure 'size' column exists (Self-healing schema)
+        try {
+            await pool.rawPool.query("ALTER TABLE uploaded_files ADD COLUMN size BIGINT DEFAULT 0");
+            console.log(`[SchemaUpdate][${year}] Added 'size' column to uploaded_files.`);
+        } catch (err) {
+            // Probably already exists
+        }
+
         // Find all files with problematic characters
         const [files] = await pool.rawPool.query("SELECT id, original_name FROM uploaded_files WHERE original_name LIKE '%,%' OR original_name LIKE \"%'%\"");
         
@@ -275,9 +284,10 @@ app.post('/api/files/sanitize-vault', async (req, res) => {
             await pool.rawPool.query("UPDATE uploaded_files SET original_name = ? WHERE id = ?", [clean, f.id]);
         }
         
-        res.json({ success: true, count: files.length });
+        res.json({ success: true, count: files.length, schemaUpdated: true });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to sanitize' });
+        console.error(`[SanitizeVault][${req.query.academicYear}] ERROR:`, err);
+        res.status(500).json({ error: 'Failed to sanitize vault' });
     }
 });
 
