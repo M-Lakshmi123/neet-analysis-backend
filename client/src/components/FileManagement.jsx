@@ -41,10 +41,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [zoom, setZoom] = useState(100);
     const [isFullScreen, setIsFullScreen] = useState(false);
     
-    // Excel Fast Preview
-    const [excelData, setExcelData] = useState(null);
-    const [excelLoading, setExcelLoading] = useState(false);
-    const [previewMode, setPreviewMode] = useState('ms'); // 'ms' or 'fast'
+    // Excel Original View
+    const [tabData, setTabData] = useState(null); // MULTI-SHEET HTML VIEW
+    const [currentSheet, setCurrentSheet] = useState('');
+    const [loadingTabs, setLoadingTabs] = useState(false);
     
     // Stability States
     const [isDragging, setIsDragging] = useState(false);
@@ -195,41 +195,37 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         setPreviewFile(file);
         setZoom(100);
         setIsFullScreen(false);
-        setPreviewMode('google');
-        setExcelData(null);
+        setTabData(null);
         
-        // Auto-fetch fast data always for fallback
         if (file.file_type === 'xlsx' || file.file_type === 'xls') {
-            fetchExcelData(file.id);
+            fetchExcelTabs(file.id);
         }
         
         logActivity(userData, `Open Preview: ${file.original_name}`);
     };
 
+    const fetchExcelTabs = async (id) => {
+        setLoadingTabs(true);
+        try {
+            const response = await fetch(`${API_URL}/api/files/excel-tabs/${id}?academicYear=${academicYear}`);
+            const data = await response.json();
+            if (response.ok) {
+                setTabData(data);
+                setCurrentSheet(data.sheetNames?.[0] || '');
+            }
+        } catch (err) {
+            console.error('Tabs fetch failed:', err);
+        } finally {
+            setLoadingTabs(false);
+        }
+    };
+
     const reloadPreview = () => {
         const current = previewFile;
         setPreviewFile(null);
-        setTimeout(() => setPreviewFile(current), 50);
-    };
-
-    const fetchExcelData = async (id) => {
-        setExcelLoading(true);
-        setExcelData(null);
-        try {
-            const response = await fetch(`${API_URL}/api/files/excel-preview-data/${id}?academicYear=${academicYear}`);
-            const data = await response.json();
-            
-            if (!response.ok) {
-                setExcelData({ error: data.error || 'Failed to load preview' });
-            } else {
-                setExcelData(data);
-            }
-        } catch (err) {
-            console.error('Fast view failed:', err);
-            setExcelData({ error: 'Network error or server timeout. This file might be too large for internal parsing.' });
-        } finally {
-            setExcelLoading(false);
-        }
+        setTimeout(() => {
+            setPreviewFile(current);
+        }, 50);
     };
 
     const handlePanStart = (e) => {};
@@ -372,18 +368,19 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                      {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
                                          <>
                                              <div className="toolbar-divider"></div>
-                                             <button 
-                                                 onClick={() => {
-                                                     const modes = ['google', 'ms', 'fast'];
-                                                     const next = modes[(modes.indexOf(previewMode) + 1) % modes.length];
-                                                     setPreviewMode(next);
-                                                 }} 
-                                                 className={`tool-btn-wide ${previewMode !== 'google' ? 'active' : ''}`}
-                                                 title="Google View (Best), MS View (25MB limit), or Fast Table"
-                                             >
-                                                 {previewMode === 'google' ? 'GOOGLE DRIVE VIEW' : previewMode === 'ms' ? 'OFFICE VIEW' : 'FAST TABLE VIEW'}
-                                             </button>
-                                             <button onClick={reloadPreview} className="tool-btn" title="Reload Preview if Stuck">
+                                             <div className="tab-switcher-simple">
+                                                 {tabData?.sheetNames?.map(name => (
+                                                     <button 
+                                                         key={name} 
+                                                         onClick={() => setCurrentSheet(name)}
+                                                         className={`mini-tab ${currentSheet === name ? 'active' : ''}`}
+                                                     >
+                                                         {name}
+                                                     </button>
+                                                 ))}
+                                             </div>
+                                             <div className="toolbar-divider"></div>
+                                             <button onClick={reloadPreview} className="tool-btn" title="Reload if Stuck">
                                                   <Loader2 size={14} />
                                              </button>
                                          </>
@@ -445,85 +442,30 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                               title="PDF Preview"
                                           />
                                       ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
-                                          previewMode === 'google' ? (
-                                              <iframe 
-                                                  src={`https://docs.google.com/viewer?srcid=${previewFile.filename}&pid=explorer&efp=${previewFile.filename}&a=v&chrome=false&embedded=true`} 
-                                                  className="full-iframe" 
-                                                  style={{ background: 'white' }}
-                                                  title="Google Drive Preview"
-                                              />
-                                          ) : previewMode === 'ms' ? (
-                                              <iframe 
-                                                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(`${API_URL}/api/files/e/${previewFile.id}?academicYear=${academicYear}`)}&wdAllowInteractivity=True&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True`} 
-                                                  className="full-iframe" 
-                                                  style={{ background: 'white' }}
-                                                  title="Excel Preview"
-                                                  onError={() => setPreviewMode('google')}
-                                              />
-                                          ) : (
-                                              <div className="excel-preview-container">
-                                                  {excelLoading ? (
-                                                      <div className="p-12 text-center text-slate-400">
-                                                          <Loader2 className="animate-spin mx-auto mb-2" size={24} />
-                                                          <p className="text-[10px] uppercase font-bold tracking-widest">Building Table Layout...</p>
-                                                      </div>
-                                                  ) : excelData?.error ? (
-                                                      <div className="p-12 text-center">
-                                                          <AlertCircle className="mx-auto mb-2 text-amber-500" size={32} />
-                                                          <p className="text-sm font-bold text-slate-600 mb-2">{excelData.error}</p>
-                                                          <button onClick={() => setPreviewMode('google')} className="px-4 py-2 bg-slate-800 text-white rounded text-xs font-bold">TRY GOOGLE DRIVE VIEW</button>
-                                                      </div>
-                                                  ) : excelData ? (
-                                                      <div className="excel-table-wrapper">
-                                                          <table className="excel-table">
-                                                              <thead>
-                                                                  <tr>
-                                                                      <th className="sticky-col row-num">#</th>
-                                                                      {Array.from({ length: excelData.rows?.[0]?.length || 10 }).map((_, i) => (
-                                                                          <th key={i} style={{ width: (excelData.columnWidths?.[i] * 8) || 120 }}>
-                                                                              {String.fromCharCode(65 + (i % 26))}{i >= 26 ? Math.floor(i / 26) : ''}
-                                                                          </th>
-                                                                      ))}
-                                                                  </tr>
-                                                              </thead>
-                                                              <tbody>
-                                                                  {excelData.rows?.map((row, rid) => (
-                                                                      <tr key={rid}>
-                                                                          <td className="sticky-col row-num">{rid + 1}</td>
-                                                                          {row.map((cell, cid) => (
-                                                                              <td key={cid} style={{ 
-                                                                                  backgroundColor: cell.style?.bg ? `#${cell.style.bg}` : 'white',
-                                                                                  color: cell.style?.fg ? `#${cell.style.fg}` : 'inherit',
-                                                                                  fontWeight: cell.style?.bold ? 'bold' : 'normal',
-                                                                                  fontSize: cell.style?.fontSize ? `${cell.style.fontSize}px` : '11px',
-                                                                                  textAlign: cell.style?.align || 'left',
-                                                                                  padding: '2px 8px',
-                                                                                  border: '0.5px solid #e2e8f0',
-                                                                                  whiteSpace: 'nowrap'
-                                                                              }}>
-                                                                                  {cell.value}
-                                                                              </td>
-                                                                          ))}
-                                                                      </tr>
-                                                                  ))}
-                                                              </tbody>
-                                                          </table>
-                                                          {excelData.totalRows > 500 && (
-                                                              <div className="p-4 text-center text-slate-400 text-[10px] font-bold">
-                                                                  LIMIT REACHED: Showing first 500 of {excelData.totalRows} rows. Use Download for full file.
-                                                              </div>
-                                                          )}
-                                                      </div>
-                                                  ) : (
-                                                       <div className="p-12 text-center">Could not parse data.</div>
-                                                  )}
-                                              </div>
-                                          )
+                                          <div className="premium-excel-viewer">
+                                              {loadingTabs ? (
+                                                  <div className="p-12 text-center text-slate-400">
+                                                      <Loader2 className="animate-spin mx-auto mb-2" size={24} />
+                                                      <p className="text-[10px] uppercase font-bold tracking-widest text-[#172554]">Generating Original View...</p>
+                                                  </div>
+                                              ) : tabData ? (
+                                                  <div 
+                                                      className="html-excel-content" 
+                                                      dangerouslySetInnerHTML={{ __html: tabData.sheets[currentSheet] }}
+                                                  />
+                                              ) : (
+                                                  <div className="p-12 text-center text-slate-400">
+                                                      <AlertCircle className="mx-auto mb-2" size={32} />
+                                                      <p className="text-sm font-bold text-slate-600 mb-2">Original View Generation Failed.</p>
+                                                      <button onClick={reloadPreview} className="flat-btn-outline mx-auto">Click to Reload Original File</button>
+                                                  </div>
+                                              )}
+                                          </div>
                                       ) : (
                                           <div className="loading-state">Preview not supported for this file type.</div>
                                       )}
-                                  </div>
-                             </div>
+                                 </div>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}
@@ -651,13 +593,21 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .flat-btn-outline { border: 1px solid #172554; color: #172554; padding: 8px 14px; border-radius: 8px; font-size: 10px; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; background: transparent; }
                 .flat-btn-outline:hover { background: #f8fafc; }
 
-                .excel-preview-container { background: #e5e7eb; min-width: 100%; min-height: 100%; display: flex; flex-direction: column; overflow: auto; }
-                .excel-table-wrapper { padding: 20px; background: #e5e7eb; }
-                .excel-table { border-collapse: collapse; background: white; border: 1px solid #d1d5db; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-                .excel-table th { background: #f3f4f6; border: 1px solid #d1d5db; padding: 4px 10px; font-size: 11px; color: #4b5563; text-align: center; font-weight: normal; }
-                .excel-table td { font-family: 'Inter', system-ui, sans-serif; min-width: 60px; height: 24px; border: 0.5px solid #e2e8f0; }
-                .row-num { background: #f3f4f6; color: #6b7280; font-size: 10px; text-align: center; border: 1px solid #d1d5db; }
-                .sticky-col { position: sticky; left: 0; z-index: 10; width: 30px; }
+                .premium-excel-viewer { padding: 40px 20px; background: #525659; overflow: auto; height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; }
+                .html-excel-content { background: white; padding: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); display: inline-block; min-width: 90%; border-radius: 4px; }
+                .tab-switcher-simple { display: flex; gap: 4px; overflow-x: auto; max-width: 350px; padding: 2px; scrollbar-width: none; }
+                .tab-switcher-simple::-webkit-scrollbar { display: none; }
+                .mini-tab { padding: 4px 12px; font-size: 10px; font-weight: 800; border: none; background: #e2e8f0; border-radius: 4px; cursor: pointer; white-space: nowrap; transition: 0.2s; color: #64748b; }
+                .mini-tab.active { background: #172554; color: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+                .mini-tab:hover:not(.active) { background: #cbd5e1; color: #1e293b; }
+
+                /* SHEETJS TABLE OVERRIDE */
+                .html-excel-content table { border-collapse: collapse; width: 100%; border: 1px solid #e2e8f0; font-family: 'Inter', sans-serif; }
+                .html-excel-content td { border: 1px solid #e2e8f0; padding: 6px 12px; font-size: 11px; color: #334155; white-space: nowrap; }
+                .html-excel-content tr:nth-child(1) td { background: #f8fafc; font-weight: 900; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
+                .html-excel-content tr:hover { background: #f1f5f9; }
+                
+                .loading-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; font-weight: 800; font-size: 11px; text-transform: uppercase; gap: 12px; }
             `}</style>
         </div>
     );

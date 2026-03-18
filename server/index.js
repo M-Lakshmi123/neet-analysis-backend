@@ -12,7 +12,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { google } = require('googleapis');
 const ExcelJS = require('exceljs');
-
+const XLSX = require('xlsx');
 const logQuery = (query, params) => {
     const logPath = path.join(__dirname, 'query_debug.log');
     const logEntry = `[${new Date().toISOString()}]\nQUERY: ${query}\nPARAMS: ${JSON.stringify(params)}\n---\n`;
@@ -365,6 +365,43 @@ app.get('/api/files/excel-preview-data/:id', async (req, res) => {
     } catch (err) {
         console.error('[FastPreview] ERROR:', err);
         res.status(500).json({ error: 'Failed to process large excel file' });
+    }
+});
+
+app.get('/api/files/excel-tabs/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+        const [meta] = await pool.rawPool.query('SELECT filename FROM uploaded_files WHERE id = ?', [id]);
+        if (meta.length === 0) return res.status(404).json({ error: 'Not found' });
+        
+        const driveRes = await drive.files.get(
+            { fileId: meta[0].filename, alt: 'media' },
+            { responseType: 'arraybuffer' }
+        );
+
+        const workbook = XLSX.read(driveRes.data, { type: 'buffer' });
+        const result = {
+            sheetNames: workbook.SheetNames,
+            sheets: {}
+        };
+
+        workbook.SheetNames.forEach(name => {
+            const sheet = workbook.Sheets[name];
+            // Render only first 200 rows to keep it fast
+            result.sheets[name] = XLSX.utils.sheet_to_html(sheet, { 
+                editable: false, 
+                header: '', 
+                footer: '',
+                // Limit range if needed: range: 0-200
+            });
+        });
+
+        res.json(result);
+    } catch (err) {
+        console.error('[ExcelTabs] Error:', err);
+        res.status(500).json({ error: 'Failed to parse Excel' });
     }
 });
 
