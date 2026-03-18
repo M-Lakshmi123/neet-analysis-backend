@@ -212,9 +212,12 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
             if (response.ok) {
                 setTabData(data);
                 setCurrentSheet(data.sheetNames?.[0] || '');
+            } else {
+                setTabData({ error: data.error || 'The server encountered an issue while generating the preview.' });
             }
         } catch (err) {
             console.error('Tabs fetch failed:', err);
+            setTabData({ error: 'Network failure. Please check your connection or reload.' });
         } finally {
             setLoadingTabs(false);
         }
@@ -448,15 +451,17 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                                       <Loader2 className="animate-spin mx-auto mb-2" size={24} />
                                                       <p className="text-[10px] uppercase font-bold tracking-widest text-[#172554]">Generating Original View...</p>
                                                   </div>
-                                              ) : tabData ? (
+                                              ) : tabData && !tabData.error ? (
                                                   <div 
                                                       className="html-excel-content" 
                                                       dangerouslySetInnerHTML={{ __html: tabData.sheets[currentSheet] }}
                                                   />
                                               ) : (
                                                   <div className="p-12 text-center text-slate-400">
-                                                      <AlertCircle className="mx-auto mb-2" size={32} />
-                                                      <p className="text-sm font-bold text-slate-600 mb-2">Original View Generation Failed.</p>
+                                                      <AlertCircle className="mx-auto mb-2 text-amber-500" size={32} />
+                                                      <p className="text-sm font-bold text-slate-600 mb-2">
+                                                            {tabData?.error || 'Original View Generation Failed.'}
+                                                      </p>
                                                       <button onClick={reloadPreview} className="flat-btn-outline mx-auto">Click to Reload Original File</button>
                                                   </div>
                                               )}

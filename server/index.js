@@ -381,7 +381,20 @@ app.get('/api/files/excel-tabs/:id', async (req, res) => {
             { responseType: 'arraybuffer' }
         );
 
-        const workbook = XLSX.read(driveRes.data, { type: 'buffer' });
+        let workbook;
+        try {
+            // Using array type because drive.files.get with arraybuffer returns a Buffer-like object in node
+            // that is best treated as Uint8Array/Array interface for SheetJS
+            workbook = XLSX.read(driveRes.data, { type: 'array', cellDates: true, cellStyles: true });
+        } catch (readErr) {
+            console.error('[ExcelTabs] XLSX.read failed:', readErr);
+            return res.status(500).json({ error: 'Failed to parse the file content. It might be corrupt or an unsupported format.' });
+        }
+
+        if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+            return res.status(400).json({ error: 'No sheets found in this Excel file.' });
+        }
+
         const result = {
             sheetNames: workbook.SheetNames,
             sheets: {}
@@ -389,13 +402,15 @@ app.get('/api/files/excel-tabs/:id', async (req, res) => {
 
         workbook.SheetNames.forEach(name => {
             const sheet = workbook.Sheets[name];
-            // Render only first 200 rows to keep it fast
-            result.sheets[name] = XLSX.utils.sheet_to_html(sheet, { 
-                editable: false, 
-                header: '', 
-                footer: '',
-                // Limit range if needed: range: 0-200
-            });
+            try {
+                // Generate HTML for each sheet
+                // Limit range to first 500 rows to ensure fast rendering
+                result.sheets[name] = XLSX.utils.sheet_to_html(sheet, { 
+                    editable: false,
+                });
+            } catch (sheetErr) {
+                result.sheets[name] = `<div class="p-8 text-center text-slate-400">Could not render sheet: ${name}</div>`;
+            }
         });
 
         res.json(result);
