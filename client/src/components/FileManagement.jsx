@@ -11,12 +11,10 @@ import {
     Trash2,
     FileCode,
     Search,
-    FileSearch,
-    Files,
-    CheckCircle,
     AlertCircle,
     Eye,
-    Maximize2
+    Maximize2,
+    CheckCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_URL } from '../utils/apiHelper';
@@ -41,13 +39,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [zoom, setZoom] = useState(100);
     const [isFullScreen, setIsFullScreen] = useState(false);
     
-    // Excel Original View
-    const [tabData, setTabData] = useState(null); // MULTI-SHEET HTML VIEW
-    const [currentSheet, setCurrentSheet] = useState('');
-    const [loadingTabs, setLoadingTabs] = useState(false);
-    
     // Stability States
-    const [isDragging, setIsDragging] = useState(false);
     const scrollContainerRef = useRef(null);
 
     useEffect(() => {
@@ -195,32 +187,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         setPreviewFile(file);
         setZoom(100);
         setIsFullScreen(false);
-        setTabData(null);
-        
-        if (file.file_type === 'xlsx' || file.file_type === 'xls') {
-            fetchExcelTabs(file.id);
-        }
-        
         logActivity(userData, `Open Preview: ${file.original_name}`);
-    };
-
-    const fetchExcelTabs = async (id) => {
-        setLoadingTabs(true);
-        try {
-            const response = await fetch(`${API_URL}/api/files/excel-tabs/${id}?academicYear=${academicYear}`);
-            const data = await response.json();
-            if (response.ok) {
-                setTabData(data);
-                setCurrentSheet(data.sheetNames?.[0] || '');
-            } else {
-                setTabData({ error: data.error || 'The server encountered an issue while generating the preview.' });
-            }
-        } catch (err) {
-            console.error('Tabs fetch failed:', err);
-            setTabData({ error: 'Network failure. Please check your connection or reload.' });
-        } finally {
-            setLoadingTabs(false);
-        }
     };
 
     const reloadPreview = () => {
@@ -230,10 +197,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
             setPreviewFile(current);
         }, 50);
     };
-
-    const handlePanStart = (e) => {};
-    const handlePanMove = (e) => {};
-    const handlePanEnd = () => {};
 
     const getFileIcon = (type) => {
         switch (type) {
@@ -367,25 +330,17 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                         </button>
                                     </div>
 
-
                                      {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
                                          <>
                                              <div className="toolbar-divider"></div>
-                                             <div className="tab-switcher-simple">
-                                                 {tabData?.sheetNames?.map(name => (
-                                                     <button 
-                                                         key={name} 
-                                                         onClick={() => setCurrentSheet(name)}
-                                                         className={`mini-tab ${currentSheet === name ? 'active' : ''}`}
-                                                     >
-                                                         {name}
-                                                     </button>
-                                                 ))}
+                                             <div className="flex items-center gap-1 bg-[#107c41] text-white px-3 py-1 rounded-md shadow-sm">
+                                                  <ExcelIcon size={14} strokeWidth={2.5} />
+                                                  <span className="text-[10px] font-black uppercase tracking-tighter">Office Pro View</span>
                                              </div>
                                              <div className="toolbar-divider"></div>
                                              <button onClick={reloadPreview} className="tool-btn" title="Reload if Stuck">
                                                   <Loader2 size={14} />
-                                             </button>
+                                              </button>
                                          </>
                                      )}
 
@@ -408,7 +363,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                          onClick={() => {
                                              const url = previewFile.file_type === 'pdf' 
                                                  ? `${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}` 
-                                                 : `https://docs.google.com/viewer?srcid=${previewFile.filename}&pid=explorer&efp=${previewFile.filename}&a=v&chrome=false&embedded=true`;
+                                                 : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}`;
                                              window.open(url, '_blank');
                                          }} 
                                          className="modal-action-btn" 
@@ -445,27 +400,12 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                               title="PDF Preview"
                                           />
                                       ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
-                                          <div className="premium-excel-viewer">
-                                              {loadingTabs ? (
-                                                  <div className="p-12 text-center text-slate-400">
-                                                      <Loader2 className="animate-spin mx-auto mb-2" size={24} />
-                                                      <p className="text-[10px] uppercase font-bold tracking-widest text-[#172554]">Generating Original View...</p>
-                                                  </div>
-                                              ) : tabData && !tabData.error ? (
-                                                  <div 
-                                                      className="html-excel-content" 
-                                                      dangerouslySetInnerHTML={{ __html: tabData.sheets[currentSheet] }}
-                                                  />
-                                              ) : (
-                                                  <div className="p-12 text-center text-slate-400">
-                                                      <AlertCircle className="mx-auto mb-2 text-amber-500" size={32} />
-                                                      <p className="text-sm font-bold text-slate-600 mb-2">
-                                                            {tabData?.error || 'Original View Generation Failed.'}
-                                                      </p>
-                                                      <button onClick={reloadPreview} className="flat-btn-outline mx-auto">Click to Reload Original File</button>
-                                                  </div>
-                                              )}
-                                          </div>
+                                          <iframe 
+                                              src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}`} 
+                                              className="full-iframe" 
+                                              title="Excel Preview"
+                                              frameBorder="0"
+                                          />
                                       ) : (
                                           <div className="loading-state">Preview not supported for this file type.</div>
                                       )}
@@ -482,7 +422,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .button-group-flat { display: flex; align-items: center; gap: 6px; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid #f1f5f9; }
                 .flat-btn { padding: 8px 14px; font-size: 10px; font-weight: 800; color: #64748b; border: none; background: transparent; border-radius: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
                 .flat-btn.active { background: #172554; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-                .v-divider { width: 1px; height: 16px; background: #cbd5e1; margin: 0 4px; }
+                .v-divider { width: 1px; height: 166px; background: #cbd5e1; margin: 0 4px; }
                 .upload-btn-compact { background: #172554; color: white; padding: 8px 18px; border-radius: 8px; border: none; font-size: 10px; font-weight: 900; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; }
                 .upload-btn-compact:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
                 
@@ -514,33 +454,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .full-iframe { width: 100%; height: 100%; border: none; }
                 .loading-state { height: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-weight: 800; font-size: 11px; text-transform: uppercase; }
                 .modal-action-btn:hover { background: #f1f5f9; }
-                .mode-switcher { display: flex; background: #e2e8f0; padding: 3px; border-radius: 6px; margin-right: 10px; }
-                .mode-btn { border: none; background: transparent; padding: 4px 10px; font-size: 9px; font-weight: 800; border-radius: 4px; cursor: pointer; color: #64748b; transition: all 0.2s; }
-                .mode-btn.active { background: white; color: #172554; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-
-                .flex { display: flex; }
-                .items-center { align-items: center; }
-                .gap-2 { gap: 8px; }
-                .gap-3 { gap: 12px; }
-                .gap-4 { gap: 16px; }
-
-                /* Immersive Modal Styles */
-                .modal-overlay.immersive { background: #1a1a1a; padding: 0; }
-                .modal-head.floating { 
-                    position: absolute; 
-                    top: 10px; 
-                    left: 20px; 
-                    right: 20px; 
-                    z-index: 100; 
-                    background: rgba(255, 255, 255, 0.9); 
-                    backdrop-filter: blur(10px); 
-                    border-radius: 12px; 
-                    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-                    border: 1px solid rgba(255,255,255,0.3);
-                    opacity: 0.1;
-                    transition: opacity 0.3s ease;
-                }
-                .modal-head.floating:hover { opacity: 1; }
                 
                 .preview-toolbar {
                     display: flex;
@@ -569,50 +482,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 }
                 .tool-btn:hover { background: #e2e8f0; color: #1e293b; }
                 .tool-btn.active { background: #172554; color: white; }
-                .tool-btn-wide {
-                    height: 32px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border: none;
-                    background: #e2e8f0;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    color: #475569;
-                    transition: all 0.2s;
-                    font-weight: 900;
-                    padding: 0 12px;
-                    font-size: 8px;
-                    letter-spacing: 0.05em;
-                }
-                .tool-btn-wide:hover { background: #cbd5e1; color: #1e293b; }
-                .tool-btn-wide.active { background: #172554; color: white; }
                 
                 .zoom-value { font-size: 10px; font-weight: 800; min-width: 40px; text-align: center; color: #1e293b; }
                 .file-badge-mini { font-size: 8px; font-weight: 900; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; color: #64748b; }
-
-                 .cursor-grab { cursor: grab !important; }
-                .cursor-grabbing { cursor: grabbing !important; }
-                .panning-overlay { position: absolute; inset: 0; z-index: 50; background: transparent; cursor: inherit; }
-                
-                .flat-btn-outline { border: 1px solid #172554; color: #172554; padding: 8px 14px; border-radius: 8px; font-size: 10px; font-weight: 800; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: all 0.2s; background: transparent; }
-                .flat-btn-outline:hover { background: #f8fafc; }
-
-                .premium-excel-viewer { padding: 40px 20px; background: #525659; overflow: auto; height: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; }
-                .html-excel-content { background: white; padding: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); display: inline-block; min-width: 90%; border-radius: 4px; }
-                .tab-switcher-simple { display: flex; gap: 4px; overflow-x: auto; max-width: 350px; padding: 2px; scrollbar-width: none; }
-                .tab-switcher-simple::-webkit-scrollbar { display: none; }
-                .mini-tab { padding: 4px 12px; font-size: 10px; font-weight: 800; border: none; background: #e2e8f0; border-radius: 4px; cursor: pointer; white-space: nowrap; transition: 0.2s; color: #64748b; }
-                .mini-tab.active { background: #172554; color: white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-                .mini-tab:hover:not(.active) { background: #cbd5e1; color: #1e293b; }
-
-                /* SHEETJS TABLE OVERRIDE */
-                .html-excel-content table { border-collapse: collapse; width: 100%; border: 1px solid #e2e8f0; font-family: 'Inter', sans-serif; }
-                .html-excel-content td { border: 1px solid #e2e8f0; padding: 6px 12px; font-size: 11px; color: #334155; white-space: nowrap; }
-                .html-excel-content tr:nth-child(1) td { background: #f8fafc; font-weight: 900; color: #1e293b; border-bottom: 2px solid #e2e8f0; }
-                .html-excel-content tr:hover { background: #f1f5f9; }
-                
-                .loading-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; font-weight: 800; font-size: 11px; text-transform: uppercase; gap: 12px; }
             `}</style>
         </div>
     );

@@ -219,8 +219,10 @@ app.get('/api/files/view/:id', async (req, res) => {
         if (meta.length === 0) return res.status(404).json({ error: 'File not found' });
 
         const file = meta[0];
+        const fileExtension = (file.original_name || '').split('.').pop().toLowerCase();
         const contentType = file.file_type === 'pdf' ? 'application/pdf' :
-            (file.file_type === 'xlsx' || file.file_type === 'xls') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+            (fileExtension === 'xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+            (fileExtension === 'xls') ? 'application/vnd.ms-excel' :
             'application/octet-stream';
 
         const safeFileName = encodeURIComponent(file.original_name || 'file');
@@ -279,146 +281,7 @@ app.post('/api/files/sanitize-vault', async (req, res) => {
     }
 });
 
-// Route removed: const ExcelJS = require('exceljs'); to the top for efficiency
-
-app.get('/api/files/excel-preview-data/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const year = req.query.academicYear || '2026';
-        const pool = await connectToDb(year);
-
-        const [meta] = await pool.rawPool.query('SELECT filename, original_name FROM uploaded_files WHERE id = ?', [id]);
-        if (meta.length === 0) return res.status(404).json({ error: 'File not found' });
-        
-        const driveId = meta[0].filename;
-        
-        // 1. Fetch metadata first to check size
-        const driveMeta = await drive.files.get({ fileId: driveId, fields: 'size' });
-        const sizeBytes = parseInt(driveMeta.data.size || 0);
-        
-        if (sizeBytes > 20 * 1024 * 1024) { // 20MB limit for internal parsing
-            return res.status(400).json({ 
-                error: 'File too large for fast preview. Please use the default Office view.',
-                size: sizeBytes 
-            });
-        }
-
-        console.log(`[FastPreview] Fetching ${driveId} (${(sizeBytes/1024/1024).toFixed(2)} MB) from Drive...`);
-
-        const driveRes = await drive.files.get(
-            { fileId: driveId, alt: 'media' },
-            { responseType: 'arraybuffer' }
-        );
-
-        console.log(`[FastPreview] Parsing buffer...`);
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(driveRes.data);
-        
-        const worksheet = workbook.worksheets[0];
-        const previewRows = [];
-        
-        // Capture Column Widths
-        const columnWidths = [];
-        worksheet.columns?.forEach((col, i) => {
-            columnWidths.push(col.width || 10);
-        });
-
-        // Limit to 500 rows for instant preview
-        worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-            if (rowNumber <= 500) {
-                const cellData = [];
-                row.eachCell({ includeEmpty: true }, (cell) => {
-                    let val = cell.value;
-                    if (val && typeof val === 'object') {
-                        if (val.text) val = val.text;
-                        else if (val.result !== undefined) val = val.result;
-                        else if (val.richText) val = val.richText.map(rt => rt.text).join('');
-                        else val = '';
-                    }
-
-                    const style = {};
-                    if (cell.fill && cell.fill.fgColor && cell.fill.fgColor.argb) {
-                        style.bg = cell.fill.fgColor.argb.substring(2);
-                    }
-                    if (cell.font) {
-                        if (cell.font.color && cell.font.color.argb) style.fg = cell.font.color.argb.substring(2);
-                        if (cell.font.bold) style.bold = true;
-                        if (cell.font.size) style.fontSize = cell.font.size;
-                    }
-                    if (cell.alignment) {
-                        style.align = cell.alignment.horizontal || 'left';
-                    }
-
-                    cellData.push({ value: val === null || val === undefined ? '' : String(val), style });
-                });
-                previewRows.push(cellData);
-            }
-        });
-
-        res.json({
-            rows: previewRows,
-            columnWidths,
-            sheetName: worksheet.name,
-            sheetNames: workbook.worksheets.map(w => w.name),
-            totalRows: worksheet.rowCount
-        });
-    } catch (err) {
-        console.error('[FastPreview] ERROR:', err);
-        res.status(500).json({ error: 'Failed to process large excel file' });
-    }
-});
-
-app.get('/api/files/excel-tabs/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const year = req.query.academicYear || '2026';
-        const pool = await connectToDb(year);
-        const [meta] = await pool.rawPool.query('SELECT filename FROM uploaded_files WHERE id = ?', [id]);
-        if (meta.length === 0) return res.status(404).json({ error: 'Not found' });
-        
-        const driveRes = await drive.files.get(
-            { fileId: meta[0].filename, alt: 'media' },
-            { responseType: 'arraybuffer' }
-        );
-
-        let workbook;
-        try {
-            // Using array type because drive.files.get with arraybuffer returns a Buffer-like object in node
-            // that is best treated as Uint8Array/Array interface for SheetJS
-            workbook = XLSX.read(driveRes.data, { type: 'array', cellDates: true, cellStyles: true });
-        } catch (readErr) {
-            console.error('[ExcelTabs] XLSX.read failed:', readErr);
-            return res.status(500).json({ error: 'Failed to parse the file content. It might be corrupt or an unsupported format.' });
-        }
-
-        if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
-            return res.status(400).json({ error: 'No sheets found in this Excel file.' });
-        }
-
-        const result = {
-            sheetNames: workbook.SheetNames,
-            sheets: {}
-        };
-
-        workbook.SheetNames.forEach(name => {
-            const sheet = workbook.Sheets[name];
-            try {
-                // Generate HTML for each sheet
-                // Limit range to first 500 rows to ensure fast rendering
-                result.sheets[name] = XLSX.utils.sheet_to_html(sheet, { 
-                    editable: false,
-                });
-            } catch (sheetErr) {
-                result.sheets[name] = `<div class="p-8 text-center text-slate-400">Could not render sheet: ${name}</div>`;
-            }
-        });
-
-        res.json(result);
-    } catch (err) {
-        console.error('[ExcelTabs] Error:', err);
-        res.status(500).json({ error: 'Failed to parse Excel' });
-    }
-});
+// Legacy Excel Preview Endpoints Removed in favor of High-Fidelity Office View
 
 app.delete('/api/files/:id', async (req, res) => {
     try {
