@@ -188,6 +188,17 @@ app.get('/api/files', async (req, res) => {
         const pool = await connectToDb(year);
         const { category } = req.query;
 
+        // Self-healing: Check if 'size' column exists, add if missing
+        try {
+            const [columns] = await pool.rawPool.query("SHOW COLUMNS FROM uploaded_files LIKE 'size'");
+            if (columns.length === 0) {
+                await pool.rawPool.query("ALTER TABLE uploaded_files ADD COLUMN size BIGINT DEFAULT 0");
+                console.log(`[SchemaUpdate][${year}] Added missing 'size' column.`);
+            }
+        } catch (schemaErr) {
+            console.error(`[SchemaUpdate][${year}] Failed to verify/add size column:`, schemaErr.message);
+        }
+
         let query = 'SELECT id, filename, original_name, category, file_type, upload_date, size FROM uploaded_files';
         const params = [];
 
@@ -198,7 +209,6 @@ app.get('/api/files', async (req, res) => {
 
         query += ' ORDER BY upload_date DESC';
 
-        // Using rawPool.query for consistency and safety
         const [rows] = await pool.rawPool.query(query, params);
         res.json(rows);
     } catch (err) {
