@@ -172,10 +172,13 @@ async function processErp() {
 
                 // Dynamically find header row in TOP-100_Error
                 let headerRowIdx = -1;
-                for (let i = 0; i < 8; i++) {
+                for (let i = 0; i < 12; i++) {
                     const row = top100Data[i];
                     if (!row) continue;
-                    if (row.some(c => String(c).toUpperCase().includes('W%'))) {
+                    if (row.some(c => {
+                        const s = String(c || '').toUpperCase();
+                        return (s.includes('WRONG') || s.includes('W%')) && s.includes('%');
+                    })) {
                         headerRowIdx = i;
                         break;
                     }
@@ -183,17 +186,25 @@ async function processErp() {
 
                 if (headerRowIdx !== -1) {
                     const headRow = top100Data[headerRowIdx];
-                    const wCol = headRow.findIndex(c => String(c).includes('W%'));
-                    const uCol = headRow.findIndex(c => String(c).includes('U%'));
+                    const wCol = headRow.findIndex(c => {
+                        const s = String(c || '').toUpperCase();
+                        return (s.includes('WRONG') || s.includes('W%')) && s.includes('%');
+                    });
+                    const uCol = headRow.findIndex(c => {
+                        const s = String(c || '').toUpperCase();
+                        return (s.includes('UN') && s.includes('%')) || (s.includes('U%'));
+                    });
 
                     // Data starts from either current header row if QNo is there, or next row
-                    const startDataIdx = top100Data[headerRowIdx][0] && String(top100Data[headerRowIdx][0]).includes('Q') ? headerRowIdx : headerRowIdx + 1;
+                    const firstColHeader = String(top100Data[headerRowIdx][0] || '').toUpperCase();
+                    const startDataIdx = (firstColHeader.startsWith('Q') || /^\d+$/.test(firstColHeader)) ? headerRowIdx : headerRowIdx + 1;
 
                     for (let i = startDataIdx; i < top100Data.length; i++) {
                         const row = top100Data[i];
-                        if (!row || !row[0]) continue;
+                        if (!row || row[0] === undefined || row[0] === null || String(row[0]).trim() === '') continue;
                         const qNoRaw = String(row[0]).trim();
-                        if (!qNoRaw.toUpperCase().startsWith('Q')) continue;
+                        // Allow Q1 or just 1
+                        if (!qNoRaw.toUpperCase().startsWith('Q') && isNaN(parseInt(qNoRaw))) continue;
                         const qNo = qNoRaw.replace(/[^0-9]/g, '');
                         nationalErrorMap[qNo] = {
                             W: formatPercentage(row[wCol !== -1 ? wCol : 6]),
@@ -415,14 +426,14 @@ function loadZeroReport(picsSubDir) {
 
     const mapping = {};
     data.forEach(r => {
-        const qNo = String(r['Q_No'] || r['QNo'] || '').trim().replace('Q', '');
+        const qNo = String(r['Q_No'] || r['QNo'] || r['Q.No'] || r['Q NO'] || '').trim().replace('Q', '');
         if (!qNo) return;
         mapping[qNo] = {
-            Subject: r['Subject'],
-            Topic: r['Topic'],
-            Sub_Topic: r['Sub_Topic'],
-            Question_Type: r['Question_Type'],
-            Statement: r['Statement']
+            Subject: r['Subject'] || r['SUBJECT'] || '--',
+            Topic: r['Topic'] || r['TOPIC'] || '--',
+            Sub_Topic: r['Sub_Topic'] || r['Sub_Topics'] || r['SUB_TOPICS'] || r['SUB_TOPIC'] || '--',
+            Question_Type: r['Question_Type'] || r['Question Type'] || r['QUESTION_TYPE'] || '--',
+            Statement: r['Statement'] || r['STATEMENT'] || '--'
         };
     });
     return { meta: mapping, testName: null };

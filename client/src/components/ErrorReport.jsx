@@ -884,8 +884,8 @@ const ErrorReport = ({ filters, setFilters }) => {
                                                             <span style={{ color: 'white', marginLeft: '5px' }}>
                                                                 {(() => {
                                                                     const raw = q.National_Wide_Error;
-                                                                    if (!raw || isNaN(parseFloat(raw))) return '';
                                                                     const num = parseFloat(raw);
+                                                                    if (isNaN(num)) return '';
                                                                     const isAlreadyPercent = String(raw).includes('%') || num > 1.0;
                                                                     return isAlreadyPercent ? Math.round(num) + '%' : Math.round(num * 100) + '%';
                                                                 })()}

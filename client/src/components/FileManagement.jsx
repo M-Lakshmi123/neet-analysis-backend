@@ -361,9 +361,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                      )}
                                      <button 
                                          onClick={() => {
-                                             const url = previewFile.file_type === 'pdf' 
-                                                 ? `${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}` 
-                                                 : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}`)}`;
+                                              const url = `https://drive.google.com/file/d/${previewFile.filename}/view?usp=sharing`;
                                              window.open(url, '_blank');
                                          }} 
                                          className="modal-action-btn" 
@@ -395,16 +393,14 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                  >
                                       {previewFile.file_type === 'pdf' ? (
                                           <iframe 
-                                              src={`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}#toolbar=0&navpanes=0&scrollbar=0`} 
+                                              src={`https://drive.google.com/file/d/${previewFile.filename}/preview`} 
                                               className="full-iframe" 
                                               title="PDF Preview"
+                                              frameBorder="0"
                                           />
                                       ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                           <iframe 
-                                              src={Number(previewFile.size || 0) > 24 * 1024 * 1024 
-                                                  ? `https://drive.google.com/file/d/${previewFile.filename}/preview`
-                                                  : `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/view/${previewFile.id}?academicYear=${academicYear}&_t=${Date.now()}`)}&action=embedview&wdHideSheetTabs=0&wdAllowInteractivity=1&wdHideHeaders=1`
-                                              } 
+                                              src={`https://drive.google.com/file/d/${previewFile.filename}/preview`} 
                                               className="full-iframe" 
                                               title="Excel Preview"
                                               frameBorder="0"

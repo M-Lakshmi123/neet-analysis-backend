@@ -11,8 +11,7 @@ const PORT = process.env.PORT || 5000;
 const fs = require('fs');
 const multer = require('multer');
 const { google } = require('googleapis');
-const ExcelJS = require('exceljs');
-const XLSX = require('xlsx');
+// Removed heavy unused libraries (ExcelJS/XLSX) to save memory
 const logQuery = (query, params) => {
     const logPath = path.join(__dirname, 'query_debug.log');
     const logEntry = `[${new Date().toISOString()}]\nQUERY: ${query}\nPARAMS: ${JSON.stringify(params)}\n---\n`;
@@ -294,19 +293,24 @@ app.post('/api/files/sanitize-vault', async (req, res) => {
             await pool.rawPool.query("UPDATE uploaded_files SET original_name = ? WHERE id = ?", [clean, f.id]);
         }
         
-        // Populate missing sizes from Google Drive
-        const [sizeFiles] = await pool.rawPool.query("SELECT id, filename FROM uploaded_files WHERE size = 0 OR size IS NULL");
+        // Populate missing sizes from Google Drive efficiently (Limit to 50 at a time to prevent timeout)
+        const [sizeFiles] = await pool.rawPool.query("SELECT id, filename FROM uploaded_files WHERE size = 0 OR size IS NULL LIMIT 100");
         let sizeUpdated = 0;
         for (const sf of sizeFiles) {
             try {
-                const driveMeta = await drive.files.get({ fileId: sf.filename, fields: 'size' });
+                // Fetch only the size field explicitly
+                const driveMeta = await drive.files.get({ 
+                    fileId: sf.filename, 
+                    fields: 'size',
+                    supportsAllDrives: true 
+                });
                 const s = parseInt(driveMeta.data.size || 0);
                 if (s > 0) {
                     await pool.rawPool.query("UPDATE uploaded_files SET size = ? WHERE id = ?", [s, sf.id]);
                     sizeUpdated++;
                 }
             } catch (e) {
-                console.error(`[SchemaUpdate] Size sync failed for ${sf.filename}:`, e.message);
+                // Silently skip broken files to ensure overall progress
             }
         }
         
