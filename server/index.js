@@ -216,12 +216,11 @@ app.get('/api/files', async (req, res) => {
     }
 });
 
-app.get('/api/files/view/:id', async (req, res) => {
-    // ... same as before but uses a separate wrapper for clean logic if needed
-    // Actually we keep this for direct view/download
+// Clean URL for viewers (e.g. Office Online or Native PDF)
+app.get('/api/files/v/:id/:name?', async (req, res) => {
     try {
         const { id } = req.params;
-        const year = req.query.academicYear || '2026';
+        const year = req.query.academicYear || '2025';
         const pool = await connectToDb(year);
 
         const [meta] = await pool.rawPool.query('SELECT filename, original_name, file_type FROM uploaded_files WHERE id = ?', [id]);
@@ -229,14 +228,15 @@ app.get('/api/files/view/:id', async (req, res) => {
 
         const file = meta[0];
         const fileExtension = (file.original_name || '').split('.').pop().toLowerCase();
+        
+        // Accurate Mime Types
         const contentType = file.file_type === 'pdf' ? 'application/pdf' :
-            (fileExtension === 'xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
-            (fileExtension === 'xls') ? 'application/vnd.ms-excel' :
+            (['xlsx', 'xls', 'xlsb', 'xlsm'].includes(fileExtension)) ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
             'application/octet-stream';
 
         const safeFileName = encodeURIComponent(file.original_name || 'file');
         
-        // STREAM LOGIC
+        // STREAM FROM GOOGLE DRIVE (Server-side Auth)
         const driveId = file.filename;
         const driveRes = await drive.files.get({ fileId: driveId, alt: 'media' }, { responseType: 'stream' });
 
@@ -244,13 +244,23 @@ app.get('/api/files/view/:id', async (req, res) => {
         if (req.query.download === 'true') {
             res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"; filename*=UTF-8''${safeFileName}`);
         } else {
+            // "inline" allows browsers to use native viewers (sharp and full-featured)
             res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"; filename*=UTF-8''${safeFileName}`);
         }
 
         driveRes.data.pipe(res);
     } catch (err) {
-        res.status(500).json({ error: 'Failed' });
+        console.error("[FileView] ERROR:", err);
+        res.status(500).json({ error: 'Streaming Failed', details: err.message });
     }
+});
+
+// Legacy route for compatibility
+app.get('/api/files/view/:id', async (req, res) => {
+    // Redirect to the new cleaner route
+    const { id } = req.params;
+    const year = req.query.academicYear || '2025';
+    res.redirect(`/api/files/v/${id}/view?academicYear=${year}`);
 });
 
 app.get('/api/files/e/:id', async (req, res) => {

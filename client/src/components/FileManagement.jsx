@@ -35,6 +35,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [uploading, setUploading] = useState(false);
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
+    const [viewerType, setViewerType] = useState('browser'); // 'browser' or 'office' or 'google'
 
     const [zoom, setZoom] = useState(100);
     const [isFullScreen, setIsFullScreen] = useState(false);
@@ -185,6 +186,13 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
     const openPreview = async (file) => {
         setPreviewFile(file);
+        // Default viewer type
+        const ext = (file.original_name || '').split('.').pop().toLowerCase();
+        if (['xlsx', 'xls'].includes(ext)) {
+            setViewerType('office');
+        } else {
+            setViewerType('browser');
+        }
         setZoom(100);
         setIsFullScreen(false);
         logActivity(userData, `Open Preview: ${file.original_name}`);
@@ -333,10 +341,16 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                      {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
                                          <>
                                              <div className="toolbar-divider"></div>
-                                             <div className="flex items-center gap-1 bg-[#107c41] text-white px-3 py-1 rounded-md shadow-sm">
+                                             <button 
+                                                 onClick={() => setViewerType(viewerType === 'office' ? 'google' : 'office')} 
+                                                 className={`tool-btn-wide ${viewerType === 'office' ? 'active' : ''}`}
+                                                 title={viewerType === 'office' ? "Switch to Google Preview" : "Switch to Office Pro View"}
+                                             >
                                                   <ExcelIcon size={14} strokeWidth={2.5} />
-                                                  <span className="text-[10px] font-black uppercase tracking-tighter">Office Pro View</span>
-                                             </div>
+                                                  <span className="text-[10px] font-black uppercase tracking-tighter">
+                                                      {viewerType === 'office' ? 'Office Pro View' : 'Std Preview'}
+                                                  </span>
+                                             </button>
                                              <div className="toolbar-divider"></div>
                                              <button onClick={reloadPreview} className="tool-btn" title="Reload if Stuck">
                                                   <Loader2 size={14} />
@@ -373,42 +387,45 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                 </div>
                             </div>
                             
-                            <div 
+                             <div 
                                 className="modal-content"
                                 ref={scrollContainerRef}
                                 style={{
                                     overflow: 'auto',
-                                    backgroundColor: previewFile.file_type === 'pdf' ? '#525659' : '#ffffff'
+                                    backgroundColor: previewFile.file_type === 'pdf' ? '#FFFFFF' : '#FFFFFF'
                                 }}
-                            >
-                                 <div 
-                                     className="preview-wrap"
-                                     style={{
-                                         width: previewFile.file_type === 'pdf' ? `${zoom}%` : '100%',
-                                         height: '100%',
-                                         minHeight: '100%',
-                                         margin: '0 auto',
-                                         position: 'relative'
-                                     }}
-                                 >
-                                      {previewFile.file_type === 'pdf' ? (
-                                          <iframe 
-                                              src={`https://drive.google.com/file/d/${previewFile.filename}/preview`} 
-                                              className="full-iframe" 
-                                              title="PDF Preview"
-                                              frameBorder="0"
-                                          />
-                                      ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
-                                          <iframe 
-                                              src={`https://drive.google.com/file/d/${previewFile.filename}/preview`} 
-                                              className="full-iframe" 
-                                              title="Excel Preview"
-                                              frameBorder="0"
-                                          />
-                                      ) : (
-                                          <div className="loading-state">Preview not supported for this file type.</div>
-                                      )}
-                                 </div>
+                             >
+                                  <div 
+                                      className="preview-wrap"
+                                      style={{
+                                          width: (previewFile.file_type === 'pdf' || viewerType === 'google') ? `${zoom}%` : '100%',
+                                          height: '100%',
+                                          minHeight: '100%',
+                                          margin: '0 auto',
+                                          position: 'relative'
+                                      }}
+                                  >
+                                       {previewFile.file_type === 'pdf' ? (
+                                           <iframe 
+                                               src={`${API_URL}/api/files/v/${previewFile.id}/${encodeURIComponent(previewFile.original_name)}?academicYear=${academicYear}#toolbar=1&navpanes=0`} 
+                                               className="full-iframe" 
+                                               title="PDF Preview"
+                                               frameBorder="0"
+                                           />
+                                       ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
+                                           <iframe 
+                                               src={viewerType === 'office' 
+                                                   ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/v/${previewFile.id}/${previewFile.original_name}?academicYear=${academicYear}`)}`
+                                                   : `https://drive.google.com/file/d/${previewFile.filename}/preview`
+                                               } 
+                                               className="full-iframe" 
+                                               title="Excel Preview"
+                                               frameBorder="0"
+                                           />
+                                       ) : (
+                                           <div className="loading-state">Preview not supported for this file type.</div>
+                                       )}
+                                  </div>
                             </div>
                         </motion.div>
                     </motion.div>
@@ -445,14 +462,24 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .icon-link.delete:hover { color: #ef4444; }
 
                 /* CRITICAL: Increased z-index to 9999 to cover global Logout/Header */
-                .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.98); backdrop-filter: blur(15px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 0px; }
-                .modal-body { width: 100vw; height: 100vh; background: white; display: flex; flex-direction: column; overflow: hidden; position: relative; border-radius: 0; }
-                .modal-head { padding: 6px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
-                .modal-title { font-size: 11px; font-weight: 800; color: #0f172a; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .modal-content { flex: 1; background: #f1f5f9; overflow: hidden; }
-                .full-iframe { width: 100%; height: 100%; border: none; }
+                .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px; transition: all 0.3s; }
+                .modal-overlay.immersive { background: rgba(0, 0, 0, 0.95); padding: 0; backdrop-filter: none; }
+                
+                .modal-body { width: 92vw; height: 92vh; background: white; display: flex; flex-direction: column; overflow: hidden; position: relative; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); transition: all 0.3s; }
+                .modal-overlay.immersive .modal-body { width: 100vw; height: 100vh; border-radius: 0; }
+                
+                .modal-head { padding: 10px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff; }
+                .modal-head.floating { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 100; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 5px 15px; border-radius: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); border: 1px solid rgba(0,0,0,0.1); width: auto; max-width: 90%; }
+                
+                .modal-title { font-size: 11px; font-weight: 800; color: #0f172a; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .modal-content { flex: 1; background: #f8fafc; overflow: hidden; }
+                .full-iframe { width: 100%; height: 100%; border: none; background: white; }
                 .loading-state { height: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-weight: 800; font-size: 11px; text-transform: uppercase; }
                 .modal-action-btn:hover { background: #f1f5f9; }
+
+                .tool-btn-wide { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 32px; background: transparent; border: none; border-radius: 6px; cursor: pointer; color: #475569; transition: all 0.2s; border: 1px solid transparent; }
+                .tool-btn-wide.active { background: #107c41; color: white; box-shadow: 0 4px 6px -1px rgba(16, 124, 65, 0.3); }
+                .tool-btn-wide:hover:not(.active) { background: #e2e8f0; }
                 
                 .preview-toolbar {
                     display: flex;
