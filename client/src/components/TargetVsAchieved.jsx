@@ -50,7 +50,8 @@ const TargetVsAchieved = ({ filters }) => {
     useEffect(() => {
         const fetchTargets = async () => {
             try {
-                const res = await fetch(`${API_URL}/api/targets`);
+                const year = filters.academicYear || '2025';
+                const res = await fetch(`${API_URL}/api/targets?academicYear=${year}`);
                 const data = await res.json();
                 setAllTargets(data);
             } catch (error) {
@@ -58,7 +59,7 @@ const TargetVsAchieved = ({ filters }) => {
             }
         };
         fetchTargets();
-    }, []);
+    }, [filters.academicYear]);
 
     useEffect(() => {
         const fetchData = async () => {
