@@ -217,7 +217,7 @@ app.get('/api/files', async (req, res) => {
 });
 
 // Clean URL for viewers (e.g. Office Online or Native PDF)
-app.get('/api/files/v/:id/:name?', async (req, res) => {
+app.get(['/api/files/v/:id', '/api/files/v/:id/:name'], async (req, res) => {
     try {
         const { id } = req.params;
         const year = req.query.academicYear || '2025';
