@@ -66,7 +66,7 @@ const RegisterPage = () => {
 
     useEffect(() => {
         const fetchCampuses = async () => {
-            const apiUrl = `${API_URL}/api/filters`;
+            const apiUrl = `${API_URL}/api/filters?academicYear=2025`;
             try {
                 const res = await fetch(apiUrl);
                 if (!res.ok) throw new Error("Backend unreachable");
@@ -80,16 +80,26 @@ const RegisterPage = () => {
                 console.warn("Backend unreachable, using fallback campus list:", err);
                 // Failover to hardcoded list so the UI still works
                 setCampuses([
-                    "HYD - MADHAPUR - BOYS",
-                    "HYD - MADHAPUR - GIRLS",
-                    "HYD - KUKATPALLY - MAIN",
-                    "VIJ - BENZ CIRCLE",
-                    "VIJ - GANGURU",
-                    "VSKP - DWARAKA NAGAR",
-                    "BLR - MARATHAHALLI",
-                    "BLR - HEBBAL",
-                    "CHE - ANNA NAGAR",
-                    "DEL - DWARKA"
+                    "BALLARI BOYS",
+                    "BALLARI GIRLS",
+                    "BANASWADI",
+                    "BANNERGHATTA ROAD",
+                    "BELAGAVI",
+                    "HEBBAL",
+                    "HEGDENAGAR",
+                    "HORAMAVU",
+                    "HUBLI",
+                    "HUBLI 2",
+                    "J P NAGAR",
+                    "KALYAN NAGAR",
+                    "MANGALURU",
+                    "RAJAJINAGAR",
+                    "SAHAKARA NAGAR",
+                    "SARJAPURA",
+                    "SHIMOGA",
+                    "UDUPI",
+                    "WHITEFIELD",
+                    "YELAHANKA"
                 ].sort());
                 // Optional: Don't show error toast to keep UI clean, or show a mild "Offline Mode" toast
             }
