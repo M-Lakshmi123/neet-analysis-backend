@@ -10,8 +10,12 @@ const LOG_PATH = path.join(__dirname, '..', 'Missing_Columns_Log.txt');
 
 async function run() {
     try {
+        const manualTestType = process.argv[2] && process.argv[2].trim() !== "" ? process.argv[2].trim() : null;
+        const manualTestName = process.argv[3] && process.argv[3].trim() !== "" ? process.argv[3].trim() : null;
+
         const yearResponse = readline.question(`Enter Academic Year (2025/2026) [Default 2025]: `, { defaultInput: '2025' });
         const year = yearResponse.trim();
+
 
         const pool = await connectToDb(year);
         console.log(`Connected to TiDB (NEET ${year}).`);
@@ -61,9 +65,10 @@ async function run() {
         let totalUploaded = 0;
         for (const fileObj of files) {
             console.log(`\nProcessing: ${path.basename(fileObj.path)} [Folder: ${fileObj.folder}]`);
-            const count = await processResultFile(fileObj.path, fileObj.folder, pool, topConfigMaps, allowedCampuses, year);
+            const count = await processResultFile(fileObj.path, fileObj.folder, pool, topConfigMaps, allowedCampuses, year, manualTestType, manualTestName);
             totalUploaded += count || 0;
         }
+
 
         console.log(`\n========================================================`);
         console.log(`✅ EXECUTION COMPLETE`);
@@ -124,7 +129,8 @@ function isKarnatakaCampus(name, allowedCampuses) {
     return keywords.some(k => upper.includes(k));
 }
 
-async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps, allowedCampuses, year) {
+async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps, allowedCampuses, year, manualTestType, manualTestName) {
+
     const wb = XLSX.readFile(filePath);
 
     // 1. Marks List Sheet
@@ -163,29 +169,50 @@ async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps
          dateStr = String(parts[0]).trim().replace(/-/g, '/');
     }
 
-    // 2. Extract Test Name using Regex (e.g. MT-07, WT_05, SGT-01)
-    // We intentionally omit word boundaries (\b) because the test name
-    // could be sandwiched between underscores like __MT-07_
-    const testMatch = metaStr.match(/([a-zA-Z]{1,5}[-_]\d{1,3}[a-zA-Z]*)/);
-    if (testMatch) {
-        testName = testMatch[1];
-        testType = testName.split(/[-_]/)[0].trim();
+    // 2. Extract or use Manual Test Name/Type
+    if (manualTestType && manualTestName) {
+        testType = manualTestType;
+        testName = manualTestName;
     } else {
-        // Fallback: If no regex match, split by '__'
-        const parts = metaStr.split('__');
-        if (parts.length >= 4) {
-            testName = parts[3].trim();
-            testType = testName.split(/[-_]/)[0].trim();
+        if (metaStr.toUpperCase().includes('SPECIAL GRAND TEST')) {
+            const sgMatch = metaStr.match(/SPECIAL GRAND TEST\s*[-_]\s*(\d+)/i);
+            if (sgMatch) {
+                testName = `NST-${sgMatch[1].padStart(2, '0')}`;
+                testType = 'NST';
+            } else {
+                testName = 'NST-01';
+                testType = 'NST';
+            }
         } else {
-            console.log("  [ERROR] Metadata test format unrecognized: " + metaStr);
-            return;
+            const testMatch = metaStr.match(/([a-zA-Z]{1,5}[-_]\d{1,3}[a-zA-Z]*)/);
+            if (testMatch) {
+                testName = testMatch[1];
+                testType = testName.split(/[-_]/)[0].trim();
+            } else {
+                // Fallback: If no regex match, split by '__'
+                const parts = metaStr.split('__');
+                if (parts.length >= 4) {
+                    testName = parts[3].trim();
+                    testType = testName.split(/[-_]/)[0].trim();
+                } else {
+                    console.log("  [ERROR] Metadata test format unrecognized: " + metaStr);
+                    return;
+                }
+            }
         }
     }
+
 
     console.log(`  Metadata: Date=[${dateStr}], StreamFolder=[${streamFromFolder}], Test=[${testName}], Type=[${testType}]`);
 
     // Stream-specific TOP/SUPER mapping (Using folder name as key)
-    const streamTopMap = topConfigMaps[streamFromFolder] || new Map();
+    let streamTopMap = new Map();
+    const normalizedFolder = String(streamFromFolder).toUpperCase().replace(/[^A-Z]/g, '');
+    if (normalizedFolder.includes('SRELITE') || metaStr.toUpperCase().includes('SR ELITE')) {
+        streamTopMap = topConfigMaps['SR ELITE'];
+    } else if (normalizedFolder.includes('JRELITE') || metaStr.toUpperCase().includes('JR ELITE')) {
+        streamTopMap = topConfigMaps['JR ELITE'];
+    }
 
     // Determine DB Stream based on folder (Verbatim as per user request)
     let dbStream = streamFromFolder || "Unknown";

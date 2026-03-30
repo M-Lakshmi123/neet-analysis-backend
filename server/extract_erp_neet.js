@@ -147,8 +147,13 @@ async function processErp() {
                 }
             }
 
-            if (streamFromMetadata === "UNKNOWN_STREAM") {
-                streamFromMetadata = readline.question(`Enter Stream Name for ${erpFile}: `).trim();
+            if (String(metadataRow).toUpperCase().includes('SPECIAL GRAND TEST')) {
+                const sgMatch = String(metadataRow).match(/SPECIAL GRAND TEST\s*[-_]\s*(\d+)/i);
+                if (sgMatch) {
+                    testName = `NST-${sgMatch[1].padStart(2, '0')}`;
+                } else {
+                    testName = 'NST-01';
+                }
             }
 
             const testType = testName.split('-')[0].trim();

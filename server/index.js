@@ -50,22 +50,39 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.
 // OLD METHOD: Service Account Bot (often crashes from 0 bytes quota)
 else {
     let authConfig = { scopes: SCOPES };
+    let hasCreds = false;
 
     if (process.env.GOOGLE_CREDENTIALS) {
+        console.log("Drive Auth: Using GOOGLE_CREDENTIALS Env Var");
         try {
             authConfig.credentials = typeof process.env.GOOGLE_CREDENTIALS === 'string' 
                 ? JSON.parse(process.env.GOOGLE_CREDENTIALS) 
                 : process.env.GOOGLE_CREDENTIALS;
-        } catch (e) { }
+            hasCreds = true;
+        } catch (e) { 
+            console.error("Drive Auth: Failed to parse GOOGLE_CREDENTIALS JSON");
+        }
     } else if (fs.existsSync('/etc/secrets/google_credentials.json')) {
         authConfig.keyFile = '/etc/secrets/google_credentials.json';
+        hasCreds = true;
     } else if (fs.existsSync('/etc/secrets/google_credentials')) {
         authConfig.keyFile = '/etc/secrets/google_credentials';
-    } else {
+        hasCreds = true;
+    } else if (fs.existsSync(path.join(__dirname, 'google_credentials.json'))) {
         authConfig.keyFile = path.join(__dirname, 'google_credentials.json');
+        hasCreds = true;
     }
 
-    auth = new google.auth.GoogleAuth(authConfig);
+    if (hasCreds) {
+        auth = new google.auth.GoogleAuth(authConfig);
+    } else {
+        console.warn("Drive Auth: No credentials found! Google Drive features will fail.");
+        // Fallback dummy auth to prevent startup crash, but route handlers will get errors
+        auth = new google.auth.GoogleAuth({ 
+            credentials: { client_email: 'missing@dummy.com', private_key: '---' }, // Dummy
+            scopes: SCOPES 
+        });
+    }
 }
 const drive = google.drive({ version: 'v3', auth });
 const DRIVE_FOLDER_ID = '1-5nfYudiGGsI-g7nUwgBmWXnaLvA2CrE';
@@ -86,7 +103,7 @@ const upload = multer({
     limits: { fileSize: 250 * 1024 * 1024 } // 250MB size limit
 });
 
-// File Management Routes (Google Drive Storage)
+// File Management Routes (Hybrid Storage: Database Chunks + Google Drive Backup)
 app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
     console.log(`[ROUTE] /api/files/upload HIT - Files: ${req.files?.length || 0}, Body:`, req.body);
     try {
@@ -100,7 +117,7 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
-        console.log(`[DriveUpload][${year}] Processing ${uploadedFiles.length} files for category: ${category}`);
+        console.log(`[FileUpload][${year}] Processing ${uploadedFiles.length} files for category: ${category}`);
 
         let successCount = 0;
         let failDetails = [];
@@ -108,66 +125,79 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
         for (const file of uploadedFiles) {
             try {
                 const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                console.log(`[DriveUpload] Processing: ${file.originalname} (${fileSizeMB} MB)`);
+                console.log(`[FileUpload] Processing: ${file.originalname} (${fileSizeMB} MB)`);
 
                 const ext = path.extname(file.originalname);
                 const fileType = ext ? ext.substring(1).toLowerCase() : 'bin';
+                const sanitizedOriginalName = file.originalname.replace(/[,']/g, '');
 
-                // 1. Upload to Google Drive directly
-                const fileMetadata = {
-                    name: file.originalname,
-                    parents: [DRIVE_FOLDER_ID]
-                };
-                const media = {
-                    mimeType: file.mimetype,
-                    body: fs.createReadStream(file.path)
-                };
+                // 1. First, Create Entry and Store in Database (Primary for Stability)
+                const [metaResult] = await pool.rawPool.query(
+                    "INSERT INTO uploaded_files (filename, original_name, category, file_type, size) VALUES (?, ?, ?, ?, ?)",
+                    ['PENDING', sanitizedOriginalName, category || 'schedules', fileType, file.size]
+                );
+                const fileId = metaResult.insertId;
 
-                const driveFile = await drive.files.create({
-                    resource: fileMetadata,
-                    media: media,
-                    fields: 'id',
-                    supportsAllDrives: true
-                });
+                // 2. Split file into 5MB chunks for TiDB compatibility (6MB limit)
+                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+                const fileBuffer = fs.readFileSync(file.path);
+                const totalChunks = Math.ceil(fileBuffer.length / CHUNK_SIZE);
                 
-                const driveId = driveFile.data.id;
-                console.log(`[DriveUpload] Uploaded to Drive successfully. ID: ${driveId}`);
-
-                // 2. Make the file viewable by anyone with the link (required for iFrame preview)
-                try {
-                    await drive.permissions.create({
-                        fileId: driveId,
-                        resource: { role: 'reader', type: 'anyone' },
-                        supportsAllDrives: true
-                    });
-                    console.log(`[DriveUpload] Permissions updated for ID: ${driveId}`);
-                } catch (permErr) {
-                    console.error(`[DriveUpload] Failed to set permissions for ID: ${driveId}`, permErr);
+                console.log(`[FileUpload] Writing ${totalChunks} chunks to Database...`);
+                for (let i = 0; i < totalChunks; i++) {
+                    const start = i * CHUNK_SIZE;
+                    const end = Math.min(start + CHUNK_SIZE, fileBuffer.length);
+                    const chunk = fileBuffer.slice(start, end);
+                    await pool.rawPool.query(
+                        "INSERT INTO file_chunks (file_id, chunk_index, chunk_data) VALUES (?, ?, ?)",
+                        [fileId, i, chunk]
+                    );
                 }
 
-                // 3. Insert metadata into TiDB (using 'filename' column to store the Drive ID)
-                // Sanitizing original_name for database and MS Office compatibility
-                const sanitizedOriginalName = file.originalname.replace(/[,']/g, '');
-                
-                await pool.rawPool.query(
-                    "INSERT INTO uploaded_files (filename, original_name, category, file_type, size) VALUES (?, ?, ?, ?, ?)",
-                    [driveId, sanitizedOriginalName, category || 'schedules', fileType, file.size]
-                );
+                // 3. (Optional) Upload to Google Drive as a permanent backup
+                let driveId = 'DATABASE_ONLY';
+                try {
+                    const fileMetadata = { name: file.originalname, parents: [DRIVE_FOLDER_ID] };
+                    const media = { mimeType: file.mimetype, body: fs.createReadStream(file.path) };
+
+                    const driveFile = await drive.files.create({
+                        resource: fileMetadata,
+                        media: media,
+                        fields: 'id',
+                        supportsAllDrives: true
+                    });
+                    
+                    driveId = driveFile.data.id;
+                    console.log(`[FileUpload] Drive Backup Successful. ID: ${driveId}`);
+
+                    // Make the file viewable (Best effort for external viewers if needed)
+                    try {
+                        await drive.permissions.create({
+                            fileId: driveId,
+                            resource: { role: 'reader', type: 'anyone' },
+                            supportsAllDrives: true
+                        });
+                    } catch (e) { }
+                } catch (driveErr) {
+                    console.warn(`[FileUpload] Drive Backup Failed (Continuing with DB storage): ${driveErr.message}`);
+                }
+
+                // 4. Update the filename column with either Drive ID or just 'DATABASE'
+                await pool.rawPool.query("UPDATE uploaded_files SET filename = ? WHERE id = ?", [driveId, fileId]);
 
                 successCount++;
-                console.log(`[DriveUpload] Success: ${file.originalname}`);
+                console.log(`[FileUpload] Success: ${file.originalname} (Stored in DB + Backup attempted)`);
 
-                // Clean up temp file from Render server disk
+                // Clean up temp file
                 try { fs.unlinkSync(file.path); } catch (e) { }
 
             } catch (fileErr) {
-                console.error(`[DriveUpload] FAILED: ${file.originalname}`, fileErr);
+                console.error(`[FileUpload] FAILED: ${file.originalname}`, fileErr);
                 failDetails.push({ name: file.originalname, error: fileErr.message });
                 try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch (e) { }
             }
         }
 
-        console.log(`[DriveUpload] Finished. Success: ${successCount}, Failed: ${failDetails.length}`);
         res.json({
             message: `Processed ${uploadedFiles.length} files. Success: ${successCount}`,
             total: uploadedFiles.length,
@@ -176,7 +206,7 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
             isSuccess: successCount > 0 && failDetails.length === 0
         });
     } catch (err) {
-        console.error('[DriveUpload][FATAL] ERROR:', err);
+        console.error('[FileUpload][FATAL] ERROR:', err);
         res.status(500).json({ error: 'System error during upload processing' });
     }
 });
@@ -236,19 +266,45 @@ app.get(['/api/files/v/:id', '/api/files/v/:id/:name'], async (req, res) => {
 
         const safeFileName = encodeURIComponent(file.original_name || 'file');
         
-        // STREAM FROM GOOGLE DRIVE (Server-side Auth)
-        const driveId = file.filename;
-        const driveRes = await drive.files.get({ fileId: driveId, alt: 'media' }, { responseType: 'stream' });
-
         res.setHeader('Content-Type', contentType);
         if (req.query.download === 'true') {
             res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"; filename*=UTF-8''${safeFileName}`);
         } else {
-            // "inline" allows browsers to use native viewers (sharp and full-featured)
             res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"; filename*=UTF-8''${safeFileName}`);
         }
 
-        driveRes.data.pipe(res);
+        // 1. TRY STREAMING FROM DATABASE (NEW STABLE METHOD)
+        const [chunks] = await pool.rawPool.query(
+            "SELECT chunk_data FROM file_chunks WHERE file_id = ? ORDER BY chunk_index ASC",
+            [id]
+        );
+
+        if (chunks.length > 0) {
+            console.log(`[FileView] Streaming ${chunks.length} chunks from Database for file ID: ${id}`);
+            for (const chunk of chunks) {
+                res.write(chunk.chunk_data);
+            }
+            return res.end();
+        }
+
+        // 2. FALLBACK TO GOOGLE DRIVE (FOR LEGACY FILES)
+        console.log(`[FileView] Chunks not found in DB. Falling back to Google Drive for ID: ${id}`);
+        const driveId = file.filename;
+        if (driveId && driveId !== 'DATABASE_ONLY' && driveId !== 'PENDING') {
+            try {
+                const driveRes = await drive.files.get({ fileId: driveId, alt: 'media' }, { responseType: 'stream' });
+                return driveRes.data.pipe(res);
+            } catch (driveErr) {
+                console.error(`[FileView] Drive Fallback Failed: ${driveErr.message}`);
+                return res.status(500).json({ 
+                    error: 'Streaming Failed', 
+                    details: 'File not found in Database and Google Drive authentication failed. Please re-upload the file.',
+                    auth_error: driveErr.message 
+                });
+            }
+        }
+
+        res.status(404).json({ error: 'File data not found in Database or Drive' });
     } catch (err) {
         console.error("[FileView] ERROR:", err);
         res.status(500).json({ error: 'Streaming Failed', details: err.message });
@@ -268,14 +324,22 @@ app.get('/api/files/e/:id', async (req, res) => {
         const { id } = req.params;
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
+        
+        // Try DB first
+        const [chunks] = await pool.rawPool.query("SELECT chunk_data FROM file_chunks WHERE file_id = ? ORDER BY chunk_index ASC", [id]);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'inline; filename="preview.xlsx"');
+
+        if (chunks.length > 0) {
+            for (const chunk of chunks) res.write(chunk.chunk_data);
+            return res.end();
+        }
+
         const [meta] = await pool.rawPool.query('SELECT filename FROM uploaded_files WHERE id = ?', [id]);
         if (meta.length === 0) return res.status(404).send('No file');
         
         const driveId = meta[0].filename;
         const driveRes = await drive.files.get({ fileId: driveId, alt: 'media' }, { responseType: 'stream' });
-        
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'inline; filename="preview.xlsx"');
         driveRes.data.pipe(res);
     } catch (err) {
         res.status(500).send('Error');

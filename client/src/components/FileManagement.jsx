@@ -35,7 +35,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [uploading, setUploading] = useState(false);
     const [statusAction, setStatusAction] = useState(null);
     const [previewFile, setPreviewFile] = useState(null);
-    const [viewerType, setViewerType] = useState('browser'); // 'browser' or 'office' or 'google'
 
     const [zoom, setZoom] = useState(100);
     const [isFullScreen, setIsFullScreen] = useState(false);
@@ -186,13 +185,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
     const openPreview = async (file) => {
         setPreviewFile(file);
-        // Default viewer type
-        const ext = (file.original_name || '').split('.').pop().toLowerCase();
-        if (['xlsx', 'xls'].includes(ext)) {
-            setViewerType('office');
-        } else {
-            setViewerType('browser');
-        }
         setZoom(100);
         setIsFullScreen(false);
         logActivity(userData, `Open Preview: ${file.original_name}`);
@@ -341,16 +333,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                      {(previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') && (
                                          <>
                                              <div className="toolbar-divider"></div>
-                                             <button 
-                                                 onClick={() => setViewerType(viewerType === 'office' ? 'google' : 'office')} 
-                                                 className={`tool-btn-wide ${viewerType === 'office' ? 'active' : ''}`}
-                                                 title={viewerType === 'office' ? "Switch to Google Preview" : "Switch to Office Pro View"}
-                                             >
+                                             <div className="flex items-center gap-1 bg-[#107c41] text-white px-3 py-1 rounded-md shadow-sm">
                                                   <ExcelIcon size={14} strokeWidth={2.5} />
-                                                  <span className="text-[10px] font-black uppercase tracking-tighter">
-                                                      {viewerType === 'office' ? 'Office Pro View' : 'Std Preview'}
-                                                  </span>
-                                             </button>
+                                                  <span className="text-[10px] font-black uppercase tracking-tighter">Office Pro View</span>
+                                             </div>
                                              <div className="toolbar-divider"></div>
                                              <button onClick={reloadPreview} className="tool-btn" title="Reload if Stuck">
                                                   <Loader2 size={14} />
@@ -398,7 +384,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                   <div 
                                       className="preview-wrap"
                                       style={{
-                                          width: (previewFile.file_type === 'pdf' || viewerType === 'google') ? `${zoom}%` : '100%',
+                                          width: `${zoom}%`,
                                           height: '100%',
                                           minHeight: '100%',
                                           margin: '0 auto',
@@ -414,10 +400,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                            />
                                        ) : (previewFile.file_type === 'xlsx' || previewFile.file_type === 'xls') ? (
                                            <iframe 
-                                               src={viewerType === 'office' 
-                                                   ? `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/v/${previewFile.id}/${previewFile.original_name}?academicYear=${academicYear}`)}`
-                                                   : `https://drive.google.com/file/d/${previewFile.filename}/preview`
-                                               } 
+                                               src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(`${API_URL}/api/files/v/${previewFile.id}/${previewFile.original_name}?academicYear=${academicYear}`)}`} 
                                                className="full-iframe" 
                                                title="Excel Preview"
                                                frameBorder="0"
