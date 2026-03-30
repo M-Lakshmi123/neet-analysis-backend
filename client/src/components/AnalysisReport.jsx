@@ -9,7 +9,6 @@ import { saveAs } from 'file-saver';
 import { logActivity } from '../utils/activityLogger';
 import { useAuth } from './auth/AuthProvider';
 
-
 const AnalysisReport = ({ filters }) => {
     const { userData } = useAuth();
     const [examStats, setExamStats] = useState([]);
@@ -19,70 +18,75 @@ const AnalysisReport = ({ filters }) => {
     const [statsSortConfig, setStatsSortConfig] = useState({ key: 'DATE', direction: 'desc' });
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
+    const getRankedData = (students) => {
+        if (!students || students.length === 0) return [];
+        const calculateRanks = (data, key) => {
+            const sorted = [...data].sort((a, b) => (Number(b[key]) || 0) - (Number(a[key]) || 0));
+            const ranks = new Map();
+            let currentRank = 1;
+            sorted.forEach((s, idx) => {
+                if (idx > 0 && (Number(s[key]) || 0) < (Number(sorted[idx - 1][key]) || 0)) {
+                    currentRank = idx + 1;
+                }
+                ranks.set(s.STUD_ID, currentRank);
+            });
+            return ranks;
+        };
+        const totalRanks = calculateRanks(students, 'tot');
+        const botRanks = calculateRanks(students, 'bot');
+        const zooRanks = calculateRanks(students, 'zoo');
+        const phyRanks = calculateRanks(students, 'phy');
+        const cheRanks = calculateRanks(students, 'che');
+        return students.map(s => ({
+            ...s,
+            calculatedRank: totalRanks.get(s.STUD_ID),
+            b_rank: botRanks.get(s.STUD_ID),
+            z_rank: zooRanks.get(s.STUD_ID),
+            p_rank: phyRanks.get(s.STUD_ID),
+            c_rank: cheRanks.get(s.STUD_ID)
+        }));
+    };
+
     useEffect(() => {
         const controller = new AbortController();
         const fetchData = async () => {
             setLoading(true);
-            setExamStats([]); // Clear old data immediately
-            setStudentMarks([]); // Clear old data immediately
+            setExamStats([]);
+            setStudentMarks([]);
 
             try {
                 const queryParams = buildQueryParams(filters).toString();
-                // Fetch Table 1: Exam Stats
                 const statsRes = await fetch(`${API_URL}/api/exam-stats?${queryParams}`, { signal: controller.signal });
                 const statsData = await statsRes.json();
-                if (!controller.signal.aborted) {
-                    let processedStats = [];
-                    if (statsData && Array.isArray(statsData)) {
-                        // Aggregate duplicate rows (test + date)
-                        const grouped = statsData.reduce((acc, curr) => {
-                            // Normalize Key: Use the same display format for the key to avoid timezone/format mismatches
-                            const dateKey = formatDate(curr.DATE);
-                            const testKey = String(curr.Test || '').trim().toUpperCase();
-                            const groupKey = `${dateKey}_${testKey}`;
-
-                            if (!acc[groupKey]) {
-                                acc[groupKey] = { ...curr };
-                                // Ensure numeric fields are numbers
-                                acc[groupKey].Attn = Number(curr.Attn) || 0;
-                                acc[groupKey].Max_T = Number(curr.Max_T) || 0;
-                                acc[groupKey].Max_B = Number(curr.Max_B) || 0;
-                                acc[groupKey].Max_Z = Number(curr.Max_Z) || 0;
-                                acc[groupKey].Max_P = Number(curr.Max_P) || 0;
-                                acc[groupKey].Max_C = Number(curr.Max_C) || 0;
-                                ['T_700', 'T_680', 'T_650', 'T_600', 'T_550', 'T_530', 'T_450', 'B_160', 'Z_160', 'P_120', 'P_100', 'C_130', 'C_100'].forEach(field => {
-                                    acc[groupKey][field] = Number(curr[field]) || 0;
-                                });
-                            } else {
-                                acc[groupKey].Attn = (Number(acc[groupKey].Attn) || 0) + (Number(curr.Attn) || 0);
-                                // Max of max scores
-                                acc[groupKey].Max_T = Math.max(Number(acc[groupKey].Max_T) || 0, Number(curr.Max_T) || 0, Number(acc[groupKey].Max_T) || 0);
-                                acc[groupKey].Max_B = Math.max(Number(acc[groupKey].Max_B) || 0, Number(curr.Max_B) || 0, Number(acc[groupKey].Max_B) || 0);
-                                acc[groupKey].Max_Z = Math.max(Number(acc[groupKey].Max_Z) || 0, Number(curr.Max_Z) || 0, Number(acc[groupKey].Max_Z) || 0);
-                                acc[groupKey].Max_P = Math.max(Number(acc[groupKey].Max_P) || 0, Number(curr.Max_P) || 0, Number(acc[groupKey].Max_P) || 0);
-                                acc[groupKey].Max_C = Math.max(Number(acc[groupKey].Max_C) || 0, Number(curr.Max_C) || 0, Number(acc[groupKey].Max_C) || 0);
-                                // Sum of threshold counts
-                                ['T_700', 'T_680', 'T_650', 'T_600', 'T_550', 'T_530', 'T_450', 'B_160', 'Z_160', 'P_120', 'P_100', 'C_130', 'C_100'].forEach(field => {
-                                    acc[groupKey][field] = (Number(acc[groupKey][field]) || 0) + (Number(curr[field]) || 0);
-                                });
-                            }
-                            return acc;
-                        }, {});
-                        processedStats = Object.values(grouped);
-                    }
-                    setExamStats(processedStats);
+                if (!controller.signal.aborted && Array.isArray(statsData)) {
+                    const grouped = statsData.reduce((acc, curr) => {
+                        const dateKey = formatDate(curr.DATE);
+                        const testKey = String(curr.Test || '').trim().toUpperCase();
+                        const groupKey = `${dateKey}_${testKey}`;
+                        if (!acc[groupKey]) {
+                            acc[groupKey] = { ...curr };
+                            ['Attn', 'Max_T', 'Max_B', 'Max_Z', 'Max_P', 'Max_C'].forEach(f => acc[groupKey][f] = Number(curr[f]) || 0);
+                            ['T_700', 'T_680', 'T_650', 'T_600', 'T_550', 'T_530', 'T_450', 'B_160', 'Z_160', 'P_120', 'P_100', 'C_130', 'C_100'].forEach(f => acc[groupKey][f] = Number(curr[f]) || 0);
+                        } else {
+                            acc[groupKey].Attn += Number(curr.Attn) || 0;
+                            acc[groupKey].Max_T = Math.max(acc[groupKey].Max_T, Number(curr.Max_T) || 0);
+                            acc[groupKey].Max_B = Math.max(acc[groupKey].Max_B, Number(curr.Max_B) || 0);
+                            acc[groupKey].Max_Z = Math.max(acc[groupKey].Max_Z, Number(curr.Max_Z) || 0);
+                            acc[groupKey].Max_P = Math.max(acc[groupKey].Max_P, Number(curr.Max_P) || 0);
+                            acc[groupKey].Max_C = Math.max(acc[groupKey].Max_C, Number(curr.Max_C) || 0);
+                            ['T_700', 'T_680', 'T_650', 'T_600', 'T_550', 'T_530', 'T_450', 'B_160', 'Z_160', 'P_120', 'P_100', 'C_130', 'C_100'].forEach(f => acc[groupKey][f] += Number(curr[f]) || 0);
+                        }
+                        return acc;
+                    }, {});
+                    setExamStats(Object.values(grouped));
                 }
 
-                // Fetch Table 2: Student Marks
                 const marksRes = await fetch(`${API_URL}/api/analysis-report?${queryParams}`, { signal: controller.signal });
                 const marksData = await marksRes.json();
-
                 if (!controller.signal.aborted) {
-                    setStudentMarks(marksData && marksData.students ? marksData.students : []);
-                    // Log activity
-                    if (marksData && marksData.students && marksData.students.length > 0) {
-                        logActivity(userData, 'Generated Analysis Report', { studentCount: marksData.students.length });
-                    }
+                    const ranked = getRankedData(marksData && marksData.students ? marksData.students : []);
+                    setStudentMarks(ranked);
+                    if (ranked.length > 0) logActivity(userData, 'Generated Analysis Report', { studentCount: ranked.length });
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -91,23 +95,12 @@ const AnalysisReport = ({ filters }) => {
                     setStudentMarks([]);
                 }
             } finally {
-                if (!controller.signal.aborted) {
-                    setLoading(false);
-                }
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
 
-        // Debounce only the network call, but show loading immediately?
-        // User wants "till full data loading only show the table from the database". 
-        // Showing loading immediately is safer to avoid confusion.
-        const timeoutId = setTimeout(() => {
-            fetchData();
-        }, 500);
-
-        return () => {
-            controller.abort();
-            clearTimeout(timeoutId);
-        };
+        const timeoutId = setTimeout(fetchData, 500);
+        return () => { controller.abort(); clearTimeout(timeoutId); };
     }, [filters]);
 
     const getStreamLabel = () => {
@@ -409,14 +402,14 @@ const AnalysisReport = ({ filters }) => {
                 Math.round(row.tot || 0),
                 Math.round(row.air) || '-',
                 Math.round(row.bot || 0),
-                Math.round(row.b_rank || 0),
+                row.b_rank || '-',
                 Math.round(row.zoo || 0),
-                Math.round(row.z_rank || 0),
+                row.z_rank || '-',
                 Math.round((Number(row.bot) || 0) + (Number(row.zoo) || 0)),
                 Math.round(row.phy || 0),
-                Math.round(row.p_rank || 0),
+                row.p_rank || '-',
                 Math.round(row.che || 0),
-                Math.round(row.c_rank || 0)
+                row.c_rank || '-'
             ]);
 
             autoTable(doc, {
@@ -603,14 +596,14 @@ const AnalysisReport = ({ filters }) => {
                     Number(student.tot || 0),
                     Math.round(student.air) || '-',
                     Number(student.bot || 0),
-                    Math.round(student.b_rank || 0),
+                    student.b_rank,
                     Number(student.zoo || 0),
-                    Math.round(student.z_rank || 0),
+                    student.z_rank,
                     Number((Number(student.bot) || 0) + (Number(student.zoo) || 0)),
                     Number(student.phy || 0),
-                    Math.round(student.p_rank || 0),
+                    student.p_rank,
                     Number(student.che || 0),
-                    Math.round(student.c_rank || 0),
+                    student.c_rank,
                     student.t_app
                 ];
                 const row = worksheet.addRow(rowData);
@@ -832,14 +825,14 @@ const AnalysisReport = ({ filters }) => {
                                                 <td className="col-yellow" style={{ fontWeight: '800', color: 'black' }}>{Number(student.tot || 0).toFixed(1)}</td>
                                                 <td className="col-white" style={{ fontWeight: '700', color: '#6c361e' }}>{Math.round(student.air) || '-'}</td>
                                                 <td className="col-green" style={{ color: 'black' }}>{Number(student.bot || 0).toFixed(1)}</td>
-                                                <td className="col-white" style={{ color: 'black' }}>{Number(student.b_rank || 0).toFixed(1)}</td>
+                                                <td className="col-white" style={{ color: 'black' }}>{student.b_rank}</td>
                                                 <td className="col-blue-light" style={{ color: 'black' }}>{Number(student.zoo || 0).toFixed(1)}</td>
-                                                <td className="col-white" style={{ color: 'black' }}>{Number(student.z_rank || 0).toFixed(1)}</td>
+                                                <td className="col-white" style={{ color: 'black' }}>{student.z_rank}</td>
                                                 <td className="col-blue-med" style={{ fontWeight: '800', color: '#1e4a80' }}>{((Number(student.bot) || 0) + (Number(student.zoo) || 0)).toFixed(1)}</td>
                                                 <td className="col-green-pale" style={{ color: 'black' }}>{Number(student.phy || 0).toFixed(1)}</td>
-                                                <td className="col-white" style={{ color: 'black' }}>{Number(student.p_rank || 0).toFixed(1)}</td>
+                                                <td className="col-white" style={{ color: 'black' }}>{student.p_rank}</td>
                                                 <td className="col-pink-pale" style={{ color: 'black' }}>{Number(student.che || 0).toFixed(1)}</td>
-                                                <td className="col-white" style={{ color: 'black' }}>{Number(student.c_rank || 0).toFixed(1)}</td>
+                                                <td className="col-white" style={{ color: 'black' }}>{student.c_rank}</td>
                                                 <td className="col-exams" style={{ fontWeight: '700', color: 'black' }}>{student.t_app}</td>
                                             </tr>
                                         ))

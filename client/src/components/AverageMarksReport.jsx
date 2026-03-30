@@ -59,15 +59,43 @@ const AverageMarksReport = ({ filters }) => {
 
     const getRankedData = (students) => {
         if (!students || students.length === 0) return [];
-        // Sort by tot descending to ensure correct ranking
-        const sorted = [...students].sort((a, b) => b.tot - a.tot);
-        let currentRank = 1;
-        return sorted.map((s, idx) => {
-            if (idx > 0 && Math.round(s.tot) < Math.round(sorted[idx - 1].tot)) {
-                currentRank = idx + 1;
-            }
-            return { ...s, calculatedRank: currentRank };
-        });
+        
+        // Helper to calculate competition rank
+        const calculateRanks = (data, key) => {
+            const sorted = [...data].sort((a, b) => (Number(b[key]) || 0) - (Number(a[key]) || 0));
+            const ranks = new Map();
+            let currentRank = 1;
+            
+            sorted.forEach((s, idx) => {
+                if (idx > 0) {
+                    const prevVal = Number(sorted[idx - 1][key]) || 0;
+                    const currVal = Number(s[key]) || 0;
+                    // Use a small epsilon for float comparison or just direct comparison since it's already averaged
+                    if (currVal < prevVal) {
+                        currentRank = idx + 1;
+                    }
+                }
+                ranks.set(s.STUD_ID, currentRank);
+            });
+            return ranks;
+        };
+
+        // Calculate all necessary ranks
+        const totalRanks = calculateRanks(students, 'tot');
+        const botRanks = calculateRanks(students, 'bot');
+        const zooRanks = calculateRanks(students, 'zoo');
+        const phyRanks = calculateRanks(students, 'phy');
+        const cheRanks = calculateRanks(students, 'che');
+
+        // Apply ranks to students and return sorted by total rank
+        return students.map(s => ({
+            ...s,
+            calculatedRank: totalRanks.get(s.STUD_ID),
+            calculatedBRank: botRanks.get(s.STUD_ID),
+            calculatedZRank: zooRanks.get(s.STUD_ID),
+            calculatedPRank: phyRanks.get(s.STUD_ID),
+            calculatedCRank: cheRanks.get(s.STUD_ID)
+        })).sort((a, b) => a.calculatedRank - b.calculatedRank);
     };
 
     const getFilteredData = () => {
@@ -240,10 +268,10 @@ const AverageMarksReport = ({ filters }) => {
         rankedStudents.forEach((s) => {
             const rowData = [
                 s.STUD_ID || '', s.name || '', s.campus || '',
-                Number(s.bot || 0), Math.round(s.b_rank || 0),
-                Number(s.zoo || 0), Math.round(s.z_rank || 0),
-                Number(s.phy || 0), Math.round(s.p_rank || 0),
-                Number(s.che || 0), Math.round(s.c_rank || 0),
+                Number(s.bot || 0), s.calculatedBRank,
+                Number(s.zoo || 0), s.calculatedZRank,
+                Number(s.phy || 0), s.calculatedPRank,
+                Number(s.che || 0), s.calculatedCRank,
                 Number(s.tot || 0), s.calculatedRank,
                 s.t_app || 0, totalConducted
             ];
