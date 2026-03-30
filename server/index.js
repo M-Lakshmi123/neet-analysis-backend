@@ -98,6 +98,16 @@ const storage = multer.diskStorage({
     }
 });
 
+// --- STARTUP STABILITY & HEALTH CHECKS ---
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'online', 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage() 
+    });
+});
+
 const upload = multer({
     storage: storage,
     limits: { fileSize: 250 * 1024 * 1024 } // 250MB size limit
@@ -105,7 +115,7 @@ const upload = multer({
 
 // File Management Routes (Hybrid Storage: Database Chunks + Google Drive Backup)
 app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
-    console.log(`[ROUTE] /api/files/upload HIT - Files: ${req.files?.length || 0}, Body:`, req.body);
+    console.log(`[STABILITY][UPLOAD] Request Received. Memory: ${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB`);
     try {
         const { category } = req.body;
         const uploadedFiles = req.files;
@@ -117,15 +127,13 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
-        console.log(`[FileUpload][${year}] Processing ${uploadedFiles.length} files for category: ${category}`);
-
         let successCount = 0;
         let failDetails = [];
 
         for (const file of uploadedFiles) {
             try {
                 const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                console.log(`[FileUpload] Processing: ${file.originalname} (${fileSizeMB} MB)`);
+                console.log(`[STABILITY][UPLOAD] Processing: ${file.originalname} (${fileSizeMB} MB)`);
 
                 const ext = path.extname(file.originalname);
                 const fileType = ext ? ext.substring(1).toLowerCase() : 'bin';
@@ -138,21 +146,28 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 );
                 const fileId = metaResult.insertId;
 
-                // 2. Transcode into 4MB chunks (Conservative limit for TiDB stability)
+                // 2. Write to TiDB in 4MB chunks WITHOUT LOADING TOTAL FILE INTO RAM
                 const CHUNK_SIZE = 4 * 1024 * 1024; 
-                const fileBuffer = fs.readFileSync(file.path);
-                const totalChunks = Math.ceil(fileBuffer.length / CHUNK_SIZE);
+                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                const fd = fs.openSync(file.path, 'r');
                 
-                console.log(`[FileUpload] Writing ${totalChunks} chunks to TiDB for ID: ${fileId}...`);
-                for (let i = 0; i < totalChunks; i++) {
-                    const chunk = fileBuffer.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-                    await pool.rawPool.query(
-                        "INSERT INTO file_chunks (file_id, chunk_index, chunk_data) VALUES (?, ?, ?)",
-                        [fileId, i, chunk]
-                    );
+                console.log(`[STABILITY][UPLOAD] Committing ${totalChunks} chunks to TiDB for ID: ${fileId}...`);
+                try {
+                    for (let i = 0; i < totalChunks; i++) {
+                        const buffer = Buffer.alloc(CHUNK_SIZE);
+                        const bytesRead = fs.readSync(fd, buffer, 0, CHUNK_SIZE, i * CHUNK_SIZE);
+                        const finalChunk = bytesRead < CHUNK_SIZE ? buffer.subarray(0, bytesRead) : buffer;
+                        
+                        await pool.rawPool.query(
+                            "INSERT INTO file_chunks (file_id, chunk_index, chunk_data) VALUES (?, ?, ?)",
+                            [fileId, i, finalChunk]
+                        );
+                    }
+                } finally {
+                    fs.closeSync(fd);
                 }
 
-                // 3. Drive Backup (Attempts silently in background)
+                // 3. Drive Backup (Silent background upload)
                 let driveId = 'DATABASE_ONLY';
                 try {
                     const driveFile = await drive.files.create({
@@ -163,7 +178,7 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                     });
                     driveId = driveFile.data.id;
                     await drive.permissions.create({ fileId: driveId, resource: { role: 'reader', type: 'anyone' }, supportsAllDrives: true }).catch(() => {});
-                } catch (de) { console.warn(`[FileUpload] Drive backup skipped: ${de.message}`); }
+                } catch (de) { console.warn(`[STABILITY] Drive backup skipped: ${de.message}`); }
 
                 // 4. Finalize
                 await pool.rawPool.query("UPDATE uploaded_files SET filename = ? WHERE id = ?", [driveId, fileId]);
@@ -171,7 +186,7 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 try { fs.unlinkSync(file.path); } catch (e) { }
 
             } catch (fileErr) {
-                console.error(`[FileUpload] FAILED: ${file.originalname}`, fileErr);
+                console.error(`[STABILITY][UPLOAD] FAILED: ${file.originalname}`, fileErr);
                 failDetails.push({ name: file.originalname, error: fileErr.message });
                 try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch (e) { }
             }
@@ -185,7 +200,7 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
             isSuccess: successCount > 0
         });
     } catch (err) {
-        console.error('[FileUpload][FATAL] ERROR:', err);
+        console.error('[STABILITY][FATAL] ERROR:', err);
         res.status(500).json({ error: 'System error during upload processing' });
     }
 });
@@ -1756,27 +1771,24 @@ process.on('unhandledRejection', (reason, promise) => {
     fs.appendFileSync('crash.log', `[${new Date().toISOString()}] UNHANDLED REJECTION: ${reason}\n`);
 });
 
-// --- RENDER KEEP-ALIVE SYSTEM ---
-// Render free tier services sleep after 15 minutes of inactivity.
-// This script pings the server every 14 minutes to keep it awake.
-const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+// --- RENDER KEEP-ALIVE & AUTO-RECTIFY SYSTEM ---
+// Render free tier services sleep after 15 mins. UptimeRobot checks every 5 mins.
+// This loop ensures the server stays awake and satisfies the health check.
+const BACKEND_URL = process.env.RENDER_EXTERNAL_URL || 'https://neet-backend-v2.onrender.com';
 
-if (RENDER_EXTERNAL_URL) {
-    setInterval(() => {
-        try {
-            // Ensure URL starts with http to prevent protocol crash
-            const pingUrl = RENDER_EXTERNAL_URL.startsWith('http') ? RENDER_EXTERNAL_URL : `https://${RENDER_EXTERNAL_URL}`;
-            const client = pingUrl.startsWith('https') ? https : require('http');
-            
-            client.get(pingUrl, (res) => {
-                console.log(`[Keep-Alive] Pinged ${pingUrl} - Status: ${res.statusCode}`);
-            }).on('error', (err) => {
-                console.error(`[Keep-Alive] Ping failed: ${err.message}`);
-            });
-        } catch (pingErr) {
-            console.error(`[Keep-Alive] Critical Failure:`, pingErr.message);
-        }
-    }, 14 * 60 * 1000); // 14 minutes
-} else {
-    console.log("[Keep-Alive] RENDER_EXTERNAL_URL not found, self-pinging skipped.");
-}
+setInterval(() => {
+    try {
+        const pingUrl = `${BACKEND_URL}/api/health`;
+        const client = pingUrl.startsWith('https') ? https : require('http');
+        
+        client.get(pingUrl, (res) => {
+            if (res.statusCode === 200) {
+                console.log(`[Stability] Keep-Alive Successful: ${new Date().toLocaleTimeString()} ✅`);
+            } else {
+                console.warn(`[Stability] Keep-Alive Warning: Status ${res.statusCode} ⚠️`);
+            }
+        }).on('error', (err) => {
+            console.error(`[Stability] Self-Ping Failed: ${err.message} ❌`);
+        });
+    } catch (e) { }
+}, 5 * 60 * 1000); // Ping every 5 minutes to match UptimeRobot
