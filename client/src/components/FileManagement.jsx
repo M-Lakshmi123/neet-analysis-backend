@@ -262,9 +262,8 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                             <tr>
                                 <th className="w-12 text-center">MODE</th>
                                 <th>FILE NAME</th>
-                                <th className="w-24 text-center">STORAGE</th>
                                 {isMainAdmin && <th className="w-48 text-right">UPLOAD DATE</th>}
-                                <th className="w-32 text-right text-right">ACTION</th>
+                                <th className="w-32 text-right">ACTION</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -272,13 +271,6 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                 <tr key={file.id} onClick={() => openPreview(file)}>
                                     <td className="text-center">{getFileIcon(file.file_type)}</td>
                                     <td><span className="file-name-text">{file.original_name}</span></td>
-                                    <td className="text-center">
-                                         {file.hasChunks ? (
-                                              <span className="storage-badge stable">SERVER DB</span>
-                                         ) : (
-                                              <span className="storage-badge legacy" title="Legacy file on Google Drive. Re-upload if connection fails.">GD-LEGACY</span>
-                                         )}
-                                    </td>
                                     {isMainAdmin && <td className="date-text text-right">{new Date(file.upload_date).toLocaleString()}</td>}
                                     <td className="text-right">
                                         <div className="flex items-center justify-end gap-3" onClick={e => e.stopPropagation()}>
