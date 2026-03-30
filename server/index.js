@@ -196,32 +196,34 @@ app.get('/api/files', async (req, res) => {
         const pool = await connectToDb(year);
         const { category } = req.query;
 
-        // Self-healing: Check if 'size' column exists, add if missing
+        // Self-healing: Check if 'size' column exists
         try {
             const [columns] = await pool.rawPool.query("SHOW COLUMNS FROM uploaded_files LIKE 'size'");
             if (columns.length === 0) {
                 await pool.rawPool.query("ALTER TABLE uploaded_files ADD COLUMN size BIGINT DEFAULT 0");
-                console.log(`[SchemaUpdate][${year}] Added missing 'size' column.`);
             }
-        } catch (schemaErr) {
-            console.error(`[SchemaUpdate][${year}] Failed to verify/add size column:`, schemaErr.message);
-        }
+        } catch (e) { }
 
-        let query = 'SELECT id, filename, original_name, category, file_type, upload_date, size FROM uploaded_files';
+        // Fetch files with a subquery to check for chunk existence
+        let query = `
+            SELECT f.id, f.filename, f.original_name, f.category, f.file_type, f.upload_date, f.size,
+                   (SELECT COUNT(*) FROM file_chunks WHERE file_id = f.id LIMIT 1) > 0 as hasChunks
+            FROM uploaded_files f
+        `;
         const params = [];
 
         if (category) {
-            query += ' WHERE category = ?';
+            query += ' WHERE f.category = ?';
             params.push(category);
         }
 
-        query += ' ORDER BY upload_date DESC';
+        query += ' ORDER BY f.upload_date DESC';
 
         const [rows] = await pool.rawPool.query(query, params);
         res.json(rows);
     } catch (err) {
-        console.error(`[FileList][${req.query.academicYear}] ERROR:`, err);
-        res.status(500).json({ error: 'Failed to fetch files from database' });
+        console.error(`[FileList] ERROR:`, err);
+        res.status(500).json({ error: 'Failed to fetch files' });
     }
 });
 

@@ -262,8 +262,9 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                             <tr>
                                 <th className="w-12 text-center">MODE</th>
                                 <th>FILE NAME</th>
-                                {isMainAdmin && <th className="w-48">UPLOAD DATE</th>}
-                                <th className="w-32 text-right">ACTION</th>
+                                <th className="w-24 text-center">STORAGE</th>
+                                {isMainAdmin && <th className="w-48 text-right">UPLOAD DATE</th>}
+                                <th className="w-32 text-right text-right">ACTION</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -271,13 +272,20 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                 <tr key={file.id} onClick={() => openPreview(file)}>
                                     <td className="text-center">{getFileIcon(file.file_type)}</td>
                                     <td><span className="file-name-text">{file.original_name}</span></td>
-                                    {isMainAdmin && <td className="date-text">{new Date(file.upload_date).toLocaleString()}</td>}
+                                    <td className="text-center">
+                                         {file.hasChunks ? (
+                                              <span className="storage-badge stable">SERVER DB</span>
+                                         ) : (
+                                              <span className="storage-badge legacy" title="Legacy file on Google Drive. Re-upload if connection fails.">GD-LEGACY</span>
+                                         )}
+                                    </td>
+                                    {isMainAdmin && <td className="date-text text-right">{new Date(file.upload_date).toLocaleString()}</td>}
                                     <td className="text-right">
                                         <div className="flex items-center justify-end gap-3" onClick={e => e.stopPropagation()}>
                                             <button onClick={() => openPreview(file)} className="icon-link view" title="View Preview"><Eye size={16} /></button>
                                             {isMainAdmin && (
                                                 <>
-                                                    <a href={`${API_URL}/api/files/view/${file.id}?academicYear=${academicYear}&download=true`} className="icon-link download" download><Download size={16} /></a>
+                                                    <a href={`${API_URL}/api/files/v/${file.id}/${file.original_name}?academicYear=${academicYear}&download=true`} className="icon-link download" download><Download size={16} /></a>
                                                     <button onClick={(e) => handleDelete(e, file.id)} className="icon-link delete"><Trash2 size={16} /></button>
                                                 </>
                                             )}
@@ -497,6 +505,10 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 
                 .flat-btn-outline { border: 1px solid #172554; color: #172554; padding: 6px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; background: transparent; }
                 .flat-btn-outline:hover { background: #f8fafc; }
+
+                .storage-badge { font-size: 8px; font-weight: 900; padding: 3px 8px; border-radius: 50px; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; white-space: nowrap; }
+                .storage-badge.stable { background: #dcfce7; color: #166534; border: 1px solid #bbfcce; }
+                .storage-badge.legacy { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
             `}</style>
         </div>
     );
