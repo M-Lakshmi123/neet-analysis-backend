@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'fi
 import { Mail, School, CheckCircle, Clock, MessageSquare, Edit } from 'lucide-react';
 import Select from 'react-select'; // Import Select for campus choosing
 
-const UserApprovals = () => {
+const UserApprovals = ({ academicYear }) => {
     const [pendingUsers, setPendingUsers] = useState([]);
     const [approvedUsers, setApprovedUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -18,11 +18,11 @@ const UserApprovals = () => {
     useEffect(() => {
         fetchUsers();
         fetchCampuses();
-    }, []);
+    }, [academicYear]);
 
     const fetchCampuses = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/filters`);
+            const res = await fetch(`${API_URL}/api/filters?academicYear=${academicYear || '2025'}`);
             const data = await res.json();
             if (data.campuses) {
                 setAllCampuses(data.campuses.map(c => ({ value: c, label: c })));

@@ -293,7 +293,7 @@ const Dashboard = () => {
                     </div>
                 );
             case 'approvals':
-                return isAdmin ? <UserApprovals /> : <div className="p-4">Access Denied</div>;
+                return isAdmin ? <UserApprovals academicYear={academicYear} /> : <div className="p-4">Access Denied</div>;
             case 'logs':
                 return isAdmin ? <ActivityLogs /> : <div className="p-4">Access Denied</div>;
             case 'file_management':
