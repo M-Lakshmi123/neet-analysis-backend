@@ -198,7 +198,7 @@ const UserApprovals = ({ academicYear }) => {
                         <CheckCircle size={18} />
                         <h4>Approved Users</h4>
                     </div>
-                    <div className="table-wrapper">
+                    <div className="table-wrapper" style={{ overflowX: 'auto' }}>
                         <table className="modern-table">
                             <thead>
                                 <tr>
