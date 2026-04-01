@@ -37,19 +37,29 @@ const AnalysisReport = ({ filters }) => {
         const zooRanks = calculateRanks(students, 'zoo');
         const phyRanks = calculateRanks(students, 'phy');
         const cheRanks = calculateRanks(students, 'che');
-        return students.map(s => ({
-            ...s,
-            calculatedRank: totalRanks.get(s.STUD_ID),
-            sel_b_rank: botRanks.get(s.STUD_ID),
-            sel_z_rank: zooRanks.get(s.STUD_ID),
-            sel_p_rank: phyRanks.get(s.STUD_ID),
-            sel_c_rank: cheRanks.get(s.STUD_ID),
-            // Prioritize what was returned from the server (uploaded)
-            b_rank: Math.round(Number(s.b_rank) || botRanks.get(s.STUD_ID)),
-            z_rank: Math.round(Number(s.z_rank) || zooRanks.get(s.STUD_ID)),
-            p_rank: Math.round(Number(s.p_rank) || phyRanks.get(s.STUD_ID)),
-            c_rank: Math.round(Number(s.c_rank) || cheRanks.get(s.STUD_ID))
-        }));
+        return students.map(s => {
+            // Keep original values from server. Backend returns AVG(B_Rank) as b_rank, etc.
+            const bRankVal = Number(s.b_rank) || 0;
+            const zRankVal = Number(s.z_rank) || 0;
+            const pRankVal = Number(s.p_rank) || 0;
+            const cRankVal = Number(s.c_rank) || 0;
+            const airVal = Number(s.air) || 0;
+
+            return {
+                ...s,
+                tot_rank: totalRanks.get(s.STUD_ID),
+                sel_b_rank: botRanks.get(s.STUD_ID),
+                sel_z_rank: zooRanks.get(s.STUD_ID),
+                sel_p_rank: phyRanks.get(s.STUD_ID),
+                sel_c_rank: cheRanks.get(s.STUD_ID),
+                // Display ONLY uploaded ranks (or their average)
+                b_rank: bRankVal > 0 ? Math.round(bRankVal) : '-',
+                z_rank: zRankVal > 0 ? Math.round(zRankVal) : '-',
+                p_rank: pRankVal > 0 ? Math.round(pRankVal) : '-',
+                c_rank: cRankVal > 0 ? Math.round(cRankVal) : '-',
+                air: airVal > 0 ? Math.round(airVal) : '-'
+            };
+        });
     };
 
     useEffect(() => {
