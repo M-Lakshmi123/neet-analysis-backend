@@ -40,10 +40,15 @@ const AnalysisReport = ({ filters }) => {
         return students.map(s => ({
             ...s,
             calculatedRank: totalRanks.get(s.STUD_ID),
-            b_rank: botRanks.get(s.STUD_ID),
-            z_rank: zooRanks.get(s.STUD_ID),
-            p_rank: phyRanks.get(s.STUD_ID),
-            c_rank: cheRanks.get(s.STUD_ID)
+            sel_b_rank: botRanks.get(s.STUD_ID),
+            sel_z_rank: zooRanks.get(s.STUD_ID),
+            sel_p_rank: phyRanks.get(s.STUD_ID),
+            sel_c_rank: cheRanks.get(s.STUD_ID),
+            // Prioritize what was returned from the server (uploaded)
+            b_rank: Math.round(Number(s.b_rank) || botRanks.get(s.STUD_ID)),
+            z_rank: Math.round(Number(s.z_rank) || zooRanks.get(s.STUD_ID)),
+            p_rank: Math.round(Number(s.p_rank) || phyRanks.get(s.STUD_ID)),
+            c_rank: Math.round(Number(s.c_rank) || cheRanks.get(s.STUD_ID))
         }));
     };
 
