@@ -247,6 +247,10 @@ async function processErp() {
                         return (s.includes('UN') && s.includes('%')) || (s.includes('U%'));
                     });
 
+                    // Stronger validation: ensure we use Column G (index 6) if it's likely the intended Wrong % column
+                    const finalWCol = (wCol === -1 || (wCol !== 6 && String(headRow[6] || '').includes('%'))) ? 6 : wCol;
+                    const finalUCol = (uCol === -1 || (uCol !== 8 && String(headRow[8] || '').includes('%'))) ? 8 : uCol;
+
                     // Data starts from either current header row if QNo is there, or next row
                     const firstColHeader = String(top100Data[headerRowIdx][0] || '').toUpperCase();
                     const startDataIdx = (firstColHeader.startsWith('Q') || /^\d+$/.test(firstColHeader)) ? headerRowIdx : headerRowIdx + 1;
@@ -259,8 +263,8 @@ async function processErp() {
                         if (!qNoRaw.toUpperCase().startsWith('Q') && isNaN(parseInt(qNoRaw))) continue;
                         const qNo = qNoRaw.replace(/[^0-9]/g, '');
                         nationalErrorMap[qNo] = {
-                            W: formatPercentage(row[wCol !== -1 ? wCol : 6]),
-                            U: formatPercentage(row[uCol !== -1 ? uCol : 8])
+                            W: formatPercentage(row[finalWCol]),
+                            U: formatPercentage(row[finalUCol])
                         };
                     }
                 }
@@ -339,7 +343,7 @@ async function processErp() {
                             Physics: row[marksColMap.PHY], P_Rank: row[marksColMap.P_Rank],
                             Chemistry: row[marksColMap.CHE], C_Rank: row[marksColMap.C_Rank],
                             Q_No: parseInt(qNo), W_U: val,
-                            National_Wide_Error: (nationalErrorMap[qNo] && nationalErrorMap[qNo][val]) || '--',
+                            National_Wide_Error: (nationalErrorMap[qNo] && nationalErrorMap[qNo].W) || '--',
                             Q_URL: urlSubMap.Q[qNo] || '', S_URL: urlSubMap.S[qNo] || DEFAULT_S_URL,
                             Key_Value: keysMap[qNo] || '', Subject: meta.Subject || '--',
                             Topic: meta.Topic || '--', Sub_Topic: meta.Sub_Topic || '--',
