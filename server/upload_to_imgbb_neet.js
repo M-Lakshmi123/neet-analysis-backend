@@ -12,8 +12,18 @@ async function uploadToImgBB() {
         process.exit(1);
     }
 
+    const args = process.argv.slice(2);
+    const targetTest = args[0];
+    const targetType = args[1]; // Ignored for folder path since it's the DB Type (e.g. NSGT)
+
+    if (targetTest) {
+        console.log(`[FILTER] Searching for Test: ${targetTest} across all streams.`);
+    }
+
     // Iterate through Stream folders
-    const streams = fs.readdirSync(picsBaseDir).filter(f => fs.statSync(path.join(picsBaseDir, f)).isDirectory());
+    const streams = fs.readdirSync(picsBaseDir).filter(f => {
+        return fs.statSync(path.join(picsBaseDir, f)).isDirectory();
+    });
 
     const browser = await puppeteer.launch({
         headless: false,
@@ -50,7 +60,11 @@ async function uploadToImgBB() {
 
         for (const stream of streams) {
             const streamPath = path.join(picsBaseDir, stream);
-            const tests = fs.readdirSync(streamPath).filter(f => fs.statSync(path.join(streamPath, f)).isDirectory());
+            const tests = fs.readdirSync(streamPath).filter(f => {
+                const isDir = fs.statSync(path.join(streamPath, f)).isDirectory();
+                if (targetTest) return isDir && f === targetTest;
+                return isDir;
+            });
 
             for (const test of tests) {
                 const testPath = path.join(streamPath, test);
@@ -68,16 +82,16 @@ async function uploadToImgBB() {
                 if (!session.mappings[stream]) session.mappings[stream] = {};
                 if (!session.mappings[stream][test]) session.mappings[stream][test] = { Q: {}, S: {} };
 
-                const qFiles = fs.readdirSync(qDir).filter(f => f.endsWith('.png') || f.endsWith('.jpg'));
-                const sFiles = fs.existsSync(sDir) ? fs.readdirSync(sDir).filter(f => f.endsWith('.png') || f.endsWith('.jpg')) : [];
+                const qFiles = fs.readdirSync(qDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg'));
+                const sFiles = fs.existsSync(sDir) ? fs.readdirSync(sDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg')) : [];
 
                 const missingQ = qFiles.filter(f => {
-                    const qNo = f.replace(/[QS]/i, '').replace(/\.(png|jpg)/, '');
+                    const qNo = f.replace(/[QS]/i, '').replace(/\.(png|jpg)/i, '');
                     return !session.mappings[stream][test].Q[qNo];
                 });
 
                 const missingS = sFiles.filter(f => {
-                    const qNo = f.replace(/[QS]/i, '').replace(/\.(png|jpg)/, '');
+                    const qNo = f.replace(/[QS]/i, '').replace(/\.(png|jpg)/i, '');
                     return !session.mappings[stream][test].S[qNo];
                 });
 
@@ -142,6 +156,12 @@ async function uploadToImgBB() {
 
                     await inputUpload.uploadFile(...filePaths);
 
+                    // Dispatch change event to force ImgBB to recognize the uploaded files (recently added requirement)
+                    await page.evaluate(() => {
+                        const el = document.querySelector('input[type="file"]');
+                        if (el) el.dispatchEvent(new Event('change', { bubbles: true }));
+                    });
+
                     console.log("  Waiting for UPLOAD button...");
                     await page.waitForSelector('button.btn.btn-big.green[data-action="upload"]', { visible: true });
                     await new Promise(r => setTimeout(r, 1500));
@@ -173,7 +193,7 @@ async function uploadToImgBB() {
                     const links = linksText.split('\n').map(l => l.trim()).filter(l => l);
 
                     missing.forEach((file, idx) => {
-                        const qNo = file.replace(/[QS]/i, '').replace(/\.(png|jpg)/, '');
+                        const qNo = file.replace(/[QS]/i, '').replace(/\.(png|jpg)/i, '');
                         if (links[idx]) session.mappings[stream][test][type][qNo] = links[idx];
                     });
 

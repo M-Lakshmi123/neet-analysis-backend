@@ -638,7 +638,7 @@ app.get('/api/filters', async (req, res) => {
             streams: (streamsRes.recordset || []).map(r => r.Stream).filter(Boolean),
             testTypes: (testTypesRes.recordset || []).map(r => r.Test_Type).filter(Boolean),
             tests: (testsRes.recordset || []).map(r => r.Test).filter(Boolean),
-            topAll: prunedTopAll
+            topAll: [...new Set(prunedTopAll)]
         };
 
         console.log(`[Filters] Success (${Date.now() - start}ms): ${responseData.campuses.length} campuses, ${responseData.topAll.length} topAll options`);
@@ -1328,7 +1328,7 @@ app.get('/api/erp/filters', async (req, res) => {
             streams: (streamsRes.recordset || []).map(r => r.Stream).filter(Boolean),
             testTypes: (testTypesRes.recordset || []).map(r => r.Test_Type).filter(Boolean),
             tests: (testsRes.recordset || []).map(r => r.Test).filter(Boolean),
-            topAll: prunedTopAll
+            topAll: [...new Set(prunedTopAll)]
         });
     } catch (err) {
         console.error("[ERP Filters] ERROR:", err);
@@ -1365,7 +1365,7 @@ app.get('/api/erp/report', async (req, res) => {
 
             const cleanValues = selection.map(v => v ? v.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
             if (cleanValues.length === 0) return;
-            clauses.push(`${field} IN(${cleanValues.map(v => `'${v}'`).join(',')})`);
+            clauses.push(`UPPER(TRIM(${field})) IN(${cleanValues.map(v => `'${v}'`).join(',')})`);
         };
 
         // Map filters to ERP columns

@@ -13,6 +13,14 @@ const normalizeId = (id) => String(id || '').trim().replace(/[^0-9]/g, '');
 const normalizeForMatch = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 async function processErp() {
+    const args = process.argv.slice(2);
+    const forcedTest = args[0];
+    const forcedType = args[1];
+
+    if (forcedTest && forcedType) {
+        console.log(`[MANUAL] Forcing Test: ${forcedTest}, Type: ${forcedType}`);
+    }
+
     let pool;
     try {
         const yearResponse = readline.question(`Enter Academic Year (2025/2026) [Default 2025]: `, { defaultInput: '2025' });
@@ -34,30 +42,69 @@ async function processErp() {
         // Categories considered as "TOP"
         const TOP_CATEGORIES = ['TOP', 'SUPER ELITE TOP', 'SUPER JR ELITE TOP'];
 
-        // 1. Load Uploader Config (Top IDs Mapping)
-        // Merge ALL sheets (except Campus ones) into a single map for global lookup
-        const configMap = new Map();
+        const configData = { '2025': {}, '2026': {} };
+        const normalizeId = (id) => String(id || '').trim().replace(/[^0-9]/g, '');
+
         if (fs.existsSync(CONFIG_FILE)) {
             const configWb = XLSX.readFile(CONFIG_FILE);
             configWb.SheetNames.forEach(sheetName => {
                 if (sheetName.toUpperCase().includes('CAMPUS')) return;
                 const sheet = configWb.Sheets[sheetName];
                 const data = XLSX.utils.sheet_to_json(sheet);
+                
+                const sheetMap = new Map();
                 data.forEach(row => {
+                    const rowYear = String(row['Year'] || row['YEAR'] || '').trim();
+                    if (!configData[rowYear]) return;
+
                     const idCol = Object.keys(row).find(k => k.toUpperCase().includes('ID') || k.toUpperCase().includes('ADM'));
-                    const id = idCol ? row[idCol] : (row['STUD_ID'] || row['stud_id'] || Object.values(row)[0]);
+                    const rawId = idCol ? row[idCol] : (row['STUD_ID'] || row['stud_id'] || Object.values(row)[0]);
+                    const nid = normalizeId(rawId);
+                    if (!nid) return;
 
                     const catCol = Object.keys(row).find(k => k.toUpperCase().includes('CATEGORY') || k.toUpperCase().includes('TOP'));
                     const category = String(catCol ? row[catCol] : (row['Category'] || 'TOP')).trim().toUpperCase();
-
-                    if (id) {
-                        const nid = normalizeId(id);
-                        configMap.set(nid, category);
+                    
+                    sheetMap.set(nid, category);
+                });
+                
+                Object.keys(configData).forEach(y => {
+                    if (sheetName.includes(y)) {
+                        configData[y][sheetName] = sheetMap;
                     }
                 });
             });
-            console.log(`[CONFIG] Loaded ${configMap.size} global ID mappings from all sheets.`);
+            console.log(`[CONFIG] Loaded category mappings for all sheets.`);
         }
+
+        const getMappedCategory = (studentId, studentYear, studentStream) => {
+            const normalizedStream = String(studentStream || '').toUpperCase();
+            const sid = normalizeId(studentId);
+            
+            let targetSheet = "";
+            if (studentYear === '2025') {
+                if (['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02'].includes(normalizedStream)) {
+                    targetSheet = "SR ELITE(2025)";
+                } else if (normalizedStream === 'JR ELITE') {
+                    targetSheet = "JR ELITE(2025)";
+                }
+            } else if (studentYear === '2026') {
+                if (normalizedStream === 'SR ELITE') {
+                    targetSheet = "SR ELITE (2026)";
+                }
+            }
+
+            if (targetSheet && configData[studentYear] && configData[studentYear][targetSheet] && configData[studentYear][targetSheet].has(sid)) {
+                return configData[studentYear][targetSheet].get(sid);
+            }
+
+            const yearSheets = configData[studentYear] || {};
+            for (const sName in yearSheets) {
+                if (yearSheets[sName].has(sid)) return yearSheets[sName].get(sid);
+            }
+
+            return "ALL";
+        };
 
         // 2. Load ImgBB Mapping
         let urlMapping = { mappings: {} };
@@ -113,50 +160,50 @@ async function processErp() {
 
             // Auto-detect Stream and Test
             let streamFromMetadata = "UNKNOWN_STREAM";
-            let testName = "SGT-01"; // Generic fallback to a common name
+            let testName = forcedTest || "SGT-01"; 
 
-            const picsBaseDir = path.join(ERP_BASE_DIR, 'PICS');
-            if (fs.existsSync(picsBaseDir)) {
-                const streams = fs.readdirSync(picsBaseDir).filter(f => fs.statSync(path.join(picsBaseDir, f)).isDirectory());
+            if (true) {
+                const picsBaseDir = path.join(ERP_BASE_DIR, 'PICS');
+                if (fs.existsSync(picsBaseDir)) {
+                    const streams = fs.readdirSync(picsBaseDir).filter(f => fs.statSync(path.join(picsBaseDir, f)).isDirectory());
 
-                // Match stream from metadata row or erpFile name
-                const searchStringNorm = normalizeForMatch(String(metadataRow) + " " + erpFile);
-                const matchedStream = streams.find(s => searchStringNorm.includes(normalizeForMatch(s)));
+                    // Match stream from metadata row or erpFile name
+                    const searchStringNorm = normalizeForMatch(String(metadataRow) + " " + erpFile);
+                    const matchedStream = streams.find(s => searchStringNorm.includes(normalizeForMatch(s)));
 
-                if (matchedStream) {
-                    streamFromMetadata = matchedStream;
-                    const streamPath = path.join(picsBaseDir, streamFromMetadata);
-                    const tests = fs.readdirSync(streamPath).filter(f => fs.statSync(path.join(streamPath, f)).isDirectory());
+                    if (matchedStream) {
+                        streamFromMetadata = matchedStream;
+                        const streamPath = path.join(picsBaseDir, streamFromMetadata);
+                        const tests = fs.readdirSync(streamPath).filter(f => fs.statSync(path.join(streamPath, f)).isDirectory());
 
-                    // Match test name (e.g., SGT-01, Grand Test 1)
-                    const matchedTest = tests.find(t => searchStringNorm.includes(normalizeForMatch(t)));
-
-                    if (matchedTest) {
-                        testName = matchedTest;
-                    } else if (tests.length > 0) {
-                        // If no specific match, but we have test folders, pick the first one (usually SGT-01)
-                        // This prevents "UNKNOWN_TEST" from appearing
-                        testName = tests[0];
+                        // Match test name (e.g., SGT-01, Grand Test 1)
+                        if (!forcedTest) {
+                            const matchedTest = tests.find(t => searchStringNorm.includes(normalizeForMatch(t)));
+                            if (matchedTest) testName = matchedTest;
+                            else if (tests.length > 0) testName = tests[0];
+                        }
+                    } else if (streams.length > 0) {
+                        // Fallback to first stream if no match
+                        streamFromMetadata = streams[0];
+                        if (!forcedTest) {
+                            const streamPath = path.join(picsBaseDir, streamFromMetadata);
+                            const tests = fs.readdirSync(streamPath).filter(f => fs.statSync(path.join(streamPath, f)).isDirectory());
+                            if (tests.length > 0) testName = tests[0];
+                        }
                     }
-                } else if (streams.length > 0) {
-                    // Fallback to first stream if no match
-                    streamFromMetadata = streams[0];
-                    const streamPath = path.join(picsBaseDir, streamFromMetadata);
-                    const tests = fs.readdirSync(streamPath).filter(f => fs.statSync(path.join(streamPath, f)).isDirectory());
-                    if (tests.length > 0) testName = tests[0];
+                }
+
+                if (!forcedTest && String(metadataRow).toUpperCase().includes('SPECIAL GRAND TEST')) {
+                    const sgMatch = String(metadataRow).match(/SPECIAL GRAND TEST\s*[-_]\s*(\d+)/i);
+                    if (sgMatch) {
+                        testName = `NST-${sgMatch[1].padStart(2, '0')}`;
+                    } else {
+                        testName = 'NST-01';
+                    }
                 }
             }
 
-            if (String(metadataRow).toUpperCase().includes('SPECIAL GRAND TEST')) {
-                const sgMatch = String(metadataRow).match(/SPECIAL GRAND TEST\s*[-_]\s*(\d+)/i);
-                if (sgMatch) {
-                    testName = `NST-${sgMatch[1].padStart(2, '0')}`;
-                } else {
-                    testName = 'NST-01';
-                }
-            }
-
-            const testType = testName.split('-')[0].trim();
+            const testType = forcedType || testName.split('-')[0].trim();
 
             console.log(`  Test: ${testName}, Date: ${rawExamDate}, Stream: ${streamFromMetadata}`);
 
@@ -258,8 +305,8 @@ async function processErp() {
                 const branchName = normalizeCampus(row[marksColMap.CAMPUS]);
 
                 // --- TOP/ALL MODE FILTERING ---
-                const configCategory = String(configMap.get(studId) || 'ALL').toUpperCase();
-                const isTopCategory = TOP_CATEGORIES.some(cat => configCategory.includes(cat));
+                const configCategory = getMappedCategory(studId, year, streamFromMetadata);
+                const isTopCategory = configCategory !== 'ALL';
 
                 let targetType = "";
                 if (modeArg === 'TOP') {
@@ -269,7 +316,7 @@ async function processErp() {
                     if (isTopCategory) continue;
                     targetType = "ALL";
                 } else { // BOTH
-                    targetType = isTopCategory ? configCategory : "ALL";
+                    targetType = configCategory;
                 }
 
                 // Find student in STUD_ERP sheet
@@ -506,7 +553,19 @@ async function uploadErpRows(pool, rows) {
     let count = 0;
 
     for (const r of rows) {
-        const sql = `
+        // Step 1: Update existing record's Top_ALL and other metadata if it matches
+        const updateSql = `
+            UPDATE ERP_REPORT 
+            SET Top_ALL = '${esc(r.Top_ALL)}',
+                Stream = '${esc(r.Stream)}'
+            WHERE STUD_ID = '${esc(r.STUD_ID)}' 
+              AND Test = '${esc(r.Test)}' 
+              AND Q_No = ${r.Q_No}
+              AND Stream = '${esc(r.Stream)}'
+              AND Exam_Date = '${r.Exam_Date}'
+        `;
+
+        const insertSql = `
             INSERT INTO ERP_REPORT (
                 STUD_ID, Student_Name, Branch, Exam_Date, Test_Type, Test, Tot_720, AIR,
                 Botany, B_Rank, Zoology, Z_Rank, Physics, P_Rank, Chemistry, C_Rank,
@@ -533,10 +592,13 @@ async function uploadErpRows(pool, rows) {
         `;
 
         try {
-            const result = await pool.request().query(sql);
+            // Try updating first (to correct labels if already exists)
+            await pool.request().query(updateSql);
+            // Then try inserting
+            const result = await pool.request().query(insertSql);
             if (result.rowsAffected[0] > 0) count++;
         } catch (err) {
-            console.error(`  [!] Error uploading student ${r.STUD_ID} Q${r.Q_No}:`, err.message);
+            console.error(`  [!] Error processing student ${r.STUD_ID} Q${r.Q_No}:`, err.message);
         }
     }
     console.log(`  [INFO] Uploaded ${count} new records (Skipped ${rows.length - count} duplicates).`);

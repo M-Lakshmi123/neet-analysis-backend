@@ -19,14 +19,6 @@ const getSubjectOrder = (subject) => {
     return SUBJECT_ORDER[s] || 99;
 };
 
-const TOP_STUDENTS = [
-    'ABHIRAM M', 'AVANEESH C CHINIWAL', 'AVANTHIKA S RAIKAR',
-    'DAYANITHA P', 'HRISHIKESH V SHOLAPURKAR', 'LIKHITH P GOWDA',
-    'RAGHURAM M', 'RAVIKIRAN KINI', 'SAGAN J S', 'SRAVYA SRI CHIDELLA',
-    'Vaishnavi Das', 'SUCHITA MANNE', 'UNNATHI JONNALA ', 'DHRUV SINGH PHOGAT',
-    'B R DHYAN', 'SURYA S'
-];
-
 const ErrorTop100 = ({ filters, setFilters }) => {
     const { userData, isAdmin, isCoAdmin } = useAuth();
     // Use props filters instead of local state
@@ -56,16 +48,28 @@ const ErrorTop100 = ({ filters, setFilters }) => {
 
             setLoading(true);
             try {
-                // Fetch data for TOP_STUDENTS
-                const topFilters = { ...filters, studentNames: TOP_STUDENTS };
-                const params = buildQueryParams(topFilters);
+                // 1. First fetch the actual list of students matching these filters (Year, Category, etc.)
+                const studentParams = buildQueryParams(filters);
+                const studentsRes = await fetch(`${API_URL}/api/erp/students?${studentParams.toString()}`);
+                const studentsData = await studentsRes.json();
+                
+                const currentTopNames = studentsData.map(s => s.name).filter(Boolean);
+                
+                if (currentTopNames.length === 0) {
+                    setReportData([]);
+                    setLoading(false);
+                    return;
+                }
 
-                // Fetch error data
-                const res = await fetch(`${API_URL}/api/erp/report?${params.toString()}`);
+                // 2. Fetch error report for these specific student names
+                const erpFilters = { ...filters, studentNames: currentTopNames };
+                const erpParams = buildQueryParams(erpFilters);
+
+                const res = await fetch(`${API_URL}/api/erp/report?${erpParams.toString()}`);
                 const errorData = await res.json();
 
-                // Fetch total participants from the list for these tests
-                const participantsRes = await fetch(`${API_URL}/api/erp/participants?${params.toString()}`);
+                // 3. Fetch total participants count for these tests
+                const participantsRes = await fetch(`${API_URL}/api/erp/participants?${erpParams.toString()}`);
                 const participantsData = await participantsRes.json();
 
                 // Group by Test then by Question
@@ -112,8 +116,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                             byCampus[s.campus].push(s.name);
                         });
 
-                        // Total students from list who took this test
-                        const totalInList = participantsData[test.testName] || TOP_STUDENTS.length;
+                        // Total students from the fetched list who took this test
+                        const totalInList = participantsData[test.testName] || currentTopNames.length;
 
                         return {
                             ...q,

@@ -26,38 +26,90 @@ async function run() {
             console.error("Config file not found: " + CONFIG_PATH);
             process.exit(1);
         }
-        const configWb = XLSX.readFile(CONFIG_PATH);
-        const topConfigMaps = {
-            'JR ELITE': new Map(),
-            'SR ELITE': new Map()
-        };
+        const configData = { '2025': {}, '2026': {} };
         const allowedCampuses = new Set();
+        const normalizeId = (id) => String(id || '').trim().replace(/[^0-9]/g, '');
 
-        const loadTopSheet = (sheetName, targetMap) => {
-            const sheet = configWb.Sheets[sheetName];
-            if (sheet) {
+        // Load Uploader Config (Top IDs Mapping)
+        if (fs.existsSync(CONFIG_PATH)) {
+            const configWb = XLSX.readFile(CONFIG_PATH);
+            configWb.SheetNames.forEach(sheetName => {
+                if (sheetName.toUpperCase().includes('CAMPUS')) return;
+                
+                const sheet = configWb.Sheets[sheetName];
                 const data = XLSX.utils.sheet_to_json(sheet);
+                
+                const sheetMap = new Map();
                 data.forEach(row => {
-                    const id = row['STUD_ID'] || row['stud_id'] || row['STUD ID'];
-                    const category = row['Category'] || row['CATEGORY'] || row['Top_ALL'] || 'TOP';
-                    if (id) targetMap.set(String(id).trim(), String(category).trim());
+                    const rowYear = String(row['Year'] || row['YEAR'] || '').trim();
+                    if (!configData[rowYear]) return;
+
+                    const idCol = Object.keys(row).find(k => k.toUpperCase().includes('ID') || k.toUpperCase().includes('ADM'));
+                    const rawId = idCol ? row[idCol] : (row['STUD_ID'] || row['stud_id'] || Object.values(row)[0]);
+                    const nid = normalizeId(rawId);
+                    if (!nid) return;
+
+                    const catCol = Object.keys(row).find(k => k.toUpperCase().includes('CATEGORY') || k.toUpperCase().includes('TOP'));
+                    const category = String(catCol ? row[catCol] : (row['Category'] || 'TOP')).trim().toUpperCase();
+                    
+                    sheetMap.set(nid, category);
+                });
+                
+                Object.keys(configData).forEach(y => {
+                    if (sheetName.includes(y)) {
+                        configData[y][sheetName] = sheetMap;
+                    }
+                });
+            });
+            console.log(`[CONFIG] Loaded category mappings for all sheets.`);
+
+            const campusSheet = configWb.Sheets['Allowed_Campuses'];
+            if (campusSheet) {
+                const data = XLSX.utils.sheet_to_json(campusSheet);
+                data.forEach(row => {
+                    const name = row['CAMPUS_NAME'] || row['campus_name'] || row['CAMPUS NAME'] || row['CAMPUS'];
+                    if (name) allowedCampuses.add(String(name).trim().toUpperCase());
                 });
             }
-        };
-
-        loadTopSheet('JR ELITE', topConfigMaps['JR ELITE']);
-        loadTopSheet('SR ELITE', topConfigMaps['SR ELITE']);
-
-        const campusSheet = configWb.Sheets['Allowed_Campuses'];
-        if (campusSheet) {
-            const data = XLSX.utils.sheet_to_json(campusSheet);
-            data.forEach(row => {
-                const name = row['CAMPUS_NAME'] || row['campus_name'] || row['CAMPUS NAME'] || row['CAMPUS'];
-                if (name) allowedCampuses.add(String(name).trim().toUpperCase());
-            });
         }
 
-        console.log(`Loaded Config: JR Top=${topConfigMaps['JR ELITE'].size}, SR Top=${topConfigMaps['SR ELITE'].size}, Campuses=${allowedCampuses.size}`);
+        let totalIds = 0;
+        Object.keys(configData).forEach(y => {
+            Object.keys(configData[y]).forEach(s => totalIds += configData[y][s].size);
+        });
+        console.log(`Loaded Config: Total IDs=${totalIds}, Campuses=${allowedCampuses.size}`);
+
+        // Logic to get category based on ID, Year and Stream
+        const getMappedCategory = (studentId, studentYear, studentStream) => {
+            const normalizedStream = String(studentStream || '').toUpperCase();
+            const sid = normalizeId(studentId);
+            
+            let targetSheet = "";
+            if (studentYear === '2025') {
+                if (['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02'].includes(normalizedStream)) {
+                    targetSheet = "SR ELITE(2025)";
+                } else if (normalizedStream === 'JR ELITE') {
+                    targetSheet = "JR ELITE(2025)";
+                }
+            } else if (studentYear === '2026') {
+                if (normalizedStream === 'SR ELITE') {
+                    targetSheet = "SR ELITE (2026)";
+                }
+            }
+
+            // 1. Try Specific Sheet
+            if (targetSheet && configData[studentYear] && configData[studentYear][targetSheet] && configData[studentYear][targetSheet].has(sid)) {
+                return configData[studentYear][targetSheet].get(sid);
+            }
+
+            // 2. Fallback: Check ALL sheets for that year
+            const yearSheets = configData[studentYear] || {};
+            for (const sName in yearSheets) {
+                if (yearSheets[sName].has(sid)) return yearSheets[sName].get(sid);
+            }
+
+            return "ALL";
+        };
 
         const files = findResultFiles(RESULT_DIR);
         console.log(`Found ${files.length} result files to process.`);
@@ -65,7 +117,7 @@ async function run() {
         let totalUploaded = 0;
         for (const fileObj of files) {
             console.log(`\nProcessing: ${path.basename(fileObj.path)} [Folder: ${fileObj.folder}]`);
-            const count = await processResultFile(fileObj.path, fileObj.folder, pool, topConfigMaps, allowedCampuses, year, manualTestType, manualTestName);
+            const count = await processResultFile(fileObj.path, fileObj.folder, pool, getMappedCategory, allowedCampuses, year, manualTestType, manualTestName);
             totalUploaded += count || 0;
         }
 
@@ -129,7 +181,7 @@ function isKarnatakaCampus(name, allowedCampuses) {
     return keywords.some(k => upper.includes(k));
 }
 
-async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps, allowedCampuses, year, manualTestType, manualTestName) {
+async function processResultFile(filePath, streamFromFolder, pool, getMappedCategory, allowedCampuses, year, manualTestType, manualTestName) {
 
     const wb = XLSX.readFile(filePath);
 
@@ -205,14 +257,8 @@ async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps
 
     console.log(`  Metadata: Date=[${dateStr}], StreamFolder=[${streamFromFolder}], Test=[${testName}], Type=[${testType}]`);
 
-    // Stream-specific TOP/SUPER mapping (Using folder name as key)
-    let streamTopMap = new Map();
-    const normalizedFolder = String(streamFromFolder).toUpperCase().replace(/[^A-Z]/g, '');
-    if (normalizedFolder.includes('SRELITE') || metaStr.toUpperCase().includes('SR ELITE')) {
-        streamTopMap = topConfigMaps['SR ELITE'];
-    } else if (normalizedFolder.includes('JRELITE') || metaStr.toUpperCase().includes('JR ELITE')) {
-        streamTopMap = topConfigMaps['JR ELITE'];
-    }
+    // TOP/SUPER mapping lookup is now global and filtered by year in Config loading
+    const streamTopMap = topConfigMaps['GLOBAL'];
 
     // Determine DB Stream based on folder (Verbatim as per user request)
     let dbStream = streamFromFolder || "Unknown";
@@ -304,21 +350,17 @@ async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps
         const row = marksData[i];
         if (!row || !row[colMap.STUD_ID]) continue;
 
-        const studId = String(row[colMap.STUD_ID]).trim();
+        const rawStudId = String(row[colMap.STUD_ID] || '').trim();
+        const studId = rawStudId.replace(/[^0-9]/g, '');
+        if (!studId) continue;
+
         const campusRaw = String(row[colMap.CAMPUS] || '').trim().toUpperCase();
 
         // Karnataka/Bangalore Filter Logic
         if (!isKarnatakaCampus(campusRaw, allowedCampuses)) continue;
 
         const cleanedCampus = cleanCampusName(campusRaw);
-        const errors = errorMap.get(studId) || { bot: '', zoo: '', phy: '', che: '' };
-
-        // Determine Top_ALL from stream-specific map
-        let topAll = 'ALL';
-        const topCat = streamTopMap.get(studId);
-        if (topCat) {
-            topAll = topCat;
-        }
+        const errors = errorMap.get(rawStudId) || errorMap.get(studId) || { bot: '', zoo: '', phy: '', che: '' };
 
         const student = {
             Test_Type: testType,
@@ -340,7 +382,6 @@ async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps
             C_Rank: row[colMap.C_Rank],
             Stream: dbStream,
             Year: year,
-            Top_ALL: topAll,
             Errors_Bot: errors.bot,
             Errors_Zoo: errors.zoo,
             Errors_Phy: errors.phy,
@@ -352,10 +393,23 @@ async function processResultFile(filePath, streamFromFolder, pool, topConfigMaps
 
     console.log(`  Ready to upload ${studentsToUpload.length} students.`);
 
+    const uploadedCount = await uploadStudents(pool, studentsToUpload, dateStr, testName, year, dbStream, getMappedCategory);
+    return uploadedCount;
+}
+
+async function uploadStudents(pool, studentsToUpload, dateStr, testName, year, dbStream, getMappedCategory) {
     if (studentsToUpload.length > 0) {
-        const BATCH_SIZE = 100;
-        for (let i = 0; i < studentsToUpload.length; i += BATCH_SIZE) {
-            const batch = studentsToUpload.slice(i, i + BATCH_SIZE);
+        const batchSize = 1000;
+        for (let i = 0; i < studentsToUpload.length; i += batchSize) {
+            const batch = studentsToUpload.slice(i, i + batchSize).map(s => {
+                // Determine Top_ALL dynamically during upload preparation
+                const category = getMappedCategory(s.STUD_ID, year, dbStream);
+                return {
+                    ...s,
+                    Top_ALL: category,
+                    Year: year
+                };
+            });
 
             // Delete existing records for these specific students to handle re-uploads
             const studentIds = batch.map(s => `'${s.STUD_ID}'`).join(',');
