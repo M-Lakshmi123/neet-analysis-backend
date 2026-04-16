@@ -239,17 +239,19 @@ async function processErp() {
                 if (headerRowIdx !== -1) {
                     const headRow = top100Data[headerRowIdx];
                     const wCol = headRow.findIndex(c => {
-                        const s = String(c || '').toUpperCase();
-                        return (s.includes('WRONG') || s.includes('W%')) && s.includes('%');
+                        const s = String(c || '').trim().toUpperCase();
+                        return (s === 'W%' || s === 'WRONG %' || s === 'WRONG %AGE' || s === 'W %') || 
+                               ((s.includes('WRONG') || s.includes('W%')) && s.includes('%') && !s.includes('CORRECT') && !s.includes('RIGHT'));
                     });
                     const uCol = headRow.findIndex(c => {
-                        const s = String(c || '').toUpperCase();
-                        return (s.includes('UN') && s.includes('%')) || (s.includes('U%'));
+                        const s = String(c || '').trim().toUpperCase();
+                        return (s === 'U%' || s === 'UN%' || s === 'UNATTEMPTED %' || s === 'U %') ||
+                               ((s.includes('UN') || s.includes('U%')) && s.includes('%') && !s.includes('WRONG') && !s.includes('CORRECT'));
                     });
 
-                    // Stronger validation: ensure we use Column G (index 6) if it's likely the intended Wrong % column
-                    const finalWCol = (wCol === -1 || (wCol !== 6 && String(headRow[6] || '').includes('%'))) ? 6 : wCol;
-                    const finalUCol = (uCol === -1 || (uCol !== 8 && String(headRow[8] || '').includes('%'))) ? 8 : uCol;
+                    // Strict Mapping: Use Column G (6) for Wrong % and Column I (8) for Unattempted % as primary choice if they look correct
+                    const finalWCol = (wCol !== -1) ? wCol : 6;
+                    const finalUCol = (uCol !== -1) ? uCol : 8;
 
                     // Data starts from either current header row if QNo is there, or next row
                     const firstColHeader = String(top100Data[headerRowIdx][0] || '').toUpperCase();
@@ -262,9 +264,14 @@ async function processErp() {
                         // Allow Q1 or just 1
                         if (!qNoRaw.toUpperCase().startsWith('Q') && isNaN(parseInt(qNoRaw))) continue;
                         const qNo = qNoRaw.replace(/[^0-9]/g, '');
+                        
+                        // LITERALLY take from the identified columns
+                        const wVal = row[finalWCol];
+                        const uVal = row[finalUCol];
+
                         nationalErrorMap[qNo] = {
-                            W: formatPercentage(row[finalWCol]),
-                            U: formatPercentage(row[finalUCol])
+                            W: formatPercentage(wVal),
+                            U: formatPercentage(uVal)
                         };
                     }
                 }
