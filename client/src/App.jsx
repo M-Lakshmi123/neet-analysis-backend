@@ -26,6 +26,7 @@ import UserApprovals from './components/admin/UserApprovals';
 import ActivityLogs from './components/admin/ActivityLogs';
 import FileManagement from './components/FileManagement';
 import { logActivity } from './utils/activityLogger';
+import { performFailoverCheck } from './utils/apiHelper';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
     const { currentUser, userData, loading, isAdmin } = useAuth();
@@ -74,6 +75,11 @@ const Dashboard = () => {
     useEffect(() => {
         sessionStorage.setItem('academic_year', academicYear);
     }, [academicYear]);
+
+    // Perform health check on load to switch backend if one is suspended
+    useEffect(() => {
+        performFailoverCheck();
+    }, []);
 
     // Ensure non-admins are redirected from admin pages if state changes
     useEffect(() => {

@@ -1,16 +1,51 @@
-const getBaseUrl = () => {
+const BACKEND_SERVICES = [
+    'https://neet-backend-3oxu.onrender.com',
+    'https://neet-backend-v2.onrender.com'
+];
+
+const getActiveBackend = () => {
     const hostname = window.location.hostname;
     const isLocal = hostname === 'localhost' || 
                    hostname === '127.0.0.1' || 
                    hostname.startsWith('192.168.') || 
                    hostname.startsWith('10.') || 
                    hostname === '0.0.0.0';
-    // Use Environment Variable if available (Render/Vite), otherwise fallback to the new V2 backend
-    const prodUrl = import.meta.env?.VITE_API_URL || 'https://neet-backend-3oxu.onrender.com';
-    return isLocal ? `http://${hostname}:5000` : prodUrl;
+
+    if (isLocal) return `http://${hostname}:5000`;
+
+    // Priority: 1. Env Var, 2. LocalSession (cached working one), 3. First Default
+    const envUrl = import.meta.env?.VITE_API_URL;
+    if (envUrl && !envUrl.includes('localhost')) return envUrl;
+
+    const cached = sessionStorage.getItem('WORKING_BACKEND_URL');
+    return cached || BACKEND_SERVICES[0];
 };
 
-export const API_URL = getBaseUrl();
+export let API_URL = getActiveBackend();
+
+/**
+ * Validates the current API_URL and switches to backup if it fails.
+ * This is called automatically by the app.
+ */
+export const performFailoverCheck = async () => {
+    if (API_URL.includes('localhost')) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/health`);
+        // If status is 503 (Render Limit) or similar failure
+        if (!response.ok && response.status !== 401) throw new Error('Service Unavailable');
+    } catch (error) {
+        console.warn(`[Failover] Primary backend (${API_URL}) unavailable. Trying backup...`);
+        const nextBackend = BACKEND_SERVICES.find(url => url !== API_URL);
+        if (nextBackend) {
+            API_URL = nextBackend;
+            sessionStorage.setItem('WORKING_BACKEND_URL', nextBackend);
+            console.info(`[Failover] Switched to backup: ${API_URL}`);
+            // Force reload to ensure all components use the new API_URL
+            window.location.reload();
+        }
+    }
+};
 
 
 export const ADMIN_WHATSAPP = '9281425210';

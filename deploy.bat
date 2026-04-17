@@ -51,8 +51,9 @@ if /i "%fire%"=="y" (
 
 :: 5. Render Manual Deploy Hook
 echo.
-echo [4/4] Triggering Render Manual Deploy Hook...
+echo [4/4] Triggering Render Manual Deploy Hooks (Multi-Account Failover)...
 curl -X POST "https://api.render.com/deploy/srv-d5u3r3nfte5s7390fou0?key=a_9tubU-WcI"
+curl -X POST "https://api.render.com/deploy/srv-d6uctgn5gffc739l5emg?key=BPEwOP8wjAc"
 echo.
 
 echo.

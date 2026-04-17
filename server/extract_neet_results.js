@@ -257,8 +257,7 @@ async function processResultFile(filePath, streamFromFolder, pool, getMappedCate
 
     console.log(`  Metadata: Date=[${dateStr}], StreamFolder=[${streamFromFolder}], Test=[${testName}], Type=[${testType}]`);
 
-    // TOP/SUPER mapping lookup is now global and filtered by year in Config loading
-    const streamTopMap = topConfigMaps['GLOBAL'];
+    // TOP/SUPER mapping lookup is now handled dynamically via getMappedCategory function
 
     // Determine DB Stream based on folder (Verbatim as per user request)
     let dbStream = streamFromFolder || "Unknown";
