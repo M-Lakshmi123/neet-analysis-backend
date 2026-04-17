@@ -100,6 +100,12 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                             wrongStudents: []
                         };
                     }
+
+                    // Prioritize the 'W' (Wrong) percentage for the global header if we find one
+                    if (row.W_U === 'W' || (row.National_Wide_Error && !testsGrouped[testKey].questions[qKey].nationalError)) {
+                        testsGrouped[testKey].questions[qKey].nationalError = row.National_Wide_Error;
+                    }
+
                     testsGrouped[testKey].questions[qKey].wrongStudents.push({
                         name: row.Student_Name,
                         campus: row.Branch

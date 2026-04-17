@@ -238,20 +238,9 @@ async function processErp() {
 
                 if (headerRowIdx !== -1) {
                     const headRow = top100Data[headerRowIdx];
-                    const wCol = headRow.findIndex(c => {
-                        const s = String(c || '').trim().toUpperCase();
-                        return (s === 'W%' || s === 'WRONG %' || s === 'WRONG %AGE' || s === 'W %') || 
-                               ((s.includes('WRONG') || s.includes('W%')) && s.includes('%') && !s.includes('CORRECT') && !s.includes('RIGHT'));
-                    });
-                    const uCol = headRow.findIndex(c => {
-                        const s = String(c || '').trim().toUpperCase();
-                        return (s === 'U%' || s === 'UN%' || s === 'UNATTEMPTED %' || s === 'U %') ||
-                               ((s.includes('UN') || s.includes('U%')) && s.includes('%') && !s.includes('WRONG') && !s.includes('CORRECT'));
-                    });
-
-                    // Strict Mapping: Use Column G (6) for Wrong % and Column I (8) for Unattempted % as primary choice if they look correct
-                    const finalWCol = (wCol !== -1) ? wCol : 6;
-                    const finalUCol = (uCol !== -1) ? uCol : 8;
+                    // Hardcoded Strict Mapping: Column G (6) and Column I (8) as requested
+                    const finalWCol = 6; 
+                    const finalUCol = 8; 
 
                     // Data starts from either current header row if QNo is there, or next row
                     const firstColHeader = String(top100Data[headerRowIdx][0] || '').toUpperCase();
@@ -350,7 +339,7 @@ async function processErp() {
                             Physics: row[marksColMap.PHY], P_Rank: row[marksColMap.P_Rank],
                             Chemistry: row[marksColMap.CHE], C_Rank: row[marksColMap.C_Rank],
                             Q_No: parseInt(qNo), W_U: val,
-                            National_Wide_Error: (nationalErrorMap[qNo] && nationalErrorMap[qNo].W) || '--',
+                            National_Wide_Error: (nationalErrorMap[qNo] ? (val === 'W' ? nationalErrorMap[qNo].W : nationalErrorMap[qNo].U) : '--'),
                             Q_URL: urlSubMap.Q[qNo] || '', S_URL: urlSubMap.S[qNo] || DEFAULT_S_URL,
                             Key_Value: keysMap[qNo] || '', Subject: meta.Subject || '--',
                             Topic: meta.Topic || '--', Sub_Topic: meta.Sub_Topic || '--',

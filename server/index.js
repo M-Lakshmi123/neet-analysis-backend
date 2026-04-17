@@ -1774,7 +1774,7 @@ process.on('unhandledRejection', (reason, promise) => {
 // --- RENDER KEEP-ALIVE & AUTO-RECTIFY SYSTEM ---
 // Render free tier services sleep after 15 mins. UptimeRobot checks every 5 mins.
 // This loop ensures the server stays awake and satisfies the health check.
-const BACKEND_URL = process.env.RENDER_EXTERNAL_URL || 'https://neet-backend-v2.onrender.com';
+const BACKEND_URL = process.env.RENDER_EXTERNAL_URL || 'https://neet-backend-3oxu.onrender.com';
 
 setInterval(() => {
     try {

@@ -10,11 +10,7 @@ set /p TEST_NAME="Enter Test Name (e.g., NSGT-02): "
 set /p TEST_TYPE="Enter Test Type (e.g., NSGT): "
 echo.
 
-:: Clear old URL mappings to ensure fresh upload
-if exist server\url_mapping_neet.json (
-    echo [CLEAN] Clearing old URL mapping cache...
-    del server\url_mapping_neet.json
-)
+:: Image Upload & URL Mapping (Now reusing cache to save time)
 echo.
 
 :: Step 1: Image Upload & URL Mapping

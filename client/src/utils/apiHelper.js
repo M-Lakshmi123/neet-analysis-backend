@@ -6,7 +6,7 @@ const getBaseUrl = () => {
                    hostname.startsWith('10.') || 
                    hostname === '0.0.0.0';
     // Use Environment Variable if available (Render/Vite), otherwise fallback to the new V2 backend
-    const prodUrl = import.meta.env?.VITE_API_URL || 'https://neet-backend-v2.onrender.com';
+    const prodUrl = import.meta.env?.VITE_API_URL || 'https://neet-backend-3oxu.onrender.com';
     return isLocal ? `http://${hostname}:5000` : prodUrl;
 };
 
