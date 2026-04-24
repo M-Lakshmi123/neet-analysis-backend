@@ -80,7 +80,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                     if (!testsGrouped[testKey]) {
                         testsGrouped[testKey] = {
                             testName: row.Test,
-                            date: row.Exam_Date,
+                            date: row.Exam_Date, customHeading: row.Custom_Heading,
                             stream: row.Stream,
                             questions: {}
                         };
@@ -271,7 +271,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 doc.setFontSize(14);
                 doc.setTextColor(0);
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
-                const testTitle = `${test.date}_${test.stream}_${test.testName}_Error Analysis`;
+                const testTitle = test.customHeading || `${test.date}_${test.stream}_${test.testName}_Error Analysis`;
                 doc.text(testTitle, pageWidth / 2, y + 6, { align: 'center' });
                 return y + 12;
             };
@@ -530,7 +530,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                         marginBottom: `${(100 * zoom) - 100 + 40}px` // Minimal adjustment for Top100 as it's not fixed height
                     }}>
                         <h2 style={{ textAlign: 'center', color: '#000', fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
-                            {test.date}_{test.stream}_{test.testName}_Error Analysis
+                            {test.customHeading || `${test.date}_${test.stream}_${test.testName}_Error Analysis`}
                         </h2>
 
                         <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', tableLayout: 'fixed' }}>

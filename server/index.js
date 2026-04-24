@@ -1401,7 +1401,7 @@ app.get('/api/erp/report', async (req, res) => {
             Student_Name, Branch, Exam_Date, Test_Type, Test, Tot_720, AIR,
             Botany, B_Rank, Zoology, Z_Rank, Physics, P_Rank, Chemistry, C_Rank,
             Q_No, W_U, National_Wide_Error, Q_URL, S_URL, Key_Value, Subject,
-            Topic, Sub_Topic, Question_Type, Statement, Year, Top_ALL, Stream
+            Topic, Sub_Topic, Question_Type, Statement, Year, Top_ALL, Stream, Custom_Heading
         FROM ERP_REPORT 
             ${where}
             ORDER BY

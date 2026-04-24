@@ -31,13 +31,15 @@ async function processErp() {
         console.log(`2. ALL (Excludes TOP categories)`);
         console.log(`3. Both (Uploads everyone with their respective labels)`);
         const modeChoice = readline.question(`Select Extraction Mode (1/2/3) [Default 3]: `, { defaultInput: '3' });
+        
+        const customHeading = readline.question(`Enter Custom Heading (Optional, leave blank to use default): `);
 
         let modeArg = 'BOTH';
         if (modeChoice === '1') modeArg = 'TOP';
         else if (modeChoice === '2') modeArg = 'ALL';
 
         pool = await connectToDb(year);
-        console.log(`Connected to TiDB (NEET ERP Extraction - Year ${year}, Mode: ${modeArg})`);
+        console.log(`Connected to TiDB (NEET ERP Extraction - Year ${year}, Mode: ${modeArg}${customHeading ? `, Heading: ${customHeading}` : ''})`);
 
         // Categories considered as "TOP"
         const TOP_CATEGORIES = ['TOP', 'SUPER ELITE TOP', 'SUPER JR ELITE TOP'];
@@ -110,18 +112,32 @@ async function processErp() {
         let urlMapping = { mappings: {} };
         const mappingPath = path.join(__dirname, 'url_mapping_neet.json');
         if (fs.existsSync(mappingPath)) {
-            urlMapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
-            console.log(`[URLS] Loaded ImgBB URL mappings.`);
+            try {
+                urlMapping = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+                console.log(`[URLS] Loaded ImgBB URL mappings.`);
+            } catch (e) {
+                console.warn(`[WARNING] Could not parse ${mappingPath}. File might be corrupted. Using empty mappings.`);
+                urlMapping = { mappings: {} };
+            }
         }
 
-        const files = fs.readdirSync(ERP_BASE_DIR);
-        const erpFiles = files.filter(f => (f.endsWith('.xlsx') || f.endsWith('.xls')) && !f.startsWith('~$'));
+        let allFiles = fs.readdirSync(ERP_BASE_DIR).map(f => ({ name: f, path: path.join(ERP_BASE_DIR, f) }));
+        
+        // Also look inside PICS folder if it exists
+        const picsDir = path.join(ERP_BASE_DIR, 'PICS');
+        if (fs.existsSync(picsDir)) {
+            const picsFiles = fs.readdirSync(picsDir).map(f => ({ name: f, path: path.join(picsDir, f) }));
+            allFiles = [...allFiles, ...picsFiles];
+        }
+
+        const erpFiles = allFiles.filter(f => (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) && !f.name.startsWith('~$'));
 
         console.log(`[FILES] Found ${erpFiles.length} ERP files to process.`);
 
-        for (const erpFile of erpFiles) {
+        for (const erpObj of erpFiles) {
+            const erpFile = erpObj.name;
+            const fullPath = erpObj.path;
             console.log(`\nProcessing ERP File: ${erpFile}`);
-            const fullPath = path.join(ERP_BASE_DIR, erpFile);
             const wb = XLSX.readFile(fullPath);
 
             // A. Find 'Marks List' case-insensitively
@@ -216,7 +232,10 @@ async function processErp() {
             const studErpData = XLSX.utils.sheet_to_json(studErpWs, { header: 1 });
 
             // C. TOP-100_Error Sheet (National Wide Error %)
-            const top100SheetName = wb.SheetNames.find(n => n.toUpperCase().includes('TOP-100_ERROR')) || 'TOP-100_Error';
+            const top100SheetName = wb.SheetNames.find(n => {
+                const cleanStr = n.toUpperCase().replace(/[-\s_]/g, '');
+                return cleanStr.includes('TOP100') || cleanStr.includes('ERROR') || cleanStr.includes('WANDU') || cleanStr.includes('W&U');
+            }) || 'TOP-100_Error';
             const top100Ws = wb.Sheets[top100SheetName];
             const nationalErrorMap = {}; // { "QNo": { "W": "percentage", "U": "percentage" } }
             if (top100Ws) {
@@ -228,8 +247,11 @@ async function processErp() {
                     const row = top100Data[i];
                     if (!row) continue;
                     if (row.some(c => {
-                        const s = String(c || '').toUpperCase();
-                        return (s.includes('WRONG') || s.includes('W%')) && s.includes('%');
+                        const s = String(c || '').toUpperCase().trim();
+                        const sClean = s.replace(/[\s\.]/g, '');
+                        return s === 'W' || s === 'U' || s === 'W%' || s === 'U%' || 
+                               s.includes('WRONG') || s.includes('UNATTEMPTED') || 
+                               sClean === 'QNO';
                     })) {
                         headerRowIdx = i;
                         break;
@@ -238,9 +260,15 @@ async function processErp() {
 
                 if (headerRowIdx !== -1) {
                     const headRow = top100Data[headerRowIdx];
-                    // Hardcoded Strict Mapping: Column G (6) and Column I (8) as requested
-                    const finalWCol = 6; 
-                    const finalUCol = 8; 
+                    // Dynamically map W and U columns, fallback to Hardcoded 6 and 8
+                    let finalWCol = 6; 
+                    let finalUCol = 8; 
+                    
+                    for (let c = 0; c < headRow.length; c++) {
+                        const th = String(headRow[c] || '').toUpperCase().trim();
+                        if (th === 'W' || th === 'W%' || th.includes('WRONG')) finalWCol = c;
+                        if (th === 'U' || th === 'U%' || th.includes('UNATTEMPTED')) finalUCol = c;
+                    }
 
                     // Data starts from either current header row if QNo is there, or next row
                     const firstColHeader = String(top100Data[headerRowIdx][0] || '').toUpperCase();
@@ -344,7 +372,8 @@ async function processErp() {
                             Key_Value: keysMap[qNo] || '', Subject: meta.Subject || '--',
                             Topic: meta.Topic || '--', Sub_Topic: meta.Sub_Topic || '--',
                             Question_Type: meta.Question_Type || '--', Statement: meta.Statement || '--',
-                            Year: year, Top_ALL: targetType, Stream: streamFromMetadata
+                            Year: year, Top_ALL: targetType, Stream: streamFromMetadata,
+                            Custom_Heading: customHeading || null
                         });
                     }
                 }
@@ -557,7 +586,8 @@ async function uploadErpRows(pool, rows) {
         const updateSql = `
             UPDATE ERP_REPORT 
             SET Top_ALL = '${esc(r.Top_ALL)}',
-                Stream = '${esc(r.Stream)}'
+                Stream = '${esc(r.Stream)}',
+                Custom_Heading = ${r.Custom_Heading ? `'${esc(r.Custom_Heading)}'` : 'NULL'}
             WHERE STUD_ID = '${esc(r.STUD_ID)}' 
               AND Test = '${esc(r.Test)}' 
               AND Q_No = ${r.Q_No}
@@ -570,7 +600,7 @@ async function uploadErpRows(pool, rows) {
                 STUD_ID, Student_Name, Branch, Exam_Date, Test_Type, Test, Tot_720, AIR,
                 Botany, B_Rank, Zoology, Z_Rank, Physics, P_Rank, Chemistry, C_Rank,
                 Q_No, W_U, National_Wide_Error, Q_URL, S_URL,
-                Key_Value, Subject, Topic, Sub_Topic, Question_Type, Statement, Year, Top_ALL, Stream
+                Key_Value, Subject, Topic, Sub_Topic, Question_Type, Statement, Year, Top_ALL, Stream, Custom_Heading
             )
             SELECT 
                 '${esc(r.STUD_ID)}', '${esc(r.Student_Name)}', '${esc(r.Branch)}', '${r.Exam_Date}',
@@ -579,7 +609,7 @@ async function uploadErpRows(pool, rows) {
                 '${esc(r.Physics)}', '${esc(r.P_Rank)}', '${esc(r.Chemistry)}', '${esc(r.C_Rank)}',
                 ${r.Q_No}, '${r.W_U}', '${esc(r.National_Wide_Error)}', '${r.Q_URL}', '${r.S_URL}',
                 '${esc(r.Key_Value)}', '${esc(r.Subject)}', '${esc(r.Topic)}', '${esc(r.Sub_Topic)}',
-                '${esc(r.Question_Type)}', '${esc(r.Statement)}', '${r.Year}', '${esc(r.Top_ALL)}', '${esc(r.Stream)}'
+                '${esc(r.Question_Type)}', '${esc(r.Statement)}', '${r.Year}', '${esc(r.Top_ALL)}', '${esc(r.Stream)}', ${r.Custom_Heading ? `'${esc(r.Custom_Heading)}'` : 'NULL'}
             FROM (SELECT 1 as dummy) AS t
             WHERE NOT EXISTS (
                 SELECT 1 FROM ERP_REPORT 
