@@ -834,7 +834,7 @@ app.get('/api/history', async (req, res) => {
                 ignoreTest: true // We want ALL tests for this stream
             });
             const examsQuery = `
-                SELECT DISTINCT Test, DATE
+                SELECT Test, DATE, MAX(Custom_Heading) as Custom_Heading
                 FROM MEDICAL_RESULT
                 ${examsWhere}
                 ORDER BY STR_TO_DATE(REPLACE(DATE, '/', '-'), '%d-%m-%Y') ASC
@@ -923,6 +923,7 @@ app.get('/api/exam-stats', async (req, res) => {
         SELECT
         DATE,
             Test,
+            MAX(Custom_Heading) as Custom_Heading,
             COUNT(STUD_ID) as Attn,
             MAX(CAST(Tot_720 AS FLOAT)) as Max_T,
             SUM(CASE WHEN CAST(Tot_720 AS FLOAT) >= 710 THEN 1 ELSE 0 END) as T_710,
@@ -1006,7 +1007,7 @@ app.get('/api/analysis-report', async (req, res) => {
 
         // 2. Get Metadata (Test Names, Dates, Total Count)
         const metaQuery = `
-            SELECT DISTINCT Test, DATE 
+            SELECT Test, DATE, MAX(Custom_Heading) as Custom_Heading 
             FROM MEDICAL_RESULT
             ${where}
             ORDER BY STR_TO_DATE(REPLACE(DATE, '/', '-'), '%d-%m-%Y') ASC

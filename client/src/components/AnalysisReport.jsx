@@ -376,7 +376,13 @@ const AnalysisReport = ({ filters }) => {
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
             const stream = (filters.stream && filters.stream.length > 0) ? filters.stream.join(',') : 'SR_ELITE';
             const testName = examStats.length > 0 ? examStats[0].Test : 'GRAND TEST';
-            const fullPattern = `${testDate}_${stream}_${testName}_All India Marks Analysis`.replace(/\//g, '-');
+            
+            // Use Custom_Heading if available, else fallback to pattern
+            let fullPattern = (examStats.length > 0 && examStats[0].Custom_Heading) 
+                ? examStats[0].Custom_Heading 
+                : `${testDate}_${stream}_${testName}_All India Marks Analysis`;
+            
+            fullPattern = fullPattern.replace(/\//g, '-');
 
             doc.setFont("helvetica", "bolditalic");
             doc.setFontSize(18); // Increased to 18

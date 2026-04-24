@@ -232,16 +232,20 @@ async function processErp() {
             const studErpData = XLSX.utils.sheet_to_json(studErpWs, { header: 1 });
 
             // C. TOP-100_Error Sheet (National Wide Error %)
-            const top100SheetName = wb.SheetNames.find(n => {
+            const matchingSheetNames = wb.SheetNames.filter(n => {
                 const cleanStr = n.toUpperCase().replace(/[-\s_]/g, '');
                 return cleanStr.includes('TOP100') || cleanStr.includes('ERROR') || cleanStr.includes('WANDU') || cleanStr.includes('W&U');
-            }) || 'TOP-100_Error';
-            const top100Ws = wb.Sheets[top100SheetName];
+            });
+            
             const nationalErrorMap = {}; // { "QNo": { "W": "percentage", "U": "percentage" } }
-            if (top100Ws) {
+            
+            for (const top100SheetName of matchingSheetNames) {
+                const top100Ws = wb.Sheets[top100SheetName];
+                if (!top100Ws) continue;
+                
                 const top100Data = XLSX.utils.sheet_to_json(top100Ws, { header: 1 });
 
-                // Dynamically find header row in TOP-100_Error
+                // Dynamically find header row in sheet
                 let headerRowIdx = -1;
                 for (let i = 0; i < 12; i++) {
                     const row = top100Data[i];
@@ -260,39 +264,44 @@ async function processErp() {
 
                 if (headerRowIdx !== -1) {
                     const headRow = top100Data[headerRowIdx];
-                    // Dynamically map W and U columns, fallback to Hardcoded 6 and 8
-                    let finalWCol = 6; 
-                    let finalUCol = 8; 
+                    let finalWCol = -1; 
+                    let finalUCol = -1; 
+                    let finalQCol = 0;
                     
                     for (let c = 0; c < headRow.length; c++) {
                         const th = String(headRow[c] || '').toUpperCase().trim();
-                        if (th === 'W' || th === 'W%' || th.includes('WRONG')) finalWCol = c;
-                        if (th === 'U' || th === 'U%' || th.includes('UNATTEMPTED')) finalUCol = c;
+                        const thClean = th.replace(/[\s\._%]/g, '');
+                        
+                        if (thClean === 'W' || thClean === 'WRONG' || thClean === 'WPERC' || thClean === 'WRONGPERC') finalWCol = c;
+                        if (thClean === 'U' || thClean === 'UNATTEMPTED' || thClean === 'UPERC' || thClean === 'UNATTEMPTEDPERC') finalUCol = c;
+                        if (thClean === 'QNO' || thClean === 'Q' || thClean === 'SLNO') finalQCol = c;
                     }
 
+                    if (finalWCol === -1) finalWCol = 6; 
+                    if (finalUCol === -1) finalUCol = 8;
+
                     // Data starts from either current header row if QNo is there, or next row
-                    const firstColHeader = String(top100Data[headerRowIdx][0] || '').toUpperCase();
+                    const firstColHeader = String(top100Data[headerRowIdx][finalQCol] || '').toUpperCase();
                     const startDataIdx = (firstColHeader.startsWith('Q') || /^\d+$/.test(firstColHeader)) ? headerRowIdx : headerRowIdx + 1;
 
                     for (let i = startDataIdx; i < top100Data.length; i++) {
                         const row = top100Data[i];
-                        if (!row || row[0] === undefined || row[0] === null || String(row[0]).trim() === '') continue;
-                        const qNoRaw = String(row[0]).trim();
+                        if (!row || row[finalQCol] === undefined || row[finalQCol] === null || String(row[finalQCol]).trim() === '') continue;
+                        const qNoRaw = String(row[finalQCol]).trim();
                         // Allow Q1 or just 1
                         if (!qNoRaw.toUpperCase().startsWith('Q') && isNaN(parseInt(qNoRaw))) continue;
                         const qNo = qNoRaw.replace(/[^0-9]/g, '');
                         
-                        // LITERALLY take from the identified columns
                         const wVal = row[finalWCol];
                         const uVal = row[finalUCol];
 
-                        nationalErrorMap[qNo] = {
-                            W: formatPercentage(wVal),
-                            U: formatPercentage(uVal)
-                        };
+                        // Only overwrite if we find actual data
+                        if (!nationalErrorMap[qNo]) nationalErrorMap[qNo] = {};
+                        if (wVal !== undefined && wVal !== null) nationalErrorMap[qNo].W = formatPercentage(wVal);
+                        if (uVal !== undefined && uVal !== null) nationalErrorMap[qNo].U = formatPercentage(uVal);
                     }
                 }
-                console.log(`  [INFO] Loaded National Error stats for ${Object.keys(nationalErrorMap).length} questions from ${top100SheetName}.`);
+                console.log(`  [INFO] Merged National Error stats from ${top100SheetName}. Total questions: ${Object.keys(nationalErrorMap).length}`);
             }
 
             // D. Load Meta Data from PICS subfolder
