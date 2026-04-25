@@ -16,6 +16,8 @@ async function run() {
         const yearResponse = readline.question(`Enter Academic Year (2025/2026) [Default 2025]: `, { defaultInput: '2025' });
         const year = yearResponse.trim();
 
+        const customHeading = readline.question(`Enter Custom Heading for PDF (Optional): `);
+
 
         const pool = await connectToDb(year);
         console.log(`Connected to TiDB (NEET ${year}).`);
@@ -117,7 +119,7 @@ async function run() {
         let totalUploaded = 0;
         for (const fileObj of files) {
             console.log(`\nProcessing: ${path.basename(fileObj.path)} [Folder: ${fileObj.folder}]`);
-            const count = await processResultFile(fileObj.path, fileObj.folder, pool, getMappedCategory, allowedCampuses, year, manualTestType, manualTestName);
+            const count = await processResultFile(fileObj.path, fileObj.folder, pool, getMappedCategory, allowedCampuses, year, manualTestType, manualTestName, customHeading);
             totalUploaded += count || 0;
         }
 
@@ -181,7 +183,7 @@ function isKarnatakaCampus(name, allowedCampuses) {
     return keywords.some(k => upper.includes(k));
 }
 
-async function processResultFile(filePath, streamFromFolder, pool, getMappedCategory, allowedCampuses, year, manualTestType, manualTestName) {
+async function processResultFile(filePath, streamFromFolder, pool, getMappedCategory, allowedCampuses, year, manualTestType, manualTestName, customHeading) {
 
     const wb = XLSX.readFile(filePath);
 
@@ -392,11 +394,11 @@ async function processResultFile(filePath, streamFromFolder, pool, getMappedCate
 
     console.log(`  Ready to upload ${studentsToUpload.length} students.`);
 
-    const uploadedCount = await uploadStudents(pool, studentsToUpload, dateStr, testName, year, dbStream, getMappedCategory);
+    const uploadedCount = await uploadStudents(pool, studentsToUpload, dateStr, testName, year, dbStream, getMappedCategory, customHeading);
     return uploadedCount;
 }
 
-async function uploadStudents(pool, studentsToUpload, dateStr, testName, year, dbStream, getMappedCategory) {
+async function uploadStudents(pool, studentsToUpload, dateStr, testName, year, dbStream, getMappedCategory, customHeading) {
     if (studentsToUpload.length > 0) {
         const batchSize = 1000;
         for (let i = 0; i < studentsToUpload.length; i += batchSize) {
@@ -406,7 +408,8 @@ async function uploadStudents(pool, studentsToUpload, dateStr, testName, year, d
                 return {
                     ...s,
                     Top_ALL: category,
-                    Year: year
+                    Year: year,
+                    Custom_Heading: customHeading
                 };
             });
 
@@ -421,8 +424,8 @@ async function uploadStudents(pool, studentsToUpload, dateStr, testName, year, d
                     s.Test_Type, s.Test, s.DATE, s.STUD_ID, s.NAME_OF_THE_STUDENT, s.CAMPUS_NAME,
                     s.Tot_720, s.AIR, s.Botany, s.B_Rank, s.Zoology, s.Z_Rank, s.Biology,
                     s.Physics, s.P_Rank, s.Chemistry, s.C_Rank, s.Stream, s.Year, s.Top_ALL,
-                    s.Errors_Bot, s.Errors_Zoo, s.Errors_Phy, s.Errors_Che
-                ].map(v => v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
+                    s.Errors_Bot, s.Errors_Zoo, s.Errors_Phy, s.Errors_Che, s.Custom_Heading
+                ].map(v => v === null || v === undefined || v === '' ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`);
                 return `(${cols.join(',')})`;
             }).join(',');
 
@@ -430,7 +433,8 @@ async function uploadStudents(pool, studentsToUpload, dateStr, testName, year, d
                 Test_Type, Test, DATE, STUD_ID, NAME_OF_THE_STUDENT, CAMPUS_NAME,
                 Tot_720, AIR, Botany, B_Rank, Zoology, Z_Rank, Biology,
                 Physics, P_Rank, Chemistry, C_Rank, Stream, Year, Top_ALL,
-                \`Errors In Botany\`, \`Errors In Zoology\`, \`Errors In Physics\`, \`Errors In Chemistry\`
+                \`Errors In Botany\`, \`Errors In Zoology\`, \`Errors In Physics\`, \`Errors In Chemistry\`,
+                Custom_Heading
             ) VALUES ${values}`;
 
             await pool.request().query(sql);

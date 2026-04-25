@@ -550,7 +550,9 @@ const AnalysisReport = ({ filters }) => {
             }
 
             // 2. Add Subtitle (Row 2)
-            const subTitleText = `${stream}_Averages of the Selected Exams`;
+            const subTitleText = (examStats.length > 0 && examStats[0].Custom_Heading) 
+                ? examStats[0].Custom_Heading 
+                : `${stream}_Averages of the Selected Exams`;
             worksheet.mergeCells('A2:O2');
             const subTitleCell = worksheet.getCell('A2');
             subTitleCell.value = subTitleText;
@@ -675,7 +677,10 @@ const AnalysisReport = ({ filters }) => {
             }
 
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
-            const fileName = `${stream}_Averages_${testDate}`.replace(/\//g, '-');
+            let fileName = (examStats.length > 0 && examStats[0].Custom_Heading) 
+                ? examStats[0].Custom_Heading 
+                : `${stream}_Averages_${testDate}`;
+            fileName = fileName.replace(/\//g, '-');
             const buffer = await workbook.xlsx.writeBuffer();
             saveAs(new Blob([buffer]), `${fileName}.xlsx`);
             logActivity(userData, 'Exported Analysis Excel', { file: fileName });

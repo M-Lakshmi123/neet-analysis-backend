@@ -1010,6 +1010,7 @@ app.get('/api/analysis-report', async (req, res) => {
             SELECT Test, DATE, MAX(Custom_Heading) as Custom_Heading 
             FROM MEDICAL_RESULT
             ${where}
+            GROUP BY Test, DATE
             ORDER BY STR_TO_DATE(REPLACE(DATE, '/', '-'), '%d-%m-%Y') ASC
             `;
 
