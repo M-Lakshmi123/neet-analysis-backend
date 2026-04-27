@@ -5,9 +5,11 @@ services:
     region: singapore
     plan: free
     rootDir: server
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: npm start
     envVars:
+      - key: NODE_VERSION
+        value: 20.x
       - key: DB_HOST
         sync: false
       - key: DB_PORT

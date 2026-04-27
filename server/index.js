@@ -837,6 +837,7 @@ app.get('/api/history', async (req, res) => {
                 SELECT Test, DATE, MAX(Custom_Heading) as Custom_Heading
                 FROM MEDICAL_RESULT
                 ${examsWhere}
+                GROUP BY Test, DATE
                 ORDER BY STR_TO_DATE(REPLACE(DATE, '/', '-'), '%d-%m-%Y') ASC
             `;
             const examsResult = await pool.request().query(examsQuery);
