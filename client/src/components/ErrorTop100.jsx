@@ -435,7 +435,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                         sy += 4.5;
 
                         doc.setTextColor(255, 255, 255);
-                        doc.setFont("helvetica", "normal");
+                        doc.setFont("helvetica", "bold");
                         names.forEach(name => {
                             // Trim name if it overflows the ~56mm column
                             let trimmedName = name;
