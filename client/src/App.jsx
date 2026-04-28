@@ -188,9 +188,6 @@ const Dashboard = () => {
                 let restrictedSelection = nextCampus.filter(c =>
                     userAllowedCampuses.some(allowed => allowed.trim().toUpperCase() === c.trim().toUpperCase())
                 );
-                if (restrictedSelection.length === 0) {
-                    restrictedSelection = userAllowedCampuses;
-                }
 
                 // Only update campus if it's actually different to avoid redundant re-renders
                 if (!areCampusesSame(nextCampus, restrictedSelection)) {
