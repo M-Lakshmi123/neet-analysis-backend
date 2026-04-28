@@ -104,14 +104,20 @@ const Dashboard = () => {
         return !isAdmin && (userRole === 'principal' || userRole === 'user' || !userAllowedCampuses.includes('All'));
     }, [isAdmin, userData, userAllowedCampuses]);
 
-    const initialFilters = React.useMemo(() => ({
-        campus: [], // Start empty to allow user to pick, or show all allowed by default (handled in apiHelper)
-        stream: [],
-        testType: [],
-        test: [],
-        topAll: [],
-        studentSearch: []
-    }), []);
+    const initialFilters = React.useMemo(() => {
+        // If restricted to exactly ONE campus, default to it. 
+        // If multiple, start empty as requested.
+        const defaultCampus = (isRestricted && userAllowedCampuses.length === 1) ? userAllowedCampuses : [];
+
+        return {
+            campus: defaultCampus,
+            stream: [],
+            testType: [],
+            test: [],
+            topAll: [],
+            studentSearch: []
+        };
+    }, [isRestricted, userAllowedCampuses]);
 
     // Separate filters for each page to allow independent selections
     const [pageFilters, setPageFilters] = useState(() => {
@@ -163,7 +169,7 @@ const Dashboard = () => {
         return {
             ...baseFilters,
             campus: restrictedSelection,
-            _allowedCampuses: isRestricted ? userAllowedCampuses : null
+            _allowedCampuses: (isRestricted && userAllowedCampuses.length > 0) ? userAllowedCampuses : null
         };
     }, [baseFilters, isRestricted, userAllowedCampuses]);
 

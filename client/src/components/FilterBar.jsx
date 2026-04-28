@@ -10,6 +10,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
     // Normalize restriction to array for uniform handling
     const allowedCampuses = Array.isArray(restrictedCampus) ? restrictedCampus : (restrictedCampus ? [restrictedCampus] : []);
     const isRestricted = allowedCampuses.length > 0;
+    // Normalize allowed campuses for robust comparison
+    const normalizedAllowed = allowedCampuses.map(c => c.trim().toUpperCase());
+
     const [options, setOptions] = useState({
         campuses: [],
         streams: [],
@@ -92,7 +95,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
 
                 setOptions({
                     campuses: data.campuses
-                        ? (isRestricted ? data.campuses.filter(c => allowedCampuses.includes(c)) : data.campuses)
+                        ? (isRestricted 
+                            ? data.campuses.filter(c => normalizedAllowed.includes(c.trim().toUpperCase())) 
+                            : data.campuses)
                         : [],
                     streams: data.streams || [],
                     testTypes: data.testTypes || [],
