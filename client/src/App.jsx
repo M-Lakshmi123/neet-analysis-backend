@@ -94,30 +94,34 @@ const Dashboard = () => {
     }, [activePage]);
 
     const userAllowedCampuses = React.useMemo(() => {
-        return userData?.allowedCampuses || (userData?.campus && userData.campus !== 'All' ? [userData.campus] : []);
+        let allowed = userData?.allowedCampuses;
+        // Support both Array and legacy Comma-Separated String
+        if (typeof allowed === 'string') {
+            allowed = allowed.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        if (Array.isArray(allowed) && allowed.length > 0) return allowed;
+        return (userData?.campus && userData.campus !== 'All' ? [userData.campus] : []);
     }, [userData]);
 
     // STRICT RULE: Only Super Admins (isAdmin) have unrestricted access. 
-    // Principals and Co-Admins are restricted to their assigned campuses unless specifically granted 'All'.
+    // Principals and Users are restricted to their assigned campuses.
     const isRestricted = React.useMemo(() => {
         const userRole = (userData?.role || '').toLowerCase();
         return !isAdmin && (userRole === 'principal' || userRole === 'user' || !userAllowedCampuses.includes('All'));
     }, [isAdmin, userData, userAllowedCampuses]);
 
     const initialFilters = React.useMemo(() => {
-        // If restricted to exactly ONE campus, default to it. 
-        // If multiple, start empty as requested.
-        const defaultCampus = (isRestricted && userAllowedCampuses.length === 1) ? userAllowedCampuses : [];
-
+        // Principals should start with an empty selection to avoid "defaulting" to one campus.
+        // If they have multiple, they see all data by default (via apiHelper fallback) but no chips.
         return {
-            campus: defaultCampus,
+            campus: [], 
             stream: [],
             testType: [],
             test: [],
             topAll: [],
             studentSearch: []
         };
-    }, [isRestricted, userAllowedCampuses]);
+    }, []);
 
     // Separate filters for each page to allow independent selections
     const [pageFilters, setPageFilters] = useState(() => {
