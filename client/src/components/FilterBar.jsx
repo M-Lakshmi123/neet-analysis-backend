@@ -348,7 +348,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
 
     const resetFilters = () => {
         setFilters({
-            campus: isRestricted ? allowedCampuses : [],
+            campus: [], // Principals now start empty as requested
             stream: [],
             testType: [],
             test: [],
@@ -393,7 +393,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         onChange={(opt) => {
                             if (opt) {
                                 const finalCampus = isRestricted
-                                    ? (allowedCampuses.includes(opt.campus) ? [opt.campus] : allowedCampuses)
+                                    ? (normalizedAllowed.includes(opt.campus?.trim().toUpperCase()) ? [opt.campus] : [])
                                     : (opt.campus ? [opt.campus] : []);
                                 setFilters(prev => ({
                                     ...prev,
@@ -406,7 +406,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                                     topAll: []
                                 }));
                             } else {
-                                setFilters(prev => ({ ...prev, studentSearch: [], quickSearch: '', campus: isRestricted ? allowedCampuses : [] }));
+                                setFilters(prev => ({ ...prev, studentSearch: [], quickSearch: '', campus: [] }));
                             }
                         }}
                         styles={{
