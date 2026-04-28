@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../../firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from './AuthProvider';
 import { LogIn, Mail, Lock, ArrowRight, ShieldCheck, Award, TrendingUp, Users, School } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import Toast from '../Toast';
+import Modal from '../Modal';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
@@ -14,7 +16,23 @@ const LoginPage = () => {
     const [error, setError] = useState('');
     const [currentSlide, setCurrentSlide] = useState(0);
     const [toast, setToast] = useState(null);
+    const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'info' });
     const navigate = useNavigate();
+    const { userData, currentUser } = useAuth();
+
+    useEffect(() => {
+        // If the user lands here but is actually authenticated but NOT approved
+        if (currentUser && userData && !userData.isApproved && !modal.isOpen && currentUser.email !== "yenjarappa.s@varsitymgmt.com") {
+            setModal({
+                isOpen: true,
+                title: 'Approval Pending',
+                message: `Hello ${userData.name || 'Principal'}, your account is currently awaiting administrator approval. You will be able to access the dashboard once access is granted.`,
+                type: 'info'
+            });
+            signOut(auth);
+            sessionStorage.removeItem('NEET_SESSION_ACTIVE');
+        }
+    }, [currentUser, userData]);
 
     const showToast = (message, type = 'error') => {
         setToast({ message, type });
@@ -75,7 +93,29 @@ const LoginPage = () => {
 
             // Perform Login
             sessionStorage.setItem('NEET_SESSION_ACTIVE', 'true');
-            await signInWithEmailAndPassword(auth, email, password);
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            // Check if user is Approved (Principal logic)
+            if (email !== ADMIN_EMAIL) {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (userDoc.exists()) {
+                    const data = userDoc.data();
+                    if (!data.isApproved) {
+                        // Show Pending Approval Modal
+                        setModal({
+                            isOpen: true,
+                            title: 'Approval Pending',
+                            message: `Hello ${data.name || 'Principal'}, your account registration is successful, but it is currently awaiting administrator approval. You will receive a notification once access is granted.`,
+                            type: 'info'
+                        });
+                        await signOut(auth);
+                        sessionStorage.removeItem('NEET_SESSION_ACTIVE');
+                        setLoading(false);
+                        return;
+                    }
+                }
+            }
 
             // On success, we navigate to root. 
             // The AuthProvider and ProtectedRoute/LoginRedirect will take over 
@@ -190,6 +230,15 @@ const LoginPage = () => {
                     />
                 )}
             </AnimatePresence>
+
+            <Modal
+                isOpen={modal.isOpen}
+                onClose={() => setModal({ ...modal, isOpen: false })}
+                title={modal.title}
+                message={modal.message}
+                type={modal.type}
+                confirmText="Understood"
+            />
         </>
     );
 };

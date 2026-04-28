@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Select from 'react-select';
+import Select, { components } from 'react-select';
 import AsyncSelect from 'react-select/async';
 import { buildQueryParams, API_URL } from '../utils/apiHelper';
 import { useAuth } from './auth/AuthProvider';
@@ -64,20 +64,10 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
             }
         } else if (actionMeta.action === "deselect-option" && actionMeta.option && actionMeta.option.value === "SELECT_ALL") {
             // Deselect All clicked
-            if (field === 'campus' && isRestricted) {
-                // For restricted users, deselecting all should revert to the allowed list (STRICT)
-                setFilters(prev => ({ ...prev, [field]: allowedCampuses }));
-            } else {
-                setFilters(prev => ({ ...prev, [field]: [] }));
-            }
+            setFilters(prev => ({ ...prev, [field]: [] }));
         } else {
             // Normal selection
             let values = selectedOptions ? selectedOptions.map(opt => opt.value).filter(v => v !== 'SELECT_ALL') : [];
-
-            // STRICT ENFORCEMENT: If campus is restricted, it can NEVER be empty
-            if (field === 'campus' && isRestricted && values.length === 0) {
-                values = allowedCampuses;
-            }
 
             setFilters(prev => ({ ...prev, [field]: values }));
         }
@@ -237,6 +227,40 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         return filters[field] && filters[field].length === 1 && filters[field][0] === "__ALL__";
     };
 
+    // Custom ValueContainer to show summary when too many items are selected
+    const CompactValueContainer = ({ children, ...props }) => {
+        const selected = props.getValue();
+        if (selected.length > 3) {
+            // Check if it's the "Select All" special case
+            if (selected.length === 1 && selected[0].value === "SELECT_ALL") {
+                return <components.ValueContainer {...props}>{children}</components.ValueContainer>;
+            }
+            return (
+                <components.ValueContainer {...props}>
+                    <div style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '800',
+                        color: '#1e3a8a',
+                        whiteSpace: 'nowrap',
+                        background: '#eff6ff',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                    }}>
+                        <span style={{ opacity: 0.7 }}>📊</span>
+                        {selected.length} Selected
+                    </div>
+                    {children.map(child => child && child.type?.name === 'Input' ? child : null)}
+                    {/* Ensure we still render the input part for searchability */}
+                    {Array.isArray(children) ? children.filter(c => c && (c.key === 'placeholder' || (c.props && c.props.editable))) : children}
+                </components.ValueContainer>
+            );
+        }
+        return <components.ValueContainer {...props}>{children}</components.ValueContainer>;
+    };
+
     // Custom styles for React Select
     const customStyles = {
         control: (base, state) => ({
@@ -248,7 +272,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
             borderRadius: '8px',
             boxShadow: 'none',
             '&:hover': { borderColor: '#172554' },
-            overflow: 'hidden'
+            overflow: 'hidden',
+            width: '100%',
+            minWidth: 0
         }),
         valueContainer: (base) => ({
             ...base,
@@ -409,6 +435,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         onChange={(opts, meta) => handleSelectChange('campus', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
+                        components={{ ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={isRestricted && allowedCampuses.length === 1}
                     />
@@ -424,6 +451,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         onChange={(opts, meta) => handleSelectChange('stream', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
+                        components={{ ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={loadingFilters || (!isRestricted && filters.campus.length === 0)}
                     />
@@ -439,6 +467,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         onChange={(opts, meta) => handleSelectChange('testType', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
+                        components={{ ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={loadingFilters || filters.stream.length === 0}
                     />
@@ -454,6 +483,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         onChange={(opts, meta) => handleSelectChange('test', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
+                        components={{ ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={loadingFilters || filters.testType.length === 0}
                     />
@@ -469,6 +499,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         onChange={(opts, meta) => handleSelectChange('topAll', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
+                        components={{ ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={loadingFilters || filters.test.length === 0}
                     />
@@ -484,6 +515,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         onChange={(opts, meta) => handleSelectChange('studentSearch', opts, meta)}
                         isLoading={loadingStudents}
                         styles={compactStyles}
+                        components={{ ValueContainer: CompactValueContainer }}
                         placeholder="Select Students..."
                         isDisabled={loadingStudents || filters.test.length === 0}
                     />

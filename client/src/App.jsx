@@ -105,13 +105,13 @@ const Dashboard = () => {
     }, [isAdmin, userData, userAllowedCampuses]);
 
     const initialFilters = React.useMemo(() => ({
-        campus: isRestricted ? userAllowedCampuses : [],
+        campus: [], // Start empty to allow user to pick, or show all allowed by default (handled in apiHelper)
         stream: [],
         testType: [],
         test: [],
         topAll: [],
         studentSearch: []
-    }), [isRestricted, userAllowedCampuses]);
+    }), []);
 
     // Separate filters for each page to allow independent selections
     const [pageFilters, setPageFilters] = useState(() => {
@@ -156,19 +156,14 @@ const Dashboard = () => {
             userAllowedCampuses.some(allowed => allowed.trim().toUpperCase() === c.trim().toUpperCase())
         );
 
-        // If selection became empty or was empty, force to ALL allowed campuses
-        if (restrictedSelection.length === 0) {
-            restrictedSelection = userAllowedCampuses;
-        }
-
-        // Stability check: if logically the same as base, return base
-        if (areCampusesSame(currentCampus, restrictedSelection)) {
-            return baseFilters;
-        }
+        // We NO LONGER force the selection to be filled with all allowed campuses by default.
+        // If it's empty, the UI will show nothing selected, but we pass the restriction
+        // via a hidden property to buildQueryParams to ensure security.
 
         return {
             ...baseFilters,
-            campus: restrictedSelection
+            campus: restrictedSelection,
+            _allowedCampuses: isRestricted ? userAllowedCampuses : null
         };
     }, [baseFilters, isRestricted, userAllowedCampuses]);
 

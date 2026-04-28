@@ -54,6 +54,9 @@ export const buildQueryParams = (filters) => {
     const params = new URLSearchParams();
 
     Object.keys(filters).forEach(key => {
+        // Skip hidden restriction property
+        if (key === '_allowedCampuses') return;
+
         const value = filters[key];
         if (value !== undefined && value !== null && (typeof value === 'boolean' || typeof value === 'number' || (typeof value === 'string' && value.length > 0) || (Array.isArray(value) && value.length > 0))) {
             if (Array.isArray(value)) {
@@ -69,6 +72,11 @@ export const buildQueryParams = (filters) => {
             }
         }
     });
+
+    // Security Fallback: If restricted but no campus selected, apply all allowed campuses
+    if (filters._allowedCampuses && (!filters.campus || filters.campus.length === 0)) {
+        filters._allowedCampuses.forEach(v => params.append('campus', v));
+    }
 
     return params;
 };
