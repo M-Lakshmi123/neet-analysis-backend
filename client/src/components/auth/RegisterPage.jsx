@@ -66,7 +66,7 @@ const RegisterPage = () => {
 
     useEffect(() => {
         const fetchCampuses = async () => {
-            const apiUrl = `${API_URL}/api/filters?academicYear=2025`;
+            const apiUrl = `${API_URL}/api/filters?academicYear=2026`;
             try {
                 const res = await fetch(apiUrl);
                 if (!res.ok) throw new Error("Backend unreachable");

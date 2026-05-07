@@ -246,7 +246,7 @@ app.get('/api/files', async (req, res) => {
 app.get(['/api/files/v/:id', '/api/files/v/:id/:name'], async (req, res) => {
     try {
         const { id } = req.params;
-        const year = req.query.academicYear || '2025';
+        const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
 
         const [meta] = await pool.rawPool.query('SELECT filename, original_name, file_type, size FROM uploaded_files WHERE id = ?', [id]);
@@ -311,7 +311,7 @@ app.get(['/api/files/v/:id', '/api/files/v/:id/:name'], async (req, res) => {
 app.get('/api/files/view/:id', async (req, res) => {
     // Redirect to the new cleaner route
     const { id } = req.params;
-    const year = req.query.academicYear || '2025';
+    const year = req.query.academicYear || '2026';
     res.redirect(`/api/files/v/${id}/view?academicYear=${year}`);
 });
 
@@ -1738,10 +1738,10 @@ app.get('/api/erp/students', async (req, res) => {
     try {
         console.log("----------------------------------------");
         console.log("STARTUP: Testing Database Connections...");
-        await connectToDb('2025');
-        console.log("STARTUP: 2025 Database Connection Verified! ✅");
         await connectToDb('2026');
         console.log("STARTUP: 2026 Database Connection Verified! ✅");
+        await connectToDb('2025');
+        console.log("STARTUP: 2025 Database Connection Verified! ✅");
         console.log("----------------------------------------");
     } catch (err) {
         console.error("STARTUP: Database Connection FAILED! ❌");

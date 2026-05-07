@@ -60,7 +60,7 @@ const Dashboard = () => {
     const { userData, isAdmin, isCoAdmin } = useAuth();
 
     const [academicYear, setAcademicYear] = useState(() => {
-        return sessionStorage.getItem('academic_year') || '2025';
+        return sessionStorage.getItem('academic_year') || '2026';
     });
 
     const [activePage, setActivePage] = useState(() => {

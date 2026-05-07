@@ -154,7 +154,7 @@ const AverageMarksReport = ({ filters }) => {
 
     const getDynamicFileName = () => {
         const stream = getStreamLabel();
-        return `2025-26_${stream}_NEET_Estimated Avg's`.replace(/[^a-z0-9\-_]/gi, '_');
+        return `2026-27_${stream}_NEET_Estimated Avg's`.replace(/[^a-z0-9\-_]/gi, '_');
     };
 
     const downloadExcel = async () => {
@@ -221,7 +221,7 @@ const AverageMarksReport = ({ filters }) => {
         // ROW 2: Left Header Block (A2:C2) - MS Gothic 16
         worksheet.mergeCells('A2:C2');
         const cellA2 = worksheet.getCell('A2');
-        const headerTextStr = `2025-26_${stream}_NEET_Estimated Avg's`;
+        const headerTextStr = `2026-27_${stream}_NEET_Estimated Avg's`;
         const parts = headerTextStr.split(stream);
         cellA2.value = {
             richText: [

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { buildQueryParams, formatDate, API_URL } from '../utils/apiHelper';
 import LoadingTimer from './LoadingTimer';
 import ExcelJS from 'exceljs';
@@ -383,7 +383,7 @@ const AverageCountReport = ({ filters }) => {
 
         worksheet.mergeCells('A3:E4');
         const cellA3 = worksheet.getCell('A3');
-        cellA3.value = { richText: [{ text: '2025-26_', font: { name: 'MS Gothic', size: 16, color: { argb: 'FFCCCCFF' }, bold: true } }, { text: stream, font: { name: 'MS Gothic', size: 16, color: { argb: 'FFFFFF00' }, bold: true } }, { text: '_NEET Avg\'s', font: { name: 'MS Gothic', size: 16, color: { argb: 'FFCCCCFF' }, bold: true } }] };
+        cellA3.value = { richText: [{ text: '2026-27_', font: { name: 'MS Gothic', size: 16, color: { argb: 'FFCCCCFF' }, bold: true } }, { text: stream, font: { name: 'MS Gothic', size: 16, color: { argb: 'FFFFFF00' }, bold: true } }, { text: '_NEET Avg\'s', font: { name: 'MS Gothic', size: 16, color: { argb: 'FFCCCCFF' }, bold: true } }] };
         cellA3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF31869B' } }; cellA3.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; cellA3.border = borderStyle;
 
         worksheet.mergeCells('F3:R4');

@@ -50,7 +50,7 @@ const TargetVsAchieved = ({ filters }) => {
     useEffect(() => {
         const fetchTargets = async () => {
             try {
-                const year = filters.academicYear || '2025';
+                const year = filters.academicYear || '2026';
                 const res = await fetch(`${API_URL}/api/targets?academicYear=${year}`);
                 const data = await res.json();
                 setAllTargets(data);
