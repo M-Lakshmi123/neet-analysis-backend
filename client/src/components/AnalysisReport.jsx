@@ -500,190 +500,73 @@ const AnalysisReport = ({ filters }) => {
 
     const downloadExcel = async () => {
         try {
+            const response = await fetch('/Template.xlsx');
+            if (!response.ok) throw new Error('Failed to fetch template file.');
+            const arrayBuffer = await response.arrayBuffer();
+
             const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet('Analysis Report');
+            await workbook.xlsx.load(arrayBuffer);
+            const worksheet = workbook.worksheets[0];
             const stream = getStreamLabel();
 
-            const borderStyle = {
-                top: { style: 'thin', color: { argb: 'FF00B0F0' } },
-                left: { style: 'thin', color: { argb: 'FF00B0F0' } },
-                bottom: { style: 'thin', color: { argb: 'FF00B0F0' } },
-                right: { style: 'thin', color: { argb: 'FF00B0F0' } }
-            };
-
-            const getHeaderBaseStyle = (bgColor, fgColor = 'FF0000FF') => ({
-                fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } },
-                font: { color: { argb: fgColor }, bold: true, size: 10 },
-                alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-                border: borderStyle
-            });
-
-            // 1. Add Title (Merged Row 1) with Logo
-            worksheet.mergeCells('A1:O1');
-            const titleCell = worksheet.getCell('A1');
-            titleCell.value = {
-                richText: [
-                    { text: '          Sri Chaitanya ', font: { name: 'Impact', size: 32, color: { argb: 'FF00B0F0' } } },
-                    { text: 'Educational Institutions., India', font: { name: 'Gill Sans MT', size: 32, color: { argb: 'FF00B0F0' } } }
-                ]
-            };
-            titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-            titleCell.border = borderStyle;
-            worksheet.getRow(1).height = 50;
-
-            // Add Logo
-            try {
-                const response = await fetch('/logo.png');
-                const blob = await response.blob();
-                const arrayBuffer = await blob.arrayBuffer();
-                const imageId = workbook.addImage({
-                    buffer: arrayBuffer,
-                    extension: 'png',
-                });
-                worksheet.addImage(imageId, {
-                    tl: { col: 0.1, row: 0.1 },
-                    ext: { width: 65, height: 60 },
-                    editAs: 'oneCell'
-                });
-            } catch (e) {
-                console.error("Failed to add logo to excel:", e);
-            }
-
-            // 2. Add Subtitle (Row 2)
-            const subTitleText = (examStats.length > 0 && examStats[0].Custom_Heading) 
-                ? examStats[0].Custom_Heading 
-                : `${stream}_Averages of the Selected Exams`;
-            worksheet.mergeCells('A2:O2');
-            const subTitleCell = worksheet.getCell('A2');
-            subTitleCell.value = subTitleText;
-            subTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF31869B' } };
-            subTitleCell.font = { name: 'MS Gothic', size: 16, color: { argb: 'FFFFFF00' }, bold: true };
-            subTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-            subTitleCell.border = borderStyle;
-            worksheet.getRow(2).height = 30;
-
-            // 3. Multi-level Headers (Rows 3 & 4)
-            const headerRow3Values = [
-                'STUD ID', 'NAME OF THE STUDENT', 'CAMPUS NAME', 'Tot 720', 'AIR',
-                'Botany M180', '', 'Zoology M180', '', 'Biology 360',
-                'Physics M180', '', 'Chemistry M180', '', 'EXAMS'
-            ];
-            const row3 = worksheet.addRow(headerRow3Values);
-            row3.height = 30;
-
-            const headerRow4Values = [
-                '', '', '', '', '',
-                'BOT', 'RANK', 'ZOO', 'RANK', '',
-                'PHY', 'RANK', 'CHEM', 'RANK', ''
-            ];
-            const row4 = worksheet.addRow(headerRow4Values);
-            row4.height = 25;
-
-            // Merge single column headers vertically (Row 3 & Row 4)
-            ['A', 'B', 'C', 'D', 'E', 'J', 'O'].forEach(col => {
-                worksheet.mergeCells(`${col}3:${col}4`);
-            });
-            // Merge subject headers horizontally
-            worksheet.mergeCells('F3:G3');
-            worksheet.mergeCells('H3:I3');
-            worksheet.mergeCells('K3:L3');
-            worksheet.mergeCells('M3:N3');
-
-            // Style headers matching AverageMarksReport
-            [row3, row4].forEach(row => {
-                row.eachCell((cell, colNumber) => {
-                    if ([1, 2, 3, 6, 7].includes(colNumber)) cell.style = getHeaderBaseStyle('FFFFFFCC');
-                    else if (colNumber === 4) cell.style = getHeaderBaseStyle('FF002060', 'FFFFFF00');
-                    else if (colNumber === 5) cell.style = getHeaderBaseStyle('FFFFFF00', 'FF0000FF');
-                    else if ([8, 9].includes(colNumber)) cell.style = getHeaderBaseStyle('FFFDE9D9');
-                    else if (colNumber === 10) cell.style = getHeaderBaseStyle('FFD9D9D9');
-                    else if ([11, 12].includes(colNumber)) cell.style = getHeaderBaseStyle('FFE4DFEC');
-                    else if ([13, 14].includes(colNumber)) cell.style = getHeaderBaseStyle('FFDDD9C4');
-                    else if (colNumber === 15) cell.style = getHeaderBaseStyle('FFFCD5B4');
-                });
-            });
-
-            // Set column widths
-            worksheet.columns = [
-                { width: 14 }, { width: 35 }, { width: 25 }, { width: 10 }, { width: 10 },
-                { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 12 },
-                { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }
-            ];
-
-            // 4. Add Data Rows
-            studentMarks.forEach(student => {
-                const rowData = [
-                    student.STUD_ID,
-                    (student.name || '').toUpperCase(),
-                    (student.campus || '').toUpperCase(),
-                    Number(student.tot || 0),
-                    Math.round(student.air) || '-',
-                    Number(student.bot || 0),
-                    student.b_rank,
-                    Number(student.zoo || 0),
-                    student.z_rank,
-                    Number((Number(student.bot) || 0) + (Number(student.zoo) || 0)),
-                    Number(student.phy || 0),
-                    student.p_rank,
-                    Number(student.che || 0),
-                    student.c_rank,
-                    student.t_app
-                ];
-                const row = worksheet.addRow(rowData);
-                row.height = 20;
-
-                row.eachCell((cell, colNumber) => {
-                    cell.border = borderStyle;
-                    cell.alignment = { vertical: 'middle', horizontal: colNumber <= 3 ? 'left' : 'center' };
-
-                    // Format numbers with 1 decimal point for marks
-                    if ([4, 6, 8, 10, 11, 13].includes(colNumber)) {
-                        cell.numFmt = '0.0';
-                    }
-
-                    if (colNumber <= 3) {
-                        cell.font = { name: 'Arial', size: 9, color: { argb: 'FF000000' } };
-                    } else if ([4, 6, 8, 10, 11, 13].includes(colNumber)) {
-                        const color = (colNumber === 4) ? 'FF0070C0' : 'FF7030A0'; // Blue for TOT, Purple for others
-                        const fontName = (colNumber === 4) ? 'Arial Black' : 'Arial';
-                        cell.font = { name: fontName, size: 10, bold: true, color: { argb: color } };
-                    } else if ([5, 7, 9, 12, 14].includes(colNumber)) {
-                        const color = (colNumber === 5) ? 'FF0000FF' : 'FFFF0000'; // Blue for AIR, Red for Others
-                        cell.font = { name: 'Arial', size: 10, bold: true, italic: (colNumber === 5), color: { argb: color } };
-                    } else {
-                        cell.font = { name: 'Arial', size: 10, color: { argb: 'FF000000' } };
-                    }
-                });
-            });
-
-            // 5. Add Totals Row
-            if (totals) {
-                const totalRowData = [
-                    'Selection Average', '', '',
-                    totals.tot, totals.air, totals.bot, totals.b_rank,
-                    totals.zoo, totals.z_rank, (Number(totals.bot) + Number(totals.zoo)),
-                    totals.phy, totals.p_rank, totals.che, totals.c_rank, ''
-                ];
-                const totalRow = worksheet.addRow(totalRowData);
-                worksheet.mergeCells(`A${totalRow.number}:C${totalRow.number}`);
-                totalRow.height = 25;
-
-                totalRow.eachCell(cell => {
-                    cell.font = { bold: true, size: 10 };
-                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
-                    cell.border = borderStyle;
-                });
-            }
-
             const testDate = examStats.length > 0 ? formatDate(examStats[0].DATE) : formatDate(new Date());
-            let fileName = (examStats.length > 0 && examStats[0].Custom_Heading) 
+            let fullPattern = (examStats.length > 0 && examStats[0].Custom_Heading) 
                 ? examStats[0].Custom_Heading 
-                : `${stream}_Averages_${testDate}`;
-            fileName = fileName.replace(/\//g, '-');
+                : `${testDate}_${stream}_${examStats.length > 0 ? examStats[0].Test : 'GRAND TEST'}_All India Marks Analysis`;
+            fullPattern = fullPattern.replace(/\//g, '-');
+            
+            // 2. Add Subtitle (Row 2) - Template already has A2:O2 merged, just set A2
+            worksheet.getCell('A2').value = fullPattern;
+
+            // Grab the style from the first data row (row 7) to apply to all inserted rows
+            const referenceRow = worksheet.getRow(7);
+            const styles = [];
+            for (let i = 1; i <= 14; i++) {
+                styles[i] = referenceRow.getCell(i).style;
+            }
+
+            // Write student data starting from row 7
+            let currentRowNum = 7;
+            studentMarks.forEach(student => {
+                const row = worksheet.getRow(currentRowNum);
+                
+                row.getCell(1).value = student.STUD_ID;
+                row.getCell(2).value = (student.name || '').toUpperCase();
+                row.getCell(3).value = (student.campus || '').toUpperCase();
+                row.getCell(4).value = Number(student.tot || 0);
+                row.getCell(5).value = Math.round(student.air) || '-';
+                row.getCell(6).value = Number(student.bot || 0);
+                row.getCell(7).value = student.b_rank;
+                row.getCell(8).value = Number(student.zoo || 0);
+                row.getCell(9).value = student.z_rank;
+                row.getCell(10).value = Number((Number(student.bot) || 0) + (Number(student.zoo) || 0));
+                row.getCell(11).value = Number(student.phy || 0);
+                row.getCell(12).value = student.p_rank;
+                row.getCell(13).value = Number(student.che || 0);
+                row.getCell(14).value = student.c_rank;
+                
+                for (let i = 1; i <= 14; i++) {
+                    if (styles[i]) {
+                        row.getCell(i).style = styles[i];
+                    }
+                }
+                
+                if (referenceRow.height) {
+                    row.height = referenceRow.height;
+                }
+                
+                currentRowNum++;
+            });
+
+            // Clean up any remaining rows from the template
+            const totalTemplateRows = worksheet.rowCount;
+            if (totalTemplateRows >= currentRowNum) {
+                worksheet.spliceRows(currentRowNum, totalTemplateRows - currentRowNum + 1);
+            }
+
             const buffer = await workbook.xlsx.writeBuffer();
-            saveAs(new Blob([buffer]), `${fileName}.xlsx`);
-            logActivity(userData, 'Exported Analysis Excel', { file: fileName });
+            saveAs(new Blob([buffer]), `${fullPattern}.xlsx`);
+            logActivity(userData, 'Exported Analysis Excel', { file: fullPattern });
 
         } catch (error) {
             console.error("Excel Export Error:", error);
