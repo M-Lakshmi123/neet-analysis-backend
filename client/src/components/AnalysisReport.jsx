@@ -562,49 +562,7 @@ const AnalysisReport = ({ filters }) => {
                 r++;
             });
 
-            // 4. Add "Campus Selection Average" row
-            if (totals) {
-                const totalRowData = [
-                    'Campus Selection Average', '', '',
-                    Number(totals.tot || 0),
-                    Math.round(totals.air) || '-',
-                    Number(totals.bot || 0),
-                    Number(totals.b_rank || 0),
-                    Number(totals.zoo || 0),
-                    Number(totals.z_rank || 0),
-                    Number((Number(totals.bot) || 0) + (Number(totals.zoo) || 0)),
-                    Number(totals.phy || 0),
-                    Number(totals.p_rank || 0),
-                    Number(totals.che || 0),
-                    Number(totals.c_rank || 0)
-                ];
 
-                // Merge cells A(r):C(r)
-                sheet.range(`A${r}:C${r}`).merged(true);
-
-                // Write values and style the cells in the totals row
-                for (let col = 1; col <= 14; col++) {
-                    const cell = sheet.cell(r, col);
-                    if (col <= 3) {
-                        if (col === 1) {
-                            cell.value(totalRowData[col - 1]);
-                        } else {
-                            cell.value(null);
-                        }
-                    } else {
-                        cell.value(totalRowData[col - 1]);
-                    }
-
-                    // Apply styles: bold, border, background color #FFF2CC for totals
-                    const baseStyle = { ...styles[col] };
-                    baseStyle.bold = true;
-                    baseStyle.fill = { type: 'solid', color: { rgb: 'FFF2CC' } };
-                    
-                    cell.style(baseStyle);
-                }
-                sheet.row(r).height(25);
-                r++;
-            }
 
             // 5. Clear remaining template rows from r up to 178 (original template size)
             for (let rowIdx = r; rowIdx <= 178; rowIdx++) {
