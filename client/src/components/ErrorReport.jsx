@@ -4,6 +4,7 @@ import FilterBar from './FilterBar';
 import { API_URL, buildQueryParams, formatDate } from '../utils/apiHelper';
 import { useAuth } from './auth/AuthProvider';
 import jsPDF from 'jspdf';
+import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 import Select from 'react-select';
@@ -30,6 +31,8 @@ const ErrorReport = ({ filters, setFilters }) => {
     const [loading, setLoading] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
     const [pdfProgress, setPdfProgress] = useState('');
+    const [generatingExcel, setGeneratingExcel] = useState(false);
+    const [excelProgress, setExcelProgress] = useState('');
     const [zoom, setZoom] = useState(1);
     const reportRef = useRef(null);
 
@@ -664,6 +667,222 @@ const ErrorReport = ({ filters, setFilters }) => {
         }
     };
 
+    const createStudentExcel = async (student, logoBuffer) => {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Error Report');
+
+        worksheet.views = [{ showGridLines: true }];
+
+        const thinBorder = {
+            top: { style: 'thin', color: { argb: 'FF000000' } },
+            left: { style: 'thin', color: { argb: 'FF000000' } },
+            bottom: { style: 'thin', color: { argb: 'FF000000' } },
+            right: { style: 'thin', color: { argb: 'FF000000' } }
+        };
+
+        const centerAlign = { horizontal: 'center', vertical: 'middle' };
+        const leftAlign = { horizontal: 'left', vertical: 'middle' };
+
+        worksheet.columns = [
+            { key: 'sNo', width: 8 },
+            { key: 'testType', width: 14 },
+            { key: 'testName', width: 28 },
+            { key: 'qNo', width: 10 },
+            { key: 'wU', width: 10 },
+            { key: 'subject', width: 14 },
+            { key: 'topic', width: 32 },
+            { key: 'subTopic', width: 32 },
+            { key: 'topPerc', width: 12 }
+        ];
+
+        if (logoBuffer) {
+            try {
+                const imageId = workbook.addImage({
+                    buffer: logoBuffer,
+                    extension: 'png',
+                });
+                worksheet.addImage(imageId, {
+                    tl: { col: 0.15, row: 0.1 },
+                    ext: { width: 70, height: 60 },
+                    editAs: 'oneCell'
+                });
+            } catch (e) {
+                console.error("Failed to add logo to Excel sheet", e);
+            }
+        }
+
+        worksheet.mergeCells('A1:B3');
+        worksheet.mergeCells('C1:I1');
+        worksheet.mergeCells('C2:I2');
+        worksheet.mergeCells('C3:I3');
+
+        const brandCell = worksheet.getCell('C1');
+        brandCell.value = {
+            richText: [
+                { text: 'Sri Chaitanya ', font: { name: 'Bookman Old Style', size: 20, bold: true, color: { argb: 'FF0070C0' } } },
+                { text: 'Educational Institutions', font: { name: 'Bookman Old Style', size: 20, color: { argb: 'FF0070C0' } } }
+            ]
+        };
+        brandCell.alignment = centerAlign;
+
+        const addressCell = worksheet.getCell('C2');
+        addressCell.value = "A.P, TELANGANA, KARNATAKA, TAMILNADU, MAHARASHTRA, DELHI, RANCHI";
+        addressCell.font = { name: 'Bookman Old Style', size: 8, bold: true, color: { argb: 'FF000000' } };
+        addressCell.alignment = centerAlign;
+
+        const officeCell = worksheet.getCell('C3');
+        officeCell.value = "Central Office, Bangalore";
+        officeCell.font = { name: 'Bookman Old Style', size: 10, bold: true, color: { argb: 'FF000000' } };
+        officeCell.alignment = centerAlign;
+
+        worksheet.getRow(1).height = 28;
+        worksheet.getRow(2).height = 15;
+        worksheet.getRow(3).height = 18;
+        worksheet.getRow(4).height = 8;
+
+        worksheet.mergeCells('A5:D5');
+        worksheet.mergeCells('E5:I5');
+
+        const nameCell = worksheet.getCell('A5');
+        nameCell.value = `STUDENT NAME: ${student.info.name || ''}`;
+        nameCell.font = { name: 'Bookman Old Style', size: 11, bold: true, color: { argb: 'FF000000' } };
+        nameCell.alignment = centerAlign;
+
+        const branchCell = worksheet.getCell('E5');
+        branchCell.value = `BRANCH: ${student.info.branch || ''}`;
+        branchCell.font = { name: 'Bookman Old Style', size: 11, bold: true, color: { argb: 'FF000000' } };
+        branchCell.alignment = centerAlign;
+
+        for (let col = 1; col <= 9; col++) {
+            const cell = worksheet.getCell(5, col);
+            cell.border = thinBorder;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8DC' } };
+        }
+        worksheet.getRow(5).height = 25;
+        worksheet.getRow(6).height = 8;
+
+        const headers = [
+            'S.No', 'Test type', 'Test Name', 'Q.No', 'W/U', 'Subject', 'Topic', 'Sub Topic', 'Top%'
+        ];
+        headers.forEach((h, index) => {
+            const cell = worksheet.getCell(7, index + 1);
+            cell.value = h;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF800000' } };
+            cell.font = { name: 'Bookman Old Style', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+            cell.alignment = centerAlign;
+            cell.border = thinBorder;
+        });
+        worksheet.getRow(7).height = 26;
+
+        let sNo = 1;
+        const formatTopPerc = (raw) => {
+            if (raw === undefined || raw === null || raw === '') return '';
+            const num = parseFloat(raw);
+            if (isNaN(num)) return String(raw);
+            const isAlreadyPercent = String(raw).includes('%') || num > 1.0;
+            return isAlreadyPercent ? Math.round(num) + '%' : Math.round(num * 100) + '%';
+        };
+
+        student.tests.forEach(test => {
+            const renderQs = getFilteredQuestions(test.questions);
+            renderQs.forEach(q => {
+                const addedRow = worksheet.addRow([
+                    sNo++,
+                    q.Test_Type || '',
+                    q.Test || '',
+                    q.Q_No || '',
+                    q.W_U || '',
+                    q.Subject || '',
+                    q.Topic || '',
+                    q.Sub_Topic || '',
+                    formatTopPerc(q.National_Wide_Error)
+                ]);
+                addedRow.height = 22;
+                addedRow.eachCell((cell, colIdx) => {
+                    cell.border = thinBorder;
+                    cell.font = { name: 'Bookman Old Style', size: 10 };
+
+                    if ([1, 4, 5, 9].includes(colIdx)) {
+                        cell.alignment = centerAlign;
+                    } else if ([2, 3, 6].includes(colIdx)) {
+                        cell.alignment = centerAlign;
+                    } else {
+                        cell.alignment = leftAlign;
+                    }
+
+                    if (colIdx === 6) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDAEEF3' } };
+                        cell.font = { name: 'Bookman Old Style', size: 10, bold: true, color: { argb: 'FF000000' } };
+                    }
+
+                    if (colIdx === 5) {
+                        const val = String(cell.value).toUpperCase();
+                        if (val === 'W') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE2E2' } };
+                            cell.font = { name: 'Bookman Old Style', size: 10, bold: true, color: { argb: 'FFB91C1C' } };
+                        } else if (val === 'U') {
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
+                            cell.font = { name: 'Bookman Old Style', size: 10, bold: true, color: { argb: 'FF1D4ED8' } };
+                        }
+                    }
+                });
+            });
+        });
+
+        return workbook;
+    };
+
+    const generateExcel = async () => {
+        if (reportData.length === 0) return;
+        setGeneratingExcel(true);
+        setExcelProgress('Loading Resources...');
+
+        try {
+            let logoBuffer = null;
+            try {
+                const response = await fetch('/logo.png');
+                if (response.ok) {
+                    const blob = await response.blob();
+                    logoBuffer = await blob.arrayBuffer();
+                }
+            } catch (e) {
+                console.error("Failed to load logo for Excel", e);
+            }
+
+            if (reportData.length === 1) {
+                const student = reportData[0];
+                setExcelProgress(`Generating Excel for ${student.info.name}...`);
+                const workbook = await createStudentExcel(student, logoBuffer);
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                saveAs(blob, `${student.info.name}_${student.info.branch}.xlsx`);
+                logActivity(userData, 'Downloaded Error Excel', { student: student.info.name });
+            } else {
+                const zip = new JSZip();
+
+                for (let i = 0; i < reportData.length; i++) {
+                    const student = reportData[i];
+                    setExcelProgress(`Generating Excel for ${student.info.name} (${i + 1}/${reportData.length})...`);
+                    const workbook = await createStudentExcel(student, logoBuffer);
+                    const buffer = await workbook.xlsx.writeBuffer();
+                    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                    zip.file(`${student.info.name}_${student.info.branch}.xlsx`, blob);
+                }
+
+                setExcelProgress('Compressing ZIP...');
+                const zipContent = await zip.generateAsync({ type: 'blob' });
+                saveAs(zipContent, `Error_Excel_Reports_${subjectFilter.value}.zip`);
+                logActivity(userData, 'Downloaded Bulk Error Excels', { count: reportData.length, subject: subjectFilter.label });
+            }
+        } catch (err) {
+            console.error("Excel/ZIP Error", err);
+            alert("Error generating Excel report: " + err.message);
+        } finally {
+            setGeneratingExcel(false);
+            setExcelProgress('');
+        }
+    };
+
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
     const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.5));
     const handleZoomReset = () => setZoom(1);
@@ -715,24 +934,40 @@ const ErrorReport = ({ filters, setFilters }) => {
                         {loading ? 'Loading...' : 'View Report'}
                     </button>
 
-                    {/* Download Button - Only visible if data is loaded */}
+                    {/* Download Buttons - Only visible if data is loaded */}
                     {reportData.length > 0 && (
-                        <button
-                            onClick={generatePDF}
-                            disabled={generatingPdf}
-                            style={{
-                                backgroundColor: '#0070c0',
-                                color: 'white',
-                                border: 'none',
-                                padding: '10px 20px',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontWeight: 'bold',
-                                marginLeft: 'auto'
-                            }}
-                        >
-                            {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download ${reportData.length > 1 ? 'All (ZIP)' : 'PDF'}`}
-                        </button>
+                        <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
+                            <button
+                                onClick={generatePDF}
+                                disabled={generatingPdf || generatingExcel}
+                                style={{
+                                    backgroundColor: '#0070c0',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '10px 20px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download ${reportData.length > 1 ? 'All (ZIP)' : 'PDF'}`}
+                            </button>
+                            <button
+                                onClick={generateExcel}
+                                disabled={generatingPdf || generatingExcel}
+                                style={{
+                                    backgroundColor: '#107c41',
+                                    color: 'white',
+                                    border: 'none',
+                                    padding: '10px 20px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                {generatingExcel ? excelProgress || 'Generating...' : `⬇ Download ${reportData.length > 1 ? 'All Excel (ZIP)' : 'Excel'}`}
+                            </button>
+                        </div>
                     )}
                 </div>
 
