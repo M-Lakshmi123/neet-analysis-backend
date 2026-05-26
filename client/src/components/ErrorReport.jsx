@@ -686,6 +686,7 @@ const ErrorReport = ({ filters, setFilters }) => {
         worksheet.columns = [
             { key: 'sNo', width: 8 },
             { key: 'testType', width: 14 },
+            { key: 'date', width: 14 },
             { key: 'testName', width: 28 },
             { key: 'qNo', width: 10 },
             { key: 'wU', width: 10 },
@@ -712,9 +713,9 @@ const ErrorReport = ({ filters, setFilters }) => {
         }
 
         worksheet.mergeCells('A1:B3');
-        worksheet.mergeCells('C1:I1');
-        worksheet.mergeCells('C2:I2');
-        worksheet.mergeCells('C3:I3');
+        worksheet.mergeCells('C1:J1');
+        worksheet.mergeCells('C2:J2');
+        worksheet.mergeCells('C3:J3');
 
         const brandCell = worksheet.getCell('C1');
         brandCell.value = {
@@ -740,20 +741,20 @@ const ErrorReport = ({ filters, setFilters }) => {
         worksheet.getRow(3).height = 18;
         worksheet.getRow(4).height = 8;
 
-        worksheet.mergeCells('A5:D5');
-        worksheet.mergeCells('E5:I5');
+        worksheet.mergeCells('A5:E5');
+        worksheet.mergeCells('F5:J5');
 
         const nameCell = worksheet.getCell('A5');
         nameCell.value = `STUDENT NAME: ${student.info.name || ''}`;
         nameCell.font = { name: 'Bookman Old Style', size: 11, bold: true, color: { argb: 'FF000000' } };
         nameCell.alignment = centerAlign;
 
-        const branchCell = worksheet.getCell('E5');
+        const branchCell = worksheet.getCell('F5');
         branchCell.value = `BRANCH: ${student.info.branch || ''}`;
         branchCell.font = { name: 'Bookman Old Style', size: 11, bold: true, color: { argb: 'FF000000' } };
         branchCell.alignment = centerAlign;
 
-        for (let col = 1; col <= 9; col++) {
+        for (let col = 1; col <= 10; col++) {
             const cell = worksheet.getCell(5, col);
             cell.border = thinBorder;
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8DC' } };
@@ -762,7 +763,7 @@ const ErrorReport = ({ filters, setFilters }) => {
         worksheet.getRow(6).height = 8;
 
         const headers = [
-            'S.No', 'Test type', 'Test Name', 'Q.No', 'W/U', 'Subject', 'Topic', 'Sub Topic', 'Top%'
+            'S.No', 'Test type', 'Date', 'Test Name', 'Q.No', 'W/U', 'Subject', 'Topic', 'Sub Topic', 'Top%'
         ];
         headers.forEach((h, index) => {
             const cell = worksheet.getCell(7, index + 1);
@@ -783,12 +784,18 @@ const ErrorReport = ({ filters, setFilters }) => {
             return isAlreadyPercent ? Math.round(num) + '%' : Math.round(num * 100) + '%';
         };
 
+        const formatDateStr = (d) => {
+            if (!d) return '';
+            return String(d).replace(/-/g, '/');
+        };
+
         student.tests.forEach(test => {
             const renderQs = getFilteredQuestions(test.questions);
             renderQs.forEach(q => {
                 const addedRow = worksheet.addRow([
                     sNo++,
                     q.Test_Type || '',
+                    formatDateStr(q.Exam_Date || test.meta.date || ''),
                     q.Test || '',
                     q.Q_No || '',
                     q.W_U || '',
@@ -802,20 +809,18 @@ const ErrorReport = ({ filters, setFilters }) => {
                     cell.border = thinBorder;
                     cell.font = { name: 'Bookman Old Style', size: 10 };
 
-                    if ([1, 4, 5, 9].includes(colIdx)) {
-                        cell.alignment = centerAlign;
-                    } else if ([2, 3, 6].includes(colIdx)) {
-                        cell.alignment = centerAlign;
-                    } else {
+                    if (colIdx === 8 || colIdx === 9) {
                         cell.alignment = leftAlign;
+                    } else {
+                        cell.alignment = centerAlign;
                     }
 
-                    if (colIdx === 6) {
+                    if (colIdx === 7) {
                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDAEEF3' } };
                         cell.font = { name: 'Bookman Old Style', size: 10, bold: true, color: { argb: 'FF000000' } };
                     }
 
-                    if (colIdx === 5) {
+                    if (colIdx === 6) {
                         const val = String(cell.value).toUpperCase();
                         if (val === 'W') {
                             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE2E2' } };
