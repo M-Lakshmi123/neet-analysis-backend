@@ -1412,7 +1412,7 @@ app.get('/api/erp/report', async (req, res) => {
             STR_TO_DATE(REPLACE(Exam_Date, '/', '-'), '%d-%m-%Y') DESC,
                 Subject,
                 Q_No ASC
-            LIMIT 3000
+            LIMIT 50000
         `;
 
         logQuery(query, req.query);

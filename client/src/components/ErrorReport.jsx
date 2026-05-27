@@ -10,12 +10,12 @@ import JSZip from 'jszip';
 import Select from 'react-select';
 import { logActivity } from '../utils/activityLogger';
 
-// Subject Sorting Order
+// Subject Sorting Order: BOTANY first, then ZOOLOGY, PHYSICS, CHEMISTRY
 const SUBJECT_ORDER = {
-    "PHYSICS": 1,
-    "CHEMISTRY": 2,
-    "BOTANY": 3,
-    "ZOOLOGY": 4
+    "BOTANY": 1,
+    "ZOOLOGY": 2,
+    "PHYSICS": 3,
+    "CHEMISTRY": 4
 };
 
 const getSubjectOrder = (subject) => {
@@ -121,15 +121,30 @@ const ErrorReport = ({ filters, setFilters }) => {
                     return parseDate(a.meta.date) - parseDate(b.meta.date);
                 });
 
-                // Sort Questions by Sequence Order (Q1, Q2, Q3...)
+                // Sort Questions by Subject, and then alphabetically by Topic
                 testsArr = testsArr.map(t => {
                     t.questions.sort((a, b) => {
+                        // 1. Sort by Subject (BOTANY -> ZOOLOGY -> PHYSICS -> CHEMISTRY)
+                        const subA = getSubjectOrder(a.Subject);
+                        const subB = getSubjectOrder(b.Subject);
+                        if (subA !== subB) return subA - subB;
+
+                        // 2. Sort by Topic (A to Z)
+                        const topicA = String(a.Topic || '').trim().toUpperCase();
+                        const topicB = String(b.Topic || '').trim().toUpperCase();
+                        const topicComp = topicA.localeCompare(topicB);
+                        if (topicComp !== 0) return topicComp;
+
+                        // 3. Fallback to Sub Topic (A to Z)
+                        const subTopicA = String(a.Sub_Topic || '').trim().toUpperCase();
+                        const subTopicB = String(b.Sub_Topic || '').trim().toUpperCase();
+                        const subTopicComp = subTopicA.localeCompare(subTopicB);
+                        if (subTopicComp !== 0) return subTopicComp;
+
+                        // 4. Fallback to Q_No
                         const qNoA = parseInt(a.Q_No) || 0;
                         const qNoB = parseInt(b.Q_No) || 0;
-                        if (qNoA !== qNoB) return qNoA - qNoB;
-
-                        // Same question number (rare), sort by subject
-                        return getSubjectOrder(a.Subject) - getSubjectOrder(b.Subject);
+                        return qNoA - qNoB;
                     });
                     return t;
                 });
@@ -668,10 +683,18 @@ const ErrorReport = ({ filters, setFilters }) => {
         }
     };
 
-    const createStudentExcel = async (student, logoBuffer) => {
+    const createStudentExcel = async (student, templateBuffer) => {
         const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Error Report');
+        
+        if (templateBuffer) {
+            await workbook.xlsx.load(templateBuffer);
+        } else {
+            const ws = workbook.addWorksheet('Error Report');
+            ws.views = [{ showGridLines: true }];
+        }
 
+        const templateSheet = workbook.getWorksheet(1) || workbook.worksheets[0];
+        const worksheet = workbook.addWorksheet('Error Report New');
         worksheet.views = [{ showGridLines: true }];
 
         const thinBorder = {
@@ -684,99 +707,63 @@ const ErrorReport = ({ filters, setFilters }) => {
         const centerAlign = { horizontal: 'center', vertical: 'middle' };
         const leftAlign = { horizontal: 'left', vertical: 'middle' };
 
-        worksheet.columns = [
-            { key: 'sNo', width: 8 },
-            { key: 'testType', width: 14 },
-            { key: 'date', width: 14 },
-            { key: 'testName', width: 28 },
-            { key: 'qNo', width: 10 },
-            { key: 'wU', width: 10 },
-            { key: 'subject', width: 14 },
-            { key: 'topic', width: 32 },
-            { key: 'subTopic', width: 32 },
-            { key: 'topPerc', width: 12 }
-        ];
+        // Copy column dimensions
+        worksheet.columns = templateSheet.columns.map(col => ({
+            key: col.key,
+            width: col.width
+        }));
 
-        if (logoBuffer) {
-            try {
-                const imageId = workbook.addImage({
-                    buffer: logoBuffer,
-                    extension: 'png',
-                });
-                worksheet.addImage(imageId, {
-                    tl: { col: 0.15, row: 0.1 },
-                    ext: { width: 70, height: 60 },
-                    editAs: 'oneCell'
-                });
-            } catch (e) {
-                console.error("Failed to add logo to Excel sheet", e);
-            }
+        // Copy rows 1 to 5
+        for (let r = 1; r <= 5; r++) {
+            const srcRow = templateSheet.getRow(r);
+            const destRow = worksheet.getRow(r);
+            destRow.height = srcRow.height;
+            
+            srcRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+                const destCell = destRow.getCell(colNumber);
+                destCell.value = cell.value;
+                destCell.style = cell.style;
+            });
         }
 
-        worksheet.mergeCells('A1:B3');
-        worksheet.mergeCells('C1:J1');
-        worksheet.mergeCells('C2:J2');
-        worksheet.mergeCells('C3:J3');
+        // Copy merges for rows 1 to 5
+        if (templateSheet.model && templateSheet.model.merges) {
+            templateSheet.model.merges.forEach(merge => {
+                const match = merge.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+                if (match) {
+                    const r1 = parseInt(match[2]);
+                    const r2 = parseInt(match[4]);
+                    if (r1 <= 5 && r2 <= 5) {
+                        worksheet.mergeCells(merge);
+                    }
+                }
+            });
+        }
 
-        const brandCell = worksheet.getCell('C1');
-        brandCell.value = {
-            richText: [
-                { text: 'Sri Chaitanya ', font: { name: 'Bookman Old Style', size: 20, bold: true, color: { argb: 'FF0070C0' } } },
-                { text: 'Educational Institutions', font: { name: 'Bookman Old Style', size: 20, color: { argb: 'FF0070C0' } } }
-            ]
-        };
-        brandCell.alignment = centerAlign;
+        // Copy images
+        templateSheet.getImages().forEach(img => {
+            worksheet.addImage(img.imageId, img.range);
+        });
 
-        const addressCell = worksheet.getCell('C2');
-        addressCell.value = "A.P, TELANGANA, KARNATAKA, TAMILNADU, MAHARASHTRA, DELHI, RANCHI";
-        addressCell.font = { name: 'Bookman Old Style', size: 8, bold: true, color: { argb: 'FF000000' } };
-        addressCell.alignment = centerAlign;
-
-        const officeCell = worksheet.getCell('C3');
-        officeCell.value = "Central Office, Bangalore";
-        officeCell.font = { name: 'Bookman Old Style', size: 10, bold: true, color: { argb: 'FF000000' } };
-        officeCell.alignment = centerAlign;
-
-        worksheet.getRow(1).height = 28;
-        worksheet.getRow(2).height = 15;
-        worksheet.getRow(3).height = 18;
-        worksheet.getRow(4).height = 8;
-
-        worksheet.mergeCells('A5:E5');
-        worksheet.mergeCells('F5:J5');
-
-        const nameCell = worksheet.getCell('A5');
+        // Write student details on row 4
+        const nameCell = worksheet.getCell('A4');
         nameCell.value = `STUDENT NAME: ${student.info.name || ''}`;
-        nameCell.font = { name: 'Bookman Old Style', size: 11, bold: true, color: { argb: 'FF000000' } };
-        nameCell.alignment = centerAlign;
 
-        const branchCell = worksheet.getCell('F5');
+        const branchCell = worksheet.getCell('F4');
         branchCell.value = `BRANCH: ${student.info.branch || ''}`;
-        branchCell.font = { name: 'Bookman Old Style', size: 11, bold: true, color: { argb: 'FF000000' } };
-        branchCell.alignment = centerAlign;
 
-        for (let col = 1; col <= 10; col++) {
-            const cell = worksheet.getCell(5, col);
-            cell.border = thinBorder;
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8DC' } };
-        }
-        worksheet.getRow(5).height = 25;
-        worksheet.getRow(6).height = 8;
-
+        // Write headers on row 5
         const headers = [
             'S.No', 'Test type', 'Date', 'Test Name', 'Q.No', 'W/U', 'Subject', 'Topic', 'Sub Topic', 'Top%'
         ];
         headers.forEach((h, index) => {
-            const cell = worksheet.getCell(7, index + 1);
+            const cell = worksheet.getCell(5, index + 1);
             cell.value = h;
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF800000' } };
-            cell.font = { name: 'Bookman Old Style', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-            cell.alignment = centerAlign;
-            cell.border = thinBorder;
         });
-        worksheet.getRow(7).height = 26;
 
         let sNo = 1;
+        let r = 6; // Data starts at Row 6
+
         const formatTopPerc = (raw) => {
             if (raw === undefined || raw === null || raw === '') return '';
             const num = parseFloat(raw);
@@ -804,20 +791,21 @@ const ErrorReport = ({ filters, setFilters }) => {
         student.tests.forEach(test => {
             const renderQs = getFilteredQuestions(test.questions);
             renderQs.forEach(q => {
-                const addedRow = worksheet.addRow([
-                    sNo++,
-                    q.Test_Type || '',
-                    formatDateStr(q.Exam_Date || test.meta.date || ''),
-                    q.Test || '',
-                    q.Q_No || '',
-                    q.W_U || '',
-                    q.Subject || '',
-                    q.Topic || '',
-                    q.Sub_Topic || '',
-                    formatTopPerc(q.National_Wide_Error)
-                ]);
-                addedRow.height = 22;
-                addedRow.eachCell((cell, colIdx) => {
+                const row = worksheet.getRow(r);
+                row.height = 22;
+                
+                row.getCell(1).value = sNo++;
+                row.getCell(2).value = q.Test_Type || '';
+                row.getCell(3).value = formatDateStr(q.Exam_Date || test.meta.date || '');
+                row.getCell(4).value = q.Test || '';
+                row.getCell(5).value = q.Q_No || '';
+                row.getCell(6).value = q.W_U || '';
+                row.getCell(7).value = q.Subject || '';
+                row.getCell(8).value = q.Topic || '';
+                row.getCell(9).value = q.Sub_Topic || '';
+                row.getCell(10).value = formatTopPerc(q.National_Wide_Error);
+
+                row.eachCell((cell, colIdx) => {
                     cell.border = thinBorder;
                     cell.font = { name: 'Bookman Old Style', size: 10 };
 
@@ -843,8 +831,14 @@ const ErrorReport = ({ filters, setFilters }) => {
                         }
                     }
                 });
+                r++;
             });
         });
+
+        // Delete the original sheet
+        workbook.removeWorksheet(templateSheet.name);
+        // Rename the new sheet
+        worksheet.name = 'Error Report';
 
         return workbook;
     };
@@ -855,21 +849,20 @@ const ErrorReport = ({ filters, setFilters }) => {
         setExcelProgress('Loading Resources...');
 
         try {
-            let logoBuffer = null;
+            let templateBuffer = null;
             try {
-                const response = await fetch('/logo.png');
+                const response = await fetch('/Error_Report_Template.xlsx');
                 if (response.ok) {
-                    const blob = await response.blob();
-                    logoBuffer = await blob.arrayBuffer();
+                    templateBuffer = await response.arrayBuffer();
                 }
             } catch (e) {
-                console.error("Failed to load logo for Excel", e);
+                console.error("Failed to load Excel template", e);
             }
 
             if (reportData.length === 1) {
                 const student = reportData[0];
                 setExcelProgress(`Generating Excel for ${student.info.name}...`);
-                const workbook = await createStudentExcel(student, logoBuffer);
+                const workbook = await createStudentExcel(student, templateBuffer);
                 const buffer = await workbook.xlsx.writeBuffer();
                 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
                 saveAs(blob, `${student.info.name}_${student.info.branch}.xlsx`);
@@ -880,7 +873,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                 for (let i = 0; i < reportData.length; i++) {
                     const student = reportData[i];
                     setExcelProgress(`Generating Excel for ${student.info.name} (${i + 1}/${reportData.length})...`);
-                    const workbook = await createStudentExcel(student, logoBuffer);
+                    const workbook = await createStudentExcel(student, templateBuffer);
                     const buffer = await workbook.xlsx.writeBuffer();
                     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
                     zip.file(`${student.info.name}_${student.info.branch}.xlsx`, blob);
