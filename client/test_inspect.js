@@ -3,7 +3,7 @@ const path = require('path');
 
 async function main() {
     const workbook = new ExcelJS.Workbook();
-    const templatePath = path.resolve('F:\\Projects\\NEET Analysis\\Error Report Template.xlsx');
+    const templatePath = path.resolve('..\\Error Report Template.xlsx');
     console.log('Loading template from:', templatePath);
     await workbook.xlsx.readFile(templatePath);
     
@@ -27,11 +27,11 @@ async function main() {
         for (let c = 1; c <= 10; c++) {
             const cell = row.getCell(c);
             if (cell.value) {
-                console.log(`Cell ${cell.address}:`, cell.value);
-                console.log(`Font:`, cell.font);
-                console.log(`Alignment:`, cell.alignment);
-                console.log(`Fill:`, cell.fill);
-                console.log(`Border:`, cell.border);
+                console.log(`Cell ${cell.address}:`, typeof cell.value === 'object' ? JSON.stringify(cell.value) : cell.value);
+                console.log(`Font:`, JSON.stringify(cell.font));
+                console.log(`Alignment:`, JSON.stringify(cell.alignment));
+                console.log(`Fill:`, JSON.stringify(cell.fill));
+                console.log(`Border:`, JSON.stringify(cell.border));
             }
         }
     }

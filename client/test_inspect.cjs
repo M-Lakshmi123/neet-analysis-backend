@@ -3,12 +3,14 @@ const path = require('path');
 
 async function main() {
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile('test_clear.xlsx');
+    const templatePath = path.resolve('..\\Error Report Template.xlsx');
+    await workbook.xlsx.readFile(templatePath);
     const worksheet = workbook.getWorksheet(1) || workbook.worksheets[0];
     console.log('Worksheet name:', worksheet.name);
     console.log('Row count:', worksheet.rowCount);
     console.log('Actual row count:', worksheet.actualRowCount);
     
+    // Find the last row that has any style or border
     let lastStyledRow = 0;
     for (let r = 1; r <= worksheet.rowCount; r++) {
         const row = worksheet.getRow(r);
@@ -24,7 +26,7 @@ async function main() {
             lastStyledRow = r;
         }
     }
-    console.log('Last styled row in test_clear.xlsx:', lastStyledRow);
+    console.log('Last styled row:', lastStyledRow);
 }
 
 main().catch(err => console.error(err));

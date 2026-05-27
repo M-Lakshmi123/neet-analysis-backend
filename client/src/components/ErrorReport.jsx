@@ -108,7 +108,8 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 const parseDate = (d) => {
                     if (!d || typeof d !== 'string') return 0;
-                    const parts = d.split('-');
+                    const clean = d.replace(/\//g, '-');
+                    const parts = clean.split('-');
                     if (parts.length !== 3) return 0;
                     const [day, month, year] = parts.map(Number);
                     const fullYear = year < 100 ? 2000 + year : year;
@@ -786,7 +787,18 @@ const ErrorReport = ({ filters, setFilters }) => {
 
         const formatDateStr = (d) => {
             if (!d) return '';
-            return String(d).replace(/-/g, '/');
+            const clean = String(d).replace(/-/g, '/');
+            const parts = clean.split('/');
+            if (parts.length !== 3) return clean;
+            
+            let [day, month, year] = parts;
+            day = day.trim().padStart(2, '0');
+            month = month.trim().padStart(2, '0');
+            year = year.trim();
+            if (year.length === 2) {
+                year = '20' + year;
+            }
+            return `${day}/${month}/${year}`;
         };
 
         student.tests.forEach(test => {
