@@ -13,12 +13,14 @@ const getActiveBackend = () => {
 
     if (isLocal) return `http://${hostname}:5000`;
 
-    // Priority: 1. Env Var, 2. LocalSession (cached working one), 3. First Default
+    // Priority: 1. LocalSession (cached working one), 2. Env Var, 3. First Default
+    const cached = sessionStorage.getItem('WORKING_BACKEND_URL');
+    if (cached) return cached;
+
     const envUrl = import.meta.env?.VITE_API_URL;
     if (envUrl && !envUrl.includes('localhost')) return envUrl;
 
-    const cached = sessionStorage.getItem('WORKING_BACKEND_URL');
-    return cached || BACKEND_SERVICES[0];
+    return BACKEND_SERVICES[0];
 };
 
 export let API_URL = getActiveBackend();
