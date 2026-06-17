@@ -14,7 +14,7 @@ const AnalysisReport = ({ filters }) => {
     const [examStats, setExamStats] = useState([]);
     const [studentMarks, setStudentMarks] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [meritSortConfig, setMeritSortConfig] = useState({ key: 'tot', direction: 'desc' });
+    const [meritSortConfig, setMeritSortConfig] = useState({ key: 'air', direction: 'asc' });
     const [statsSortConfig, setStatsSortConfig] = useState({ key: 'DATE', direction: 'desc' });
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
@@ -202,6 +202,17 @@ const AnalysisReport = ({ filters }) => {
                 bVal = b[key] ?? '';
             }
 
+            // Rank columns contain '-' when missing, which should sort to the bottom
+            const isRankCol = ['air', 'b_rank', 'z_rank', 'p_rank', 'c_rank'].includes(key);
+            if (isRankCol) {
+                const valA = aVal === '-' ? (direction === 'asc' ? Infinity : -Infinity) : Number(aVal);
+                const valB = bVal === '-' ? (direction === 'asc' ? Infinity : -Infinity) : Number(bVal);
+                if (valA === valB) return 0;
+                if (valA < valB) return direction === 'asc' ? -1 : 1;
+                if (valA > valB) return direction === 'asc' ? 1 : -1;
+                return 0;
+            }
+
             // Handle numeric conversion for marks/ranks
             const isNumeric = (val) => typeof val === 'number' || (typeof val === 'string' && val.trim() !== '' && !isNaN(val));
 
@@ -243,9 +254,10 @@ const AnalysisReport = ({ filters }) => {
     const requestSort = (configSetter, key) => {
         configSetter(prev => {
             // Default direction based on column type
-            const isNumericCol = ['tot', 'air', 'bot', 'b_rank', 'zoo', 'z_rank', 'bio', 'phy', 'p_rank', 'che', 'c_rank', 'STUD_ID'].includes(key);
+            const isRankCol = ['air', 'b_rank', 'z_rank', 'p_rank', 'c_rank'].includes(key);
+            const isNumericCol = ['tot', 'bot', 'zoo', 'bio', 'phy', 'che', 'STUD_ID'].includes(key);
             const isDateCol = key === 'DATE';
-            const defaultDir = (isNumericCol || isDateCol) ? 'desc' : 'asc';
+            const defaultDir = isRankCol ? 'asc' : ((isNumericCol || isDateCol) ? 'desc' : 'asc');
 
             return {
                 key,
@@ -416,7 +428,7 @@ const AnalysisReport = ({ filters }) => {
                 { content: "RANK", styles: { halign: 'center', textColor: [0, 0, 0], fillColor: [242, 220, 219] } }
             ];
 
-            const body = studentMarks.map(row => [
+            const body = sortedStudentMarks.map(row => [
                 row.STUD_ID || '',
                 (row.name || '').toUpperCase(),
                 (row.campus || '').toUpperCase(),
@@ -535,7 +547,7 @@ const AnalysisReport = ({ filters }) => {
 
             // 3. Populate student data starting from row 7
             let r = 7;
-            studentMarks.forEach(student => {
+            sortedStudentMarks.forEach(student => {
                 const rowData = [
                     student.STUD_ID,
                     (student.name || '').toUpperCase(),
