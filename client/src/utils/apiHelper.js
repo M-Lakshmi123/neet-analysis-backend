@@ -38,8 +38,18 @@ export const performFailoverCheck = async () => {
         console.warn(`[Failover] Primary backend (${API_URL}) unavailable. Trying backup...`);
         const nextBackend = BACKEND_SERVICES.find(url => url !== API_URL);
         if (nextBackend) {
+            const now = Date.now();
+            const lastSwitch = Number(sessionStorage.getItem('LAST_FAILOVER_TIME')) || 0;
+
+            // If we already switched in the last 60 seconds, do not switch again/reload to avoid infinite reload loop
+            if (now - lastSwitch < 60000) {
+                console.warn(`[Failover] Already switched backends recently. Waiting for backend to spin up...`);
+                return;
+            }
+
             API_URL = nextBackend;
             sessionStorage.setItem('WORKING_BACKEND_URL', nextBackend);
+            sessionStorage.setItem('LAST_FAILOVER_TIME', String(now));
             console.info(`[Failover] Switched to backup: ${API_URL}`);
             // Force reload to ensure all components use the new API_URL
             window.location.reload();
