@@ -7,6 +7,7 @@ import './index.css';
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import AnalysisReport from './components/AnalysisReport';
+import ToppersPerformanceReport from './components/ToppersPerformanceReport';
 import TestWiseImprovements from './components/TestWiseImprovements';
 import AverageReport from './components/AverageReport';
 import AverageMarksReport from './components/AverageMarksReport';
@@ -254,6 +255,12 @@ const Dashboard = () => {
                         <AnalysisReport filters={globalFilters} />
                     </div>
                 );
+            case 'toppers_performance':
+                return (
+                    <div className="report-sections">
+                        <ToppersPerformanceReport filters={globalFilters} setFilters={setGlobalFilters} setActivePage={setActivePage} />
+                    </div>
+                );
             case 'test_improvements':
                 return (
                     <div className="report-sections">
@@ -321,7 +328,7 @@ const Dashboard = () => {
         }
     };
 
-    const showFilterBar = ['principal_dashboard', 'analysis', 'test_improvements', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
+    const showFilterBar = ['principal_dashboard', 'analysis', 'toppers_performance', 'test_improvements', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
 
     return (
         <div className="dashboard-root">
@@ -330,6 +337,7 @@ const Dashboard = () => {
                 <Header title={
                     activePage === 'principal_dashboard' ? 'Principal Dashboard' :
                     activePage === 'analysis' ? 'Analysis Report' :
+                    activePage === 'toppers_performance' ? 'Toppers Performance Report' :
                         activePage === 'test_improvements' ? 'Test Wise Improvements' :
                             activePage === 'averages' ? 'Average Marks Report' :
                                 activePage === 'average_count' ? 'Average Count Report' :

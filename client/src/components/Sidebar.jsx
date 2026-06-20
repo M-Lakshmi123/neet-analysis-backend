@@ -15,6 +15,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
     // Base items everyone sees
     const baseItems = [
         { id: 'analysis', label: 'Analysis Report', icon: <BarChart3 size={18} /> },
+        { id: 'toppers_performance', label: 'Toppers Performance Report', icon: <BarChart3 size={18} /> },
         { id: 'test_improvements', label: 'Test Wise Improvements', icon: <Activity size={18} /> },
         { id: 'progress', label: 'Progress Report', icon: <Users size={18} /> },
         { id: 'averages', label: 'Average Marks Report', icon: <ClipboardList size={18} /> },
