@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { buildQueryParams, formatDate, API_URL } from '../utils/apiHelper';
 import LoadingTimer from './LoadingTimer';
 import ExcelJS from 'exceljs';
@@ -58,6 +58,72 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
     const [erpLoading, setErpLoading] = useState(false);
     const [selectedErpTest, setSelectedErpTest] = useState('');
     const [zoomImage, setZoomImage] = useState(null); // { url, title }
+
+    // Zoom and pan states for question preview
+    const [zoomScale, setZoomScale] = useState(1);
+    const [zoomOffset, setZoomOffset] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const zoomContainerRef = useRef(null);
+
+    // Reset zoom when image changes
+    useEffect(() => {
+        setZoomScale(1);
+        setZoomOffset({ x: 0, y: 0 });
+        setIsDragging(false);
+    }, [zoomImage]);
+
+    // Handle mouse wheel zoom with passive: false to prevent background page scroll
+    useEffect(() => {
+        const handleWheelEvent = (e) => {
+            if (zoomImage) {
+                e.preventDefault();
+                const delta = e.deltaY;
+                const zoomSpeed = 0.15;
+                setZoomScale(prev => {
+                    let next = prev + (delta < 0 ? zoomSpeed : -zoomSpeed);
+                    next = Math.min(Math.max(next, 1), 6);
+                    if (next === 1) {
+                        setZoomOffset({ x: 0, y: 0 });
+                    }
+                    return next;
+                });
+            }
+        };
+
+        const container = zoomContainerRef.current;
+        if (container) {
+            container.addEventListener('wheel', handleWheelEvent, { passive: false });
+        }
+        return () => {
+            if (container) {
+                container.removeEventListener('wheel', handleWheelEvent);
+            }
+        };
+    }, [zoomImage]);
+
+    const handleMouseDown = (e) => {
+        if (zoomScale > 1) {
+            setIsDragging(true);
+            setDragStart({
+                x: e.clientX - zoomOffset.x,
+                y: e.clientY - zoomOffset.y
+            });
+        }
+    };
+
+    const handleMouseMove = (e) => {
+        if (isDragging && zoomScale > 1) {
+            setZoomOffset({
+                x: e.clientX - dragStart.x,
+                y: e.clientY - dragStart.y
+            });
+        }
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
 
     // Fetch data using the existing analysis-report endpoint
     useEffect(() => {
@@ -190,8 +256,8 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
     const studentScoresChartData = useMemo(() => {
         if (toppersList.length === 0) return { labels: [], datasets: [] };
         
-        // Reverse for horizontal chart so highest score is at the top
-        const displayData = topLimit > 10 ? [...toppersList].reverse() : toppersList;
+        // No reverse so highest score is at the top
+        const displayData = toppersList;
 
         return {
             labels: displayData.map(s => s.name),
@@ -872,7 +938,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                     <div className="drawer-charts-row">
                                         <div className="drawer-chart-col">
                                             <h4 className="drawer-section-title">Subject Wise Performance</h4>
-                                            <div style={{ height: '200px', position: 'relative' }}>
+                                            <div style={{ height: '240px', position: 'relative' }}>
                                                 <Bar 
                                                     data={{
                                                         labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
@@ -889,7 +955,8 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                             datalabels: {
                                                                 color: '#000000',
                                                                 anchor: 'end',
-                                                                align: 'top',
+                                                                align: 'end',
+                                                                offset: 4,
                                                                 font: { weight: 'bold', size: 10 },
                                                                 formatter: (val) => val
                                                             }
@@ -904,7 +971,10 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                         },
                                                         scales: {
                                                             x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } },
-                                                            y: { grid: { display: true, color: '#f1f5f9' }, max: 180, ticks: { font: { size: 9 } } }
+                                                            y: { grid: { display: true, color: '#f1f5f9' }, max: 200, ticks: { font: { size: 9 } } }
+                                                        },
+                                                        layout: {
+                                                            padding: { top: 15 }
                                                         }
                                                     }}
                                                 />
@@ -913,7 +983,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
                                         <div className="drawer-chart-col">
                                             <h4 className="drawer-section-title">Marks Loss Distribution</h4>
-                                            <div style={{ height: '200px', position: 'relative' }}>
+                                            <div style={{ height: '240px', position: 'relative' }}>
                                                 <Doughnut 
                                                     data={{
                                                         labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
@@ -1038,15 +1108,6 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                                         View Question
                                                                     </button>
                                                                 )}
-                                                                {q.sUrl && (
-                                                                    <button 
-                                                                        className="q-image-btn solution" 
-                                                                        onClick={() => setZoomImage({ url: q.sUrl, title: `Solution Q${q.qNo} (${q.subject})` })}
-                                                                    >
-                                                                        <Maximize2 size={12} style={{ marginRight: '4px' }} />
-                                                                        View Solution
-                                                                    </button>
-                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -1066,13 +1127,51 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 <div className="zoom-overlay" onClick={() => setZoomImage(null)}>
                     <div className="zoom-container animate-fade-in" onClick={(e) => e.stopPropagation()}>
                         <div className="zoom-header">
-                            <span className="zoom-title">{zoomImage.title}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span className="zoom-title">{zoomImage.title}</span>
+                                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', fontWeight: 'bold' }}>
+                                    💡 Scroll mouse wheel to zoom | Drag to pan
+                                </span>
+                            </div>
                             <button className="zoom-close-btn" onClick={() => setZoomImage(null)}>
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="zoom-body">
-                            <img src={zoomImage.url} alt={zoomImage.title} className="zoomed-image-el" />
+                        <div 
+                            ref={zoomContainerRef}
+                            className="zoom-body"
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                            style={{
+                                cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                background: '#f1f5f9',
+                                padding: '20px',
+                                minHeight: '300px',
+                                userSelect: 'none'
+                            }}
+                        >
+                            <img 
+                                src={zoomImage.url} 
+                                alt={zoomImage.title} 
+                                className="zoomed-image-el" 
+                                style={{
+                                    transform: `translate(${zoomOffset.x}px, ${zoomOffset.y}px) scale(${zoomScale})`,
+                                    transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+                                    transformOrigin: 'center center',
+                                    maxWidth: '100%',
+                                    maxHeight: '70vh',
+                                    objectFit: 'contain',
+                                    borderRadius: '6px',
+                                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                    pointerEvents: 'none'
+                                }}
+                            />
                         </div>
                     </div>
                 </div>
@@ -1360,10 +1459,10 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     padding: 20px;
                 }
                 .drawer-container {
-                    width: 90%;
-                    max-width: 850px;
+                    width: 95%;
+                    max-width: 1300px;
                     background: white;
-                    height: 85vh;
+                    height: 90vh;
                     border-radius: 16px;
                     box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15), 0 10px 10px -5px rgba(0,0,0,0.04);
                     display: flex;
