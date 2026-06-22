@@ -178,9 +178,10 @@ const Dashboard = () => {
         };
     }, [baseFilters, isRestricted, userAllowedCampuses]);
 
-    const setGlobalFilters = (updater) => {
+    const setGlobalFilters = (updater, targetPage = null) => {
+        const pageKey = targetPage || activePage;
         setPageFilters(prev => {
-            const current = prev[activePage] || initialFilters;
+            const current = prev[pageKey] || initialFilters;
             let next = typeof updater === 'function' ? updater(current) : updater;
 
             // Apply restriction here too for immediate state consistency
@@ -201,7 +202,7 @@ const Dashboard = () => {
 
             return {
                 ...prev,
-                [activePage]: next
+                [pageKey]: next
             };
         });
     };

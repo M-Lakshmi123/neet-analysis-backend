@@ -15,7 +15,7 @@ import {
     Legend,
     ArcElement
 } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Doughnut } from 'react-chartjs-2';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { 
     Award, 
@@ -257,7 +257,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         };
     }, [toppersList]);
 
-    // Chart 3: Campus Distribution
+    // Chart 3: Campus Distribution (Doughnut Chart)
     const campusDistributionChartData = useMemo(() => {
         if (toppersList.length === 0) return { labels: [], datasets: [] };
 
@@ -274,15 +274,23 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             labels: sortedCampuses.map(item => item[0]),
             datasets: [
                 {
-                    label: 'Toppers Count',
                     data: sortedCampuses.map(item => item[1]),
-                    backgroundColor: '#10b981',
-                    borderRadius: 6,
-                    barThickness: 30,
+                    backgroundColor: [
+                        '#4f46e5', // Indigo
+                        '#10b981', // Emerald
+                        '#f59e0b', // Amber
+                        '#f43f5e', // Rose
+                        '#06b6d4', // Cyan
+                        '#8b5cf6', // Purple
+                        '#ec4899', // Pink
+                        '#1e293b', // Slate
+                        '#64748b', // Slate light
+                        '#3b82f6'  // Blue
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
                     datalabels: {
                         color: '#ffffff',
-                        anchor: 'center',
-                        align: 'center',
                         font: { weight: 'bold', size: 12 },
                         formatter: (val) => val
                     }
@@ -364,11 +372,19 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
     };
 
     const campusDistributionChartOptions = {
-        indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
+        cutout: '60%',
         plugins: {
-            legend: { display: false },
+            legend: {
+                display: true,
+                position: 'right',
+                labels: {
+                    color: '#475569',
+                    font: { weight: 'bold', size: 11 },
+                    padding: 12
+                }
+            },
             tooltip: {
                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                 titleColor: '#1e293b',
@@ -377,27 +393,26 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 borderWidth: 1,
                 padding: 10
             },
-            datalabels: { display: true }
-        },
-        scales: {
-            x: {
-                grid: { display: false },
-                ticks: { color: '#475569', stepSize: 1 }
-            },
-            y: {
-                grid: { display: false },
-                ticks: { color: '#475569', font: { weight: 'bold', size: 11 } }
+            datalabels: {
+                display: true
             }
-        },
-        layout: {
-            padding: { right: 20 }
         }
     };
 
     // Calculate Marks Loss Details for current selected test
     const erpAnalysis = useMemo(() => {
         if (!selectedStudent || erpData.length === 0 || !selectedErpTest) {
-            return { totalLost: 0, wrongCount: 0, wrongLost: 0, unattemptedCount: 0, unattemptedLost: 0, questions: [], subjects: {} };
+            return { 
+                totalLost: 0, 
+                wrongCount: 0, 
+                wrongLost: 0, 
+                unattemptedCount: 0, 
+                unattemptedLost: 0, 
+                questions: [], 
+                subjects: {},
+                scoredMarks: { BOTANY: 180, ZOOLOGY: 180, PHYSICS: 180, CHEMISTRY: 180 },
+                totalScored: 720
+            };
         }
 
         const testRows = erpData.filter(r => r.Test === selectedErpTest);
@@ -447,6 +462,15 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             });
         });
 
+        const firstRow = testRows[0];
+        const scoredMarks = {
+            BOTANY: firstRow ? (Number(firstRow.Botany) || 0) : 180,
+            ZOOLOGY: firstRow ? (Number(firstRow.Zoology) || 0) : 180,
+            PHYSICS: firstRow ? (Number(firstRow.Physics) || 0) : 180,
+            CHEMISTRY: firstRow ? (Number(firstRow.Chemistry) || 0) : 180
+        };
+        const totalScored = firstRow ? (Number(firstRow.Tot_720) || 0) : 720;
+
         const wrongLost = wrongCount * 5;
         const unattemptedLost = unattemptedCount * 4;
         const totalLost = wrongLost + unattemptedLost;
@@ -458,16 +482,22 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             unattemptedCount,
             unattemptedLost,
             questions: questionsList.sort((a, b) => a.qNo - b.qNo),
-            subjects: subMap
+            subjects: subMap,
+            scoredMarks,
+            totalScored
         };
     }, [selectedStudent, erpData, selectedErpTest]);
 
     // Redirection helper to student timeline performance
-    const handleViewStudentHistory = (studentId) => {
-        setFilters(prev => ({
-            ...prev,
-            studentSearch: [studentId]
-        }));
+    const handleViewStudentHistory = (student) => {
+        setFilters({
+            campus: [student.campus],
+            stream: [],
+            studentSearch: [student.STUD_ID],
+            testType: [],
+            test: [],
+            topAll: []
+        }, 'student_performance');
         setActivePage('student_performance');
     };
 
@@ -674,7 +704,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     {activeTab === 'campuses' && (
                         <div style={{ height: '320px', position: 'relative', width: '100%' }}>
                             {toppersList.length > 0 ? (
-                                <Bar data={campusDistributionChartData} options={campusDistributionChartOptions} />
+                                <Doughnut data={campusDistributionChartData} options={campusDistributionChartOptions} />
                             ) : (
                                 <div className="empty-chart-msg">No data available to display chart</div>
                             )}
@@ -743,7 +773,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                 </button>
                                                 <button 
                                                     className="btn-action-view" 
-                                                    onClick={() => handleViewStudentHistory(student.STUD_ID)}
+                                                    onClick={() => handleViewStudentHistory(student)}
                                                     title="View Full Timeline"
                                                 >
                                                     History
@@ -761,7 +791,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             {/* MARKS LOSS ANALYZER SLIDE DRAWER / MODAL */}
             {selectedStudent && (
                 <div className="drawer-overlay" onClick={() => setSelectedStudent(null)}>
-                    <div className="drawer-container animate-slide-in" onClick={(e) => e.stopPropagation()}>
+                    <div className="drawer-container animate-fade-in" onClick={(e) => e.stopPropagation()}>
                         {/* Drawer Header */}
                         <div className="drawer-header">
                             <div className="drawer-title-block">
@@ -838,13 +868,98 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                         </span>
                                     </div>
 
+                                    {/* Charts side-by-side breakdown */}
+                                    <div className="drawer-charts-row">
+                                        <div className="drawer-chart-col">
+                                            <h4 className="drawer-section-title">Subject Wise Performance</h4>
+                                            <div style={{ height: '200px', position: 'relative' }}>
+                                                <Bar 
+                                                    data={{
+                                                        labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
+                                                        datasets: [{
+                                                            data: [
+                                                                erpAnalysis.scoredMarks.BOTANY,
+                                                                erpAnalysis.scoredMarks.ZOOLOGY,
+                                                                erpAnalysis.scoredMarks.PHYSICS,
+                                                                erpAnalysis.scoredMarks.CHEMISTRY
+                                                            ],
+                                                            backgroundColor: ['#10b981', '#3b82f6', '#eab308', '#ec4899'],
+                                                            borderRadius: 6,
+                                                            barThickness: 24,
+                                                            datalabels: {
+                                                                color: '#000000',
+                                                                anchor: 'end',
+                                                                align: 'top',
+                                                                font: { weight: 'bold', size: 10 },
+                                                                formatter: (val) => val
+                                                            }
+                                                        }]
+                                                    }}
+                                                    options={{
+                                                        responsive: true,
+                                                        maintainAspectRatio: false,
+                                                        plugins: {
+                                                            legend: { display: false },
+                                                            datalabels: { display: true }
+                                                        },
+                                                        scales: {
+                                                            x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } },
+                                                            y: { grid: { display: true, color: '#f1f5f9' }, max: 180, ticks: { font: { size: 9 } } }
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="drawer-chart-col">
+                                            <h4 className="drawer-section-title">Marks Loss Distribution</h4>
+                                            <div style={{ height: '200px', position: 'relative' }}>
+                                                <Doughnut 
+                                                    data={{
+                                                        labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
+                                                        datasets: [{
+                                                            data: [
+                                                                erpAnalysis.subjects.BOTANY.lost,
+                                                                erpAnalysis.subjects.ZOOLOGY.lost,
+                                                                erpAnalysis.subjects.PHYSICS.lost,
+                                                                erpAnalysis.subjects.CHEMISTRY.lost
+                                                            ],
+                                                            backgroundColor: ['#10b981', '#3b82f6', '#eab308', '#ec4899'],
+                                                            borderWidth: 1,
+                                                            borderColor: '#ffffff',
+                                                            datalabels: {
+                                                                color: '#ffffff',
+                                                                font: { weight: 'bold', size: 10 },
+                                                                formatter: (val) => val > 0 ? `-${val}` : ''
+                                                            }
+                                                        }]
+                                                    }}
+                                                    options={{
+                                                        responsive: true,
+                                                        maintainAspectRatio: false,
+                                                        cutout: '60%',
+                                                        plugins: {
+                                                            legend: {
+                                                                display: true,
+                                                                position: 'right',
+                                                                labels: { boxWidth: 10, padding: 8, font: { size: 9, weight: 'bold' } }
+                                                            },
+                                                            datalabels: { display: true }
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Subject Breakdown Table */}
                                     <div className="drawer-subject-breakdown">
-                                        <h4 className="drawer-section-title">Subject-wise Score Loss</h4>
+                                        <h4 className="drawer-section-title">Subject-wise Score & Loss</h4>
                                         <table className="drawer-mini-table">
                                             <thead>
                                                 <tr>
                                                     <th>Subject</th>
+                                                    <th>Scored Marks</th>
                                                     <th>Wrong (W)</th>
                                                     <th>Unattempted (U)</th>
                                                     <th>Total Lost</th>
@@ -854,12 +969,26 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                 {Object.entries(erpAnalysis.subjects).map(([subject, stats]) => (
                                                     <tr key={subject}>
                                                         <td className="font-bold">{subject}</td>
+                                                        <td className="font-bold" style={{ color: '#0f172a' }}>
+                                                            {erpAnalysis.scoredMarks[subject]} / 180
+                                                        </td>
                                                         <td>{stats.w} <span className="sub-text">(-{stats.w * 5})</span></td>
                                                         <td>{stats.u} <span className="sub-text">(-{stats.u * 4})</span></td>
                                                         <td className="loss-red font-bold">-{stats.lost}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
+                                            <tfoot>
+                                                <tr style={{ background: '#f8fafc', fontWeight: 'bold', borderTop: '2px solid #cbd5e1' }}>
+                                                    <td>TOTAL</td>
+                                                    <td style={{ color: '#172554', fontSize: '0.85rem' }}>
+                                                        {erpAnalysis.totalScored} / 720
+                                                    </td>
+                                                    <td>{erpAnalysis.wrongCount} <span className="sub-text">(-{erpAnalysis.wrongLost})</span></td>
+                                                    <td>{erpAnalysis.unattemptedCount} <span className="sub-text">(-{erpAnalysis.unattemptedLost})</span></td>
+                                                    <td className="loss-red" style={{ fontSize: '0.85rem' }}>-{erpAnalysis.totalLost}</td>
+                                                </tr>
+                                            </tfoot>
                                         </table>
                                     </div>
 
@@ -1199,6 +1328,22 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     background: #4f46e5;
                 }
 
+                .drawer-charts-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 15px;
+                    background: rgba(248, 250, 252, 0.7);
+                    padding: 12px;
+                    border-radius: 12px;
+                    border: 1px solid #e2e8f0;
+                    margin-bottom: 5px;
+                }
+                .drawer-chart-col {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
+                }
+
                 /* Drawer details panel */
                 .drawer-overlay {
                     position: fixed;
@@ -1206,18 +1351,21 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background: rgba(0, 0, 0, 0.5);
-                    backdrop-filter: blur(4px);
+                    background: rgba(0, 0, 0, 0.55);
+                    backdrop-filter: blur(6px);
                     z-index: 1000;
                     display: flex;
-                    justify-content: flex-end;
+                    justify-content: center;
+                    align-items: center;
+                    padding: 20px;
                 }
                 .drawer-container {
-                    width: 100%;
-                    max-width: 580px;
+                    width: 90%;
+                    max-width: 850px;
                     background: white;
-                    height: 100%;
-                    box-shadow: -10px 0 25px -5px rgba(0,0,0,0.15);
+                    height: 85vh;
+                    border-radius: 16px;
+                    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15), 0 10px 10px -5px rgba(0,0,0,0.04);
                     display: flex;
                     flex-direction: column;
                     overflow: hidden;
