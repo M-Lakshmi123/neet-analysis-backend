@@ -56,7 +56,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [erpData, setErpData] = useState([]);
     const [erpLoading, setErpLoading] = useState(false);
-    const [selectedErpTest, setSelectedErpTest] = useState('');
+    const [selectedErpTests, setSelectedErpTests] = useState([]);
     const [zoomImage, setZoomImage] = useState(null); // { url, title }
 
     // Zoom and pan states for question preview
@@ -159,7 +159,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
     useEffect(() => {
         if (!selectedStudent) {
             setErpData([]);
-            setSelectedErpTest('');
+            setSelectedErpTests([]);
             return;
         }
 
@@ -171,10 +171,10 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 const data = await res.json();
                 setErpData(data || []);
                 
-                // Set default selected test if available
+                // Select all tests by default
                 if (data && data.length > 0) {
                     const uniqueTests = [...new Set(data.map(r => r.Test))];
-                    setSelectedErpTest(uniqueTests[0] || '');
+                    setSelectedErpTests(uniqueTests);
                 }
             } catch (error) {
                 console.error("Failed to fetch ERP data for topper:", error);
@@ -465,9 +465,9 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         }
     };
 
-    // Calculate Marks Loss Details for current selected test
+    // Calculate Marks Loss Details for current selected tests
     const erpAnalysis = useMemo(() => {
-        if (!selectedStudent || erpData.length === 0 || !selectedErpTest) {
+        if (!selectedStudent || erpData.length === 0 || !selectedErpTests || selectedErpTests.length === 0) {
             return { 
                 totalLost: 0, 
                 wrongCount: 0, 
@@ -475,13 +475,18 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 unattemptedCount: 0, 
                 unattemptedLost: 0, 
                 questions: [], 
-                subjects: {},
+                subjects: {
+                    BOTANY: { w: 0, u: 0, lost: 0 },
+                    ZOOLOGY: { w: 0, u: 0, lost: 0 },
+                    PHYSICS: { w: 0, u: 0, lost: 0 },
+                    CHEMISTRY: { w: 0, u: 0, lost: 0 }
+                },
                 scoredMarks: { BOTANY: 180, ZOOLOGY: 180, PHYSICS: 180, CHEMISTRY: 180 },
                 totalScored: 720
             };
         }
 
-        const testRows = erpData.filter(r => r.Test === selectedErpTest);
+        const testRows = erpData.filter(r => selectedErpTests.includes(r.Test));
         
         let wrongCount = 0;
         let unattemptedCount = 0;
@@ -516,6 +521,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             }
 
             questionsList.push({
+                test: row.Test,
                 qNo: row.Q_No,
                 subject: row.Subject,
                 topic: row.Topic || 'Unknown Topic',
@@ -528,14 +534,30 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             });
         });
 
-        const firstRow = testRows[0];
+        // Compute average scored marks per subject across all selected tests
+        const testScores = selectedErpTests.map(tName => {
+            const firstRowForTest = erpData.find(r => r.Test === tName);
+            if (firstRowForTest) {
+                return {
+                    botany: Number(firstRowForTest.Botany) || 0,
+                    zoology: Number(firstRowForTest.Zoology) || 0,
+                    physics: Number(firstRowForTest.Physics) || 0,
+                    chemistry: Number(firstRowForTest.Chemistry) || 0,
+                    total: Number(firstRowForTest.Tot_720) || 0
+                };
+            } else {
+                return { botany: 180, zoology: 180, physics: 180, chemistry: 180, total: 720 };
+            }
+        });
+
+        const numTests = testScores.length || 1;
         const scoredMarks = {
-            BOTANY: firstRow ? (Number(firstRow.Botany) || 0) : 180,
-            ZOOLOGY: firstRow ? (Number(firstRow.Zoology) || 0) : 180,
-            PHYSICS: firstRow ? (Number(firstRow.Physics) || 0) : 180,
-            CHEMISTRY: firstRow ? (Number(firstRow.Chemistry) || 0) : 180
+            BOTANY: Math.round(testScores.reduce((sum, s) => sum + s.botany, 0) / numTests),
+            ZOOLOGY: Math.round(testScores.reduce((sum, s) => sum + s.zoology, 0) / numTests),
+            PHYSICS: Math.round(testScores.reduce((sum, s) => sum + s.physics, 0) / numTests),
+            CHEMISTRY: Math.round(testScores.reduce((sum, s) => sum + s.chemistry, 0) / numTests)
         };
-        const totalScored = firstRow ? (Number(firstRow.Tot_720) || 0) : 720;
+        const totalScored = Math.round(testScores.reduce((sum, s) => sum + s.total, 0) / numTests);
 
         const wrongLost = wrongCount * 5;
         const unattemptedLost = unattemptedCount * 4;
@@ -547,12 +569,33 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             wrongLost,
             unattemptedCount,
             unattemptedLost,
-            questions: questionsList.sort((a, b) => a.qNo - b.qNo),
+            questions: questionsList.sort((a, b) => a.test.localeCompare(b.test) || a.qNo - b.qNo),
             subjects: subMap,
             scoredMarks,
             totalScored
         };
-    }, [selectedStudent, erpData, selectedErpTest]);
+    }, [selectedStudent, erpData, selectedErpTests]);
+
+    const uniqueTests = useMemo(() => [...new Set(erpData.map(r => r.Test))], [erpData]);
+
+    const handleSelectAllTests = () => {
+        if (selectedErpTests.length === uniqueTests.length) {
+            setSelectedErpTests([uniqueTests[0]]);
+        } else {
+            setSelectedErpTests(uniqueTests);
+        }
+    };
+
+    const handleToggleTest = (test) => {
+        setSelectedErpTests(prev => {
+            if (prev.includes(test)) {
+                if (prev.length === 1) return prev;
+                return prev.filter(t => t !== test);
+            } else {
+                return [...prev, test];
+            }
+        });
+    };
 
     // Redirection helper to student timeline performance
     const handleViewStudentHistory = (student) => {
@@ -887,17 +930,25 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                             ) : (
                                 <>
                                     {/* Test Selector */}
-                                    <div className="drawer-filter-row">
-                                        <label className="filter-label">Select Exam to Analyze:</label>
-                                        <select 
-                                            className="drawer-select" 
-                                            value={selectedErpTest} 
-                                            onChange={(e) => setSelectedErpTest(e.target.value)}
-                                        >
-                                            {[...new Set(erpData.map(r => r.Test))].map(t => (
-                                                <option key={t} value={t}>{t}</option>
+                                    <div className="drawer-filter-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+                                        <label className="filter-label" style={{ marginBottom: 0 }}>Select Exams to Analyze:</label>
+                                        <div className="exam-selection-pills">
+                                            <button 
+                                                className={`exam-pill ${selectedErpTests.length === uniqueTests.length ? 'active' : ''}`}
+                                                onClick={handleSelectAllTests}
+                                            >
+                                                All Exams ({uniqueTests.length})
+                                            </button>
+                                            {uniqueTests.map(t => (
+                                                <button 
+                                                    key={t}
+                                                    className={`exam-pill ${selectedErpTests.includes(t) ? 'active' : ''}`}
+                                                    onClick={() => handleToggleTest(t)}
+                                                >
+                                                    {t}
+                                                </button>
                                             ))}
-                                        </select>
+                                        </div>
                                     </div>
 
                                     {/* Score Loss Cards */}
@@ -929,8 +980,17 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                     <div className="potential-score-banner">
                                         <CheckCircle size={18} color="#10b981" style={{ marginRight: '8px', flexShrink: 0 }} />
                                         <span>
-                                            With 0 mistakes, this student's score on this test would have been 
-                                            <strong> {720 - erpAnalysis.totalLost} / 720</strong>.
+                                            {selectedErpTests.length > 1 ? (
+                                                <>
+                                                    With 0 mistakes, this student's average score across these tests would have been 
+                                                    <strong> {720 - Math.round(erpAnalysis.totalLost / selectedErpTests.length)} / 720</strong>.
+                                                </>
+                                            ) : (
+                                                <>
+                                                    With 0 mistakes, this student's score on this test would have been 
+                                                    <strong> {720 - erpAnalysis.totalLost} / 720</strong>.
+                                                </>
+                                            )}
                                         </span>
                                     </div>
 
@@ -1040,7 +1100,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                     <tr key={subject}>
                                                         <td className="font-bold">{subject}</td>
                                                         <td className="font-bold" style={{ color: '#0f172a' }}>
-                                                            {erpAnalysis.scoredMarks[subject]} / 180
+                                                            {erpAnalysis.scoredMarks[subject]} / 180 {selectedErpTests.length > 1 && <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal' }}>(avg)</span>}
                                                         </td>
                                                         <td>{stats.w} <span className="sub-text">(-{stats.w * 5})</span></td>
                                                         <td>{stats.u} <span className="sub-text">(-{stats.u * 4})</span></td>
@@ -1052,7 +1112,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                 <tr style={{ background: '#f8fafc', fontWeight: 'bold', borderTop: '2px solid #cbd5e1' }}>
                                                     <td>TOTAL</td>
                                                     <td style={{ color: '#172554', fontSize: '0.85rem' }}>
-                                                        {erpAnalysis.totalScored} / 720
+                                                        {erpAnalysis.totalScored} / 720 {selectedErpTests.length > 1 && <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal' }}>(avg)</span>}
                                                     </td>
                                                     <td>{erpAnalysis.wrongCount} <span className="sub-text">(-{erpAnalysis.wrongLost})</span></td>
                                                     <td>{erpAnalysis.unattemptedCount} <span className="sub-text">(-{erpAnalysis.unattemptedLost})</span></td>
@@ -1077,6 +1137,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                     <div className={`q-detail-card ${q.status.toLowerCase()}`} key={idx}>
                                                         <div className="q-card-top">
                                                             <div className="q-identifier">
+                                                                <span className="q-badge-test">{q.test}</span>
                                                                 <span className="q-badge-subject">{q.subject}</span>
                                                                 <span className="q-num">Q{q.qNo}</span>
                                                             </div>
@@ -1102,7 +1163,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                                 {q.qUrl && (
                                                                     <button 
                                                                         className="q-image-btn" 
-                                                                        onClick={() => setZoomImage({ url: q.qUrl, title: `Question Q${q.qNo} (${q.subject})` })}
+                                                                        onClick={() => setZoomImage({ url: q.qUrl, title: `${q.test} • Question Q${q.qNo} (${q.subject})` })}
                                                                     >
                                                                         <Maximize2 size={12} style={{ marginRight: '4px' }} />
                                                                         View Question
@@ -1442,6 +1503,44 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     display: flex;
                     flex-direction: column;
                     gap: 5px;
+                }
+
+                .exam-selection-pills {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                    width: 100%;
+                }
+                .exam-pill {
+                    padding: 6px 14px;
+                    border-radius: 20px;
+                    background: #f1f5f9;
+                    border: 1px solid #cbd5e1;
+                    color: #475569;
+                    font-size: 0.8rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+                .exam-pill:hover {
+                    background: #e2e8f0;
+                    color: #0f172a;
+                }
+                .exam-pill.active {
+                    background: #6366f1;
+                    border-color: #6366f1;
+                    color: white;
+                    box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2);
+                }
+                .q-badge-test {
+                    background: #e0e7ff;
+                    color: #4338ca;
+                    font-weight: 800;
+                    font-size: 0.7rem;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    text-transform: uppercase;
+                    margin-right: 6px;
                 }
 
                 /* Drawer details panel */
