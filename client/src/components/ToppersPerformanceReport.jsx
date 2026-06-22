@@ -17,6 +17,7 @@ import {
 } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import Select, { components } from 'react-select';
 import { 
     Award, 
     Activity, 
@@ -42,6 +43,58 @@ ChartJS.register(
     Legend,
     ChartDataLabels
 );
+
+// Custom components for multi-select dropdown with checkboxes
+const CheckboxOption = (props) => {
+    return (
+        <components.Option {...props}>
+            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                    type="checkbox"
+                    checked={props.isSelected}
+                    onChange={() => null}
+                    style={{ 
+                        marginRight: '8px', 
+                        cursor: 'pointer',
+                        accentColor: '#1e40af',
+                        pointerEvents: 'none'
+                    }}
+                />
+                <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '500' }}>{props.label}</span>
+            </div>
+        </components.Option>
+    );
+};
+
+const CompactValueContainer = ({ children, ...props }) => {
+    const selected = props.getValue().filter(v => v.value !== "SELECT_ALL");
+    const totalOptions = props.options.filter(v => v.value !== "SELECT_ALL").length;
+    
+    if (selected.length > 2) {
+        return (
+            <components.ValueContainer {...props}>
+                <div style={{
+                    fontSize: '0.72rem',
+                    fontWeight: '800',
+                    color: '#1e3a8a',
+                    whiteSpace: 'nowrap',
+                    background: '#eff6ff',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                }}>
+                    <span style={{ opacity: 0.7 }}>📊</span>
+                    {selected.length === totalOptions ? 'All Exams Selected' : `${selected.length} Selected`}
+                </div>
+                {children.map(child => child && child.type?.name === 'Input' ? child : null)}
+                {Array.isArray(children) ? children.filter(c => c && (c.key === 'placeholder' || (c.props && c.props.editable))) : children}
+            </components.ValueContainer>
+        );
+    }
+    return <components.ValueContainer {...props}>{children}</components.ValueContainer>;
+};
 
 const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
     const { userData } = useAuth();
@@ -597,6 +650,75 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         });
     };
 
+    const reactSelectStyles = {
+        control: (base, state) => ({
+            ...base,
+            background: 'white',
+            borderColor: state.isFocused ? '#172554' : '#e2e8f0',
+            minHeight: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            boxShadow: 'none',
+            '&:hover': { borderColor: '#172554' },
+            overflow: 'hidden',
+            width: '100%',
+            maxWidth: '450px'
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '32px',
+            padding: '0 8px',
+            display: 'flex',
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+            fontSize: '0.75rem',
+        }),
+        placeholder: (base) => ({
+            ...base,
+            fontSize: '0.75rem',
+            color: '#94a3b8',
+            whiteSpace: 'nowrap'
+        }),
+        multiValue: (base) => ({
+            ...base,
+            backgroundColor: '#eff6ff',
+            borderRadius: '4px',
+            margin: '2px 2px 2px 0',
+            flexShrink: 0,
+        }),
+        multiValueLabel: (base) => ({
+            ...base,
+            color: '#1e40af',
+            fontSize: '0.65rem',
+            fontWeight: '700',
+            padding: '1px 4px'
+        }),
+        multiValueRemove: (base) => ({
+            ...base,
+            padding: '0 2px',
+            ':hover': { backgroundColor: '#ef4444', color: 'white' },
+        }),
+        option: (base, state) => ({
+            ...base,
+            backgroundColor: state.isFocused ? '#f1f5f9' : 'transparent',
+            ':active': { backgroundColor: '#e2e8f0' },
+            padding: '6px 10px',
+        })
+    };
+
     // Redirection helper to student timeline performance
     const handleViewStudentHistory = (student) => {
         setFilters({
@@ -930,26 +1052,47 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                             ) : (
                                 <>
                                     {/* Test Selector */}
-                                    <div className="drawer-filter-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px' }}>
+                                    <div className="drawer-filter-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '8px', zIndex: 50 }}>
                                         <label className="filter-label" style={{ marginBottom: 0 }}>Select Exams to Analyze:</label>
-                                        <div className="exam-selection-pills">
-                                            <button 
-                                                className={`exam-pill ${selectedErpTests.length === uniqueTests.length ? 'active' : ''}`}
-                                                onClick={handleSelectAllTests}
-                                            >
-                                                All Exams ({uniqueTests.length})
-                                            </button>
-                                            {uniqueTests.map(t => (
-                                                <button 
-                                                    key={t}
-                                                    className={`exam-pill ${selectedErpTests.includes(t) ? 'active' : ''}`}
-                                                    onClick={() => handleToggleTest(t)}
-                                                >
-                                                    {t}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        <Select
+                                            isMulti
+                                            options={[
+                                                { value: "SELECT_ALL", label: "Select All" },
+                                                ...uniqueTests.map(t => ({ value: t, label: t }))
+                                            ]}
+                                            value={
+                                                selectedErpTests.length === uniqueTests.length
+                                                    ? [{ value: "SELECT_ALL", label: "Select All" }, ...selectedErpTests.map(t => ({ value: t, label: t }))]
+                                                    : selectedErpTests.map(t => ({ value: t, label: t }))
+                                            }
+                                            onChange={(selectedOptions, actionMeta) => {
+                                                if (actionMeta.action === "select-option" && actionMeta.option.value === "SELECT_ALL") {
+                                                    setSelectedErpTests(uniqueTests);
+                                                } else if (actionMeta.action === "deselect-option" && actionMeta.option.value === "SELECT_ALL") {
+                                                    setSelectedErpTests([]);
+                                                } else {
+                                                    let values = selectedOptions ? selectedOptions.map(opt => opt.value).filter(v => v !== 'SELECT_ALL') : [];
+                                                    setSelectedErpTests(values);
+                                                }
+                                            }}
+                                            closeMenuOnSelect={false}
+                                            hideSelectedOptions={false}
+                                            components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
+                                            styles={reactSelectStyles}
+                                            placeholder="Select Exams..."
+                                        />
                                     </div>
+
+                                    {selectedErpTests.length === 0 ? (
+                                        <div className="drawer-empty-state" style={{ padding: '60px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                                            <HelpCircle size={48} color="#6366f1" style={{ marginBottom: '15px' }} />
+                                            <h4 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}>No Exam Selected</h4>
+                                            <p style={{ fontSize: '0.85rem', color: '#64748b', textAlign: 'center', maxWidth: '300px', margin: 0 }}>
+                                                Please select one or more exams from the dropdown list to see the student's performance analysis.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <>
 
                                     {/* Score Loss Cards */}
                                     <div className="drawer-loss-cards">
@@ -1178,6 +1321,8 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                     </div>
                                 </>
                             )}
+                        </>
+                    )}
                         </div>
                     </div>
                 </div>
@@ -1505,33 +1650,6 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     gap: 5px;
                 }
 
-                .exam-selection-pills {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 8px;
-                    width: 100%;
-                }
-                .exam-pill {
-                    padding: 6px 14px;
-                    border-radius: 20px;
-                    background: #f1f5f9;
-                    border: 1px solid #cbd5e1;
-                    color: #475569;
-                    font-size: 0.8rem;
-                    font-weight: 700;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-                .exam-pill:hover {
-                    background: #e2e8f0;
-                    color: #0f172a;
-                }
-                .exam-pill.active {
-                    background: #6366f1;
-                    border-color: #6366f1;
-                    color: white;
-                    box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2);
-                }
                 .q-badge-test {
                     background: #e0e7ff;
                     color: #4338ca;
