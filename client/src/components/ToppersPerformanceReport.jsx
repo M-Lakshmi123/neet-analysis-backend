@@ -1145,6 +1145,8 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
                             style={{
+                                flex: 1,
+                                width: '100%',
                                 cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
                                 overflow: 'hidden',
                                 display: 'flex',
@@ -1152,7 +1154,6 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                 alignItems: 'center',
                                 background: '#f1f5f9',
                                 padding: '20px',
-                                minHeight: '300px',
                                 userSelect: 'none'
                             }}
                         >
@@ -1165,7 +1166,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                     transition: isDragging ? 'none' : 'transform 0.1s ease-out',
                                     transformOrigin: 'center center',
                                     maxWidth: '100%',
-                                    maxHeight: '70vh',
+                                    maxHeight: '100%',
                                     objectFit: 'contain',
                                     borderRadius: '6px',
                                     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
@@ -1814,8 +1815,9 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 .zoom-container {
                     background: white;
                     border-radius: 12px;
-                    max-width: 90%;
-                    max-height: 90%;
+                    width: 90%;
+                    max-width: 1100px;
+                    height: 85vh;
                     display: flex;
                     flex-direction: column;
                     overflow: hidden;
