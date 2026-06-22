@@ -1453,7 +1453,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     bottom: 0;
                     background: rgba(0, 0, 0, 0.55);
                     backdrop-filter: blur(6px);
-                    z-index: 1000;
+                    z-index: 9999;
                     display: flex;
                     justify-content: center;
                     align-items: center;
@@ -1806,7 +1806,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     bottom: 0;
                     background: rgba(0, 0, 0, 0.75);
                     backdrop-filter: blur(4px);
-                    z-index: 1100;
+                    z-index: 10000;
                     display: flex;
                     align-items: center;
                     justify-content: center;
