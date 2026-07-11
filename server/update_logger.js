@@ -13,6 +13,18 @@ const mysql = require('mysql2/promise');
  */
 async function logUpdateNotification(pool, { title, description, category, targetPage, targetQuery = null, fileId = null }) {
     try {
+        // Prevent duplicate updates within 5 minutes
+        const [recent] = await pool.rawPool.query(`
+            SELECT id FROM latest_updates 
+            WHERE title = ? AND created_at > NOW() - INTERVAL 5 MINUTE
+            LIMIT 1
+        `, [title]);
+        
+        if (recent && recent.length > 0) {
+            console.log(`[UPDATE LOGGER] Duplicate recent update detected, skipping logging: ${title}`);
+            return;
+        }
+
         const sql = `
             INSERT INTO latest_updates (title, description, category, target_page, target_query, file_id)
             VALUES (?, ?, ?, ?, ?, ?)

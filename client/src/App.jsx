@@ -244,9 +244,21 @@ const Dashboard = () => {
             if (update.target_query) {
                 try {
                     const filters = typeof update.target_query === 'string' ? JSON.parse(update.target_query) : update.target_query;
+                    
+                    // Sanitize filters: convert string values to arrays since FilterBar expects arrays
+                    const sanitizedFilters = {};
+                    if (filters && typeof filters === 'object') {
+                        Object.keys(filters).forEach(key => {
+                            const val = filters[key];
+                            if (val !== null && val !== undefined) {
+                                sanitizedFilters[key] = Array.isArray(val) ? val : [val];
+                            }
+                        });
+                    }
+
                     setGlobalFilters(prev => ({
                         ...prev,
-                        ...filters
+                        ...sanitizedFilters
                     }), update.target_page);
                 } catch (e) {
                     console.error("Failed to parse target query on redirect:", e);
