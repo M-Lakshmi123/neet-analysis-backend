@@ -225,15 +225,11 @@ const Dashboard = () => {
 
                 if (sortedUpdates.length > 0) {
                     const latest = sortedUpdates[0];
-                    const lastSeenId = parseInt(localStorage.getItem('last_seen_update_id') || '0', 10);
+                    const lastDismissedId = parseInt(localStorage.getItem('last_dismissed_popup_id') || '0', 10);
                     
-                    // Show popup if there's a new update that is unseen
-                    if (latest.id > lastSeenId) {
-                        const sessionPoppedId = parseInt(sessionStorage.getItem('last_popped_update_id') || '0', 10);
-                        if (latest.id > sessionPoppedId) {
-                            setNewUpdate(latest);
-                            sessionStorage.setItem('last_popped_update_id', latest.id.toString());
-                        }
+                    // Show popup if there's a new update that hasn't been dismissed/seen yet
+                    if (latest.id > lastDismissedId) {
+                        setNewUpdate(latest);
                     }
                 }
             } catch (err) {
@@ -242,11 +238,11 @@ const Dashboard = () => {
         };
 
         fetchUpdates();
-        const interval = setInterval(fetchUpdates, 30000); // Check every 30 seconds
+        const interval = setInterval(fetchUpdates, 15000); // Check every 15 seconds for real-time live updates
 
         const handleStorageChange = () => {
-            const lastSeenId = parseInt(localStorage.getItem('last_seen_update_id') || '0', 10);
-            setNewUpdate(prev => (prev && prev.id <= lastSeenId) ? null : prev);
+            const lastDismissedId = parseInt(localStorage.getItem('last_dismissed_popup_id') || '0', 10);
+            setNewUpdate(prev => (prev && prev.id <= lastDismissedId) ? null : prev);
         };
         window.addEventListener('storage', handleStorageChange);
 
@@ -258,6 +254,7 @@ const Dashboard = () => {
 
     const handleNotificationClick = (update) => {
         localStorage.setItem('last_seen_update_id', update.id.toString());
+        localStorage.setItem('last_dismissed_popup_id', update.id.toString());
         setNewUpdate(prev => (prev && prev.id === update.id) ? null : prev);
         window.dispatchEvent(new Event('storage'));
 
@@ -279,7 +276,7 @@ const Dashboard = () => {
 
     const dismissNotification = () => {
         if (newUpdate) {
-            localStorage.setItem('last_seen_update_id', newUpdate.id.toString());
+            localStorage.setItem('last_dismissed_popup_id', newUpdate.id.toString());
             setNewUpdate(null);
             window.dispatchEvent(new Event('storage'));
         }

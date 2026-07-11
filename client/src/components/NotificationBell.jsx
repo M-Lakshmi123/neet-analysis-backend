@@ -36,6 +36,7 @@ const NotificationBell = ({ updates, onNotificationClick }) => {
         if (!isOpen && updates.length > 0) {
             const maxId = Math.max(...updates.map(u => u.id));
             localStorage.setItem('last_seen_update_id', maxId.toString());
+            localStorage.setItem('last_dismissed_popup_id', maxId.toString());
             setLastSeenId(maxId);
             window.dispatchEvent(new Event('storage'));
         }
