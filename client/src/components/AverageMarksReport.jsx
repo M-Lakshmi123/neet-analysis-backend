@@ -60,7 +60,7 @@ const AverageMarksReport = ({ filters }) => {
     const getRankedData = (students) => {
         if (!students || students.length === 0) return [];
         
-        // Helper to calculate competition rank (only for Total Rank)
+        // Helper to calculate competition rank
         const calculateRanks = (data, key) => {
             const sorted = [...data].sort((a, b) => (Number(b[key]) || 0) - (Number(a[key]) || 0));
             const ranks = new Map();
@@ -80,21 +80,19 @@ const AverageMarksReport = ({ filters }) => {
         };
 
         const totalRanks = calculateRanks(students, 'tot');
+        const botanyRanks = calculateRanks(students, 'bot');
+        const zoologyRanks = calculateRanks(students, 'zoo');
+        const physicsRanks = calculateRanks(students, 'phy');
+        const chemistryRanks = calculateRanks(students, 'che');
 
         return students.map(s => {
-            const bR = Number(s.b_rank) || 0;
-            const zR = Number(s.z_rank) || 0;
-            const pR = Number(s.p_rank) || 0;
-            const cR = Number(s.c_rank) || 0;
-
             return {
                 ...s,
                 calculatedRank: totalRanks.get(s.STUD_ID),
-                // Display ONLY uploaded ranks (or their average)
-                b_rank: bR > 0 ? Math.round(bR) : '-',
-                z_rank: zR > 0 ? Math.round(zR) : '-',
-                p_rank: pR > 0 ? Math.round(pR) : '-',
-                c_rank: cR > 0 ? Math.round(cR) : '-'
+                b_rank: (s.bot !== null && s.bot !== undefined && s.bot !== '') ? botanyRanks.get(s.STUD_ID) : '-',
+                z_rank: (s.zoo !== null && s.zoo !== undefined && s.zoo !== '') ? zoologyRanks.get(s.STUD_ID) : '-',
+                p_rank: (s.phy !== null && s.phy !== undefined && s.phy !== '') ? physicsRanks.get(s.STUD_ID) : '-',
+                c_rank: (s.che !== null && s.che !== undefined && s.che !== '') ? chemistryRanks.get(s.STUD_ID) : '-'
             };
         }).sort((a, b) => a.calculatedRank - b.calculatedRank);
     };
