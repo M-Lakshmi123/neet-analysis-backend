@@ -326,6 +326,29 @@ async function uploadToDB(rows, tableName, filename) {
         console.log(`Success: ${successCount}`);
         console.log(`Failed:  ${failCount} (Likely duplicates or data errors)`);
 
+        if (successCount > 0) {
+            try {
+                const firstRow = rows[0] || {};
+                const testName = firstRow.TEST || firstRow.Test || firstRow.test || "Unknown Test";
+                const streamName = firstRow.STREAM || firstRow.Stream || firstRow.stream || "Unknown Stream";
+                let testType = "NST";
+                if (testName && testName !== "Unknown Test") {
+                    testType = testName.split(/[-_]/)[0].trim();
+                }
+                const { logUpdateNotification } = require('./update_logger');
+                
+                await logUpdateNotification(pool, {
+                    title: `${testName} Results Auto-Updated`,
+                    description: `Auto-uploader updated Marks & Ranks for ${testName} (${streamName}).`,
+                    category: 'marks',
+                    targetPage: 'analysis',
+                    targetQuery: { testType, test: testName }
+                });
+            } catch (e) {
+                console.error(`[NOTIFICATION] Auto-upload notification failed:`, e.message);
+            }
+        }
+
         // Clear checkpoint on completion
         if (checkpoints[filename]) {
             delete checkpoints[filename];

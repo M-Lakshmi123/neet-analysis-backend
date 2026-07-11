@@ -395,6 +395,20 @@ async function processResultFile(filePath, streamFromFolder, pool, getMappedCate
     console.log(`  Ready to upload ${studentsToUpload.length} students.`);
 
     const uploadedCount = await uploadStudents(pool, studentsToUpload, dateStr, testName, year, dbStream, getMappedCategory, customHeading);
+    if (uploadedCount > 0) {
+        try {
+            const { logUpdateNotification } = require('./update_logger');
+            await logUpdateNotification(pool, {
+                title: `${testName} Results Updated`,
+                description: `Admin updated Marks & Ranks for ${testName} (${dbStream}).`,
+                category: 'marks',
+                targetPage: 'analysis',
+                targetQuery: { testType: testType, test: testName }
+            });
+        } catch (e) {
+            console.error(`[NOTIFICATION] Failed to log result upload:`, e.message);
+        }
+    }
     return uploadedCount;
 }
 

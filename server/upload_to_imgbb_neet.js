@@ -25,29 +25,118 @@ async function uploadToImgBB() {
         return fs.statSync(path.join(picsBaseDir, f)).isDirectory();
     });
 
-    const browser = await puppeteer.launch({
-        headless: false,
-        defaultViewport: null,
-        args: ['--start-maximized']
-    });
+    const mappingPath = path.join(__dirname, 'url_mapping_neet.json');
+    let session = {
+        mappings: {} // { "StreamName": { "TestName": { Q: {}, S: {} } } }
+    };
 
-    const page = await browser.newPage();
+    if (fs.existsSync(mappingPath)) {
+        try {
+            session = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+        } catch (e) {
+            console.warn("Could not parse mapping cache, starting fresh.");
+        }
+    }
 
-    try {
-        const mappingPath = path.join(__dirname, 'url_mapping_neet.json');
-        let session = {
-            mappings: {} // { "StreamName": { "TestName": { Q: {}, S: {} } } }
-        };
-
-        if (fs.existsSync(mappingPath)) {
-            try {
-                session = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
-            } catch (e) {
-                console.warn("Could not parse mapping cache, starting fresh.");
+    // Check if there are existing mappings for the target test
+    let hasExistingMappings = false;
+    if (targetTest) {
+        for (const stream in session.mappings) {
+            if (session.mappings[stream][targetTest]) {
+                const testMap = session.mappings[stream][targetTest];
+                const qCount = Object.keys(testMap.Q || {}).length;
+                const sCount = Object.keys(testMap.S || {}).length;
+                if (qCount > 0 || sCount > 0) {
+                    hasExistingMappings = true;
+                    break;
+                }
             }
         }
+    }
 
-        // Login to ImgBB
+    if (hasExistingMappings) {
+        const readline = require('readline');
+        const rl = readline.createInterface({
+            input: process.stdin,
+            output: process.stdout
+        });
+
+        const answer = await new Promise(resolve => {
+            rl.question(`\n[WARNING] Existing URL mappings found for Test "${targetTest}". \nDo you want to delete these mappings and re-upload new images? (y/N) [Default: N]: `, (ans) => {
+                resolve(ans.trim().toLowerCase());
+            });
+        });
+        rl.close();
+
+        if (answer === 'y' || answer === 'yes') {
+            console.log(`[RESET] Deleting existing mappings for Test "${targetTest}"...`);
+            for (const stream in session.mappings) {
+                if (session.mappings[stream][targetTest]) {
+                    delete session.mappings[stream][targetTest];
+                }
+            }
+            fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
+            console.log(`[RESET] Mapping cache updated. Will re-upload all images for "${targetTest}".`);
+        } else {
+            console.log(`[CONTINUE] Keeping existing mappings. Only missing images will be uploaded.`);
+        }
+    }
+
+    // Early exit check: see if there are actually any missing images to upload
+    let hasAnyMissing = false;
+    for (const stream of streams) {
+        const streamPath = path.join(picsBaseDir, stream);
+        const tests = fs.readdirSync(streamPath).filter(f => {
+            const isDir = fs.statSync(path.join(streamPath, f)).isDirectory();
+            if (targetTest) return isDir && f === targetTest;
+            return isDir;
+        });
+
+        for (const test of tests) {
+            const testPath = path.join(streamPath, test);
+            const qDir = path.join(testPath, 'Q');
+            const sDir = path.join(testPath, 'S');
+
+            if (!fs.existsSync(qDir)) continue;
+
+            const streamMap = session.mappings[stream] || {};
+            const testMap = streamMap[test] || { Q: {}, S: {} };
+
+            const qFiles = fs.readdirSync(qDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg'));
+            const sFiles = fs.existsSync(sDir) ? fs.readdirSync(sDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg')) : [];
+
+            const missingQ = qFiles.filter(f => {
+                const qNo = f.replace(/[QS]/i, '').replace(/\.(png|jpg)/i, '');
+                return !testMap.Q[qNo];
+            });
+
+            const missingS = sFiles.filter(f => {
+                const qNo = f.replace(/[QS]/i, '').replace(/\.(png|jpg)/i, '');
+                return !testMap.S[qNo];
+            });
+
+            if (missingQ.length > 0 || missingS.length > 0) {
+                hasAnyMissing = true;
+                break;
+            }
+        }
+        if (hasAnyMissing) break;
+    }
+
+    if (!hasAnyMissing) {
+        console.log(`\n✅ [INSTANT] All images for "${targetTest || 'all tests'}" already mapped. No upload needed.`);
+        process.exit(0);
+    }
+
+    let browser;
+    try {
+        browser = await puppeteer.launch({
+            headless: false,
+            defaultViewport: null,
+            args: ['--start-maximized']
+        });
+
+        const page = await browser.newPage();
         await page.setDefaultNavigationTimeout(0);
         await page.setDefaultTimeout(0);
         await page.goto('https://imgbb.com/login', { waitUntil: 'networkidle2' });
@@ -209,7 +298,7 @@ async function uploadToImgBB() {
     } catch (err) {
         console.error("Upload Error:", err);
     } finally {
-        await browser.close();
+        if (browser) await browser.close();
         process.exit(0);
     }
 }

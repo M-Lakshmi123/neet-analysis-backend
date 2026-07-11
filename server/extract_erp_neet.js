@@ -391,6 +391,18 @@ async function processErp() {
             console.log(`  [SYNC] Processing ${rowsToUpload.length} error records (Skipping duplicates)...`);
             if (rowsToUpload.length > 0) {
                 await uploadErpRows(pool, rowsToUpload);
+                try {
+                    const { logUpdateNotification } = require('./update_logger');
+                    await logUpdateNotification(pool, {
+                        title: `${testName} Error Analysis Updated`,
+                        description: `Admin updated Error Report Analysis for ${testName} (${streamFromMetadata}).`,
+                        category: 'errors',
+                        targetPage: 'errors',
+                        targetQuery: { testType: testType, test: testName }
+                    });
+                } catch (e) {
+                    console.error(`[NOTIFICATION] Failed to log ERP upload:`, e.message);
+                }
             }
         }
 

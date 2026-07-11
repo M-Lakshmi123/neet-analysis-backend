@@ -63,6 +63,21 @@ async function connectToDb(year = '2026') {
             console.log(`Connected to TiDB (${targetYear}) Successfully!`);
             connection.release();
 
+            // Ensure latest_updates table exists
+            await poolRaw.query(`
+                CREATE TABLE IF NOT EXISTS latest_updates (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    category VARCHAR(100),
+                    target_page VARCHAR(100),
+                    target_query VARCHAR(255),
+                    file_id INT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            `);
+            console.log(`Verified 'latest_updates' table in TiDB (${targetYear})`);
+
             // Create a wrapper to mimic strict MSSQL interface
             pools[targetYear] = {
                 rawPool: poolRaw,

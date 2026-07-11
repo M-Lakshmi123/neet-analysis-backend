@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { db } from './firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import './index.css';
+import AdminUpdateNotification from './components/AdminUpdateNotification';
 
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
@@ -27,7 +28,7 @@ import UserApprovals from './components/admin/UserApprovals';
 import ActivityLogs from './components/admin/ActivityLogs';
 import FileManagement from './components/FileManagement';
 import { logActivity } from './utils/activityLogger';
-import { performFailoverCheck } from './utils/apiHelper';
+import { performFailoverCheck, API_URL } from './utils/apiHelper';
 
 const ProtectedRoute = ({ children, requireAdmin = false }) => {
     const { currentUser, userData, loading, isAdmin } = useAuth();
@@ -207,6 +208,83 @@ const Dashboard = () => {
         });
     };
 
+    const [updates, setUpdates] = useState([]);
+    const [newUpdate, setNewUpdate] = useState(null);
+
+    // Fetch latest updates/notifications
+    useEffect(() => {
+        if (!userData) return;
+
+        const fetchUpdates = async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/latest-updates?academicYear=${academicYear}&_t=${Date.now()}`);
+                if (!response.ok) throw new Error('Unreachable');
+                const data = await response.json();
+                const sortedUpdates = Array.isArray(data) ? data : [];
+                setUpdates(sortedUpdates);
+
+                if (sortedUpdates.length > 0) {
+                    const latest = sortedUpdates[0];
+                    const lastSeenId = parseInt(localStorage.getItem('last_seen_update_id') || '0', 10);
+                    
+                    // Show popup if there's a new update that is unseen
+                    if (latest.id > lastSeenId) {
+                        const sessionPoppedId = parseInt(sessionStorage.getItem('last_popped_update_id') || '0', 10);
+                        if (latest.id > sessionPoppedId) {
+                            setNewUpdate(latest);
+                            sessionStorage.setItem('last_popped_update_id', latest.id.toString());
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch latest updates:", err);
+            }
+        };
+
+        fetchUpdates();
+        const interval = setInterval(fetchUpdates, 30000); // Check every 30 seconds
+
+        const handleStorageChange = () => {
+            const lastSeenId = parseInt(localStorage.getItem('last_seen_update_id') || '0', 10);
+            setNewUpdate(prev => (prev && prev.id <= lastSeenId) ? null : prev);
+        };
+        window.addEventListener('storage', handleStorageChange);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, [academicYear, userData]);
+
+    const handleNotificationClick = (update) => {
+        localStorage.setItem('last_seen_update_id', update.id.toString());
+        setNewUpdate(prev => (prev && prev.id === update.id) ? null : prev);
+        window.dispatchEvent(new Event('storage'));
+
+        if (update.target_page) {
+            setActivePage(update.target_page);
+            if (update.target_query) {
+                try {
+                    const filters = typeof update.target_query === 'string' ? JSON.parse(update.target_query) : update.target_query;
+                    setGlobalFilters(prev => ({
+                        ...prev,
+                        ...filters
+                    }), update.target_page);
+                } catch (e) {
+                    console.error("Failed to parse target query on redirect:", e);
+                }
+            }
+        }
+    };
+
+    const dismissNotification = () => {
+        if (newUpdate) {
+            localStorage.setItem('last_seen_update_id', newUpdate.id.toString());
+            setNewUpdate(null);
+            window.dispatchEvent(new Event('storage'));
+        }
+    };
+
     const hasLoggedSession = React.useRef(false);
 
     useEffect(() => {
@@ -335,22 +413,26 @@ const Dashboard = () => {
         <div className="dashboard-root">
             <Sidebar activePage={activePage} setActivePage={setActivePage} />
             <main className="dashboard-main-content">
-                <Header title={
-                    activePage === 'principal_dashboard' ? 'Principal Dashboard' :
-                    activePage === 'analysis' ? 'Analysis Report' :
-                    activePage === 'toppers_performance' ? 'Toppers Performance Report' :
-                        activePage === 'test_improvements' ? 'Test Wise Improvements' :
-                            activePage === 'averages' ? 'Average Marks Report' :
-                                activePage === 'average_count' ? 'Average Count Report' :
-                                    activePage === 'progress' ? 'Progress Report' :
-                                        activePage === 'errors' ? 'Error Report' :
-                                            activePage === 'error_top' ? 'Error Top 100%' :
-                                                activePage === 'error_count' ? 'Error Count Report' :
-                                                    activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
-                                                        activePage === 'student_performance' ? 'Student Performance' :
-                                                            activePage === 'approvals' ? 'User Approvals' :
-                                                                activePage === 'file_management' ? 'Schedules & Timetable & Files' : 'Activity Logs'
-                } />
+                <Header 
+                    title={
+                        activePage === 'principal_dashboard' ? 'Principal Dashboard' :
+                        activePage === 'analysis' ? 'Analysis Report' :
+                        activePage === 'toppers_performance' ? 'Toppers Performance Report' :
+                            activePage === 'test_improvements' ? 'Test Wise Improvements' :
+                                activePage === 'averages' ? 'Average Marks Report' :
+                                    activePage === 'average_count' ? 'Average Count Report' :
+                                        activePage === 'progress' ? 'Progress Report' :
+                                            activePage === 'errors' ? 'Error Report' :
+                                                activePage === 'error_top' ? 'Error Top 100%' :
+                                                    activePage === 'error_count' ? 'Error Count Report' :
+                                                        activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
+                                                            activePage === 'student_performance' ? 'Student Performance' :
+                                                                activePage === 'approvals' ? 'User Approvals' :
+                                                                    activePage === 'file_management' ? 'Schedules & Timetable & Files' : 'Activity Logs'
+                    } 
+                    updates={updates}
+                    onNotificationClick={handleNotificationClick}
+                />
                 <div className="content-inner">
 
                     {showFilterBar && (
@@ -373,6 +455,11 @@ const Dashboard = () => {
                     {renderPageContent()}
                 </div>
             </main>
+            <AdminUpdateNotification 
+                newUpdate={newUpdate} 
+                onClose={dismissNotification} 
+                onView={handleNotificationClick} 
+            />
         </div>
     );
 };

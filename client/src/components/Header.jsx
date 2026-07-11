@@ -4,8 +4,9 @@ import { useAuth } from './auth/AuthProvider';
 import { LogOut, School, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { collection, addDoc } from 'firebase/firestore';
+import NotificationBell from './NotificationBell';
 
-const Header = ({ title }) => {
+const Header = ({ title, updates = [], onNotificationClick }) => {
     const { currentUser, userData, isAdmin } = useAuth();
     const navigate = useNavigate();
 
@@ -37,6 +38,7 @@ const Header = ({ title }) => {
             </div>
 
             <div className="header-right-area">
+                <NotificationBell updates={updates} onNotificationClick={onNotificationClick} />
                 <div className="user-profile-compact">
                     <div className="header-user-info">
                         <span className="user-label">

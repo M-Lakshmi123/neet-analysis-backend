@@ -5,6 +5,7 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { connectToDb, sql } = require('./db');
+const { logUpdateNotification } = require('./update_logger');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -108,6 +109,20 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+app.get('/api/latest-updates', async (req, res) => {
+    try {
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+        const { recordset } = await pool.request().query(
+            "SELECT * FROM latest_updates ORDER BY created_at DESC LIMIT 10"
+        );
+        res.json(recordset);
+    } catch (err) {
+        console.error("Error fetching latest updates:", err);
+        res.status(500).json({ error: "Failed to fetch updates" });
+    }
+});
+
 const upload = multer({
     storage: storage,
     limits: { fileSize: 250 * 1024 * 1024 } // 250MB size limit
@@ -184,6 +199,16 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 await pool.rawPool.query("UPDATE uploaded_files SET filename = ? WHERE id = ?", [driveId, fileId]);
                 successCount++;
                 try { fs.unlinkSync(file.path); } catch (e) { }
+
+                const categoryLabel = (category || 'schedules') === 'schedules' ? 'Schedules & Time Tables' : 'Average Files';
+                await logUpdateNotification(pool, {
+                    title: `New File Uploaded`,
+                    description: `Admin uploaded "${sanitizedOriginalName}" under ${categoryLabel}.`,
+                    category: `file_${category || 'schedules'}`,
+                    targetPage: 'file_management',
+                    targetQuery: null,
+                    fileId: fileId
+                });
 
             } catch (fileErr) {
                 console.error(`[STABILITY][UPLOAD] FAILED: ${file.originalname}`, fileErr);

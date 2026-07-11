@@ -293,6 +293,39 @@ async function uploadToDB(rows, tableName, filename) {
         console.log(`Success: ${successCount}`);
         console.log(`Failed:  ${failCount} (Duplicates or Errors)`);
 
+        if (successCount > 0) {
+            try {
+                const firstRow = rows[0] || {};
+                const testName = firstRow.TEST || firstRow.Test || firstRow.test || "Unknown Test";
+                const streamName = firstRow.STREAM || firstRow.Stream || firstRow.stream || "Unknown Stream";
+                let testType = "NST";
+                if (testName && testName !== "Unknown Test") {
+                    testType = testName.split(/[-_]/)[0].trim();
+                }
+                const { logUpdateNotification } = require('./update_logger');
+                
+                if (tableName === 'MEDICAL_RESULT') {
+                    await logUpdateNotification(pool, {
+                        title: `${testName} Results Auto-Updated`,
+                        description: `Auto-uploader updated Marks & Ranks for ${testName} (${streamName}).`,
+                        category: 'marks',
+                        targetPage: 'analysis',
+                        targetQuery: { testType, test: testName }
+                    });
+                } else if (tableName === 'ERP_REPORT') {
+                    await logUpdateNotification(pool, {
+                        title: `${testName} Error Analysis Auto-Updated`,
+                        description: `Auto-uploader updated Error Report Analysis for ${testName} (${streamName}).`,
+                        category: 'errors',
+                        targetPage: 'errors',
+                        targetQuery: { testType, test: testName }
+                    });
+                }
+            } catch (e) {
+                console.error(`[NOTIFICATION] Auto-upload notification failed:`, e.message);
+            }
+        }
+
         if (checkpoints[filename]) {
             delete checkpoints[filename];
             saveCheckpoint(checkpoints);
