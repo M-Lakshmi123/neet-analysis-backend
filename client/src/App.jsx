@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { db } from './firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import './index.css';
-import AdminUpdateNotification from './components/AdminUpdateNotification';
+import NotificationBot from './components/NotificationBot';
 
 import Header from './components/Header';
 import FilterBar from './components/FilterBar';
@@ -209,7 +209,6 @@ const Dashboard = () => {
     };
 
     const [updates, setUpdates] = useState([]);
-    const [newUpdate, setNewUpdate] = useState(null);
 
     // Fetch latest updates/notifications
     useEffect(() => {
@@ -222,16 +221,6 @@ const Dashboard = () => {
                 const data = await response.json();
                 const sortedUpdates = Array.isArray(data) ? data : [];
                 setUpdates(sortedUpdates);
-
-                if (sortedUpdates.length > 0) {
-                    const latest = sortedUpdates[0];
-                    const lastDismissedId = parseInt(localStorage.getItem('last_dismissed_popup_id') || '0', 10);
-                    
-                    // Show popup if there's a new update that hasn't been dismissed/seen yet
-                    if (latest.id > lastDismissedId) {
-                        setNewUpdate(latest);
-                    }
-                }
             } catch (err) {
                 console.error("Failed to fetch latest updates:", err);
             }
@@ -240,22 +229,14 @@ const Dashboard = () => {
         fetchUpdates();
         const interval = setInterval(fetchUpdates, 15000); // Check every 15 seconds for real-time live updates
 
-        const handleStorageChange = () => {
-            const lastDismissedId = parseInt(localStorage.getItem('last_dismissed_popup_id') || '0', 10);
-            setNewUpdate(prev => (prev && prev.id <= lastDismissedId) ? null : prev);
-        };
-        window.addEventListener('storage', handleStorageChange);
-
         return () => {
             clearInterval(interval);
-            window.removeEventListener('storage', handleStorageChange);
         };
     }, [academicYear, userData]);
 
     const handleNotificationClick = (update) => {
         localStorage.setItem('last_seen_update_id', update.id.toString());
         localStorage.setItem('last_dismissed_popup_id', update.id.toString());
-        setNewUpdate(prev => (prev && prev.id === update.id) ? null : prev);
         window.dispatchEvent(new Event('storage'));
 
         if (update.target_page) {
@@ -271,14 +252,6 @@ const Dashboard = () => {
                     console.error("Failed to parse target query on redirect:", e);
                 }
             }
-        }
-    };
-
-    const dismissNotification = () => {
-        if (newUpdate) {
-            localStorage.setItem('last_dismissed_popup_id', newUpdate.id.toString());
-            setNewUpdate(null);
-            window.dispatchEvent(new Event('storage'));
         }
     };
 
@@ -452,10 +425,9 @@ const Dashboard = () => {
                     {renderPageContent()}
                 </div>
             </main>
-            <AdminUpdateNotification 
-                newUpdate={newUpdate} 
-                onClose={dismissNotification} 
-                onView={handleNotificationClick} 
+            <NotificationBot 
+                updates={updates} 
+                onNotificationClick={handleNotificationClick} 
             />
         </div>
     );
