@@ -12,14 +12,44 @@ const NotificationBot = ({ updates, onNotificationClick }) => {
         return parseInt(localStorage.getItem('last_seen_update_id') || '0', 10);
     });
 
+    const [filterSeenId, setFilterSeenId] = useState(() => {
+        return parseInt(localStorage.getItem('last_seen_update_id') || '0', 10);
+    });
+
     // Sync seen status
     useEffect(() => {
         const handleStorageChange = () => {
-            setLastSeenId(parseInt(localStorage.getItem('last_seen_update_id') || '0', 10));
+            const storedSeenId = parseInt(localStorage.getItem('last_seen_update_id') || '0', 10);
+            setLastSeenId(storedSeenId);
+            if (!isOpen) {
+                setFilterSeenId(storedSeenId);
+            }
         };
         window.addEventListener('storage', handleStorageChange);
         return () => window.removeEventListener('storage', handleStorageChange);
-    }, []);
+    }, [isOpen]);
+
+    // Update filterSeenId only when the bot is closed, so updates don't disappear while reading
+    useEffect(() => {
+        if (!isOpen) {
+            setFilterSeenId(lastSeenId);
+        }
+    }, [isOpen, lastSeenId]);
+
+    const isToday = (dateString) => {
+        if (!dateString) return false;
+        const d = new Date(dateString);
+        if (isNaN(d.getTime())) return false;
+        const today = new Date();
+        return d.getDate() === today.getDate() &&
+               d.getMonth() === today.getMonth() &&
+               d.getFullYear() === today.getFullYear();
+    };
+
+    const filteredUpdates = updates.filter(update => {
+        const isSeen = update.id <= filterSeenId;
+        return !isSeen || isToday(update.created_at);
+    });
 
     const unreadCount = updates.filter(u => u.id > lastSeenId).length;
 
@@ -181,13 +211,13 @@ const NotificationBot = ({ updates, onNotificationClick }) => {
                             </div>
 
                             {/* Updates List as Chat Messages */}
-                            {updates.length === 0 ? (
+                            {filteredUpdates.length === 0 ? (
                                 <div className="chat-no-updates">
                                     <Sparkles size={24} className="text-slate-300 mb-2" />
                                     <p>Everything is up to date! I'll tell you here when new data arrives.</p>
                                 </div>
                             ) : (
-                                updates.map((update) => {
+                                filteredUpdates.map((update) => {
                                     const isUnread = update.id > lastSeenId;
                                     return (
                                         <div key={update.id} className="chat-message bot">

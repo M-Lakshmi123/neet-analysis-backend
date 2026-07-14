@@ -13,23 +13,27 @@ const mysql = require('mysql2/promise');
  */
 async function logUpdateNotification(pool, { title, description, category, targetPage, targetQuery = null, fileId = null }) {
     try {
-        // Prevent duplicate updates within 5 minutes
-        const [recent] = await pool.rawPool.query(`
-            SELECT id FROM latest_updates 
-            WHERE title = ? AND created_at > NOW() - INTERVAL 5 MINUTE
-            LIMIT 1
-        `, [title]);
-        
-        if (recent && recent.length > 0) {
-            console.log(`[UPDATE LOGGER] Duplicate recent update detected, skipping logging: ${title}`);
-            return;
+        const qStr = targetQuery && typeof targetQuery === 'object' ? JSON.stringify(targetQuery) : targetQuery;
+
+        // Deduplicate: remove any existing identical/overlapping notifications
+        if (fileId) {
+            await pool.rawPool.query(`
+                DELETE FROM latest_updates WHERE file_id = ?
+            `, [fileId]);
+        } else if (qStr) {
+            await pool.rawPool.query(`
+                DELETE FROM latest_updates WHERE title = ? AND target_page = ? AND target_query = ?
+            `, [title, targetPage, qStr]);
+        } else {
+            await pool.rawPool.query(`
+                DELETE FROM latest_updates WHERE title = ? AND description = ?
+            `, [title, description]);
         }
 
         const sql = `
             INSERT INTO latest_updates (title, description, category, target_page, target_query, file_id)
             VALUES (?, ?, ?, ?, ?, ?)
         `;
-        const qStr = targetQuery && typeof targetQuery === 'object' ? JSON.stringify(targetQuery) : targetQuery;
         
         await pool.rawPool.query(sql, [title, description, category, targetPage, qStr, fileId]);
         console.log(`[UPDATE LOGGER] Success: Recorded update "${title}"`);

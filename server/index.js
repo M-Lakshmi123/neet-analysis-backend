@@ -114,7 +114,10 @@ app.get('/api/latest-updates', async (req, res) => {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
         const { recordset } = await pool.request().query(
-            "SELECT * FROM latest_updates ORDER BY created_at DESC LIMIT 10"
+            `SELECT lu.* FROM latest_updates lu 
+             LEFT JOIN uploaded_files uf ON lu.file_id = uf.id 
+             WHERE lu.file_id IS NULL OR uf.id IS NOT NULL 
+             ORDER BY lu.created_at DESC LIMIT 10`
         );
         res.json(recordset);
     } catch (err) {
@@ -439,8 +442,11 @@ app.delete('/api/files/:id', async (req, res) => {
 
         // 2. Clean up old TiDB chunks (if there are any left from before the Drive integration)
         await pool.rawPool.query('DELETE FROM file_chunks WHERE file_id = ?', [id]);
-        
-        // 3. Delete metadata mapping in DB
+
+        // 3. Delete associated notification updates from latest_updates
+        await pool.rawPool.query('DELETE FROM latest_updates WHERE file_id = ?', [id]);
+
+        // 4. Delete metadata mapping in DB
         await pool.rawPool.query('DELETE FROM uploaded_files WHERE id = ?', [id]);
         
         res.json({ message: 'File deleted successfully from Drive and Database' });
