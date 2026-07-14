@@ -638,10 +638,13 @@ const ErrorReport = ({ filters, setFilters }) => {
         return doc;
     };
 
-    const generatePDF = async () => {
+    const generatePDF = async (limitCount = null) => {
         if (reportData.length === 0) return;
         setGeneratingPdf(true);
         setPdfProgress('Loading Resources...');
+
+        // Ensure limitCount is parsed as a number if passed as an event or non-number
+        const actualLimit = typeof limitCount === 'number' ? limitCount : null;
 
         try {
             const [impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
@@ -653,16 +656,47 @@ const ErrorReport = ({ filters, setFilters }) => {
 
             const fonts = { impactFont, bookmanFont, bookmanBoldFont };
 
-            if (reportData.length === 1) {
-                const doc = await createStudentPDF(reportData[0], fonts, logoImg);
-                doc.save(`${reportData[0].info.name}_${reportData[0].info.branch}.pdf`);
-                logActivity(userData, 'Downloaded Error PDF', { student: reportData[0].info.name });
-            } else {
+            // Helper to extract numeric AIR (default to 999999 for missing/invalid ranks)
+            const getAIR = (t) => {
+                if (!t || !t.meta) return 999999;
+                const airVal = t.meta.air;
+                if (airVal === null || airVal === undefined || airVal === '') return 999999;
+                const parsed = parseInt(airVal, 10);
+                return isNaN(parsed) ? 999999 : parsed;
+            };
+
+            // Helper to extract numeric Total Marks (default to 0)
+            const getTot = (t) => {
+                if (!t || !t.meta) return 0;
+                const totVal = t.meta.tot;
+                if (totVal === null || totVal === undefined || totVal === '') return 0;
+                const parsed = parseInt(totVal, 10);
+                return isNaN(parsed) ? 0 : parsed;
+            };
+
+            // Sort students: Best All India Rank (AIR) first, then highest total score
+            const sortedStudents = [...reportData].sort((a, b) => {
+                const airA = Math.min(...a.tests.map(getAIR));
+                const airB = Math.min(...b.tests.map(getAIR));
+                if (airA !== airB) return airA - airB;
+
+                const totA = Math.max(...a.tests.map(getTot));
+                const totB = Math.max(...b.tests.map(getTot));
+                return totB - totA;
+            });
+
+            const targetStudents = actualLimit ? sortedStudents.slice(0, actualLimit) : reportData;
+
+            if (targetStudents.length === 1) {
+                const doc = await createStudentPDF(targetStudents[0], fonts, logoImg);
+                doc.save(`${targetStudents[0].info.name}_${targetStudents[0].info.branch}.pdf`);
+                logActivity(userData, 'Downloaded Error PDF', { student: targetStudents[0].info.name });
+            } else if (targetStudents.length > 0) {
                 const zip = new JSZip();
 
-                for (let i = 0; i < reportData.length; i++) {
-                    const student = reportData[i];
-                    setPdfProgress(`Generating PDF for ${student.info.name} (${i + 1}/${reportData.length})...`);
+                for (let i = 0; i < targetStudents.length; i++) {
+                    const student = targetStudents[i];
+                    setPdfProgress(`Generating PDF for ${student.info.name} (${i + 1}/${targetStudents.length})...`);
                     const doc = await createStudentPDF(student, fonts, logoImg);
                     const blob = doc.output('blob');
                     zip.file(`${student.info.name}_${student.info.branch}.pdf`, blob);
@@ -670,8 +704,13 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 setPdfProgress('Compressing...');
                 const zipContent = await zip.generateAsync({ type: 'blob' });
-                saveAs(zipContent, `Error_Reports_${subjectFilter.value}.zip`);
-                logActivity(userData, 'Downloaded Bulk Error Reports', { count: reportData.length, subject: subjectFilter.label });
+                const zipName = actualLimit 
+                    ? `Error_Reports_Top_${actualLimit}_${subjectFilter.value}.zip`
+                    : `Error_Reports_${subjectFilter.value}.zip`;
+                saveAs(zipContent, zipName);
+                logActivity(userData, 'Downloaded Bulk Error Reports', { count: targetStudents.length, subject: subjectFilter.label });
+            } else {
+                alert("No students found to download.");
             }
 
         } catch (err) {
@@ -946,7 +985,71 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                     {/* Download Buttons - Only visible if data is loaded */}
                     {reportData.length > 0 && (
-                        <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
+                        <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto', alignItems: 'center' }}>
+                            {reportData.length > 1 && (
+                                <div style={{ display: 'flex', gap: '6px', marginRight: '5px', paddingRight: '10px', borderRight: '1px solid #ddd' }}>
+                                    <button
+                                        onClick={() => generatePDF(10)}
+                                        disabled={generatingPdf || generatingExcel}
+                                        style={{
+                                            background: 'linear-gradient(135deg, #ffeef0 0%, #ffd0d6 100%)',
+                                            color: '#b31b2c',
+                                            border: '1px solid #ffccd3',
+                                            padding: '8px 12px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontWeight: 'bold',
+                                            fontSize: '13px',
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                            transition: 'all 0.2s ease',
+                                            opacity: (generatingPdf || generatingExcel) ? 0.6 : 1
+                                        }}
+                                        title="Download Top 10 Student PDF Reports"
+                                    >
+                                        Top 10 PDF
+                                    </button>
+                                    <button
+                                        onClick={() => generatePDF(20)}
+                                        disabled={generatingPdf || generatingExcel}
+                                        style={{
+                                            background: 'linear-gradient(135deg, #eef5ff 0%, #d0e4ff 100%)',
+                                            color: '#0052cc',
+                                            border: '1px solid #ccdfff',
+                                            padding: '8px 12px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontWeight: 'bold',
+                                            fontSize: '13px',
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                            transition: 'all 0.2s ease',
+                                            opacity: (generatingPdf || generatingExcel) ? 0.6 : 1
+                                        }}
+                                        title="Download Top 20 Student PDF Reports"
+                                    >
+                                        Top 20 PDF
+                                    </button>
+                                    <button
+                                        onClick={() => generatePDF(50)}
+                                        disabled={generatingPdf || generatingExcel}
+                                        style={{
+                                            background: 'linear-gradient(135deg, #effaf3 0%, #d1f4e0 100%)',
+                                            color: '#107c41',
+                                            border: '1px solid #c1eed5',
+                                            padding: '8px 12px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontWeight: 'bold',
+                                            fontSize: '13px',
+                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                            transition: 'all 0.2s ease',
+                                            opacity: (generatingPdf || generatingExcel) ? 0.6 : 1
+                                        }}
+                                        title="Download Top 50 Student PDF Reports"
+                                    >
+                                        Top 50 PDF
+                                    </button>
+                                </div>
+                            )}
                             <button
                                 onClick={generatePDF}
                                 disabled={generatingPdf || generatingExcel}
