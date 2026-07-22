@@ -552,7 +552,7 @@ const buildWhereClause = (req, options = {}) => {
         } else if (quickSearch && typeof quickSearch === 'string' && quickSearch.trim() !== '') {
             // Only use quickSearch LIKE if no specific student is selected
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
-            clauses.push(`(NAME_OF_THE_STUDENT LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
+            clauses.push(`(UPPER(NAME_OF_THE_STUDENT) LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
         }
     }
 
@@ -1744,7 +1744,7 @@ app.get('/api/erp/students', async (req, res) => {
 
         if (quickSearch && quickSearch.trim() !== '') {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
-            clauses.push(`(Student_Name LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
+            clauses.push(`(UPPER(Student_Name) LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
         }
 
         const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : "WHERE 1=1";

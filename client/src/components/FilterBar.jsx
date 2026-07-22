@@ -45,11 +45,18 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
             return [{ value: "SELECT_ALL", label: "ALL SELECTED" }];
         }
 
-        // For studentSearch, map IDs back to labels using the students list
+        // For studentSearch, map IDs back to labels using the students list or quickSearch label
         if (field === 'studentSearch') {
             return val.map(v => {
                 const s = students.find(st => st.id.toString() === v.toString());
-                return s ? { value: s.id, label: s.name } : { value: v, label: v };
+                if (s) {
+                    const labelText = s.name ? (s.name.includes('(') ? s.name : `${s.name} (${s.id})`) : s.id;
+                    return { value: s.id, label: labelText };
+                }
+                if (filters.quickSearch && filters.quickSearch.toString().includes(v.toString())) {
+                    return { value: v, label: filters.quickSearch };
+                }
+                return { value: v, label: v };
             });
         }
         return val.map(v => ({ value: v, label: v }));
@@ -193,19 +200,14 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         if (!inputValue || inputValue.length < 1) return []; // Search from 1 character
 
         try {
-            // Start with base search params
+            // Global search by student name/ID across entire system for selected year
             const searchParams = buildQueryParams({
                 quickSearch: inputValue,
-                campus: filters.campus,
-                stream: filters.stream,
-                testType: filters.testType,
-                test: filters.test,
-                topAll: filters.topAll,
                 academicYear: filters.academicYear
             });
 
-            // If restricted and no campus selected, enforce allowed campuses
-            if (isRestricted && (!filters.campus || filters.campus.length === 0)) {
+            // If restricted user, enforce allowed campuses
+            if (isRestricted) {
                 allowedCampuses.forEach(c => {
                     searchParams.append('campus', c);
                 });
