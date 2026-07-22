@@ -500,14 +500,26 @@ const buildWhereClause = (req, options = {}) => {
         let selection = [...valArray];
         if (field === 'Stream') {
             const groups = {
-                'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS'],
-                'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS'],
-                'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02']
+                'JR ELITE': ['JR ELITE', 'JR ELITE & AIIMS', 'JR_ELITE', 'JR_ELITE_SET_01'],
+                'JR_ELITE': ['JR ELITE', 'JR ELITE & AIIMS', 'JR_ELITE', 'JR_ELITE_SET_01'],
+                'JR AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS', 'JR_AIIMS'],
+                'JR_AIIMS': ['JR AIIMS', 'JR ELITE & AIIMS', 'JR_AIIMS'],
+                'SR ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02', 'SR-ELITE', 'SR ELITE-SET-01', 'SR ELITE-SET-02', 'SR_ELITE'],
+                'SR_ELITE': ['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02', 'SR-ELITE', 'SR ELITE-SET-01', 'SR ELITE-SET-02', 'SR_ELITE']
             };
             valArray.forEach(v => {
-                if (groups[v]) {
-                    selection = [...new Set([...selection, ...groups[v]])];
-                }
+                if (!v) return;
+                const rawV = v.toString().trim().toUpperCase();
+                const spaceV = rawV.replace(/_/g, ' ').replace(/-/g, ' ');
+                const underscoreV = rawV.replace(/ /g, '_').replace(/-/g, '_');
+
+                let matched = false;
+                [rawV, spaceV, underscoreV].forEach(key => {
+                    if (groups[key]) {
+                        selection = [...new Set([...selection, ...groups[key]])];
+                        matched = true;
+                    }
+                });
             });
         }
 
@@ -917,7 +929,7 @@ app.get('/api/studentsByCampus', async (req, res) => {
             ${where} 
             GROUP BY STUD_ID
             ORDER BY name
-            LIMIT 100`;
+            LIMIT 10000`;
 
         const students = await pool.request().query(query);
         console.log(`[studentsByCampus] Found ${students.recordset.length} students.First result: `, students.recordset[0]);
@@ -1749,7 +1761,7 @@ app.get('/api/erp/students', async (req, res) => {
             ${whereClause} 
             GROUP BY STUD_ID
             ORDER BY name
-            LIMIT 100`;
+            LIMIT 10000`;
 
         const result = await pool.request().query(query);
         res.json(result.recordset);
