@@ -870,8 +870,8 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                         },
                         y: {
                             grid: { display: true, color: '#e2e8f0' },
-                            max: 200,
-                            ticks: { font: { size: 20, weight: 'bold' }, color: '#64748b', stepSize: 40 }
+                            max: 180,
+                            ticks: { font: { size: 20, weight: 'bold' }, color: '#64748b', stepSize: 45 }
                         }
                     },
                     layout: { padding: { top: 45, bottom: 10, left: 15, right: 15 } }
@@ -1629,7 +1629,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                         },
                                                         scales: {
                                                             x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } },
-                                                            y: { grid: { display: true, color: '#f1f5f9' }, max: 200, ticks: { font: { size: 9 } } }
+                                                            y: { grid: { display: true, color: '#f1f5f9' }, max: 180, ticks: { font: { size: 9 }, stepSize: 45 } }
                                                         },
                                                         layout: {
                                                             padding: { top: 15 }
