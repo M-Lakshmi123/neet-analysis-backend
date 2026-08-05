@@ -61,19 +61,35 @@ const loadImage = (url) => {
     });
 };
 
-const getChartImage = (chartRef) => {
-    try {
-        if (!chartRef.current) return null;
-        if (typeof chartRef.current.toBase64Image === 'function') {
-            return chartRef.current.toBase64Image();
+const createHighResChartImage = (type, data, options, width = 1400, height = 950) => {
+    return new Promise((resolve) => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            const chart = new ChartJS(ctx, {
+                type: type,
+                data: data,
+                options: {
+                    ...options,
+                    responsive: false,
+                    animation: false,
+                    devicePixelRatio: 2
+                }
+            });
+
+            setTimeout(() => {
+                const imgData = canvas.toDataURL('image/png', 1.0);
+                chart.destroy();
+                resolve(imgData);
+            }, 80);
+        } catch (e) {
+            console.error("Offscreen 4K chart error:", e);
+            resolve(null);
         }
-        if (chartRef.current.canvas && typeof chartRef.current.canvas.toDataURL === 'function') {
-            return chartRef.current.canvas.toDataURL('image/png');
-        }
-    } catch (e) {
-        console.error("Error getting chart image:", e);
-    }
-    return null;
+    });
 };
 
 ChartJS.register(
@@ -783,7 +799,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         setActivePage('student_performance');
     };
 
-    // Download Student Marks Loss Report as PDF
+    // Download Student Marks Loss Report as PDF (Ultra-Sharp 4K Single Page Executive Report)
     const downloadStudentPdf = async () => {
         if (!selectedStudent || !erpAnalysis) return;
         setIsExportingPdf(true);
@@ -795,7 +811,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             const margin = 12;
             const contentWidth = pageWidth - (margin * 2);
 
-            // Load fonts & logo in parallel
+            // 1. Load fonts & logo in parallel
             const [impactFont, bookmanFont, bookmanBoldFont, logoImg] = await Promise.all([
                 loadFont('/fonts/unicode.impact.ttf'),
                 loadFont('/fonts/bookman-old-style.ttf'),
@@ -817,16 +833,95 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
             }
 
-            // Draw Top Header Accent Bars
-            let y = 14;
+            // 2. Generate Ultra-Sharp 4K Offscreen Charts
+            const bar4kPromise = createHighResChartImage(
+                'bar',
+                {
+                    labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
+                    datasets: [{
+                        data: [
+                            erpAnalysis.scoredMarks.BOTANY,
+                            erpAnalysis.scoredMarks.ZOOLOGY,
+                            erpAnalysis.scoredMarks.PHYSICS,
+                            erpAnalysis.scoredMarks.CHEMISTRY
+                        ],
+                        backgroundColor: ['#10b981', '#3b82f6', '#eab308', '#ec4899'],
+                        borderRadius: 8,
+                        barThickness: 48,
+                        datalabels: {
+                            color: '#000000',
+                            anchor: 'end',
+                            align: 'end',
+                            offset: 6,
+                            font: { weight: 'bold', size: 18 },
+                            formatter: (val) => val
+                        }
+                    }]
+                },
+                {
+                    plugins: {
+                        legend: { display: false },
+                        datalabels: { display: true }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { font: { size: 16, weight: 'bold' }, color: '#1e293b' } },
+                        y: { grid: { display: true, color: '#e2e8f0' }, max: 200, ticks: { font: { size: 14, weight: 'bold' }, color: '#64748b' } }
+                    },
+                    layout: { padding: { top: 38, bottom: 10, left: 10, right: 10 } }
+                },
+                1400,
+                950
+            );
+
+            const doughnut4kPromise = createHighResChartImage(
+                'doughnut',
+                {
+                    labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
+                    datasets: [{
+                        data: [
+                            erpAnalysis.subjects.BOTANY.lost,
+                            erpAnalysis.subjects.ZOOLOGY.lost,
+                            erpAnalysis.subjects.PHYSICS.lost,
+                            erpAnalysis.subjects.CHEMISTRY.lost
+                        ],
+                        backgroundColor: ['#10b981', '#3b82f6', '#eab308', '#ec4899'],
+                        borderWidth: 3,
+                        borderColor: '#ffffff',
+                        datalabels: {
+                            color: '#ffffff',
+                            font: { weight: 'bold', size: 18 },
+                            formatter: (val) => val > 0 ? `-${val}` : ''
+                        }
+                    }]
+                },
+                {
+                    cutout: '52%',
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'right',
+                            labels: { boxWidth: 18, padding: 14, font: { size: 16, weight: 'bold' }, color: '#1e293b' }
+                        },
+                        datalabels: { display: true }
+                    },
+                    layout: { padding: { top: 20, bottom: 20, left: 10, right: 10 } }
+                },
+                1400,
+                950
+            );
+
+            const [bar4kImg, doughnut4kImg] = await Promise.all([bar4kPromise, doughnut4kPromise]);
+
+            // 3. Top Accent Bar (Positioned high with generous margin to avoid colliding with text)
+            let y = 10;
             doc.setFillColor(15, 23, 42); // Navy dark #0f172a
-            doc.rect(margin, y, contentWidth, 3, 'F');
+            doc.rect(margin, y, contentWidth, 2.5, 'F');
             doc.setFillColor(245, 158, 11); // Amber accent #f59e0b
-            doc.rect(margin, y + 3, contentWidth, 1, 'F');
+            doc.rect(margin, y + 2.5, contentWidth, 1, 'F');
 
-            y += 9;
+            y = 22; // Clear 8.5mm spacing below accent bar
 
-            // Draw Logo & Institution Title
+            // 4. Logo & Institution Header
             let logoW = 0;
             const logoH = 11;
             if (logoImg && logoImg.width) {
@@ -853,7 +948,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
             if (logoImg) {
                 try {
-                    doc.addImage(logoImg, 'PNG', currentX, y - 7, logoW, logoH);
+                    doc.addImage(logoImg, 'PNG', currentX, y - 7.5, logoW, logoH);
                 } catch (e) {}
                 currentX += logoW + gap;
             }
@@ -870,12 +965,12 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
             y += 6;
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(9);
+            doc.setFontSize(8.5);
             doc.setTextColor(71, 85, 105);
             doc.text("Central Office, Bangalore • Academic Performance Division", pageWidth / 2, y, { align: 'center' });
 
             y += 6;
-            // Document Main Title
+            // Document Main Title Banner
             doc.setFillColor(30, 58, 138); // #1e3a8a
             doc.roundedRect(margin, y, contentWidth, 9, 2, 2, 'F');
             doc.setTextColor(255, 255, 255);
@@ -885,7 +980,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
             y += 13;
 
-            // Student Information Card Box
+            // 5. Student Information Profile Box
             doc.setFillColor(248, 250, 252); // #f8fafc
             doc.setDrawColor(226, 232, 240); // #e2e8f0
             doc.setLineWidth(0.4);
@@ -932,112 +1027,50 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             doc.setFont("helvetica", "normal");
             doc.text(new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), col2X + 28, y + 18);
 
-            y += 26;
+            y += 28;
 
-            // Performance KPI Cards (3 boxes)
-            const cardGap = 4;
-            const cardWidth = (contentWidth - (cardGap * 2)) / 3;
-
-            // Card 1: Total Scored Avg
-            doc.setFillColor(239, 246, 255); // #eff6ff blue
-            doc.setDrawColor(191, 219, 254);
-            doc.roundedRect(margin, y, cardWidth, 18, 2, 2, 'FD');
-            doc.setFontSize(8);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(30, 64, 175);
-            doc.text("TOTAL SCORED AVG", margin + (cardWidth / 2), y + 5, { align: 'center' });
-            doc.setFontSize(13);
-            doc.text(`${erpAnalysis.totalScored} / 720`, margin + (cardWidth / 2), y + 12, { align: 'center' });
-
-            // Card 2: Wrong Answers Penalty
-            const card2X = margin + cardWidth + cardGap;
-            doc.setFillColor(254, 242, 242); // #fef2f2 red
-            doc.setDrawColor(254, 202, 202);
-            doc.roundedRect(card2X, y, cardWidth, 18, 2, 2, 'FD');
-            doc.setFontSize(8);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(153, 27, 27);
-            doc.text("WRONG ANSWERS (W)", card2X + (cardWidth / 2), y + 5, { align: 'center' });
-            doc.setFontSize(12);
-            doc.text(`-${erpAnalysis.wrongLost} Marks (${erpAnalysis.wrongCount} Qs)`, card2X + (cardWidth / 2), y + 12, { align: 'center' });
-
-            // Card 3: Unattempted Penalty
-            const card3X = card2X + cardWidth + cardGap;
-            doc.setFillColor(254, 252, 232); // #fefce8 yellow
-            doc.setDrawColor(254, 240, 138);
-            doc.roundedRect(card3X, y, cardWidth, 18, 2, 2, 'FD');
-            doc.setFontSize(8);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(133, 77, 14);
-            doc.text("UNATTEMPTED (U)", card3X + (cardWidth / 2), y + 5, { align: 'center' });
-            doc.setFontSize(12);
-            doc.text(`-${erpAnalysis.unattemptedLost} Marks (${erpAnalysis.unattemptedCount} Qs)`, card3X + (cardWidth / 2), y + 12, { align: 'center' });
-
-            y += 22;
-
-            // Potential Score Banner Box
-            doc.setFillColor(236, 253, 245); // #ecfdf5 green
-            doc.setDrawColor(167, 243, 208);
-            doc.roundedRect(margin, y, contentWidth, 10, 2, 2, 'FD');
-            doc.setFontSize(8.5);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(6, 95, 70);
-            
-            const potScore = selectedErpTests.length > 1
-                ? (720 - Math.round(erpAnalysis.totalLost / selectedErpTests.length))
-                : (720 - erpAnalysis.totalLost);
-
-            doc.text(`POTENTIAL SCORE: With 0 mistakes, this student's score potential would be ${potScore} / 720.`, margin + 6, y + 6.5);
-
-            y += 14;
-
-            // Subject-Wise Charts Section (Side-by-side)
-            const barImg = getChartImage(subjectBarChartRef);
-            const doughnutImg = getChartImage(lossDoughnutChartRef);
-
+            // 6. Ultra-Sharp 4K Side-by-Side Performance Charts
             const chartBoxWidth = (contentWidth - 6) / 2;
-            const chartBoxHeight = 55;
+            const chartBoxHeight = 85;
 
-            if (barImg || doughnutImg) {
-                // Bar Chart Frame
-                if (barImg) {
-                    doc.setDrawColor(226, 232, 240);
-                    doc.setFillColor(255, 255, 255);
-                    doc.roundedRect(margin, y, chartBoxWidth, chartBoxHeight, 2, 2, 'FD');
-                    doc.setFontSize(8.5);
-                    doc.setFont("helvetica", "bold");
-                    doc.setTextColor(15, 23, 42);
-                    doc.text("Subject Wise Performance (Scored Marks)", margin + 6, y + 5);
-                    try {
-                        doc.addImage(barImg, 'PNG', margin + 3, y + 7, chartBoxWidth - 6, chartBoxHeight - 9);
-                    } catch (e) { console.error("Bar image error:", e); }
-                }
-
-                // Doughnut Chart Frame
-                if (doughnutImg) {
-                    const dX = margin + chartBoxWidth + 6;
-                    doc.setDrawColor(226, 232, 240);
-                    doc.setFillColor(255, 255, 255);
-                    doc.roundedRect(dX, y, chartBoxWidth, chartBoxHeight, 2, 2, 'FD');
-                    doc.setFontSize(8.5);
-                    doc.setFont("helvetica", "bold");
-                    doc.setTextColor(15, 23, 42);
-                    doc.text("Marks Loss Distribution (Subject Penalty)", dX + 6, y + 5);
-                    try {
-                        doc.addImage(doughnutImg, 'PNG', dX + 3, y + 7, chartBoxWidth - 6, chartBoxHeight - 9);
-                    } catch (e) { console.error("Doughnut image error:", e); }
-                }
-
-                y += chartBoxHeight + 6;
+            // Bar Chart Frame
+            if (bar4kImg) {
+                doc.setDrawColor(226, 232, 240);
+                doc.setFillColor(255, 255, 255);
+                doc.roundedRect(margin, y, chartBoxWidth, chartBoxHeight, 2, 2, 'FD');
+                doc.setFontSize(9.5);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(15, 23, 42);
+                doc.text("Subject Wise Performance (Scored Marks)", margin + 6, y + 6.5);
+                try {
+                    doc.addImage(bar4kImg, 'PNG', margin + 2, y + 9, chartBoxWidth - 4, chartBoxHeight - 12);
+                } catch (e) { console.error("Bar image error:", e); }
             }
 
-            // Subject Breakdown Table (autoTable)
-            doc.setFontSize(9.5);
+            // Doughnut Chart Frame
+            if (doughnut4kImg) {
+                const dX = margin + chartBoxWidth + 6;
+                doc.setDrawColor(226, 232, 240);
+                doc.setFillColor(255, 255, 255);
+                doc.roundedRect(dX, y, chartBoxWidth, chartBoxHeight, 2, 2, 'FD');
+                doc.setFontSize(9.5);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(15, 23, 42);
+                doc.text("Marks Loss Distribution (Subject Penalty)", dX + 6, y + 6.5);
+                try {
+                    doc.addImage(doughnut4kImg, 'PNG', dX + 2, y + 9, chartBoxWidth - 4, chartBoxHeight - 12);
+                } catch (e) { console.error("Doughnut image error:", e); }
+            }
+
+            y += chartBoxHeight + 10;
+
+            // 7. Subject Breakdown Table (autoTable)
+            doc.setFontSize(10);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(15, 23, 42);
             doc.text("SUBJECT-WISE SCORE & MARKS LOSS BREAKDOWN", margin, y);
 
-            y += 3;
+            y += 4;
 
             const tableRows = Object.entries(erpAnalysis.subjects).map(([subj, stats]) => {
                 const scored = erpAnalysis.scoredMarks[subj] || 0;
@@ -1062,18 +1095,18 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             autoTable(doc, {
                 startY: y,
                 margin: { left: margin, right: margin },
-                head: [['Subject', 'Scored Marks', 'Wrong (W)', 'Unattempted (U)', 'Total Lost']],
+                head: [['Subject', 'Scored Marks', 'Wrong Answers (W)', 'Unattempted (U)', 'Total Marks Lost']],
                 body: tableRows,
                 theme: 'grid',
                 headStyles: {
                     fillColor: [30, 58, 138],
                     textColor: [255, 255, 255],
                     fontStyle: 'bold',
-                    fontSize: 8.5,
+                    fontSize: 9,
                     halign: 'center'
                 },
                 bodyStyles: {
-                    fontSize: 8,
+                    fontSize: 8.5,
                     textColor: [30, 41, 59],
                     halign: 'center'
                 },
@@ -1093,89 +1126,17 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 }
             });
 
-            y = doc.lastAutoTable.finalY + 8;
+            // 8. Single Clean Footer (Fixed X positions so left and right text never overlap)
+            doc.setDrawColor(226, 232, 240);
+            doc.setLineWidth(0.3);
+            doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
 
-            // Incorrect / Skipped Questions Table
-            if (erpAnalysis.questions && erpAnalysis.questions.length > 0) {
-                if (y > pageHeight - 45) {
-                    doc.addPage();
-                    y = 15;
-                }
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(100, 116, 139);
 
-                doc.setFontSize(9.5);
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(15, 23, 42);
-                doc.text(`INCORRECT & SKIPPED QUESTIONS DETAILS (${erpAnalysis.questions.length} Items)`, margin, y);
-
-                y += 3;
-
-                const qRows = erpAnalysis.questions.map((q, idx) => [
-                    idx + 1,
-                    q.test || '-',
-                    q.subject || '-',
-                    `Q${q.qNo}`,
-                    q.status === 'W' ? 'Wrong' : 'Unattempted',
-                    `${q.topic || 'General'}${q.subTopic ? ` (${q.subTopic})` : ''}`,
-                    q.keyValue || 'N/A',
-                    q.status === 'W' ? '-5 Marks' : '-4 Marks'
-                ]);
-
-                autoTable(doc, {
-                    startY: y,
-                    margin: { left: margin, right: margin, bottom: 15 },
-                    head: [['#', 'Test Name', 'Subject', 'Q#', 'Status', 'Topic / Sub-Topic', 'Key', 'Loss']],
-                    body: qRows,
-                    theme: 'striped',
-                    headStyles: {
-                        fillColor: [15, 23, 42],
-                        textColor: [255, 255, 255],
-                        fontStyle: 'bold',
-                        fontSize: 8,
-                        halign: 'center'
-                    },
-                    bodyStyles: {
-                        fontSize: 7.5,
-                        textColor: [51, 65, 85]
-                    },
-                    columnStyles: {
-                        0: { halign: 'center', cellWidth: 7 },
-                        1: { halign: 'left', cellWidth: 26 },
-                        2: { halign: 'center', cellWidth: 20 },
-                        3: { halign: 'center', cellWidth: 10, fontStyle: 'bold' },
-                        4: { halign: 'center', cellWidth: 22, fontStyle: 'bold' },
-                        5: { halign: 'left' },
-                        6: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
-                        7: { halign: 'center', cellWidth: 18, fontStyle: 'bold', textColor: [220, 38, 38] }
-                    },
-                    didParseCell: (data) => {
-                        if (data.section === 'body' && data.column.index === 4) {
-                            if (data.cell.raw === 'Wrong') {
-                                data.cell.styles.textColor = [220, 38, 38];
-                            } else {
-                                data.cell.styles.textColor = [202, 138, 4];
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Footer on all pages
-            const totalPages = doc.internal.getNumberOfPages();
-            for (let i = 1; i <= totalPages; i++) {
-                doc.setPage(i);
-                
-                doc.setDrawColor(226, 232, 240);
-                doc.setLineWidth(0.3);
-                doc.line(margin, pageHeight - 10, pageWidth - margin, pageHeight - 10);
-
-                doc.setFontSize(7.5);
-                doc.setFont("helvetica", "normal");
-                doc.setTextColor(100, 116, 139);
-
-                doc.text("Sri Chaitanya Educational Institutions • Academic Performance System", margin, pageHeight - 6);
-                doc.text("Confidential — For Student, Parent & Faculty Guidance", pageWidth / 2, pageHeight - 6, { align: 'center' });
-                doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 6, { align: 'right' });
-            }
+            doc.text("Sri Chaitanya Educational Institutions • Academic Performance System", margin, pageHeight - 6);
+            doc.text("Page 1 of 1", pageWidth - margin, pageHeight - 6, { align: 'right' });
 
             const cleanFileName = `${selectedStudent.name.replace(/[^a-zA-Z0-9]/g, '_')}_Marks_Loss_Report.pdf`;
             doc.save(cleanFileName);
