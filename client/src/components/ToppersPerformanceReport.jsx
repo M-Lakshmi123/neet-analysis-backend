@@ -833,7 +833,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
             }
 
-            // 2. Generate Ultra-Sharp 4K Offscreen Charts
+            // 2. Generate Ultra-Sharp Offscreen Charts with Large Bold Text
             const bar4kPromise = createHighResChartImage(
                 'bar',
                 {
@@ -845,15 +845,15 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                             erpAnalysis.scoredMarks.PHYSICS,
                             erpAnalysis.scoredMarks.CHEMISTRY
                         ],
-                        backgroundColor: ['#10b981', '#3b82f6', '#eab308', '#ec4899'],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ec4899'],
                         borderRadius: 8,
-                        barThickness: 48,
+                        barThickness: 50,
                         datalabels: {
-                            color: '#000000',
+                            color: '#0f172a',
                             anchor: 'end',
                             align: 'end',
-                            offset: 6,
-                            font: { weight: 'bold', size: 18 },
+                            offset: 4,
+                            font: { weight: 'bold', size: 30 },
                             formatter: (val) => val
                         }
                     }]
@@ -864,13 +864,20 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                         datalabels: { display: true }
                     },
                     scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 16, weight: 'bold' }, color: '#1e293b' } },
-                        y: { grid: { display: true, color: '#e2e8f0' }, max: 200, ticks: { font: { size: 14, weight: 'bold' }, color: '#64748b' } }
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 26, weight: 'bold' }, color: '#0f172a', padding: 8 }
+                        },
+                        y: {
+                            grid: { display: true, color: '#e2e8f0' },
+                            max: 200,
+                            ticks: { font: { size: 20, weight: 'bold' }, color: '#64748b', stepSize: 40 }
+                        }
                     },
-                    layout: { padding: { top: 38, bottom: 10, left: 10, right: 10 } }
+                    layout: { padding: { top: 45, bottom: 10, left: 15, right: 15 } }
                 },
-                1400,
-                950
+                750,
+                550
             );
 
             const doughnut4kPromise = createHighResChartImage(
@@ -884,30 +891,35 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                             erpAnalysis.subjects.PHYSICS.lost,
                             erpAnalysis.subjects.CHEMISTRY.lost
                         ],
-                        backgroundColor: ['#10b981', '#3b82f6', '#eab308', '#ec4899'],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ec4899'],
                         borderWidth: 3,
                         borderColor: '#ffffff',
                         datalabels: {
                             color: '#ffffff',
-                            font: { weight: 'bold', size: 18 },
+                            font: { weight: 'bold', size: 28 },
                             formatter: (val) => val > 0 ? `-${val}` : ''
                         }
                     }]
                 },
                 {
-                    cutout: '52%',
+                    cutout: '50%',
                     plugins: {
                         legend: {
                             display: true,
-                            position: 'right',
-                            labels: { boxWidth: 18, padding: 14, font: { size: 16, weight: 'bold' }, color: '#1e293b' }
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 24,
+                                padding: 20,
+                                font: { size: 24, weight: 'bold' },
+                                color: '#0f172a'
+                            }
                         },
                         datalabels: { display: true }
                     },
-                    layout: { padding: { top: 20, bottom: 20, left: 10, right: 10 } }
+                    layout: { padding: { top: 15, bottom: 15, left: 15, right: 15 } }
                 },
-                1400,
-                950
+                750,
+                550
             );
 
             const [bar4kImg, doughnut4kImg] = await Promise.all([bar4kPromise, doughnut4kPromise]);
@@ -1010,22 +1022,19 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
             // Right Column
             const academicYr = filters.academicYear || '2026';
-            const examsCountText = selectedErpTests.length === uniqueTests.length ? `All Exams (${uniqueTests.length})` : `${selectedErpTests.length} Exams Selected`;
+            const testNameText = selectedErpTests.length === uniqueTests.length 
+                ? `All Exams (${uniqueTests.length})` 
+                : selectedErpTests.join(', ');
 
             doc.setFont("helvetica", "bold");
             doc.text("Academic Year:", col2X, y + 6);
             doc.setFont("helvetica", "normal");
-            doc.text(academicYr, col2X + 28, y + 6);
+            doc.text(academicYr, col2X + 26, y + 6);
 
             doc.setFont("helvetica", "bold");
-            doc.text("Analyzed Exams:", col2X, y + 12);
+            doc.text("Test:", col2X, y + 12);
             doc.setFont("helvetica", "normal");
-            doc.text(examsCountText, col2X + 28, y + 12);
-
-            doc.setFont("helvetica", "bold");
-            doc.text("Report Date:", col2X, y + 18);
-            doc.setFont("helvetica", "normal");
-            doc.text(new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), col2X + 28, y + 18);
+            doc.text(testNameText, col2X + 26, y + 12);
 
             y += 28;
 
