@@ -1022,6 +1022,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
             // Right Column
             const academicYr = filters.academicYear || '2026';
+            const studentStream = selectedStudent.stream || selectedStudent.Stream || (erpData && erpData.length > 0 ? erpData.find(r => r.Stream)?.Stream : null) || (filters.stream && filters.stream.length > 0 ? filters.stream.join(', ') : '-');
             const testNameText = selectedErpTests.length === uniqueTests.length 
                 ? `All Exams (${uniqueTests.length})` 
                 : selectedErpTests.join(', ');
@@ -1032,9 +1033,14 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             doc.text(academicYr, col2X + 26, y + 6);
 
             doc.setFont("helvetica", "bold");
-            doc.text("Test:", col2X, y + 12);
+            doc.text("Stream:", col2X, y + 12);
             doc.setFont("helvetica", "normal");
-            doc.text(testNameText, col2X + 26, y + 12);
+            doc.text(String(studentStream || '-'), col2X + 26, y + 12);
+
+            doc.setFont("helvetica", "bold");
+            doc.text("Test:", col2X, y + 18);
+            doc.setFont("helvetica", "normal");
+            doc.text(testNameText, col2X + 26, y + 18);
 
             y += 28;
 
@@ -1455,7 +1461,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                             <div className="drawer-title-block">
                                 <h3 className="drawer-title">Marks Loss Analyzer</h3>
                                 <span className="drawer-subtitle">
-                                    {selectedStudent.name} ({selectedStudent.STUD_ID}) • {selectedStudent.campus}
+                                    {selectedStudent.name} ({selectedStudent.STUD_ID}) • {selectedStudent.campus} {(selectedStudent.stream || selectedStudent.Stream || (erpData && erpData.length > 0 ? erpData.find(r => r.Stream)?.Stream : null)) ? `• ${selectedStudent.stream || selectedStudent.Stream || erpData.find(r => r.Stream)?.Stream}` : ''}
                                 </span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
