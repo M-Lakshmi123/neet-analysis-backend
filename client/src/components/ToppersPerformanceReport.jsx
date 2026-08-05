@@ -222,15 +222,20 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 const year = filters.academicYear || '2026';
                 const res = await fetch(`${API_URL}/api/erp/report?academicYear=${year}&studentSearch=${selectedStudent.STUD_ID}`);
                 const data = await res.json();
-                setErpData(data || []);
+                const safeData = Array.isArray(data) ? data : [];
+                setErpData(safeData);
                 
                 // Select all tests by default
-                if (data && data.length > 0) {
-                    const uniqueTests = [...new Set(data.map(r => r.Test))];
+                if (safeData.length > 0) {
+                    const uniqueTests = [...new Set(safeData.map(r => r.Test).filter(Boolean))];
                     setSelectedErpTests(uniqueTests);
+                } else {
+                    setSelectedErpTests([]);
                 }
             } catch (error) {
                 console.error("Failed to fetch ERP data for topper:", error);
+                setErpData([]);
+                setSelectedErpTests([]);
             } finally {
                 setErpLoading(false);
             }
@@ -1022,7 +1027,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             {/* MARKS LOSS ANALYZER SLIDE DRAWER / MODAL */}
             {selectedStudent && (
                 <div className="drawer-overlay" onClick={() => setSelectedStudent(null)}>
-                    <div className="drawer-container animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                    <div className="drawer-container topper-drawer-animate" onClick={(e) => e.stopPropagation()}>
                         {/* Drawer Header */}
                         <div className="drawer-header">
                             <div className="drawer-title-block">
@@ -1331,7 +1336,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             {/* ZOOMED IMAGE OVERLAY */}
             {zoomImage && (
                 <div className="zoom-overlay" onClick={() => setZoomImage(null)}>
-                    <div className="zoom-container animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                    <div className="zoom-container topper-drawer-animate" onClick={(e) => e.stopPropagation()}>
                         <div className="zoom-header">
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                                 <span className="zoom-title">{zoomImage.title}</span>
@@ -2088,10 +2093,11 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     from { transform: translateX(100%); }
                     to { transform: translateX(0); }
                 }
-                .animate-fade-in {
-                    animation: fadeIn 0.2s ease-out;
+                .topper-drawer-animate {
+                    animation: topperDrawerFadeIn 0.25s ease-out forwards;
+                    opacity: 1 !important;
                 }
-                @keyframes fadeIn {
+                @keyframes topperDrawerFadeIn {
                     from { opacity: 0; transform: scale(0.95); }
                     to { opacity: 1; transform: scale(1); }
                 }

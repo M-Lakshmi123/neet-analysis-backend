@@ -19,12 +19,12 @@ function startTunnel() {
             console.log("!!! FOUND NEW TUNNEL URL:", url);
             
             // Update the .env.production file
-            const envPath = "f:/Projects/NEET Analysis/client/.env.production";
+            const envPath = path.resolve(__dirname, '..', 'client', '.env.production');
             fs.writeFileSync(envPath, "VITE_API_URL=" + url + "\n");
             
             // Run build and deploy
             console.log("Redeploying website to Firebase...");
-            const projectDir = "f:/Projects/NEET Analysis/client";
+            const projectDir = path.resolve(__dirname, '..', 'client');
             const redeploy = spawn('cmd.exe', ['/c', 'npm run build && firebase deploy'], { cwd: projectDir });
             
             redeploy.stdout.on('data', (d) => console.log(d.toString()));
@@ -37,7 +37,7 @@ function startTunnel() {
         const urlMatch = output.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
         if (urlMatch) {
              const url = urlMatch[0];
-             const envPath = "f:/Projects/NEET Analysis/client/.env.production";
+             const envPath = path.resolve(__dirname, '..', 'client', '.env.production');
              fs.writeFileSync(envPath, "VITE_API_URL=" + url);
         }
         console.error(output);

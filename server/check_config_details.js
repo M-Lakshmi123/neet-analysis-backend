@@ -1,7 +1,7 @@
 const XLSX = require('xlsx');
 const path = require('path');
 
-const CONFIG_PATH = 'f:\\Projects\\NEET Analysis\\Uploader_Config.xlsx';
+const CONFIG_PATH = path.resolve(__dirname, '..', 'Uploader_Config.xlsx');
 const configWb = XLSX.readFile(CONFIG_PATH);
 
 console.log('Sheet Names:', configWb.SheetNames);

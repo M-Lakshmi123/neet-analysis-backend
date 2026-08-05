@@ -5,8 +5,9 @@ const { connectToDb } = require('./db');
 const readline = require('readline-sync');
 
 // --- Configuration ---
-const ERP_BASE_DIR = 'f:\\Projects\\NEET Analysis\\ERP Report';
-const CONFIG_FILE = 'f:\\Projects\\NEET Analysis\\Uploader_Config.xlsx';
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const ERP_BASE_DIR = path.join(PROJECT_ROOT, 'ERP Report');
+const CONFIG_FILE = path.join(PROJECT_ROOT, 'Uploader_Config.xlsx');
 const DEFAULT_S_URL = 'https://i.ibb.co/p6D1ywtP/No-Name.png';
 
 const normalizeId = (id) => String(id || '').trim().replace(/[^0-9]/g, '');
@@ -601,8 +602,15 @@ function formatDateToSQL(dateStr) {
 async function uploadErpRows(pool, rows) {
     const esc = (str) => String(str || '').replace(/'/g, "''");
     let count = 0;
+    let processed = 0;
+    const total = rows.length;
 
     for (const r of rows) {
+        processed++;
+        if (processed % 100 === 0 || processed === total) {
+            console.log(`  [SYNC] Uploading records... ${processed}/${total}`);
+        }
+
         // Step 1: Update existing record's Top_ALL and other metadata if it matches
         const updateSql = `
             UPDATE ERP_REPORT 

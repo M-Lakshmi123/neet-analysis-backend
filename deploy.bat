@@ -3,6 +3,14 @@ TITLE NEET Analysis Super-Deployer
 COLOR 0B
 CLS
 
+:: Auto-detect Git path if not in environment PATH
+where git >nul 2>nul
+if %errorlevel% neq 0 (
+    if exist "C:\Program Files\Git\cmd" set "PATH=%PATH%;C:\Program Files\Git\cmd"
+    if exist "C:\Program Files (x86)\Git\cmd" set "PATH=%PATH%;C:\Program Files (x86)\Git\cmd"
+    if exist "%LOCALAPPDATA%\Programs\Git\cmd" set "PATH=%PATH%;%LOCALAPPDATA%\Programs\Git\cmd"
+)
+
 echo ========================================================
 echo        NEET ANALYSIS - ONE-CLICK DEPLOYER
 echo ========================================================

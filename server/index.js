@@ -919,6 +919,12 @@ app.get('/api/studentsByCampus', async (req, res) => {
         console.log(`[studentsByCampus] Generated WHERE: "${where}"`);
         console.log(`[studentsByCampus] Global Search - Generated WHERE: "${where}"`);
 
+        let orderClause = 'ORDER BY name';
+        if (req.query.quickSearch && typeof req.query.quickSearch === 'string' && req.query.quickSearch.trim() !== '') {
+            const safeSearch = req.query.quickSearch.trim().replace(/'/g, "''").toUpperCase();
+            orderClause = `ORDER BY CASE WHEN UPPER(MAX(NAME_OF_THE_STUDENT)) LIKE '${safeSearch}%' THEN 0 ELSE 1 END, name`;
+        }
+
         const query = `
         SELECT
         TRIM(STUD_ID) as id,
@@ -928,7 +934,7 @@ app.get('/api/studentsByCampus', async (req, res) => {
             FROM MEDICAL_RESULT 
             ${where} 
             GROUP BY STUD_ID
-            ORDER BY name
+            ${orderClause}
             LIMIT 10000`;
 
         const students = await pool.request().query(query);

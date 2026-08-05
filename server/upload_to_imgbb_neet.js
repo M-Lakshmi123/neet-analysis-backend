@@ -2,9 +2,133 @@ const XLSX = require('xlsx');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
+
+function askQuestion(query) {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    return new Promise(resolve => {
+        rl.question(query, (ans) => {
+            rl.close();
+            resolve(ans.trim());
+        });
+    });
+}
+
+function parseImageInfo(title, alt, src) {
+    const candidates = [title, alt, src ? path.basename(src) : ''].filter(Boolean);
+    
+    for (const cand of candidates) {
+        const str = cand.trim();
+
+        // Solution pattern (S) e.g., S1, S 1, S-1, S_1, S01
+        const sMatch = str.match(/S\s*[-_]?\s*(\d+)/i);
+        if (sMatch) {
+            return { type: 'S', qNo: parseInt(sMatch[1], 10).toString() };
+        }
+
+        // Question pattern (Q) e.g., Q1, Q 1, Q-1, Q_1, Q01
+        const qMatch = str.match(/Q\s*[-_]?\s*(\d+)/i);
+        if (qMatch) {
+            return { type: 'Q', qNo: parseInt(qMatch[1], 10).toString() };
+        }
+    }
+
+    // Fallback: pure number e.g. "1.png" or "1"
+    for (const cand of candidates) {
+        const numMatch = cand.trim().match(/^(\d+)(\.(png|jpg|jpeg|webp))?$/i);
+        if (numMatch) {
+            return { type: 'Q', qNo: parseInt(numMatch[1], 10).toString() };
+        }
+    }
+
+    return null;
+}
+
+async function extractAlbumImagesFromImgBB(page, albumUrl) {
+    const extracted = { Q: {}, S: {}, total: 0 };
+    let currentPageUrl = albumUrl;
+    let pageNum = 1;
+    const visited = new Set();
+
+    while (currentPageUrl && !visited.has(currentPageUrl) && pageNum <= 20) {
+        visited.add(currentPageUrl);
+        try {
+            await page.goto(currentPageUrl, { waitUntil: 'networkidle2' });
+        } catch (e) {
+            console.warn(`  [Warning] Could not navigate to album page ${currentPageUrl}: ${e.message}`);
+            break;
+        }
+
+        const pageData = await page.evaluate(() => {
+            const items = Array.from(document.querySelectorAll('.list-item, [data-type="image"]'));
+            const imageList = items.map(item => {
+                const dataTitle = item.getAttribute('data-title');
+                const imgEl = item.querySelector('img');
+                const linkEl = item.querySelector('a[href*="ibb.co"]');
+                return {
+                    title: dataTitle || (imgEl ? imgEl.alt : ''),
+                    alt: imgEl ? imgEl.alt : '',
+                    src: imgEl ? imgEl.src : '',
+                    viewer: linkEl ? linkEl.href : ''
+                };
+            });
+
+            let nextUrl = null;
+            const nextBtn = document.querySelector('a.pagination-next, a[rel="next"]');
+            if (nextBtn && nextBtn.href) {
+                nextUrl = nextBtn.href;
+            } else {
+                const pageLinks = Array.from(document.querySelectorAll('a[href*="page="]'));
+                const curMatch = window.location.href.match(/page=(\d+)/);
+                const curPage = curMatch ? parseInt(curMatch[1], 10) : 1;
+                const targetLink = pageLinks.find(a => {
+                    const m = a.href.match(/page=(\d+)/);
+                    return m && parseInt(m[1], 10) === curPage + 1;
+                });
+                if (targetLink) nextUrl = targetLink.href;
+            }
+
+            return { imageList, nextUrl };
+        });
+
+        if (!pageData.imageList || pageData.imageList.length === 0) {
+            break;
+        }
+
+        for (const img of pageData.imageList) {
+            if (!img.src) continue;
+            const parsed = parseImageInfo(img.title, img.alt, img.src);
+            if (parsed) {
+                if (parsed.type === 'Q') {
+                    if (!extracted.Q[parsed.qNo]) {
+                        extracted.Q[parsed.qNo] = img.src;
+                        extracted.total++;
+                    }
+                } else if (parsed.type === 'S') {
+                    if (!extracted.S[parsed.qNo]) {
+                        extracted.S[parsed.qNo] = img.src;
+                        extracted.total++;
+                    }
+                }
+            }
+        }
+
+        if (pageData.nextUrl && pageData.nextUrl !== currentPageUrl) {
+            currentPageUrl = pageData.nextUrl;
+            pageNum++;
+        } else {
+            break;
+        }
+    }
+
+    return extracted;
+}
 
 async function uploadToImgBB() {
-    const ERP_BASE = "F:\\Projects\\NEET Analysis\\ERP Report";
+    const ERP_BASE = path.resolve(__dirname, '..', 'ERP Report');
     const picsBaseDir = path.join(ERP_BASE, 'PICS');
 
     if (!fs.existsSync(picsBaseDir)) {
@@ -14,20 +138,19 @@ async function uploadToImgBB() {
 
     const args = process.argv.slice(2);
     const targetTest = args[0];
-    const targetType = args[1]; // Ignored for folder path since it's the DB Type (e.g. NSGT)
+    const targetType = args[1];
 
     if (targetTest) {
         console.log(`[FILTER] Searching for Test: ${targetTest} across all streams.`);
     }
 
-    // Iterate through Stream folders
     const streams = fs.readdirSync(picsBaseDir).filter(f => {
         return fs.statSync(path.join(picsBaseDir, f)).isDirectory();
     });
 
     const mappingPath = path.join(__dirname, 'url_mapping_neet.json');
     let session = {
-        mappings: {} // { "StreamName": { "TestName": { Q: {}, S: {} } } }
+        mappings: {}
     };
 
     if (fs.existsSync(mappingPath)) {
@@ -38,7 +161,7 @@ async function uploadToImgBB() {
         }
     }
 
-    // Check if there are existing mappings for the target test
+    // Check if there are existing local mappings for target test
     let hasExistingMappings = false;
     if (targetTest) {
         for (const stream in session.mappings) {
@@ -55,21 +178,10 @@ async function uploadToImgBB() {
     }
 
     if (hasExistingMappings) {
-        const readline = require('readline');
-        const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout
-        });
-
-        const answer = await new Promise(resolve => {
-            rl.question(`\n[WARNING] Existing URL mappings found for Test "${targetTest}". \nDo you want to delete these mappings and re-upload new images? (y/N) [Default: N]: `, (ans) => {
-                resolve(ans.trim().toLowerCase());
-            });
-        });
-        rl.close();
+        const answer = (await askQuestion(`\n[WARNING] Existing URL mappings found locally for Test "${targetTest}". \nDo you want to delete these mappings and re-upload new images? (y/N) [Default: N]: `)).toLowerCase();
 
         if (answer === 'y' || answer === 'yes') {
-            console.log(`[RESET] Deleting existing mappings for Test "${targetTest}"...`);
+            console.log(`[RESET] Deleting existing local mappings for Test "${targetTest}"...`);
             for (const stream in session.mappings) {
                 if (session.mappings[stream][targetTest]) {
                     delete session.mappings[stream][targetTest];
@@ -78,63 +190,31 @@ async function uploadToImgBB() {
             fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
             console.log(`[RESET] Mapping cache updated. Will re-upload all images for "${targetTest}".`);
         } else {
-            console.log(`[CONTINUE] Keeping existing mappings. Only missing images will be uploaded.`);
+            console.log(`[CONTINUE] Keeping existing mappings. Missing images will be checked/uploaded.`);
         }
-    }
-
-    // Early exit check: see if there are actually any missing images to upload
-    let hasAnyMissing = false;
-    for (const stream of streams) {
-        const streamPath = path.join(picsBaseDir, stream);
-        const tests = fs.readdirSync(streamPath).filter(f => {
-            const isDir = fs.statSync(path.join(streamPath, f)).isDirectory();
-            if (targetTest) return isDir && f === targetTest;
-            return isDir;
-        });
-
-        for (const test of tests) {
-            const testPath = path.join(streamPath, test);
-            const qDir = path.join(testPath, 'Q');
-            const sDir = path.join(testPath, 'S');
-
-            if (!fs.existsSync(qDir)) continue;
-
-            const streamMap = session.mappings[stream] || {};
-            const testMap = streamMap[test] || { Q: {}, S: {} };
-
-            const qFiles = fs.readdirSync(qDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg'));
-            const sFiles = fs.existsSync(sDir) ? fs.readdirSync(sDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg')) : [];
-
-            const missingQ = qFiles.filter(f => {
-                const qNo = f.replace(/[QS]/i, '').replace(/\.(png|jpg)/i, '');
-                return !testMap.Q[qNo];
-            });
-
-            const missingS = sFiles.filter(f => {
-                const qNo = f.replace(/[QS]/i, '').replace(/\.(png|jpg)/i, '');
-                return !testMap.S[qNo];
-            });
-
-            if (missingQ.length > 0 || missingS.length > 0) {
-                hasAnyMissing = true;
-                break;
-            }
-        }
-        if (hasAnyMissing) break;
-    }
-
-    if (!hasAnyMissing) {
-        console.log(`\n✅ [INSTANT] All images for "${targetTest || 'all tests'}" already mapped. No upload needed.`);
-        process.exit(0);
     }
 
     let browser;
     try {
-        browser = await puppeteer.launch({
+        const launchOptions = {
             headless: false,
             defaultViewport: null,
             args: ['--start-maximized']
-        });
+        };
+
+        const chromeCandidates = [
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe')
+        ];
+        for (const candidate of chromeCandidates) {
+            if (fs.existsSync(candidate)) {
+                launchOptions.executablePath = candidate;
+                break;
+            }
+        }
+
+        browser = await puppeteer.launch(launchOptions);
 
         const page = await browser.newPage();
         await page.setDefaultNavigationTimeout(0);
@@ -174,6 +254,117 @@ async function uploadToImgBB() {
                 const qFiles = fs.readdirSync(qDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg'));
                 const sFiles = fs.existsSync(sDir) ? fs.readdirSync(sDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg')) : [];
 
+                // --- SEARCH / CREATE ALBUM ---
+                const findAlbumOnPage = async (name) => {
+                    return await page.evaluate((targetName) => {
+                        const elements = Array.from(document.querySelectorAll('.list-item-desc-title-link, .album-name, .name, a.name, a[href*="/album/"]'));
+                        const target = elements.find(el => {
+                            const txt = (el.innerText || el.getAttribute('title') || '').trim();
+                            return txt === targetName || txt.includes(targetName);
+                        });
+                        if (!target) return null;
+                        return target.tagName === 'A' ? target.href : target.closest('a')?.href;
+                    }, name);
+                };
+
+                await page.goto('https://siri121.imgbb.com/albums', { waitUntil: 'networkidle2' });
+                let albumUrl = await findAlbumOnPage(ALBUM_NAME);
+
+                if (!albumUrl) {
+                    for (let p = 2; p <= 5; p++) {
+                        try {
+                            await page.goto(`https://siri121.imgbb.com/albums?page=${p}`, { waitUntil: 'networkidle2' });
+                            albumUrl = await findAlbumOnPage(ALBUM_NAME);
+                            if (albumUrl) break;
+                        } catch (e) {
+                            break;
+                        }
+                    }
+                }
+
+                let albumExistedOnImgBB = false;
+                if (albumUrl) {
+                    albumExistedOnImgBB = true;
+                } else {
+                    console.log(`  Creating album: ${ALBUM_NAME}`);
+                    await page.goto('https://siri121.imgbb.com/albums', { waitUntil: 'networkidle2' });
+                    await page.evaluate(() => {
+                        const target = Array.from(document.querySelectorAll('span.btn-text, span, a, button'))
+                            .find(s => s.innerText && s.innerText.toLowerCase().includes('create new album'));
+                        if (target) (target.closest('a, button') || target).click();
+                    });
+                    await new Promise(r => setTimeout(r, 1500));
+                    const nameInputSelector = 'input[placeholder="Album name"], input[name="form-album-name"], input[name="album_name"], input[name="name"]';
+                    await page.waitForSelector(nameInputSelector, { visible: true, timeout: 5000 }).catch(() => {});
+
+                    const inputEl = await page.$(nameInputSelector);
+                    if (inputEl) {
+                        await page.type(nameInputSelector, ALBUM_NAME);
+                        await page.keyboard.press('Enter');
+                        
+                        await page.evaluate(() => {
+                            const btn = document.querySelector('button[type="submit"], button[data-action="submit"], .modal-box button[type="submit"], button.btn-input, button.default');
+                            if (btn) btn.click();
+                        });
+                        
+                        await new Promise(r => setTimeout(r, 4000));
+
+                        const currentUrl = page.url();
+                        if (currentUrl.includes('/album/')) {
+                            albumUrl = currentUrl;
+                        } else {
+                            await page.goto('https://siri121.imgbb.com/albums', { waitUntil: 'networkidle2' });
+                            albumUrl = await findAlbumOnPage(ALBUM_NAME);
+                        }
+                    }
+                }
+
+                if (!albumUrl) {
+                    console.error(`Could not find or create album: ${ALBUM_NAME}`);
+                    continue;
+                }
+
+                // If album already existed on ImgBB, check its contents!
+                if (albumExistedOnImgBB) {
+                    console.log(`  Album "${ALBUM_NAME}" already exists on ImgBB. Checking images in album...`);
+                    const extractedData = await extractAlbumImagesFromImgBB(page, albumUrl);
+
+                    if (extractedData.total > 0) {
+                        console.log(`\n======================================================================`);
+                        console.log(`[ALBUM FOUND] Album "${ALBUM_NAME}" already exists on ImgBB with ${extractedData.total} images!`);
+                        console.log(`======================================================================`);
+                        console.log(`Options:`);
+                        console.log(`  1) Take/use existing album images only (Extract URLs & skip re-uploading) [DEFAULT]`);
+                        console.log(`  2) Upload missing/new images to this album (Keep existing + upload missing)`);
+                        console.log(`  3) Delete existing mappings & re-upload all images to this album`);
+                        console.log(`----------------------------------------------------------------------`);
+
+                        const choice = await askQuestion(`Select option for "${ALBUM_NAME}" (1/2/3) [Default: 1]: `);
+                        const selectedOption = (choice === '2') ? '2' : ((choice === '3') ? '3' : '1');
+
+                        if (selectedOption === '1') {
+                            console.log(`\n[TAKE ALBUM] Using existing ${extractedData.total} images from ImgBB album for "${ALBUM_NAME}"...`);
+                            Object.assign(session.mappings[stream][test].Q, extractedData.Q);
+                            Object.assign(session.mappings[stream][test].S, extractedData.S);
+                            fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
+                            console.log(`✅ [INSTANT] Successfully mapped ${extractedData.total} images from existing album "${ALBUM_NAME}". Skipping upload.`);
+                            continue; // Skip uploading for this album!
+                        } else if (selectedOption === '2') {
+                            console.log(`\n[MERGE ALBUM] Merging ${extractedData.total} existing images from ImgBB for "${ALBUM_NAME}"...`);
+                            Object.assign(session.mappings[stream][test].Q, extractedData.Q);
+                            Object.assign(session.mappings[stream][test].S, extractedData.S);
+                            fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
+                        } else if (selectedOption === '3') {
+                            console.log(`\n[RESET ALBUM] Re-uploading all images for "${ALBUM_NAME}"...`);
+                            session.mappings[stream][test] = { Q: {}, S: {} };
+                            fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
+                        }
+                    } else {
+                        console.log(`  [INFO] Album "${ALBUM_NAME}" exists on ImgBB but is empty.`);
+                    }
+                }
+
+                // Check missing Q and S images after album check / merge
                 const missingQ = qFiles.filter(f => {
                     const qNo = f.replace(/[QS]/i, '').replace(/\.(png|jpg)/i, '');
                     return !session.mappings[stream][test].Q[qNo];
@@ -185,45 +376,11 @@ async function uploadToImgBB() {
                 });
 
                 if (missingQ.length === 0 && missingS.length === 0) {
-                    console.log(`[INSTANT] All images for ${stream}/${test} already mapped.`);
+                    console.log(`[INSTANT] All images for ${stream}/${test} are already mapped.`);
                     continue;
                 }
 
-                // --- CREATE / FIND ALBUM ---
-                await page.goto('https://siri121.imgbb.com/albums', { waitUntil: 'networkidle2' });
-                let albumUrl = await page.evaluate((name) => {
-                    const elements = Array.from(document.querySelectorAll('.list-item-desc-title-link, .album-name, .name, a.name'));
-                    const target = elements.find(el => el.innerText && el.innerText.trim() === name);
-                    return target ? (target.tagName === 'A' ? target.href : target.closest('a')?.href) : null;
-                }, ALBUM_NAME);
-
-                if (!albumUrl) {
-                    console.log(`  Creating album: ${ALBUM_NAME}`);
-                    await page.evaluate(() => {
-                        const target = Array.from(document.querySelectorAll('span.btn-text, a, button'))
-                            .find(s => s.innerText && s.innerText.includes('Create new album'));
-                        if (target) (target.closest('a, button') || target).click();
-                    });
-                    await new Promise(r => setTimeout(r, 2000));
-                    const nameInputSelector = 'input[placeholder="Album name"], input[name="form-album-name"], input[name="album_name"]';
-                    await page.waitForSelector(nameInputSelector, { visible: true });
-                    await page.type(nameInputSelector, ALBUM_NAME);
-                    await page.evaluate(() => document.querySelector('button[data-action="submit"].btn-input.default')?.click());
-                    await new Promise(r => setTimeout(r, 5000));
-                    await page.goto('https://siri121.imgbb.com/albums', { waitUntil: 'networkidle2' });
-                    albumUrl = await page.evaluate((name) => {
-                        const elements = Array.from(document.querySelectorAll('.list-item-desc-title-link, .album-name, .name, a.name'));
-                        const target = elements.find(el => el.innerText && el.innerText.trim() === name);
-                        return target ? (target.tagName === 'A' ? target.href : target.closest('a')?.href) : null;
-                    }, ALBUM_NAME);
-                }
-
-                if (!albumUrl) {
-                    console.error(`Could not find or create album: ${ALBUM_NAME}`);
-                    continue;
-                }
-
-                // Process Q and S
+                // Process Q and S upload if missing files remain
                 for (const type of ['Q', 'S']) {
                     const dir = type === 'Q' ? qDir : sDir;
                     const missing = type === 'Q' ? missingQ : missingS;
@@ -245,7 +402,6 @@ async function uploadToImgBB() {
 
                     await inputUpload.uploadFile(...filePaths);
 
-                    // Dispatch change event to force ImgBB to recognize the uploaded files (recently added requirement)
                     await page.evaluate(() => {
                         const el = document.querySelector('input[type="file"]');
                         if (el) el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -293,7 +449,7 @@ async function uploadToImgBB() {
             }
         }
 
-        console.log(`\n✅ Upload complete. final mapping saved to ${mappingPath}`);
+        console.log(`\n✅ Upload complete. Final mapping saved to ${mappingPath}`);
 
     } catch (err) {
         console.error("Upload Error:", err);

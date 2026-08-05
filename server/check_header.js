@@ -2,7 +2,7 @@ const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
 
-const FILE_PATH = 'f:\\Projects\\NEET Analysis\\Result\\SR_ELITE_SET_01\\BAN_BASAVESWARA NAGAR COACHING CENTER.xls';
+const FILE_PATH = path.resolve(__dirname, '..', 'Result', 'SR_ELITE_SET_01', 'BAN_BASAVESWARA NAGAR COACHING CENTER.xls');
 if (fs.existsSync(FILE_PATH)) {
     const wb = XLSX.readFile(FILE_PATH);
     const ws = wb.Sheets['Marks List'];

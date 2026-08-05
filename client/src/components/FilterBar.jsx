@@ -195,34 +195,64 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
             .map(s => ({ value: s.id, label: `${s.name} (${s.id})` }))
     ];
 
-    // Load options for the Async Global Search
+    // Load options for the Async Search (progressive live typing N -> NA -> NAI)
     const loadStudentOptions = async (inputValue) => {
-        if (!inputValue || inputValue.length < 1) return []; // Search from 1 character
+        if (!inputValue || inputValue.trim().length === 0) {
+            return studentOptions;
+        }
+
+        const trimmedInput = inputValue.trim();
 
         try {
-            // Global search by student name/ID across entire system for selected year
+            // First try with current active filters
             const searchParams = buildQueryParams({
-                quickSearch: inputValue,
-                academicYear: filters.academicYear
+                quickSearch: trimmedInput,
+                academicYear: filters.academicYear,
+                campus: filters.campus,
+                stream: filters.stream,
+                testType: filters.testType,
+                test: filters.test,
+                topAll: filters.topAll
             });
 
             // If restricted user, enforce allowed campuses
-            if (isRestricted) {
+            if (isRestricted && (!filters.campus || filters.campus.length === 0)) {
                 allowedCampuses.forEach(c => {
                     searchParams.append('campus', c);
                 });
             }
 
-            const url = `${API_URL}${endpoints.students}?${searchParams.toString()}`;
-            const res = await fetch(url);
-            const data = await res.json();
+            let url = `${API_URL}${endpoints.students}?${searchParams.toString()}`;
+            let res = await fetch(url);
+            let data = await res.json();
 
-            return data.map(s => ({
-                value: s.id,
-                label: `${s.name} (${s.id})`,
-                campus: s.campus,
-                streams: s.streams ? s.streams.split(',').map(v => v.trim()) : []
-            }));
+            // Fallback: If strict filters return 0 results, search globally across all streams/tests for that year
+            if ((!data || data.length === 0) && (filters.stream?.length > 0 || filters.test?.length > 0 || filters.testType?.length > 0)) {
+                const fallbackParams = buildQueryParams({
+                    quickSearch: trimmedInput,
+                    academicYear: filters.academicYear
+                });
+                if (isRestricted) {
+                    allowedCampuses.forEach(c => fallbackParams.append('campus', c));
+                }
+                const fallbackUrl = `${API_URL}${endpoints.students}?${fallbackParams.toString()}`;
+                const fallbackRes = await fetch(fallbackUrl);
+                data = await fallbackRes.json();
+            }
+
+            const formatted = (data || [])
+                .filter(s => s && s.name && s.id && String(s.name).trim() !== '' && String(s.id).trim() !== '')
+                .map(s => ({
+                    value: s.id,
+                    label: `${s.name} (${s.id})`,
+                    campus: s.campus,
+                    streams: s.streams ? s.streams.split(',').map(v => v.trim()) : []
+                }));
+
+            return [
+                { value: "SELECT_ALL", label: "Select All Students" },
+                ...formatted
+            ];
         } catch (err) {
             console.error("Async Search Error:", err);
             return [];
@@ -514,10 +544,12 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
 
                 <div className={`filter-item wide-item ${loadingStudents || filters.test.length === 0 ? 'disabled-logic' : ''}`}>
                     <label>STUDENT LIST</label>
-                    <Select
+                    <AsyncSelect
                         isMulti
                         name="studentSearch"
-                        options={studentOptions}
+                        cacheOptions
+                        defaultOptions={studentOptions}
+                        loadOptions={loadStudentOptions}
                         value={getValue('studentSearch')}
                         onChange={(opts, meta) => handleSelectChange('studentSearch', opts, meta)}
                         isLoading={loadingStudents}

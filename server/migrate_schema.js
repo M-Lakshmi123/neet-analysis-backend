@@ -1,6 +1,6 @@
 const mysql = require('mysql2/promise');
 const path = require('path');
-require('dotenv').config({ path: 'f:/Projects/NEET Analysis/server/.env' });
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 async function migrate() {
     const config2025 = {

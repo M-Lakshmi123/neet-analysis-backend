@@ -1,3 +1,3 @@
 @echo off
-cd /d "f:\Projects\NEET Analysis\server"
+cd /d "%~dp0"
 node index.js
