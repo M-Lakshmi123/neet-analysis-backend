@@ -490,7 +490,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
     const uniqueTests = useMemo(() => [...new Set(erpData.map(r => r.Test))], [erpData]);
 
-    // Download Student Marks Loss Report as PDF
+    // Download Student Marks Loss Report as PDF (Ultra-Sharp 4K Single Page Executive Report)
     const downloadStudentPdf = async () => {
         if (!selectedStudent || !erpAnalysis) return;
         setIsExportingPdf(true);
@@ -502,6 +502,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
             const margin = 12;
             const contentWidth = pageWidth - (margin * 2);
 
+            // 1. Load fonts & logo in parallel
             const [impactFont, bookmanFont, bookmanBoldFont, logoImg] = await Promise.all([
                 loadFont('/fonts/unicode.impact.ttf'),
                 loadFont('/fonts/bookman-old-style.ttf'),
@@ -509,6 +510,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 loadImage('/logo.png')
             ]);
 
+            // Register Fonts if available
             if (impactFont) {
                 doc.addFileToVFS("unicode.impact.ttf", impactFont);
                 doc.addFont("unicode.impact.ttf", "Impact", "normal");
@@ -522,6 +524,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
             }
 
+            // 2. Generate Ultra-Sharp Offscreen Charts with Large Bold Text
             const bar4kPromise = createHighResChartImage(
                 'bar',
                 {
@@ -612,14 +615,16 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
             const [bar4kImg, doughnut4kImg] = await Promise.all([bar4kPromise, doughnut4kPromise]);
 
+            // 3. Top Accent Bar (Positioned high with generous margin to avoid colliding with text)
             let y = 10;
-            doc.setFillColor(15, 23, 42);
+            doc.setFillColor(15, 23, 42); // Navy dark #0f172a
             doc.rect(margin, y, contentWidth, 2.5, 'F');
-            doc.setFillColor(245, 158, 11);
+            doc.setFillColor(245, 158, 11); // Amber accent #f59e0b
             doc.rect(margin, y + 2.5, contentWidth, 1, 'F');
 
-            y = 22;
+            y = 22; // Clear 8.5mm spacing below accent bar
 
+            // 4. Logo & Institution Header
             let logoW = 0;
             const logoH = 11;
             if (logoImg && logoImg.width) {
@@ -668,7 +673,8 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
             doc.text("Central Office, Bangalore • Academic Performance Division", pageWidth / 2, y, { align: 'center' });
 
             y += 6;
-            doc.setFillColor(30, 58, 138);
+            // Document Main Title Banner
+            doc.setFillColor(30, 58, 138); // #1e3a8a
             doc.roundedRect(margin, y, contentWidth, 9, 2, 2, 'F');
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(11);
@@ -677,154 +683,105 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
             y += 13;
 
-            doc.setFillColor(248, 250, 252);
-            doc.setDrawColor(226, 232, 240);
+            // 5. Student Information Profile Box
+            doc.setFillColor(248, 250, 252); // #f8fafc
+            doc.setDrawColor(226, 232, 240); // #e2e8f0
             doc.setLineWidth(0.4);
             doc.roundedRect(margin, y, contentWidth, 22, 2, 2, 'FD');
 
-            const col1X = margin + 4;
-            const col2X = margin + (contentWidth / 2) + 4;
-
-            doc.setTextColor(71, 85, 105);
-            doc.setFontSize(8.5);
-            doc.setFont("helvetica", "normal");
-
-            doc.text("Student Name:", col1X, y + 6);
-            doc.text("Student ID:", col1X, y + 12);
-            doc.text("Campus:", col1X, y + 18);
-
+            doc.setFontSize(9);
             doc.setTextColor(15, 23, 42);
+
+            const col1X = margin + 5;
+            const col2X = margin + (contentWidth / 2) + 5;
+
+            // Left Column
             doc.setFont("helvetica", "bold");
+            doc.text("Student Name:", col1X, y + 6);
+            doc.setFont("helvetica", "normal");
             doc.text(selectedStudent.name || '-', col1X + 26, y + 6);
+
+            doc.setFont("helvetica", "bold");
+            doc.text("Student ID:", col1X, y + 12);
+            doc.setFont("helvetica", "normal");
             doc.text(String(selectedStudent.STUD_ID || '-'), col1X + 26, y + 12);
+
+            doc.setFont("helvetica", "bold");
+            doc.text("Campus:", col1X, y + 18);
+            doc.setFont("helvetica", "normal");
             doc.text(selectedStudent.campus || '-', col1X + 26, y + 18);
 
+            // Right Column
+            const academicYr = filters.academicYear || '2026';
             const studentStream = selectedStudent.stream || selectedStudent.Stream || (erpData && erpData.length > 0 ? erpData.find(r => r.Stream)?.Stream : null) || (filters.stream && filters.stream.length > 0 ? filters.stream.join(', ') : '-');
             const testNameText = selectedErpTests.length === uniqueTests.length 
-                ? `All Exams (${selectedErpTests.length})` 
+                ? `All Exams (${uniqueTests.length})` 
                 : selectedErpTests.join(', ');
 
+            doc.setFont("helvetica", "bold");
+            doc.text("Academic Year:", col2X, y + 6);
             doc.setFont("helvetica", "normal");
-            doc.setTextColor(71, 85, 105);
-            doc.text("Stream:", col2X, y + 6);
-            doc.text("Exam(s) Analyzed:", col2X, y + 12);
-            doc.text("Report Date:", col2X, y + 18);
+            doc.text(academicYr, col2X + 26, y + 6);
 
-            doc.setTextColor(15, 23, 42);
             doc.setFont("helvetica", "bold");
-            doc.text(studentStream, col2X + 30, y + 6);
-            
-            const maxTestWidth = 55;
-            let displayTestText = testNameText;
-            if (doc.getTextWidth(displayTestText) > maxTestWidth) {
-                while (displayTestText.length > 3 && doc.getTextWidth(displayTestText + '...') > maxTestWidth) {
-                    displayTestText = displayTestText.slice(0, -1);
-                }
-                displayTestText += '...';
-            }
-            doc.text(displayTestText, col2X + 30, y + 12);
-            doc.text(formatDate(new Date()), col2X + 30, y + 18);
-
-            y += 26;
-
-            const cardWidth = (contentWidth - 6) / 3;
-            const cardHeight = 16;
-
-            doc.setFillColor(254, 242, 242);
-            doc.setDrawColor(254, 202, 202);
-            doc.roundedRect(margin, y, cardWidth, cardHeight, 2, 2, 'FD');
-            doc.setTextColor(153, 27, 27);
-            doc.setFontSize(7.5);
-            doc.setFont("helvetica", "bold");
-            doc.text("TOTAL SCORE LOSS", margin + 4, y + 4.5);
-            doc.setFontSize(12);
-            doc.text(`-${erpAnalysis.totalLost} Marks`, margin + 4, y + 11);
-
-            const card2X = margin + cardWidth + 3;
-            doc.setFillColor(255, 251, 235);
-            doc.setDrawColor(253, 230, 138);
-            doc.roundedRect(card2X, y, cardWidth, cardHeight, 2, 2, 'FD');
-            doc.setTextColor(146, 64, 14);
-            doc.setFontSize(7.5);
-            doc.setFont("helvetica", "bold");
-            doc.text("WRONG ANSWERS (W)", card2X + 4, y + 4.5);
-            doc.setFontSize(12);
-            doc.text(`-${erpAnalysis.wrongLost} Marks`, card2X + 4, y + 11);
-            doc.setFontSize(7);
+            doc.text("Stream:", col2X, y + 12);
             doc.setFont("helvetica", "normal");
-            doc.text(`(${erpAnalysis.wrongCount} wrong × -5)`, card2X + 4, y + 14.5);
+            doc.text(String(studentStream || '-'), col2X + 26, y + 12);
 
-            const card3X = card2X + cardWidth + 3;
-            doc.setFillColor(240, 253, 244);
-            doc.setDrawColor(187, 247, 208);
-            doc.roundedRect(card3X, y, cardWidth, cardHeight, 2, 2, 'FD');
-            doc.setTextColor(22, 101, 52);
-            doc.setFontSize(7.5);
             doc.setFont("helvetica", "bold");
-            doc.text("UNATTEMPTED (U)", card3X + 4, y + 4.5);
-            doc.setFontSize(12);
-            doc.text(`-${erpAnalysis.unattemptedLost} Marks`, card3X + 4, y + 11);
-            doc.setFontSize(7);
+            doc.text("Test:", col2X, y + 18);
             doc.setFont("helvetica", "normal");
-            doc.text(`(${erpAnalysis.unattemptedCount} skipped × -4)`, card3X + 4, y + 14.5);
+            doc.text(testNameText, col2X + 26, y + 18);
 
-            y += cardHeight + 4;
+            y += 28;
 
-            doc.setFillColor(236, 253, 245);
-            doc.setDrawColor(167, 243, 208);
-            doc.roundedRect(margin, y, contentWidth, 7.5, 1.5, 1.5, 'FD');
-            doc.setTextColor(6, 95, 70);
-            doc.setFontSize(8.5);
-            doc.setFont("helvetica", "bold");
-            const potentialScoreText = selectedErpTests.length > 1
-                ? `With 0 mistakes, average score across these tests would have been: ${720 - Math.round(erpAnalysis.totalLost / selectedErpTests.length)} / 720`
-                : `With 0 mistakes, score on this test would have been: ${720 - erpAnalysis.totalLost} / 720`;
-            doc.text(potentialScoreText, pageWidth / 2, y + 5, { align: 'center' });
+            // 6. Ultra-Sharp 4K Side-by-Side Performance Charts
+            const chartBoxWidth = (contentWidth - 6) / 2;
+            const chartBoxHeight = 85;
 
-            y += 10.5;
-
-            const chartBoxW = (contentWidth - 4) / 2;
-            const chartBoxH = 48;
-
-            doc.setFillColor(255, 255, 255);
-            doc.setDrawColor(226, 232, 240);
-            doc.roundedRect(margin, y, chartBoxW, chartBoxH, 2, 2, 'FD');
-            doc.setTextColor(30, 41, 59);
-            doc.setFontSize(8.5);
-            doc.setFont("helvetica", "bold");
-            doc.text("Subject Wise Performance (Scored)", margin + 6, y + 6.5);
-
+            // Bar Chart Frame
             if (bar4kImg) {
-                doc.addImage(bar4kImg, 'PNG', margin + 3, y + 8, chartBoxW - 6, chartBoxH - 10);
+                doc.setDrawColor(226, 232, 240);
+                doc.setFillColor(255, 255, 255);
+                doc.roundedRect(margin, y, chartBoxWidth, chartBoxHeight, 2, 2, 'FD');
+                doc.setFontSize(9.5);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(15, 23, 42);
+                doc.text("Subject Wise Performance (Scored Marks)", margin + 6, y + 6.5);
+                try {
+                    doc.addImage(bar4kImg, 'PNG', margin + 2, y + 9, chartBoxWidth - 4, chartBoxHeight - 12);
+                } catch (e) { console.error("Bar image error:", e); }
             }
 
-            const dX = margin + chartBoxW + 4;
-            doc.setFillColor(255, 255, 255);
-            doc.setDrawColor(226, 232, 240);
-            doc.roundedRect(dX, y, chartBoxW, chartBoxH, 2, 2, 'FD');
-            doc.setTextColor(30, 41, 59);
-            doc.setFontSize(8.5);
-            doc.setFont("helvetica", "bold");
-            doc.text("Marks Loss Distribution (Subject Penalty)", dX + 6, y + 6.5);
-
+            // Doughnut Chart Frame
             if (doughnut4kImg) {
-                doc.addImage(doughnut4kImg, 'PNG', dX + 3, y + 8, chartBoxW - 6, chartBoxH - 10);
+                const dX = margin + chartBoxWidth + 6;
+                doc.setDrawColor(226, 232, 240);
+                doc.setFillColor(255, 255, 255);
+                doc.roundedRect(dX, y, chartBoxWidth, chartBoxHeight, 2, 2, 'FD');
+                doc.setFontSize(9.5);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(15, 23, 42);
+                doc.text("Marks Loss Distribution (Subject Penalty)", dX + 6, y + 6.5);
+                try {
+                    doc.addImage(doughnut4kImg, 'PNG', dX + 2, y + 9, chartBoxWidth - 4, chartBoxHeight - 12);
+                } catch (e) { console.error("Doughnut image error:", e); }
             }
 
-            y += chartBoxH + 4;
+            y += chartBoxHeight + 10;
 
-            doc.setTextColor(30, 41, 59);
-            doc.setFontSize(9);
+            // 7. Subject Breakdown Table (autoTable)
+            doc.setFontSize(10);
             doc.setFont("helvetica", "bold");
+            doc.setTextColor(15, 23, 42);
             doc.text("SUBJECT-WISE SCORE & MARKS LOSS BREAKDOWN", margin, y);
 
-            y += 2.5;
+            y += 4;
 
-            const subjectRows = Object.entries(erpAnalysis.subjects).map(([subject, stats]) => {
-                const scored = erpAnalysis.scoredMarks[subject] || 0;
+            const tableRows = Object.entries(erpAnalysis.subjects).map(([subj, stats]) => {
+                const scored = erpAnalysis.scoredMarks[subj] || 0;
                 return [
-                    subject,
-                    '180',
+                    subj,
                     `${scored} / 180 ${selectedErpTests.length > 1 ? '(avg)' : ''}`,
                     `${stats.w} (-${stats.w * 5})`,
                     `${stats.u} (-${stats.u * 4})`,
@@ -832,9 +789,9 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 ];
             });
 
-            subjectRows.push([
+            // Add Total Row
+            tableRows.push([
                 'TOTAL',
-                '720',
                 `${erpAnalysis.totalScored} / 720 ${selectedErpTests.length > 1 ? '(avg)' : ''}`,
                 `${erpAnalysis.wrongCount} (-${erpAnalysis.wrongLost})`,
                 `${erpAnalysis.unattemptedCount} (-${erpAnalysis.unattemptedLost})`,
@@ -843,33 +800,31 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
             autoTable(doc, {
                 startY: y,
-                head: [['Subject', 'Target', 'Scored Marks', 'Wrong (W)', 'Unattempted (U)', 'Net Lost']],
-                body: subjectRows,
-                theme: 'grid',
                 margin: { left: margin, right: margin },
+                head: [['Subject', 'Scored Marks', 'Wrong Answers (W)', 'Unattempted (U)', 'Total Marks Lost']],
+                body: tableRows,
+                theme: 'grid',
                 headStyles: {
                     fillColor: [30, 58, 138],
                     textColor: [255, 255, 255],
-                    fontSize: 8,
                     fontStyle: 'bold',
-                    halign: 'center',
-                    cellPadding: 1.8
+                    fontSize: 9,
+                    halign: 'center'
                 },
                 bodyStyles: {
-                    fontSize: 7.5,
+                    fontSize: 8.5,
                     textColor: [30, 41, 59],
-                    cellPadding: 1.5
+                    halign: 'center'
                 },
                 columnStyles: {
-                    0: { fontStyle: 'bold', halign: 'left' },
-                    1: { halign: 'center' },
-                    2: { halign: 'center', fontStyle: 'bold' },
-                    3: { halign: 'center', textColor: [180, 83, 9] },
-                    4: { halign: 'center', textColor: [22, 101, 52] },
-                    5: { halign: 'center', fontStyle: 'bold', textColor: [220, 38, 38] }
+                    0: { halign: 'left', fontStyle: 'bold' },
+                    1: { halign: 'center', fontStyle: 'bold' },
+                    2: { halign: 'center' },
+                    3: { halign: 'center' },
+                    4: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold' }
                 },
                 didParseCell: (data) => {
-                    if (data.row.index === subjectRows.length - 1) {
+                    if (data.row.index === tableRows.length - 1) {
                         data.cell.styles.fontStyle = 'bold';
                         data.cell.styles.fillColor = [241, 245, 249];
                         data.cell.styles.textColor = [15, 23, 42];
@@ -877,7 +832,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 }
             });
 
-            // Single Clean Footer
+            // 8. Single Clean Footer (Fixed X positions so left and right text never overlap)
             doc.setDrawColor(226, 232, 240);
             doc.setLineWidth(0.3);
             doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
@@ -1040,47 +995,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                                 </div>
                             ) : (
                                 <>
-                                    {/* Test Selector */}
-                                    <div className="test-selector-wrapper">
-                                        <label className="filter-label">Select Exam(s) to Analyze:</label>
-                                        <Select
-                                            isMulti
-                                            options={[
-                                                { value: "SELECT_ALL", label: "Select All" },
-                                                ...uniqueTests.map(t => ({ value: t, label: t }))
-                                            ]}
-                                            value={
-                                                selectedErpTests.length === uniqueTests.length
-                                                    ? [{ value: "SELECT_ALL", label: "Select All" }, ...selectedErpTests.map(t => ({ value: t, label: t }))]
-                                                    : selectedErpTests.map(t => ({ value: t, label: t }))
-                                            }
-                                            onChange={(selectedOptions, actionMeta) => {
-                                                if (actionMeta.action === "select-option" && actionMeta.option.value === "SELECT_ALL") {
-                                                    setSelectedErpTests(uniqueTests);
-                                                } else if (actionMeta.action === "deselect-option" && actionMeta.option.value === "SELECT_ALL") {
-                                                    setSelectedErpTests([]);
-                                                } else {
-                                                    let values = selectedOptions ? selectedOptions.map(opt => opt.value).filter(v => v !== 'SELECT_ALL') : [];
-                                                    setSelectedErpTests(values);
-                                                }
-                                            }}
-                                            closeMenuOnSelect={false}
-                                            hideSelectedOptions={false}
-                                            components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
-                                            styles={reactSelectStyles}
-                                            placeholder="Select Exams..."
-                                        />
-                                    </div>
-
-                                    {selectedErpTests.length === 0 ? (
-                                        <div className="empty-box">
-                                            <HelpCircle size={48} color="#6366f1" />
-                                            <h4>No Exam Selected</h4>
-                                            <p>Select one or more exams from the dropdown above to view the analysis.</p>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            {/* Score Loss Cards */}
+                                    {/* Score Loss Cards */}
                                             <div className="drawer-loss-cards">
                                                 <div className="loss-summary-card total">
                                                     <span className="loss-card-title">Total Score Loss</span>
@@ -1286,24 +1201,14 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                                                                     </div>
                                                                 )}
 
-                                                                {(q.qUrl || q.sUrl) && (
+                                                                {q.qUrl && (
                                                                     <div className="q-actions-bar">
-                                                                        {q.qUrl && (
-                                                                            <button 
-                                                                                className="q-preview-btn"
-                                                                                onClick={() => setZoomImage({ url: q.qUrl, title: `${q.test} - Q${q.qNo} (${q.subject})` })}
-                                                                            >
-                                                                                <Maximize2 size={13} /> View Question
-                                                                            </button>
-                                                                        )}
-                                                                        {q.sUrl && (
-                                                                            <button 
-                                                                                className="q-preview-btn solution"
-                                                                                onClick={() => setZoomImage({ url: q.sUrl, title: `${q.test} - Q${q.qNo} Solution (${q.subject})` })}
-                                                                            >
-                                                                                <BookOpen size={13} /> View Solution
-                                                                            </button>
-                                                                        )}
+                                                                        <button 
+                                                                            className="q-preview-btn"
+                                                                            onClick={() => setZoomImage({ url: q.qUrl, title: `${q.test} - Q${q.qNo} (${q.subject})` })}
+                                                                        >
+                                                                            <Maximize2 size={13} /> View Question
+                                                                        </button>
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -1313,12 +1218,10 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                                             </div>
                                         </>
                                     )}
-                                </>
+                                </div>
                             )}
-                        </div>
+                        </>
                     )}
-                </>
-            )}
 
             {/* Question Image Zoom Modal */}
             {zoomImage && (
