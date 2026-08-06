@@ -1020,22 +1020,52 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                                                 </div>
                                             </div>
 
-                                            {/* Potential Score Banner */}
-                                            <div className="potential-score-banner">
-                                                <CheckCircle size={20} color="#10b981" style={{ marginRight: '10px', flexShrink: 0 }} />
-                                                <span>
-                                                    {selectedErpTests.length > 1 ? (
-                                                        <>
-                                                            With 0 mistakes, this student's average score across these tests would have been 
-                                                            <strong> {720 - Math.round(erpAnalysis.totalLost / selectedErpTests.length)} / 720</strong>.
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            With 0 mistakes, this student's score on this test would have been 
-                                                            <strong> {720 - erpAnalysis.totalLost} / 720</strong>.
-                                                        </>
-                                                    )}
-                                                </span>
+                                            {/* Potential Score Banner & Exam Averages Summary */}
+                                            <div className="potential-score-banner" style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px 18px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <CheckCircle size={20} color="#10b981" style={{ flexShrink: 0 }} />
+                                                        <span style={{ fontWeight: '700', fontSize: '0.9rem', color: '#065f46' }}>
+                                                            Selected Exams: <strong>{selectedErpTests.length}</strong> / {uniqueTests.length} Test{selectedErpTests.length > 1 ? 's' : ''}
+                                                        </span>
+                                                        <span style={{
+                                                            background: '#d1fae5',
+                                                            color: '#047857',
+                                                            padding: '2px 8px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: '800'
+                                                        }}>
+                                                            {selectedErpTests.length === uniqueTests.length ? 'All Exams Selected' : `${selectedErpTests.length} Selected`}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ fontSize: '0.88rem', color: '#065f46', fontWeight: '600' }}>
+                                                        With 0 mistakes, projected average score: <strong style={{ color: '#047857', fontSize: '1rem', fontWeight: '900' }}>{720 - Math.round(erpAnalysis.totalLost / (selectedErpTests.length || 1))} / 720</strong>
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px dashed #a7f3d0' }}>
+                                                    <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#047857', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                                        {selectedErpTests.length > 1 ? `Averages (${selectedErpTests.length} Exams):` : 'Exam Score:'}
+                                                    </span>
+                                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                        <span style={{ background: '#047857', color: '#ffffff', padding: '3px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '800' }}>
+                                                            TOT: {erpAnalysis.totalScored} / 720
+                                                        </span>
+                                                        <span style={{ background: '#ffffff', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
+                                                            BOT: <strong style={{ color: '#047857' }}>{erpAnalysis.scoredMarks.BOTANY}</strong>/180
+                                                        </span>
+                                                        <span style={{ background: '#ffffff', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
+                                                            ZOO: <strong style={{ color: '#047857' }}>{erpAnalysis.scoredMarks.ZOOLOGY}</strong>/180
+                                                        </span>
+                                                        <span style={{ background: '#ffffff', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
+                                                            PHY: <strong style={{ color: '#047857' }}>{erpAnalysis.scoredMarks.PHYSICS}</strong>/180
+                                                        </span>
+                                                        <span style={{ background: '#ffffff', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
+                                                            CHE: <strong style={{ color: '#047857' }}>{erpAnalysis.scoredMarks.CHEMISTRY}</strong>/180
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             {/* Charts Row */}
