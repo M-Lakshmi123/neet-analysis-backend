@@ -5,7 +5,8 @@ import {
     ClipboardList,
     Users,
     Activity,
-    FileWarning
+    FileWarning,
+    FileText
 } from 'lucide-react';
 
 const Sidebar = ({ activePage, setActivePage }) => {
