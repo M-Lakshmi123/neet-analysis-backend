@@ -32,7 +32,10 @@ import {
     CheckCircle,
     ChevronRight,
     Users,
-    Download
+    Download,
+    SlidersHorizontal,
+    Sparkles,
+    UserCheck
 } from 'lucide-react';
 
 const loadFont = async (url) => {
@@ -157,7 +160,7 @@ const CompactValueContainer = ({ children, ...props }) => {
 const reactSelectStyles = {
     control: (provided) => ({
         ...provided,
-        minHeight: '36px',
+        minHeight: '38px',
         borderRadius: '8px',
         borderColor: '#cbd5e1',
         boxShadow: 'none',
@@ -165,7 +168,7 @@ const reactSelectStyles = {
     }),
     valueContainer: (provided) => ({
         ...provided,
-        padding: '2px 8px'
+        padding: '2px 10px'
     }),
     input: (provided) => ({
         ...provided,
@@ -277,7 +280,6 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                     const fetchedStudents = data.students || [];
                     setStudents(fetchedStudents);
                     
-                    // Default to selecting the #1 topper if available
                     if (fetchedStudents.length > 0) {
                         const sorted = [...fetchedStudents].sort((a, b) => (Number(b.tot) || 0) - (Number(a.tot) || 0));
                         setSelectedStudent(sorted[0]);
@@ -346,7 +348,6 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 
                 if (safeData.length > 0) {
                     const uniqueTests = [...new Set(safeData.map(r => r.Test).filter(Boolean))];
-                    // If main filter test is selected, match against uniqueTests
                     if (filters?.test && Array.isArray(filters.test) && filters.test.length > 0) {
                         const filterTestsLower = filters.test.map(t => String(t).trim().toLowerCase());
                         const matched = uniqueTests.filter(t => {
@@ -876,83 +877,15 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 }
             });
 
-            y = doc.lastAutoTable.finalY + 4;
-
-            doc.setTextColor(30, 41, 59);
-            doc.setFontSize(9);
-            doc.setFont("helvetica", "bold");
-            doc.text(`QUESTION PENALTY DETAILS (${erpAnalysis.questions.length} INCORRECT / SKIPPED)`, margin, y);
-
-            y += 2.5;
-
-            const qTableRows = erpAnalysis.questions.map((q, idx) => [
-                String(idx + 1),
-                String(q.test || '-'),
-                String(q.qNo || '-'),
-                String(q.subject || '-'),
-                String(q.topic || 'Unknown Topic'),
-                q.status === 'W' ? 'Wrong' : 'Skipped',
-                q.status === 'W' ? '-5 Marks' : '-4 Marks',
-                String(q.keyValue || '-')
-            ]);
-
-            const availableHeight = pageHeight - y - 10;
-            const rowHeightEst = 3.8;
-            const maxRowsThatFit = Math.max(3, Math.floor(availableHeight / rowHeightEst));
-            const displayQRows = qTableRows.slice(0, maxRowsThatFit);
-
-            autoTable(doc, {
-                startY: y,
-                head: [['#', 'Exam', 'Q.No', 'Subject', 'Topic Name', 'Status', 'Penalty', 'Key']],
-                body: displayQRows.length > 0 ? displayQRows : [['-', '-', '-', '-', 'No penalty questions recorded', '-', '-', '-']],
-                theme: 'striped',
-                margin: { left: margin, right: margin },
-                headStyles: {
-                    fillColor: [15, 23, 42],
-                    textColor: [255, 255, 255],
-                    fontSize: 7.5,
-                    fontStyle: 'bold',
-                    halign: 'center',
-                    cellPadding: 1.2
-                },
-                bodyStyles: {
-                    fontSize: 6.8,
-                    textColor: [15, 23, 42],
-                    cellPadding: 1.0
-                },
-                columnStyles: {
-                    0: { halign: 'center', cellWidth: 8 },
-                    1: { halign: 'center', cellWidth: 20 },
-                    2: { halign: 'center', cellWidth: 12, fontStyle: 'bold' },
-                    3: { halign: 'center', cellWidth: 22 },
-                    4: { halign: 'left', cellWidth: 'auto' },
-                    5: { halign: 'center', cellWidth: 18, fontStyle: 'bold' },
-                    6: { halign: 'center', cellWidth: 18, fontStyle: 'bold' },
-                    7: { halign: 'center', cellWidth: 12 }
-                },
-                didParseCell: (data) => {
-                    if (data.section === 'body') {
-                        const statusVal = data.row.cells[5]?.text?.[0];
-                        if (statusVal === 'Wrong') {
-                            if (data.column.index === 5 || data.column.index === 6) {
-                                data.cell.styles.textColor = [220, 38, 38];
-                            }
-                        } else if (statusVal === 'Skipped') {
-                            if (data.column.index === 5 || data.column.index === 6) {
-                                data.cell.styles.textColor = [217, 119, 6];
-                            }
-                        }
-                    }
-                }
-            });
-
-            if (qTableRows.length > maxRowsThatFit) {
-                const footerY = Math.min(pageHeight - 6, doc.lastAutoTable.finalY + 3.5);
-                doc.setFontSize(6.5);
-                doc.setFont("helvetica", "italic");
-                doc.setTextColor(100, 116, 139);
-                doc.text(`* Showing ${maxRowsThatFit} of ${qTableRows.length} total mistake questions. See dashboard for full interactive details.`, margin, footerY);
-            }
+            // Single Clean Footer
+            doc.setDrawColor(226, 232, 240);
+            doc.setLineWidth(0.3);
+            doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+            doc.setFontSize(7.5);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(100, 116, 139);
+            doc.text("Generated automatically via Sri Chaitanya Medicon Analytics Platform", margin, pageHeight - 7);
+            doc.text(`Page 1 of 1`, pageWidth - margin, pageHeight - 7, { align: 'right' });
 
             const cleanFileName = `${selectedStudent.name.replace(/[^a-zA-Z0-9]/g, '_')}_Marks_Loss_Report.pdf`;
             doc.save(cleanFileName);
@@ -967,18 +900,20 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
     return (
         <div className="topper-marks-loss-container">
             {/* Top Control Bar with Top N Filters */}
-            <div className="toppers-controls-bar" style={{ flexWrap: 'wrap', gap: '12px' }}>
-                <div className="results-indicator" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Award size={20} color="#1e3a8a" />
+            <div className="toppers-controls-bar">
+                <div className="results-indicator">
+                    <div className="title-icon-badge">
+                        <Award size={22} color="#ffffff" />
+                    </div>
                     <div>
-                        <strong style={{ color: '#0f172a', fontSize: '1.05rem' }}>Topper Marks Loss Executive Directory</strong>
-                        <span style={{ display: 'block', fontSize: '0.8rem', color: '#64748b' }}>
-                            Found <strong>{students.length}</strong> Toppers matching filters. Showing <strong>Top {toppersList.length}</strong>.
+                        <strong className="main-title">Topper Marks Loss Executive Directory</strong>
+                        <span className="sub-title">
+                            Found <strong>{students.length}</strong> Toppers matching filters • Showing <strong>Top {toppersList.length}</strong>
                         </span>
                     </div>
                 </div>
 
-                <div className="control-right" style={{ flexWrap: 'wrap', gap: '10px' }}>
+                <div className="control-right">
                     {/* Preset Pills */}
                     <div className="pill-group">
                         {[5, 10, 15, 20, 50, 100].map((num) => (
@@ -993,39 +928,22 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                     </div>
 
                     {/* Custom Input */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f1f5f9', padding: '3px 8px', borderRadius: '20px' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569' }}>Custom Top:</span>
+                    <div className="custom-input-box">
+                        <span className="custom-label">Custom:</span>
                         <input
                             type="number"
                             min="1"
                             max="500"
+                            className="custom-number-input"
                             value={customInput}
                             onChange={(e) => setCustomInput(e.target.value)}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleSetTopLimit(customInput);
                             }}
-                            style={{
-                                width: '50px',
-                                padding: '3px 6px',
-                                borderRadius: '6px',
-                                border: '1px solid #cbd5e1',
-                                fontSize: '0.85rem',
-                                fontWeight: '700',
-                                textAlign: 'center'
-                            }}
                         />
                         <button
+                            className="custom-set-btn"
                             onClick={() => handleSetTopLimit(customInput)}
-                            style={{
-                                background: '#1e3a8a',
-                                color: 'white',
-                                border: 'none',
-                                padding: '4px 10px',
-                                borderRadius: '12px',
-                                fontSize: '0.75rem',
-                                fontWeight: '700',
-                                cursor: 'pointer'
-                            }}
                         >
                             Set
                         </button>
@@ -1035,67 +953,38 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
             {/* Student Selection Button Tabs */}
             {loading ? (
-                <div style={{ padding: '30px', textAlign: 'center', background: '#fff', borderRadius: '12px' }}>
+                <div className="loader-box">
                     <div className="loading-spinner"></div>
-                    <p style={{ marginTop: '10px', color: '#64748b' }}>Loading Toppers List...</p>
+                    <p>Loading Toppers Directory...</p>
                 </div>
             ) : toppersList.length === 0 ? (
-                <div style={{ padding: '40px', textAlign: 'center', background: '#fff', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                    <Users size={40} color="#94a3b8" />
-                    <h4 style={{ margin: '10px 0 5px', color: '#1e293b' }}>No Students Found</h4>
-                    <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Try adjusting your filters to find toppers matching your criteria.</p>
+                <div className="empty-box">
+                    <Users size={44} color="#94a3b8" />
+                    <h4>No Toppers Found</h4>
+                    <p>Try adjusting your filters to find students matching criteria.</p>
                 </div>
             ) : (
                 <>
-                    <div className="student-buttons-row" style={{
-                        display: 'flex',
-                        gap: '8px',
-                        overflowX: 'auto',
-                        padding: '8px 4px',
-                        background: '#ffffff',
-                        borderRadius: '12px',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                    }}>
+                    <div className="student-buttons-bar">
                         {toppersList.map((stud, idx) => {
                             const isSelected = selectedStudent?.STUD_ID === stud.STUD_ID;
+                            const rankNum = idx + 1;
+                            let badgeClass = 'rank-badge normal';
+                            if (rankNum === 1) badgeClass = 'rank-badge gold';
+                            else if (rankNum === 2) badgeClass = 'rank-badge silver';
+                            else if (rankNum === 3) badgeClass = 'rank-badge bronze';
+
                             return (
                                 <button
                                     key={stud.STUD_ID || idx}
                                     onClick={() => setSelectedStudent(stud)}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px',
-                                        padding: '8px 14px',
-                                        borderRadius: '8px',
-                                        border: isSelected ? '2px solid #1e3a8a' : '1px solid #cbd5e1',
-                                        background: isSelected ? 'linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%)' : '#f8fafc',
-                                        color: isSelected ? '#ffffff' : '#1e293b',
-                                        fontWeight: isSelected ? '700' : '600',
-                                        fontSize: '0.82rem',
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap',
-                                        transition: 'all 0.2s',
-                                        boxShadow: isSelected ? '0 4px 6px -1px rgba(30, 58, 138, 0.3)' : 'none'
-                                    }}
+                                    className={`student-tab-btn ${isSelected ? 'selected' : ''}`}
                                 >
-                                    <span style={{
-                                        background: isSelected ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
-                                        color: isSelected ? '#ffffff' : '#475569',
-                                        padding: '2px 6px',
-                                        borderRadius: '4px',
-                                        fontSize: '0.72rem',
-                                        fontWeight: '800'
-                                    }}>
-                                        #{idx + 1}
+                                    <span className={badgeClass}>
+                                        #{rankNum}
                                     </span>
-                                    <span>{stud.name || stud.STUD_NAME}</span>
-                                    <span style={{
-                                        fontSize: '0.75rem',
-                                        opacity: isSelected ? 0.9 : 0.7,
-                                        fontWeight: '700'
-                                    }}>
+                                    <span className="stud-name">{stud.name || stud.STUD_NAME}</span>
+                                    <span className="stud-score">
                                         ({Number(stud.tot || 0).toFixed(1)})
                                     </span>
                                 </button>
@@ -1105,66 +994,32 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
                     {/* Main Content Area for Selected Student */}
                     {selectedStudent && (
-                        <div className="marks-loss-executive-view" style={{
-                            background: '#ffffff',
-                            borderRadius: '16px',
-                            border: '1px solid #e2e8f0',
-                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05)',
-                            padding: '24px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '20px'
-                        }}>
+                        <div className="marks-loss-executive-card">
                             {/* Executive Header Banner */}
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                borderBottom: '2px solid #f1f5f9',
-                                paddingBottom: '16px',
-                                flexWrap: 'wrap',
-                                gap: '15px'
-                            }}>
-                                <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                                        <h2 style={{ fontSize: '1.4rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-                                            {selectedStudent.name || selectedStudent.STUD_NAME}
-                                        </h2>
-                                        <span style={{
-                                            background: '#eff6ff',
-                                            color: '#1e40af',
-                                            padding: '3px 8px',
-                                            borderRadius: '6px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: '700'
-                                        }}>
-                                            ID: {selectedStudent.STUD_ID}
-                                        </span>
+                            <div className="executive-header">
+                                <div className="student-profile-info">
+                                    <div className="profile-avatar">
+                                        <UserCheck size={26} color="#ffffff" />
                                     </div>
-                                    <p style={{ fontSize: '0.88rem', color: '#64748b', margin: 0 }}>
-                                        Campus: <strong>{selectedStudent.campus || '-'}</strong> • Stream: <strong>{selectedStudent.stream || selectedStudent.Stream || 'SR_ELITE'}</strong>
-                                    </p>
+                                    <div>
+                                        <div className="title-row">
+                                            <h2 className="student-full-name">
+                                                {selectedStudent.name || selectedStudent.STUD_NAME}
+                                            </h2>
+                                            <span className="id-badge">
+                                                ID: {selectedStudent.STUD_ID}
+                                            </span>
+                                        </div>
+                                        <p className="student-submeta">
+                                            Campus: <strong>{selectedStudent.campus || '-'}</strong> • Stream: <strong>{selectedStudent.stream || selectedStudent.Stream || 'SR_ELITE'}</strong>
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <button
                                     onClick={downloadStudentPdf}
                                     disabled={isExportingPdf || erpLoading || erpData.length === 0}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        padding: '10px 20px',
-                                        borderRadius: '10px',
-                                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                                        color: 'white',
-                                        border: 'none',
-                                        fontWeight: '700',
-                                        fontSize: '0.9rem',
-                                        cursor: isExportingPdf || erpLoading || erpData.length === 0 ? 'not-allowed' : 'pointer',
-                                        boxShadow: '0 4px 10px rgba(220, 38, 38, 0.3)',
-                                        transition: 'all 0.2s',
-                                        opacity: isExportingPdf || erpLoading || erpData.length === 0 ? 0.6 : 1
-                                    }}
+                                    className="download-pdf-exec-btn"
                                 >
                                     <FileText size={18} />
                                     {isExportingPdf ? 'Generating Executive PDF...' : 'Download PDF Report'}
@@ -1173,21 +1028,21 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
                             {/* ERP Data Content */}
                             {erpLoading ? (
-                                <div style={{ padding: '60px', textAlign: 'center' }}>
+                                <div className="loader-box">
                                     <div className="loading-spinner"></div>
-                                    <p style={{ marginTop: '12px', color: '#64748b', fontWeight: '500' }}>Fetching ERP Marks Loss details for {selectedStudent.name}...</p>
+                                    <p>Fetching ERP Marks Loss details for {selectedStudent.name}...</p>
                                 </div>
                             ) : erpData.length === 0 ? (
-                                <div style={{ padding: '60px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
-                                    <AlertTriangle size={48} color="#eab308" style={{ marginBottom: '12px' }} />
-                                    <h4 style={{ fontSize: '1.1rem', color: '#0f172a', margin: '0 0 6px' }}>No Marks Loss Data Available</h4>
-                                    <p style={{ color: '#64748b', fontSize: '0.88rem', margin: 0 }}>We couldn't find any Wrong (W) or Unattempted (U) records in the database for this student.</p>
+                                <div className="empty-box">
+                                    <AlertTriangle size={48} color="#eab308" />
+                                    <h4>No Marks Loss Data Available</h4>
+                                    <p>We couldn't find any Wrong (W) or Unattempted (U) records in the database for this student.</p>
                                 </div>
                             ) : (
                                 <>
                                     {/* Test Selector */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '400px' }}>
-                                        <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155' }}>Select Exam(s) to Analyze:</label>
+                                    <div className="test-selector-wrapper">
+                                        <label className="filter-label">Select Exam(s) to Analyze:</label>
                                         <Select
                                             isMulti
                                             options={[
@@ -1218,10 +1073,10 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                                     </div>
 
                                     {selectedErpTests.length === 0 ? (
-                                        <div style={{ padding: '60px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: '12px' }}>
-                                            <HelpCircle size={48} color="#6366f1" style={{ marginBottom: '12px' }} />
-                                            <h4 style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#0f172a', margin: '0 0 8px' }}>No Exam Selected</h4>
-                                            <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>Select one or more exams from the dropdown above to view the analysis.</p>
+                                        <div className="empty-box">
+                                            <HelpCircle size={48} color="#6366f1" />
+                                            <h4>No Exam Selected</h4>
+                                            <p>Select one or more exams from the dropdown above to view the analysis.</p>
                                         </div>
                                     ) : (
                                         <>
@@ -1252,7 +1107,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
                                             {/* Potential Score Banner */}
                                             <div className="potential-score-banner">
-                                                <CheckCircle size={18} color="#10b981" style={{ marginRight: '8px', flexShrink: 0 }} />
+                                                <CheckCircle size={20} color="#10b981" style={{ marginRight: '10px', flexShrink: 0 }} />
                                                 <span>
                                                     {selectedErpTests.length > 1 ? (
                                                         <>
@@ -1498,6 +1353,755 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                     </div>
                 </div>
             )}
+
+            {/* Dedicated Styling for Executive Topper Marks Loss Report */}
+            <style>{`
+                .topper-marks-loss-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                    width: 100%;
+                }
+
+                /* Control Bar */
+                .toppers-controls-bar {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    background: rgba(255, 255, 255, 0.9);
+                    backdrop-filter: blur(12px);
+                    border: 1px solid rgba(226, 232, 240, 0.8);
+                    padding: 12px 22px;
+                    border-radius: 14px;
+                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+                    flex-wrap: wrap;
+                    gap: 15px;
+                }
+
+                .results-indicator {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+
+                .title-icon-badge {
+                    width: 42px;
+                    height: 42px;
+                    border-radius: 10px;
+                    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+                }
+
+                .main-title {
+                    font-size: 1.1rem;
+                    font-weight: 800;
+                    color: #0f172a;
+                    display: block;
+                    letter-spacing: -0.01em;
+                }
+
+                .sub-title {
+                    font-size: 0.82rem;
+                    color: #64748b;
+                    display: block;
+                    margin-top: 1px;
+                }
+
+                .control-right {
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                    flex-wrap: wrap;
+                }
+
+                /* Preset Pills */
+                .pill-group {
+                    display: flex;
+                    background: #f1f5f9;
+                    border-radius: 20px;
+                    padding: 3px;
+                    border: 1px solid #e2e8f0;
+                }
+
+                .pill-btn {
+                    border: none;
+                    background: transparent;
+                    color: #475569;
+                    font-size: 0.82rem;
+                    font-weight: 700;
+                    padding: 6px 14px;
+                    border-radius: 17px;
+                    cursor: pointer;
+                    transition: all 0.2s ease-in-out;
+                }
+
+                .pill-btn:hover {
+                    color: #0f172a;
+                }
+
+                .pill-btn.active {
+                    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+                    color: white;
+                    box-shadow: 0 3px 8px rgba(30, 58, 138, 0.3);
+                }
+
+                /* Custom Input Box */
+                .custom-input-box {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: #f8fafc;
+                    padding: 4px 10px;
+                    border-radius: 20px;
+                    border: 1px solid #cbd5e1;
+                }
+
+                .custom-label {
+                    font-size: 0.8rem;
+                    font-weight: 700;
+                    color: #475569;
+                }
+
+                .custom-number-input {
+                    width: 55px;
+                    padding: 4px 8px;
+                    border-radius: 6px;
+                    border: 1px solid #cbd5e1;
+                    font-size: 0.85rem;
+                    font-weight: 800;
+                    text-align: center;
+                    outline: none;
+                    color: #0f172a;
+                }
+
+                .custom-number-input:focus {
+                    border-color: #3b82f6;
+                    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+                }
+
+                .custom-set-btn {
+                    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+                    color: white;
+                    border: none;
+                    padding: 5px 12px;
+                    border-radius: 12px;
+                    font-size: 0.78rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    box-shadow: 0 2px 4px rgba(30, 58, 138, 0.2);
+                }
+
+                .custom-set-btn:hover {
+                    opacity: 0.95;
+                    transform: translateY(-1px);
+                }
+
+                /* Student Button Tabs Bar */
+                .student-buttons-bar {
+                    display: flex;
+                    gap: 10px;
+                    overflow-x: auto;
+                    padding: 10px 6px;
+                    background: #ffffff;
+                    border-radius: 14px;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+                    scrollbar-width: thin;
+                }
+
+                .student-tab-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 16px;
+                    border-radius: 10px;
+                    border: 1px solid #cbd5e1;
+                    background: #f8fafc;
+                    color: #1e293b;
+                    font-weight: 600;
+                    font-size: 0.84rem;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    transition: all 0.2s ease-in-out;
+                }
+
+                .student-tab-btn:hover {
+                    background: #f1f5f9;
+                    border-color: #94a3b8;
+                    transform: translateY(-1px);
+                }
+
+                .student-tab-btn.selected {
+                    border: 2px solid #1e3a8a;
+                    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+                    color: #ffffff;
+                    font-weight: 700;
+                    box-shadow: 0 6px 15px -3px rgba(30, 58, 138, 0.35);
+                }
+
+                .rank-badge {
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    font-size: 0.72rem;
+                    font-weight: 800;
+                    letter-spacing: 0.02em;
+                }
+
+                .rank-badge.gold {
+                    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                    color: #ffffff;
+                    box-shadow: 0 2px 4px rgba(217, 119, 6, 0.3);
+                }
+
+                .rank-badge.silver {
+                    background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+                    color: #ffffff;
+                }
+
+                .rank-badge.bronze {
+                    background: linear-gradient(135deg, #b45309 0%, #78350f 100%);
+                    color: #ffffff;
+                }
+
+                .rank-badge.normal {
+                    background: #e2e8f0;
+                    color: #334155;
+                }
+
+                .student-tab-btn.selected .rank-badge.normal {
+                    background: rgba(255, 255, 255, 0.2);
+                    color: #ffffff;
+                }
+
+                .stud-name {
+                    font-size: 0.85rem;
+                }
+
+                .stud-score {
+                    font-size: 0.76rem;
+                    opacity: 0.85;
+                    font-weight: 700;
+                }
+
+                /* Executive Main Card */
+                .marks-loss-executive-card {
+                    background: #ffffff;
+                    border-radius: 16px;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
+                    padding: 24px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 22px;
+                }
+
+                /* Executive Header */
+                .executive-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border-bottom: 2px solid #f1f5f9;
+                    padding-bottom: 18px;
+                    flex-wrap: wrap;
+                    gap: 15px;
+                }
+
+                .student-profile-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                }
+
+                .profile-avatar {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 12px;
+                    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 4px 10px rgba(30, 58, 138, 0.25);
+                }
+
+                .title-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                }
+
+                .student-full-name {
+                    font-size: 1.45rem;
+                    font-weight: 800;
+                    color: #0f172a;
+                    margin: 0;
+                    letter-spacing: -0.01em;
+                }
+
+                .id-badge {
+                    background: #eff6ff;
+                    color: #1e40af;
+                    padding: 3px 10px;
+                    border-radius: 6px;
+                    font-size: 0.78rem;
+                    font-weight: 800;
+                    border: 1px solid #bfdbfe;
+                }
+
+                .student-submeta {
+                    font-size: 0.88rem;
+                    color: #64748b;
+                    margin: 3px 0 0 0;
+                }
+
+                .download-pdf-exec-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 10px 20px;
+                    border-radius: 10px;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    color: white;
+                    border: none;
+                    font-weight: 800;
+                    font-size: 0.88rem;
+                    cursor: pointer;
+                    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+                    transition: all 0.2s ease-in-out;
+                }
+
+                .download-pdf-exec-btn:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+                }
+
+                .test-selector-wrapper {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    max-width: 420px;
+                }
+
+                /* Loss Cards */
+                .drawer-loss-cards {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                    gap: 15px;
+                }
+
+                .loss-summary-card {
+                    padding: 16px 20px;
+                    border-radius: 12px;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+                    transition: transform 0.2s;
+                }
+
+                .loss-summary-card:hover {
+                    transform: translateY(-2px);
+                }
+
+                .loss-summary-card.total {
+                    background: linear-gradient(135deg, #fef2f2 0%, #ffe4e6 100%);
+                    border: 1px solid #fecaca;
+                    color: #991b1b;
+                }
+
+                .loss-summary-card.wrong {
+                    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+                    border: 1px solid #fde68a;
+                    color: #92400e;
+                }
+
+                .loss-summary-card.skipped {
+                    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+                    border: 1px solid #bbf7d0;
+                    color: #166534;
+                }
+
+                .loss-card-title {
+                    font-size: 0.75rem;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    letter-spacing: 0.03em;
+                    opacity: 0.85;
+                }
+
+                .loss-card-val {
+                    font-size: 1.4rem;
+                    font-weight: 900;
+                    margin-top: 4px;
+                }
+
+                .loss-card-sub {
+                    font-size: 0.76rem;
+                    margin-top: 4px;
+                    opacity: 0.9;
+                }
+
+                /* Potential Score Banner */
+                .potential-score-banner {
+                    display: flex;
+                    align-items: center;
+                    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+                    border: 1px solid #a7f3d0;
+                    color: #065f46;
+                    padding: 12px 18px;
+                    border-radius: 10px;
+                    font-size: 0.92rem;
+                    box-shadow: 0 2px 5px rgba(16, 185, 129, 0.08);
+                }
+
+                .potential-score-banner strong {
+                    margin: 0 4px;
+                    font-weight: 900;
+                    color: #047857;
+                }
+
+                /* Charts Grid */
+                .drawer-charts-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 20px;
+                    background: #f8fafc;
+                    padding: 18px;
+                    border-radius: 14px;
+                    border: 1px solid #e2e8f0;
+                }
+
+                @media (max-width: 900px) {
+                    .drawer-charts-row {
+                        grid-template-columns: 1fr;
+                    }
+                }
+
+                .drawer-chart-col {
+                    background: #ffffff;
+                    border-radius: 10px;
+                    padding: 14px;
+                    border: 1px solid #e2e8f0;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                }
+
+                .drawer-section-title {
+                    font-size: 0.92rem;
+                    font-weight: 800;
+                    color: #0f172a;
+                    margin-bottom: 12px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.03em;
+                }
+
+                /* Mini Table */
+                .drawer-subject-breakdown {
+                    background: #ffffff;
+                    border-radius: 12px;
+                    border: 1px solid #e2e8f0;
+                    padding: 16px;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+                }
+
+                .drawer-mini-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.85rem;
+                }
+
+                .drawer-mini-table th {
+                    text-align: left;
+                    background: #1e3a8a;
+                    color: #ffffff;
+                    padding: 10px 14px;
+                    font-weight: 800;
+                    font-size: 0.8rem;
+                    letter-spacing: 0.02em;
+                }
+
+                .drawer-mini-table td {
+                    padding: 10px 14px;
+                    border-bottom: 1px solid #f1f5f9;
+                    color: #1e293b;
+                }
+
+                .drawer-mini-table tr:hover {
+                    background: #f8fafc;
+                }
+
+                .sub-text {
+                    font-size: 0.72rem;
+                    color: #64748b;
+                    margin-left: 4px;
+                }
+
+                .loss-red {
+                    color: #dc2626;
+                }
+
+                /* Questions List */
+                .drawer-questions-list {
+                    background: #ffffff;
+                    border-radius: 12px;
+                    border: 1px solid #e2e8f0;
+                    padding: 16px;
+                }
+
+                .drawer-section-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 14px;
+                    border-bottom: 1px solid #f1f5f9;
+                    padding-bottom: 8px;
+                }
+
+                .q-count-badge {
+                    background: #eff6ff;
+                    color: #1e40af;
+                    padding: 3px 10px;
+                    border-radius: 12px;
+                    font-size: 0.78rem;
+                    font-weight: 800;
+                }
+
+                .questions-grid-wrapper {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+
+                .q-detail-card {
+                    background: #f8fafc;
+                    border-radius: 10px;
+                    padding: 14px;
+                    border-left: 5px solid #cbd5e1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+                }
+
+                .q-detail-card.w {
+                    border-left-color: #f59e0b;
+                }
+
+                .q-detail-card.u {
+                    border-left-color: #10b981;
+                }
+
+                .q-card-top {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                .q-identifier {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+
+                .q-badge-test {
+                    background: #e0e7ff;
+                    color: #4338ca;
+                    font-weight: 800;
+                    font-size: 0.72rem;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                }
+
+                .q-badge-subject {
+                    background: #e2e8f0;
+                    color: #334155;
+                    font-weight: 800;
+                    font-size: 0.72rem;
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                }
+
+                .q-num {
+                    font-weight: 800;
+                    color: #0f172a;
+                    font-size: 0.9rem;
+                }
+
+                .q-status-tag {
+                    font-size: 0.72rem;
+                    font-weight: 800;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                }
+
+                .q-status-tag.w {
+                    background: #fffbeb;
+                    color: #b45309;
+                    border: 1px solid #fde68a;
+                }
+
+                .q-status-tag.u {
+                    background: #f0fdf4;
+                    color: #15803d;
+                    border: 1px solid #bbf7d0;
+                }
+
+                .q-topic-line {
+                    font-size: 0.84rem;
+                    color: #334155;
+                }
+
+                .q-actions-bar {
+                    display: flex;
+                    gap: 10px;
+                    margin-top: 4px;
+                }
+
+                .q-preview-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                    border: 1px solid #cbd5e1;
+                    background: #ffffff;
+                    color: #475569;
+                    font-size: 0.76rem;
+                    font-weight: 700;
+                    padding: 5px 12px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .q-preview-btn:hover {
+                    background: #f8fafc;
+                    border-color: #6366f1;
+                    color: #6366f1;
+                }
+
+                .q-preview-btn.solution:hover {
+                    border-color: #10b981;
+                    color: #10b981;
+                }
+
+                /* Zoom Modal */
+                .zoom-modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.75);
+                    backdrop-filter: blur(4px);
+                    z-index: 10000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }
+
+                .zoom-modal-content {
+                    background: white;
+                    border-radius: 14px;
+                    width: 90%;
+                    max-width: 1100px;
+                    height: 85vh;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+                }
+
+                .zoom-modal-header {
+                    padding: 14px 20px;
+                    background: #f8fafc;
+                    border-bottom: 1px solid #cbd5e1;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                .zoom-modal-header h5 {
+                    font-weight: 800;
+                    color: #0f172a;
+                    font-size: 0.95rem;
+                    margin: 0;
+                }
+
+                .zoom-close-btn {
+                    border: none;
+                    background: transparent;
+                    color: #475569;
+                    cursor: pointer;
+                    padding: 4px;
+                    border-radius: 50%;
+                }
+
+                .zoom-close-btn:hover {
+                    background: #e2e8f0;
+                }
+
+                .zoom-modal-body {
+                    padding: 20px;
+                    flex: 1;
+                    overflow: hidden;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    background: #f1f5f9;
+                }
+
+                .zoomable-image {
+                    max-width: 100%;
+                    max-height: 75vh;
+                    object-fit: contain;
+                    border-radius: 6px;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+                }
+
+                .loader-box {
+                    padding: 50px;
+                    text-align: center;
+                    background: #ffffff;
+                    border-radius: 14px;
+                    border: 1px solid #e2e8f0;
+                }
+
+                .loading-spinner {
+                    width: 36px;
+                    height: 36px;
+                    border: 4px solid #f1f5f9;
+                    border-top-color: #1e3a8a;
+                    border-radius: 50%;
+                    animation: spin 0.8s linear infinite;
+                    margin: 0 auto 12px;
+                }
+
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+
+                .empty-box {
+                    padding: 50px;
+                    text-align: center;
+                    background: #ffffff;
+                    border-radius: 14px;
+                    border: 1px dashed #cbd5e1;
+                }
+
+                .empty-box h4 {
+                    margin: 12px 0 6px;
+                    color: #0f172a;
+                    font-weight: 800;
+                }
+
+                .empty-box p {
+                    color: #64748b;
+                    font-size: 0.88rem;
+                    margin: 0;
+                }
+            `}</style>
         </div>
     );
 };
