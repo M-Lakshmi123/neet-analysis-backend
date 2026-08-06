@@ -287,10 +287,23 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 const safeData = Array.isArray(data) ? data : [];
                 setErpData(safeData);
                 
-                // Select all tests by default
                 if (safeData.length > 0) {
                     const uniqueTests = [...new Set(safeData.map(r => r.Test).filter(Boolean))];
-                    setSelectedErpTests(uniqueTests);
+                    // If main filter test is selected, match against uniqueTests
+                    if (filters?.test && Array.isArray(filters.test) && filters.test.length > 0) {
+                        const filterTestsLower = filters.test.map(t => String(t).trim().toLowerCase());
+                        const matched = uniqueTests.filter(t => {
+                            const tLower = String(t).trim().toLowerCase();
+                            return filterTestsLower.some(ft => ft === tLower || tLower.includes(ft) || ft.includes(tLower));
+                        });
+                        if (matched.length > 0) {
+                            setSelectedErpTests(matched);
+                        } else {
+                            setSelectedErpTests(uniqueTests);
+                        }
+                    } else {
+                        setSelectedErpTests(uniqueTests);
+                    }
                 } else {
                     setSelectedErpTests([]);
                 }
@@ -304,7 +317,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         };
 
         fetchErpData();
-    }, [selectedStudent, filters.academicYear]);
+    }, [selectedStudent, filters.academicYear, filters.test]);
 
     // Slice and sort toppers list
     const toppersList = useMemo(() => {

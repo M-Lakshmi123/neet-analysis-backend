@@ -9,6 +9,7 @@ import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import AnalysisReport from './components/AnalysisReport';
 import ToppersPerformanceReport from './components/ToppersPerformanceReport';
+import TopperMarksLossReport from './components/TopperMarksLossReport';
 import TestWiseImprovements from './components/TestWiseImprovements';
 import AverageReport from './components/AverageReport';
 import AverageMarksReport from './components/AverageMarksReport';
@@ -286,6 +287,8 @@ const Dashboard = () => {
         if (userData?.email) {
             const pageNames = {
                 'analysis': 'Analysis Report',
+                'toppers_performance': 'Toppers Performance Report',
+                'topper_marks_loss': 'Topper Marks Loss',
                 'test_improvements': 'Test Wise Improvements',
                 'averages': 'Average Marks Report',
                 'average_count': 'Average Count Report',
@@ -320,6 +323,12 @@ const Dashboard = () => {
                 return (
                     <div className="report-sections">
                         <ToppersPerformanceReport filters={globalFilters} setFilters={setGlobalFilters} setActivePage={setActivePage} />
+                    </div>
+                );
+            case 'topper_marks_loss':
+                return (
+                    <div className="report-sections">
+                        <TopperMarksLossReport filters={globalFilters} setFilters={setGlobalFilters} setActivePage={setActivePage} />
                     </div>
                 );
             case 'test_improvements':
@@ -389,7 +398,7 @@ const Dashboard = () => {
         }
     };
 
-    const showFilterBar = ['principal_dashboard', 'analysis', 'toppers_performance', 'test_improvements', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
+    const showFilterBar = ['principal_dashboard', 'analysis', 'toppers_performance', 'topper_marks_loss', 'test_improvements', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
 
     return (
         <div className="dashboard-root">
@@ -400,6 +409,7 @@ const Dashboard = () => {
                         activePage === 'principal_dashboard' ? 'Principal Dashboard' :
                         activePage === 'analysis' ? 'Analysis Report' :
                         activePage === 'toppers_performance' ? 'Toppers Performance Report' :
+                        activePage === 'topper_marks_loss' ? 'Topper Marks Loss Report' :
                             activePage === 'test_improvements' ? 'Test Wise Improvements' :
                                 activePage === 'averages' ? 'Average Marks Report' :
                                     activePage === 'average_count' ? 'Average Count Report' :
