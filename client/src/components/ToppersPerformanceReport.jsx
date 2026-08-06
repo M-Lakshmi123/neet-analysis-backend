@@ -1611,9 +1611,6 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                     {selectedErpTests.length === uniqueTests.length ? 'All Exams Selected' : `${selectedErpTests.length} Selected`}
                                                 </span>
                                             </div>
-                                            <div style={{ fontSize: '0.88rem', color: '#065f46', fontWeight: '600' }}>
-                                                With 0 mistakes, projected average score: <strong style={{ color: '#047857', fontSize: '1rem', fontWeight: '900' }}>{720 - Math.round(erpAnalysis.totalLost / (selectedErpTests.length || 1))} / 720</strong>
-                                            </div>
                                         </div>
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px dashed #a7f3d0' }}>
