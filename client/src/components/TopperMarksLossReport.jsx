@@ -200,6 +200,18 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
     const subjectBarChartRef = useRef(null);
     const lossDoughnutChartRef = useRef(null);
 
+    const hasSelectedFilters = useMemo(() => {
+        if (!filters) return false;
+        const { campus, stream, testType, test, studentSearch } = filters;
+        return (
+            (Array.isArray(campus) && campus.length > 0) ||
+            (Array.isArray(stream) && stream.length > 0) ||
+            (Array.isArray(testType) && testType.length > 0) ||
+            (Array.isArray(test) && test.length > 0) ||
+            (Array.isArray(studentSearch) && studentSearch.length > 0)
+        );
+    }, [filters]);
+
     // Zoom and pan states for question preview
     const [zoomScale, setZoomScale] = useState(1);
     const [zoomOffset, setZoomOffset] = useState({ x: 0, y: 0 });
@@ -914,9 +926,19 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 </div>
             ) : toppersList.length === 0 ? (
                 <div className="empty-box">
-                    <Users size={44} color="#94a3b8" />
-                    <h4>No Toppers Found</h4>
-                    <p>Try adjusting your filters to find students matching criteria.</p>
+                    {!hasSelectedFilters ? (
+                        <>
+                            <SlidersHorizontal size={44} color="#3b82f6" />
+                            <h4>Please Select Filters to Display Data</h4>
+                            <p>To display toppers and marks loss report, kindly select the required filters first from the top filter bar.</p>
+                        </>
+                    ) : (
+                        <>
+                            <Users size={44} color="#94a3b8" />
+                            <h4>No Toppers Found</h4>
+                            <p>Try adjusting your filters to find students matching criteria.</p>
+                        </>
+                    )}
                 </div>
             ) : (
                 <>
@@ -989,9 +1011,19 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                                 </div>
                             ) : erpData.length === 0 ? (
                                 <div className="empty-box">
-                                    <AlertTriangle size={48} color="#eab308" />
-                                    <h4>No Marks Loss Data Available</h4>
-                                    <p>We couldn't find any Wrong (W) or Unattempted (U) records in the database for this student.</p>
+                                    {!hasSelectedFilters ? (
+                                        <>
+                                            <SlidersHorizontal size={48} color="#3b82f6" />
+                                            <h4>Please Select Filters to Display Data</h4>
+                                            <p>To display the marks loss report for this student, kindly select the required filters first from the top filter bar.</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <AlertTriangle size={48} color="#eab308" />
+                                            <h4>No Marks Loss Data Available</h4>
+                                            <p>We couldn't find any Wrong (W) or Unattempted (U) records in the database for this student with the selected filters.</p>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <>
