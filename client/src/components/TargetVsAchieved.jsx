@@ -101,15 +101,19 @@ const TargetVsAchieved = ({ filters }) => {
             streamFilter.some(s => ['All', '__ALL__'].includes(s));
 
         if (!isAllStream) {
-            const mappedStreams = streamFilter.map(s => {
-                const up = s.trim().toUpperCase();
-                // Map all Elite variants to "SR ELITE" to match TARGETS table
-                if (up.includes('SR_ELITE') || up.includes('SR ELITE')) return 'SR ELITE';
-                return up;
-            });
             filtered = filtered.filter(t => {
-                const tStream = t.Stream ? t.Stream.trim().toUpperCase() : '';
-                return mappedStreams.includes(tStream);
+                const tStreamRaw = t.Stream ? t.Stream.trim().toUpperCase() : '';
+                const tStreamNorm = tStreamRaw.replace(/_/g, ' ');
+                return streamFilter.some(sf => {
+                    const sfRaw = sf ? sf.trim().toUpperCase() : '';
+                    const sfNorm = sfRaw.replace(/_/g, ' ');
+                    return (
+                        tStreamRaw === sfRaw ||
+                        tStreamNorm === sfNorm ||
+                        (sfNorm.includes('SR ELITE') && tStreamNorm.includes('SR ELITE')) ||
+                        (sfNorm.includes('SR AIIMS') && tStreamNorm.includes('SR AIIMS'))
+                    );
+                });
             });
         }
 
