@@ -341,8 +341,7 @@ const AverageReport = ({ filters }) => {
             const avgBio = Math.round(attemptedRows.reduce((a, b) => a + (Number(b.Botany) || 0) + (Number(b.Zoology) || 0), 0) / attemptedRows.length);
 
             tableRows.push([
-                "AVERAGE",
-                "",
+                { content: "AVERAGE", colSpan: 2 },
                 avg('Tot_720'),
                 avgAIR,
                 avg('Botany'),
