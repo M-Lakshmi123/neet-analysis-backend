@@ -23,6 +23,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
     const { userData, isAdmin, isCoAdmin } = useAuth();
     // Use props filters instead of local state
     const [subjectFilter, setSubjectFilter] = useState({ value: 'ALL', label: 'All Subjects' });
+    const [topLimitFilter, setTopLimitFilter] = useState({ value: 100, label: 'Top 100 Students' });
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -36,6 +37,18 @@ const ErrorTop100 = ({ filters, setFilters }) => {
         { value: 'CHEMISTRY', label: 'Chemistry' },
         { value: 'BOTANY', label: 'Botany' },
         { value: 'ZOOLOGY', label: 'Zoology' }
+    ];
+
+    // Top Limit Options
+    const topLimitOptions = [
+        { value: 5, label: 'Top 5 Students' },
+        { value: 10, label: 'Top 10 Students' },
+        { value: 15, label: 'Top 15 Students' },
+        { value: 20, label: 'Top 20 Students' },
+        { value: 25, label: 'Top 25 Students' },
+        { value: 50, label: 'Top 50 Students' },
+        { value: 100, label: 'Top 100 Students' },
+        { value: 'ALL', label: 'All Students' }
     ];
 
     // Fetch Report Data
@@ -72,11 +85,37 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 const participantsRes = await fetch(`${API_URL}/api/erp/participants?${erpParams.toString()}`);
                 const participantsData = await participantsRes.json();
 
-                // Group by Test then by Question
+                // Group by Test then by Question, and track student scores for ranking
                 const testsGrouped = {};
+                const studentScoresByTest = {};
 
                 errorData.forEach(row => {
                     const testKey = row.Test;
+                    if (!studentScoresByTest[testKey]) {
+                        studentScoresByTest[testKey] = {};
+                    }
+                    const sName = (row.Student_Name || '').trim();
+                    if (sName) {
+                        const key = sName.toUpperCase();
+                        if (!studentScoresByTest[testKey][key]) {
+                            studentScoresByTest[testKey][key] = {
+                                name: sName,
+                                campus: row.Branch,
+                                tot: parseFloat(row.Tot_720) || 0,
+                                air: parseFloat(row.AIR) || 999999
+                            };
+                        } else {
+                            const tot = parseFloat(row.Tot_720) || 0;
+                            const air = parseFloat(row.AIR) || 999999;
+                            if (tot > studentScoresByTest[testKey][key].tot) {
+                                studentScoresByTest[testKey][key].tot = tot;
+                            }
+                            if (air > 0 && air < studentScoresByTest[testKey][key].air) {
+                                studentScoresByTest[testKey][key].air = air;
+                            }
+                        }
+                    }
+
                     if (!testsGrouped[testKey]) {
                         testsGrouped[testKey] = {
                             testName: row.Test,
@@ -106,10 +145,31 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                         testsGrouped[testKey].questions[qKey].nationalError = row.National_Wide_Error;
                     }
 
-                    testsGrouped[testKey].questions[qKey].wrongStudents.push({
-                        name: row.Student_Name,
-                        campus: row.Branch
+                    if (sName) {
+                        const exists = testsGrouped[testKey].questions[qKey].wrongStudents.some(s => (s.name || '').toUpperCase() === sName.toUpperCase());
+                        if (!exists) {
+                            testsGrouped[testKey].questions[qKey].wrongStudents.push({
+                                name: sName,
+                                campus: row.Branch
+                            });
+                        }
+                    }
+                });
+
+                // Rank students per test
+                const rankedStudentsMap = {};
+                Object.entries(studentScoresByTest).forEach(([testKey, studentsObj]) => {
+                    const list = Object.values(studentsObj);
+                    list.sort((a, b) => {
+                        if (a.air !== 999999 && b.air !== 999999 && a.air !== b.air) {
+                            return a.air - b.air;
+                        }
+                        if (b.tot !== a.tot) {
+                            return b.tot - a.tot;
+                        }
+                        return a.name.localeCompare(b.name);
                     });
+                    rankedStudentsMap[testKey] = list.map(s => s.name);
                 });
 
                 // Process into array
@@ -145,7 +205,11 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                         return (parseInt(a.qNo) || 0) - (parseInt(b.qNo) || 0);
                     });
 
-                    return { ...test, questions: questionsArr };
+                    return {
+                        ...test,
+                        rankedStudents: rankedStudentsMap[test.testName] || [],
+                        questions: questionsArr
+                    };
                 });
 
                 setReportData(processed);
@@ -163,6 +227,36 @@ const ErrorTop100 = ({ filters, setFilters }) => {
         const timeout = setTimeout(fetchData, 500);
         return () => clearTimeout(timeout);
     }, [filters]);
+
+    // Filter questions by selected Top Limit (Top 5, Top 10, Top 15, etc.)
+    const getTopFilteredQuestions = (test) => {
+        const limit = topLimitFilter.value;
+        if (limit === 'ALL' || !test.rankedStudents || test.rankedStudents.length === 0) {
+            return test.questions;
+        }
+
+        const topNList = test.rankedStudents.slice(0, Number(limit));
+        const allowedSet = new Set(topNList.map(n => n.toUpperCase()));
+
+        return test.questions.map(q => {
+            const filteredWrong = q.wrongStudents.filter(s => allowedSet.has((s.name || '').toUpperCase()));
+
+            const byCampus = {};
+            filteredWrong.forEach(s => {
+                if (!byCampus[s.campus]) byCampus[s.campus] = [];
+                byCampus[s.campus].push(s.name);
+            });
+
+            const totalCount = Math.min(Number(limit), q.totalCount);
+
+            return {
+                ...q,
+                byCampus,
+                wrongCount: filteredWrong.length,
+                totalCount: totalCount
+            };
+        });
+    };
 
     // Apply Subject Filter
     const getFilteredQuestions = (questions) => {
@@ -279,7 +373,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
             let isFirstPage = true;
 
             for (const test of reportData) {
-                const filteredQs = getFilteredQuestions(test.questions);
+                const topQs = getTopFilteredQuestions(test);
+                const filteredQs = getFilteredQuestions(topQs);
                 if (filteredQs.length === 0) continue;
 
                 if (!isFirstPage) {
@@ -381,7 +476,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
 
                     doc.setFontSize(7);
                     doc.setTextColor(0, 0, 150);
-                    doc.text("Top 100", currX + wTop / 2, yPos + rowH / 2 - 3, { align: 'center' });
+                    const pdfTopLabel = topLimitFilter.value === 'ALL' ? 'All' : `Top ${topLimitFilter.value}`;
+                    doc.text(pdfTopLabel, currX + wTop / 2, yPos + rowH / 2 - 3, { align: 'center' });
                     doc.text("(%):", currX + wTop / 2, yPos + rowH / 2 + 1, { align: 'center' });
                     doc.setTextColor(255, 0, 0);
                     doc.setFontSize(9);
@@ -455,9 +551,10 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 }
             }
 
+            const topTag = topLimitFilter.value === 'ALL' ? 'All' : `Top_${topLimitFilter.value}`;
             const filename = (reportData.length === 1)
-                ? `${reportData[0].date}_${reportData[0].stream}_${reportData[0].testName}_Error Analysis.pdf`
-                : `Top_100_Error_Report.pdf`;
+                ? `${reportData[0].date}_${reportData[0].stream}_${reportData[0].testName}_${topTag}_Error Analysis.pdf`
+                : `${topTag}_Error_Report.pdf`;
             doc.save(filename);
             logActivity(userData, 'Downloaded Error Top 100 PDF', { file: filename });
 
@@ -474,33 +571,71 @@ const ErrorTop100 = ({ filters, setFilters }) => {
 
     return (
         <div style={{ padding: '20px', backgroundColor: '#808080', minHeight: '100vh', boxSizing: 'border-box', overflow: 'auto' }}>
-            <div className="no-print" style={{ maxWidth: '98%', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px' }}>
-                {/* Removed FilterBar from here as it is now in App.jsx */}
+            <div className="no-print" style={{ maxWidth: '98%', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    {/* Row 1: Top Limit Quick Pill Buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '14px', marginRight: '6px', color: '#333' }}>Top Students Filter:</span>
+                        {topLimitOptions.map((opt) => {
+                            const isActive = topLimitFilter.value === opt.value;
+                            return (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => setTopLimitFilter(opt)}
+                                    style={{
+                                        padding: '5px 14px',
+                                        borderRadius: '20px',
+                                        border: isActive ? '1px solid #0056b3' : '1px solid #ced4da',
+                                        backgroundColor: isActive ? '#0070c0' : '#f8f9fa',
+                                        color: isActive ? '#ffffff' : '#333333',
+                                        fontWeight: isActive ? 'bold' : '500',
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease-in-out',
+                                        boxShadow: isActive ? '0 2px 6px rgba(0,112,192,0.35)' : 'none'
+                                    }}
+                                >
+                                    {opt.value === 'ALL' ? 'ALL' : `TOP ${opt.value}`}
+                                </button>
+                            );
+                        })}
+                    </div>
 
-                <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <span style={{ marginRight: '10px', fontWeight: 'bold' }}>Subject:</span>
-                        <div style={{ width: '200px' }}>
-                            <Select options={subjectOptions} value={subjectFilter} onChange={setSubjectFilter} />
+                    {/* Row 2: Select Dropdowns, Zoom, and Download */}
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '20px', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <span style={{ marginRight: '8px', fontWeight: 'bold', fontSize: '14px' }}>Top Limit:</span>
+                                <div style={{ width: '180px' }}>
+                                    <Select options={topLimitOptions} value={topLimitFilter} onChange={setTopLimitFilter} />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <span style={{ marginRight: '8px', fontWeight: 'bold', fontSize: '14px' }}>Subject:</span>
+                                <div style={{ width: '180px' }}>
+                                    <Select options={subjectOptions} value={subjectFilter} onChange={setSubjectFilter} />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #dee2e6' }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '13px', marginRight: '5px' }}>Zoom:</span>
+                                <button onClick={() => setZoom(prev => Math.max(prev - 0.1, 0.5))} style={{ padding: '2px 8px', cursor: 'pointer' }}>-</button>
+                                <span style={{ minWidth: '45px', textAlign: 'center', fontWeight: 'bold' }}>{Math.round(zoom * 100)}%</span>
+                                <button onClick={() => setZoom(prev => Math.min(prev + 0.1, 2))} style={{ padding: '2px 8px', cursor: 'pointer' }}>+</button>
+                                <button onClick={() => setZoom(1)} style={{ padding: '2px 8px', cursor: 'pointer', marginLeft: '5px', fontSize: '12px' }}>Reset</button>
+                            </div>
                         </div>
-                    </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #dee2e6' }}>
-                        <span style={{ fontWeight: 'bold', fontSize: '13px', marginRight: '5px' }}>Zoom:</span>
-                        <button onClick={() => setZoom(prev => Math.max(prev - 0.1, 0.5))} style={{ padding: '2px 8px', cursor: 'pointer' }}>-</button>
-                        <span style={{ minWidth: '45px', textAlign: 'center', fontWeight: 'bold' }}>{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => setZoom(prev => Math.min(prev + 0.1, 2))} style={{ padding: '2px 8px', cursor: 'pointer' }}>+</button>
-                        <button onClick={() => setZoom(1)} style={{ padding: '2px 8px', cursor: 'pointer', marginLeft: '5px', fontSize: '12px' }}>Reset</button>
-                    </div>
-
-                    <div style={{ flex: 1, textAlign: 'right' }}>
-                        <button
-                            onClick={generatePDF}
-                            disabled={reportData.length === 0 || generatingPdf}
-                            style={{ backgroundColor: '#0070c0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                        >
-                            {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download PDF Report`}
-                        </button>
+                        <div>
+                            <button
+                                onClick={generatePDF}
+                                disabled={reportData.length === 0 || generatingPdf}
+                                style={{ backgroundColor: '#0070c0', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                            >
+                                {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download PDF Report`}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -508,8 +643,9 @@ const ErrorTop100 = ({ filters, setFilters }) => {
             {loading && <div style={{ textAlign: 'center', color: 'white', fontSize: '20px' }}>Loading Top 100% Error Data...</div>}
 
             {!loading && reportData.map((test, tIdx) => {
+                const topQs = getTopFilteredQuestions(test);
                 // Sort questions for current display
-                const sortedQs = [...test.questions].sort((a, b) => {
+                const sortedQs = [...topQs].sort((a, b) => {
                     const valA = parseFloat(a.nationalError) || 0;
                     const valB = parseFloat(b.nationalError) || 0;
                     return valB - valA; // Descending
@@ -559,7 +695,9 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.qNo}</td>
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold', color: 'red' }}>{q.wrongCount}/{q.totalCount}</td>
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                                                <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>Top 100(%):</div>
+                                                <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>
+                                                    {topLimitFilter.value === 'ALL' ? 'All (%)' : `Top ${topLimitFilter.value} (%)`}
+                                                </div>
                                                 <div style={{ color: 'red', fontSize: '14px', fontWeight: 'bold' }}>
                                                     {(() => {
                                                         const raw = q.nationalError;
