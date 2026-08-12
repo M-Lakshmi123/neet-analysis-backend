@@ -476,8 +476,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
 
                     doc.setFontSize(7);
                     doc.setTextColor(0, 0, 150);
-                    const pdfTopLabel = topLimitFilter.value === 'ALL' ? 'All' : `Top ${topLimitFilter.value}`;
-                    doc.text(pdfTopLabel, currX + wTop / 2, yPos + rowH / 2 - 3, { align: 'center' });
+                    doc.text("Top 100", currX + wTop / 2, yPos + rowH / 2 - 3, { align: 'center' });
                     doc.text("(%):", currX + wTop / 2, yPos + rowH / 2 + 1, { align: 'center' });
                     doc.setTextColor(255, 0, 0);
                     doc.setFontSize(9);
@@ -695,9 +694,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>{q.qNo}</td>
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold', color: 'red' }}>{q.wrongCount}/{q.totalCount}</td>
                                             <td style={{ border: '1px solid black', padding: '8px', textAlign: 'center' }}>
-                                                <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>
-                                                    {topLimitFilter.value === 'ALL' ? 'All (%)' : `Top ${topLimitFilter.value} (%)`}
-                                                </div>
+                                                <div style={{ color: 'blue', fontSize: '11px', fontWeight: 'bold' }}>Top 100(%):</div>
                                                 <div style={{ color: 'red', fontSize: '14px', fontWeight: 'bold' }}>
                                                     {(() => {
                                                         const raw = q.nationalError;
