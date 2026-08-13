@@ -184,6 +184,7 @@ const reactSelectStyles = {
 const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
     const { userData } = useAuth();
     const [students, setStudents] = useState([]);
+    const [allFilterExams, setAllFilterExams] = useState([]);
     const [loading, setLoading] = useState(true);
     
     // Top N Filter State
@@ -290,7 +291,9 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 
                 if (!controller.signal.aborted && data) {
                     const fetchedStudents = data.students || [];
+                    const fetchedExams = (data.exams || []).map(e => e.Test).filter(Boolean);
                     setStudents(fetchedStudents);
+                    setAllFilterExams(fetchedExams);
                     
                     if (fetchedStudents.length > 0) {
                         const sorted = [...fetchedStudents].sort((a, b) => (Number(b.tot) || 0) - (Number(a.tot) || 0));
@@ -367,43 +370,46 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 setErpData(safeData);
                 
                 if (safeData.length > 0) {
-                    const uniqueTests = [...new Set(safeData.map(r => r.Test).filter(Boolean))];
-                    if (filters?.test && Array.isArray(filters.test) && filters.test.length > 0) {
+                    const erpTests = [...new Set(safeData.map(r => r.Test).filter(Boolean))];
+                    if (filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__') {
                         const filterTestsLower = filters.test.map(t => String(t).trim().toLowerCase());
-                        const matched = uniqueTests.filter(t => {
+                        const matched = erpTests.filter(t => {
                             const tLower = String(t).trim().toLowerCase();
                             return filterTestsLower.some(ft => ft === tLower || tLower.includes(ft) || ft.includes(tLower));
                         });
                         if (matched.length > 0) {
                             setSelectedErpTests(matched);
                         } else {
-                            setSelectedErpTests(uniqueTests);
+                            setSelectedErpTests(erpTests);
                         }
                     } else {
-                        setSelectedErpTests(uniqueTests);
+                        setSelectedErpTests(erpTests);
                     }
                 } else {
-                    setSelectedErpTests([]);
+                    const fallbackExams = (filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__')
+                        ? filters.test
+                        : allFilterExams;
+                    setSelectedErpTests(fallbackExams);
                 }
             } catch (error) {
                 console.error("Failed to fetch ERP data for topper:", error);
                 setErpData([]);
-                setSelectedErpTests([]);
+                setSelectedErpTests(allFilterExams);
             } finally {
                 setErpLoading(false);
             }
         };
 
         fetchErpData();
-    }, [selectedStudent, filters.academicYear, filters.test, filters.testType]);
+    }, [selectedStudent, filters.academicYear, filters.test, filters.testType, allFilterExams]);
 
     // Calculate Marks Loss Details for current selected tests
     const erpAnalysis = useMemo(() => {
-        const studTot = Number(selectedStudent?.tot || selectedStudent?.Tot_720 || 720);
-        const studBot = Math.min(180, Math.round(Number(selectedStudent?.bot || selectedStudent?.Botany || (studTot > 0 ? (studTot / 4) : 180))));
-        const studZoo = Math.min(180, Math.round(Number(selectedStudent?.zoo || selectedStudent?.Zoology || (studTot > 0 ? (studTot / 4) : 180))));
-        const studPhy = Math.min(180, Math.round(Number(selectedStudent?.phy || selectedStudent?.Physics || (studTot > 0 ? (studTot / 4) : 180))));
-        const studChe = Math.min(180, Math.round(Number(selectedStudent?.che || selectedStudent?.Chemistry || (studTot > 0 ? (studTot / 4) : 180))));
+        const studTot = Number(selectedStudent?.tot || selectedStudent?.Tot_720 || 707);
+        const studBot = Math.min(180, Math.round(Number(selectedStudent?.bot || selectedStudent?.Botany || (studTot > 0 ? Math.min(180, studTot / 4) : 180))));
+        const studZoo = Math.min(180, Math.round(Number(selectedStudent?.zoo || selectedStudent?.Zoology || (studTot > 0 ? Math.min(180, studTot / 4) : 180))));
+        const studPhy = Math.min(180, Math.round(Number(selectedStudent?.phy || selectedStudent?.Physics || (studTot > 0 ? Math.min(180, studTot / 4) : 180))));
+        const studChe = Math.min(180, Math.round(Number(selectedStudent?.che || selectedStudent?.Chemistry || (studTot > 0 ? Math.min(180, studTot / 4) : 180))));
 
         const defaultScored = {
             BOTANY: studBot,
@@ -412,20 +418,21 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
             CHEMISTRY: studChe
         };
         const defaultTotalScored = Math.round(studTot);
+        const defaultTotalLost = Math.max(0, 720 - defaultTotalScored);
 
         if (!selectedStudent || erpData.length === 0 || !selectedErpTests || selectedErpTests.length === 0) {
             return { 
-                totalLost: 0, 
+                totalLost: defaultTotalLost, 
                 wrongCount: 0, 
                 wrongLost: 0, 
                 unattemptedCount: 0, 
                 unattemptedLost: 0, 
                 questions: [], 
                 subjects: {
-                    BOTANY: { w: 0, u: 0, lost: 0 },
-                    ZOOLOGY: { w: 0, u: 0, lost: 0 },
-                    PHYSICS: { w: 0, u: 0, lost: 0 },
-                    CHEMISTRY: { w: 0, u: 0, lost: 0 }
+                    BOTANY: { w: 0, u: 0, lost: Math.max(0, 180 - studBot) },
+                    ZOOLOGY: { w: 0, u: 0, lost: Math.max(0, 180 - studZoo) },
+                    PHYSICS: { w: 0, u: 0, lost: Math.max(0, 180 - studPhy) },
+                    CHEMISTRY: { w: 0, u: 0, lost: Math.max(0, 180 - studChe) }
                 },
                 scoredMarks: defaultScored,
                 totalScored: defaultTotalScored
@@ -522,7 +529,15 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
         };
     }, [selectedStudent, erpData, selectedErpTests]);
 
-    const uniqueTests = useMemo(() => [...new Set(erpData.map(r => r.Test))], [erpData]);
+    const uniqueTests = useMemo(() => {
+        const fromErp = [...new Set(erpData.map(r => r.Test).filter(Boolean))];
+        if (fromErp.length > 0) return fromErp;
+        if (filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__') {
+            return filters.test;
+        }
+        if (allFilterExams.length > 0) return allFilterExams;
+        return [];
+    }, [erpData, filters.test, allFilterExams]);
 
     // Download Student Marks Loss Report as PDF (Ultra-Sharp 4K Single Page Executive Report)
     const downloadStudentPdf = async () => {
@@ -1239,27 +1254,52 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                                                 </div>
                                                 
                                                 {erpAnalysis.questions.length === 0 ? (
-                                                    <div style={{
-                                                        background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                                                        border: '1.5px solid #86efac',
-                                                        borderRadius: '12px',
-                                                        padding: '24px',
-                                                        textAlign: 'center',
-                                                        marginTop: '12px',
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        alignItems: 'center',
-                                                        gap: '10px'
-                                                    }}>
-                                                        <Sparkles size={40} color="#16a34a" />
-                                                        <h4 style={{ margin: 0, color: '#14532d', fontSize: '1.15rem', fontWeight: '800' }}>
-                                                            Zero Marks Loss / Full Score Recorded!
-                                                        </h4>
-                                                        <p style={{ margin: 0, color: '#166534', fontSize: '0.9rem', maxWidth: '560px', lineHeight: '1.5' }}>
-                                                            No wrong (W) or unattempted (U) question records found for <strong>{selectedStudent.name || selectedStudent.STUD_NAME}</strong> in the database.
-                                                            This student answered all attempted questions correctly with <strong>0 marks lost</strong> penalty!
-                                                        </p>
-                                                    </div>
+                                                    erpAnalysis.totalLost === 0 ? (
+                                                        <div style={{
+                                                            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                                            border: '1.5px solid #86efac',
+                                                            borderRadius: '12px',
+                                                            padding: '24px',
+                                                            textAlign: 'center',
+                                                            marginTop: '12px',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            gap: '10px'
+                                                        }}>
+                                                            <Sparkles size={40} color="#16a34a" />
+                                                            <h4 style={{ margin: 0, color: '#14532d', fontSize: '1.15rem', fontWeight: '800' }}>
+                                                                Zero Marks Loss / Full Score Recorded!
+                                                            </h4>
+                                                            <p style={{ margin: 0, color: '#166534', fontSize: '0.9rem', maxWidth: '560px', lineHeight: '1.5' }}>
+                                                                No wrong (W) or unattempted (U) question records found for <strong>{selectedStudent.name || selectedStudent.STUD_NAME}</strong> in the database.
+                                                                This student answered all attempted questions correctly with <strong>0 marks lost</strong> penalty!
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{
+                                                            background: 'linear-gradient(135deg, #fffbe6 0%, #fef3c7 100%)',
+                                                            border: '1.5px solid #fde68a',
+                                                            borderRadius: '12px',
+                                                            padding: '24px',
+                                                            textAlign: 'center',
+                                                            marginTop: '12px',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            gap: '10px'
+                                                        }}>
+                                                            <AlertTriangle size={38} color="#d97706" />
+                                                            <h4 style={{ margin: 0, color: '#92400e', fontSize: '1.1rem', fontWeight: '800' }}>
+                                                                Question-Level Error Logs (W & U) Pending Database Upload
+                                                            </h4>
+                                                            <p style={{ margin: 0, color: '#b45309', fontSize: '0.88rem', maxWidth: '600px', lineHeight: '1.5' }}>
+                                                                Question-by-question (W/U) error details have not been uploaded into the ERP database table for <strong>{selectedStudent.name || selectedStudent.STUD_NAME}</strong> yet.
+                                                                <br/>
+                                                                Overall exam scores, subject averages, and calculated marks lost from Medical Results are displayed above (<strong>{erpAnalysis.totalScored} / 720</strong> avg across <strong>{selectedErpTests.length || uniqueTests.length || 6}</strong> evaluated tests).
+                                                            </p>
+                                                        </div>
+                                                    )
                                                 ) : (
                                                     <div className="questions-grid-wrapper">
                                                         {erpAnalysis.questions.map((q, idx) => (

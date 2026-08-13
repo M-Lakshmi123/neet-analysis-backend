@@ -1804,27 +1804,52 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                         </div>
                                         
                                         {erpAnalysis.questions.length === 0 ? (
-                                            <div style={{
-                                                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                                                border: '1.5px solid #86efac',
-                                                borderRadius: '12px',
-                                                padding: '24px',
-                                                textAlign: 'center',
-                                                marginTop: '12px',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                gap: '10px'
-                                            }}>
-                                                <Sparkles size={40} color="#16a34a" />
-                                                <h4 style={{ margin: 0, color: '#14532d', fontSize: '1.15rem', fontWeight: '800' }}>
-                                                    Zero Marks Loss / Full Score Recorded!
-                                                </h4>
-                                                <p style={{ margin: 0, color: '#166534', fontSize: '0.9rem', maxWidth: '560px', lineHeight: '1.5' }}>
-                                                    No wrong (W) or unattempted (U) question records found for <strong>{selectedStudent.name || selectedStudent.STUD_NAME}</strong> in the database.
-                                                    This student answered all attempted questions correctly with <strong>0 marks lost</strong> penalty!
-                                                </p>
-                                            </div>
+                                            erpAnalysis.totalLost === 0 ? (
+                                                <div style={{
+                                                    background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                                                    border: '1.5px solid #86efac',
+                                                    borderRadius: '12px',
+                                                    padding: '24px',
+                                                    textAlign: 'center',
+                                                    marginTop: '12px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    gap: '10px'
+                                                }}>
+                                                    <Sparkles size={40} color="#16a34a" />
+                                                    <h4 style={{ margin: 0, color: '#14532d', fontSize: '1.15rem', fontWeight: '800' }}>
+                                                        Zero Marks Loss / Full Score Recorded!
+                                                    </h4>
+                                                    <p style={{ margin: 0, color: '#166534', fontSize: '0.9rem', maxWidth: '560px', lineHeight: '1.5' }}>
+                                                        No wrong (W) or unattempted (U) question records found for <strong>{selectedStudent.name || selectedStudent.STUD_NAME}</strong> in the database.
+                                                        This student answered all attempted questions correctly with <strong>0 marks lost</strong> penalty!
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <div style={{
+                                                    background: 'linear-gradient(135deg, #fffbe6 0%, #fef3c7 100%)',
+                                                    border: '1.5px solid #fde68a',
+                                                    borderRadius: '12px',
+                                                    padding: '24px',
+                                                    textAlign: 'center',
+                                                    marginTop: '12px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    gap: '10px'
+                                                }}>
+                                                    <AlertTriangle size={38} color="#d97706" />
+                                                    <h4 style={{ margin: 0, color: '#92400e', fontSize: '1.1rem', fontWeight: '800' }}>
+                                                        Question-Level Error Logs (W & U) Pending Database Upload
+                                                    </h4>
+                                                    <p style={{ margin: 0, color: '#b45309', fontSize: '0.88rem', maxWidth: '600px', lineHeight: '1.5' }}>
+                                                        Question-by-question (W/U) error details have not been uploaded into the ERP database table for <strong>{selectedStudent.name || selectedStudent.STUD_NAME}</strong> yet.
+                                                        <br/>
+                                                        Overall exam scores, subject averages, and calculated marks lost from Medical Results are displayed above (<strong>{erpAnalysis.totalScored} / 720</strong> avg across evaluated tests).
+                                                    </p>
+                                                </div>
+                                            )
                                         ) : (
                                             <div className="questions-grid-wrapper">
                                                 {erpAnalysis.questions.map((q, idx) => (
