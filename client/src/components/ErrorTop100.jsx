@@ -232,30 +232,32 @@ const ErrorTop100 = ({ filters, setFilters }) => {
     const getTopFilteredQuestions = (test) => {
         const limit = topLimitFilter.value;
         if (limit === 'ALL' || !test.rankedStudents || test.rankedStudents.length === 0) {
-            return test.questions;
+            return test.questions.filter(q => (q.wrongCount && q.wrongCount > 0) || (q.wrongStudents && q.wrongStudents.length > 0));
         }
 
         const topNList = test.rankedStudents.slice(0, Number(limit));
         const allowedSet = new Set(topNList.map(n => n.toUpperCase()));
 
-        return test.questions.map(q => {
-            const filteredWrong = q.wrongStudents.filter(s => allowedSet.has((s.name || '').toUpperCase()));
+        return test.questions
+            .map(q => {
+                const filteredWrong = q.wrongStudents.filter(s => allowedSet.has((s.name || '').toUpperCase()));
 
-            const byCampus = {};
-            filteredWrong.forEach(s => {
-                if (!byCampus[s.campus]) byCampus[s.campus] = [];
-                byCampus[s.campus].push(s.name);
-            });
+                const byCampus = {};
+                filteredWrong.forEach(s => {
+                    if (!byCampus[s.campus]) byCampus[s.campus] = [];
+                    byCampus[s.campus].push(s.name);
+                });
 
-            const totalCount = Math.min(Number(limit), q.totalCount);
+                const totalCount = Math.min(Number(limit), q.totalCount);
 
-            return {
-                ...q,
-                byCampus,
-                wrongCount: filteredWrong.length,
-                totalCount: totalCount
-            };
-        });
+                return {
+                    ...q,
+                    byCampus,
+                    wrongCount: filteredWrong.length,
+                    totalCount: totalCount
+                };
+            })
+            .filter(q => q.wrongCount > 0);
     };
 
     // Apply Subject Filter
