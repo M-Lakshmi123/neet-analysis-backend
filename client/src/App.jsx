@@ -257,9 +257,20 @@ const Dashboard = () => {
                         });
                     }
 
+                    // Fallback stream extraction if missing from target_query (e.g. description "Admin updated Marks for WT-04 (JR ELITE)")
+                    if ((!sanitizedFilters.stream || sanitizedFilters.stream.length === 0) && (update.description || update.title)) {
+                        const textToSearch = `${update.description || ''} ${update.title || ''}`;
+                        const match = textToSearch.match(/\(([^)]+)\)/);
+                        if (match && match[1]) {
+                            const extractedStream = match[1].trim();
+                            if (extractedStream && !extractedStream.toLowerCase().includes('admin') && !extractedStream.toLowerCase().includes('results')) {
+                                sanitizedFilters.stream = [extractedStream];
+                            }
+                        }
+                    }
+
                     setGlobalFilters(prev => ({
-                        campus: prev.campus || [],
-                        academicYear: prev.academicYear || '2026',
+                        ...prev,
                         ...sanitizedFilters
                     }));
                 } catch (e) {
