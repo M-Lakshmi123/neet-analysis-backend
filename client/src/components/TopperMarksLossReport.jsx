@@ -403,6 +403,25 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
         fetchErpData();
     }, [selectedStudent, filters.academicYear, filters.test, filters.testType, allFilterExams]);
 
+const estimateWU = (lost) => {
+    if (!lost || lost <= 0) return { w: 0, wLost: 0, u: 0, uLost: 0 };
+    let w = Math.floor(lost / 5);
+    let rem = lost % 5;
+    let u = 0;
+    if (rem === 4) {
+        u = 1;
+    } else if (rem === 3 && w > 0) {
+        w -= 1;
+        u = 2;
+    } else if (rem === 2 && w >= 2) {
+        w -= 2;
+        u = 3;
+    }
+    const wLost = w * 5;
+    const uLost = u * 4;
+    return { w, wLost, u, uLost };
+};
+
     // Calculate Marks Loss Details for current selected tests
     const erpAnalysis = useMemo(() => {
         const studTot = Number(selectedStudent?.tot || selectedStudent?.Tot_720 || 707);
@@ -421,18 +440,34 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
         const defaultTotalLost = Math.max(0, 720 - defaultTotalScored);
 
         if (!selectedStudent || erpData.length === 0 || !selectedErpTests || selectedErpTests.length === 0) {
+            const botLost = Math.max(0, 180 - studBot);
+            const zooLost = Math.max(0, 180 - studZoo);
+            const phyLost = Math.max(0, 180 - studPhy);
+            const cheLost = Math.max(0, 180 - studChe);
+
+            const botWU = estimateWU(botLost);
+            const zooWU = estimateWU(zooLost);
+            const phyWU = estimateWU(phyLost);
+            const cheWU = estimateWU(cheLost);
+
+            const wrongCount = botWU.w + zooWU.w + phyWU.w + cheWU.w;
+            const wrongLost = botWU.wLost + zooWU.wLost + phyWU.wLost + cheWU.wLost;
+            const unattemptedCount = botWU.u + zooWU.u + phyWU.u + cheWU.u;
+            const unattemptedLost = botWU.uLost + zooWU.uLost + phyWU.uLost + cheWU.uLost;
+            const totalLost = wrongLost + unattemptedLost || defaultTotalLost;
+
             return { 
-                totalLost: defaultTotalLost, 
-                wrongCount: 0, 
-                wrongLost: 0, 
-                unattemptedCount: 0, 
-                unattemptedLost: 0, 
+                totalLost, 
+                wrongCount, 
+                wrongLost, 
+                unattemptedCount, 
+                unattemptedLost, 
                 questions: [], 
                 subjects: {
-                    BOTANY: { w: 0, u: 0, lost: Math.max(0, 180 - studBot) },
-                    ZOOLOGY: { w: 0, u: 0, lost: Math.max(0, 180 - studZoo) },
-                    PHYSICS: { w: 0, u: 0, lost: Math.max(0, 180 - studPhy) },
-                    CHEMISTRY: { w: 0, u: 0, lost: Math.max(0, 180 - studChe) }
+                    BOTANY: { w: botWU.w, u: botWU.u, lost: botLost },
+                    ZOOLOGY: { w: zooWU.w, u: zooWU.u, lost: zooLost },
+                    PHYSICS: { w: phyWU.w, u: phyWU.u, lost: phyLost },
+                    CHEMISTRY: { w: cheWU.w, u: cheWU.u, lost: cheLost }
                 },
                 scoredMarks: defaultScored,
                 totalScored: defaultTotalScored
