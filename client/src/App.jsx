@@ -258,9 +258,10 @@ const Dashboard = () => {
                     }
 
                     setGlobalFilters(prev => ({
-                        ...prev,
+                        campus: prev.campus || [],
+                        academicYear: prev.academicYear || '2026',
                         ...sanitizedFilters
-                    }), update.target_page);
+                    }));
                 } catch (e) {
                     console.error("Failed to parse target query on redirect:", e);
                 }

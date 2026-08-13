@@ -403,7 +403,7 @@ async function processResultFile(filePath, streamFromFolder, pool, getMappedCate
                 description: `Admin updated Marks & Ranks for ${testName} (${dbStream}).`,
                 category: 'marks',
                 targetPage: 'analysis',
-                targetQuery: { testType: testType, test: testName }
+                targetQuery: { stream: dbStream, testType: testType, test: testName }
             });
         } catch (e) {
             console.error(`[NOTIFICATION] Failed to log result upload:`, e.message);

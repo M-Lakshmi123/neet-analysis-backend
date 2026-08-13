@@ -399,7 +399,7 @@ async function processErp() {
                         description: `Admin updated Error Report Analysis for ${testName} (${streamFromMetadata}).`,
                         category: 'errors',
                         targetPage: 'errors',
-                        targetQuery: { testType: testType, test: testName }
+                        targetQuery: { stream: streamFromMetadata, testType: testType, test: testName }
                     });
                 } catch (e) {
                     console.error(`[NOTIFICATION] Failed to log ERP upload:`, e.message);

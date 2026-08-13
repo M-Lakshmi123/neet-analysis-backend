@@ -372,7 +372,7 @@ async function uploadToDB(rows, tableName, filename) {
                     description: `Auto-uploader updated Error Report Analysis for ${testName} (${streamName}).`,
                     category: 'errors',
                     targetPage: 'errors',
-                    targetQuery: { testType, test: testName }
+                    targetQuery: { stream: streamName, testType, test: testName }
                 });
             } catch (e) {
                 console.error(`[NOTIFICATION] Auto-upload notification failed:`, e.message);

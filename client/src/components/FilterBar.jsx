@@ -120,6 +120,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                     const validateField = (key, available) => {
                         const currentValues = prev[key];
                         if (!currentValues || currentValues.length === 0 || currentValues[0] === "__ALL__") return;
+                        if (!available || available.length === 0) return;
 
                         const filtered = currentValues.filter(v => available.includes(v));
                         if (filtered.length !== currentValues.length) {

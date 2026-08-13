@@ -310,7 +310,7 @@ async function uploadToDB(rows, tableName, filename) {
                         description: `Auto-uploader updated Marks & Ranks for ${testName} (${streamName}).`,
                         category: 'marks',
                         targetPage: 'analysis',
-                        targetQuery: { testType, test: testName }
+                        targetQuery: { stream: streamName, testType, test: testName }
                     });
                 } else if (tableName === 'ERP_REPORT') {
                     await logUpdateNotification(pool, {
@@ -318,7 +318,7 @@ async function uploadToDB(rows, tableName, filename) {
                         description: `Auto-uploader updated Error Report Analysis for ${testName} (${streamName}).`,
                         category: 'errors',
                         targetPage: 'errors',
-                        targetQuery: { testType, test: testName }
+                        targetQuery: { stream: streamName, testType, test: testName }
                     });
                 }
             } catch (e) {
