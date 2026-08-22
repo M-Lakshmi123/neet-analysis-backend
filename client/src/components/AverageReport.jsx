@@ -78,7 +78,7 @@ const analyzeLaggingSubjectAndLosses = (transformedRows) => {
     };
 };
 
-// Canvas Chart Generator with exact 11.3pt PDF Font Size (50px canvas size) & High-Contrast Dark Slate Navy Labels
+// Canvas Chart Generator with exact 10.3pt PDF Font Size (46px canvas size) & High-Contrast Dark Slate Navy Labels
 const generateChartImage = (transformedRows) => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -129,8 +129,8 @@ const generateChartImage = (transformedRows) => {
                             borderColor: '#94a3b8',
                             borderWidth: 2,
                             borderRadius: 8,
-                            padding: { top: 5, bottom: 5, left: 8, right: 8 },
-                            font: { weight: 'bold', size: 50 }, // 50px canvas font = EXACT 11.3pt bold font in PDF!
+                            padding: { top: 4, bottom: 4, left: 8, right: 8 },
+                            font: { weight: 'bold', size: 46 }, // 46px canvas font = EXACT 10.3pt bold font in PDF!
                             formatter: (val) => val !== null ? val : 'AB'
                         }
                     }
@@ -140,15 +140,15 @@ const generateChartImage = (transformedRows) => {
                 responsive: false,
                 animation: false,
                 layout: {
-                    padding: { top: 90, right: 70, bottom: 25, left: 80 }
+                    padding: { top: 85, right: 70, bottom: 25, left: 80 }
                 },
                 plugins: {
                     title: {
                         display: true,
                         text: 'Student Performance Trend (Total Marks / 720)',
-                        font: { size: 46, weight: 'bold' },
+                        font: { size: 44, weight: 'bold' },
                         color: '#0f172a',
-                        padding: { top: 15, bottom: 35 }
+                        padding: { top: 15, bottom: 30 }
                     },
                     legend: {
                         display: false
@@ -188,6 +188,7 @@ const AverageReport = ({ filters }) => {
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
+    const [includeChart, setIncludeChart] = useState(true); // Toggle to include or exclude chart & diagnostics
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
     useEffect(() => {
@@ -290,7 +291,7 @@ const AverageReport = ({ filters }) => {
         });
     };
 
-    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformedRows) => {
+    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformedRows, isChartIncluded) => {
         const doc = new jsPDF('p', 'mm', 'a4');
 
         if (impactFont) {
@@ -568,8 +569,8 @@ const AverageReport = ({ filters }) => {
             }
         });
 
-        // 6. Modern Chart & Lagging Subject Marks Loss Diagnostics Section
-        if (chartImgData) {
+        // Optional Chart & Lagging Subject Diagnostics (only when isChartIncluded is TRUE)
+        if (isChartIncluded && chartImgData) {
             const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
             const chartHeight = 75;
 
@@ -784,11 +785,11 @@ const AverageReport = ({ filters }) => {
             if (studentIds.length === 1) {
                 const sRows = grouped[studentIds[0]];
                 const transformed = getTransformedRows(sRows);
-                const chartImgData = await generateChartImage(transformed);
-                const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed);
+                const chartImgData = includeChart ? await generateChartImage(transformed) : null;
+                const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart);
                 const sName = sRows[0].NAME_OF_THE_STUDENT || 'Report';
                 doc.save(`${sName}_Progress_Report.pdf`);
-                logActivity(userData, 'Downloaded Progress PDF', { student: sName });
+                logActivity(userData, 'Downloaded Progress PDF', { student: sName, includeChart });
             } else {
                 const zip = new JSZip();
                 const campusName = grouped[studentIds[0]][0].CAMPUS_NAME || 'Campus';
@@ -797,15 +798,15 @@ const AverageReport = ({ filters }) => {
                     const sRows = grouped[id];
                     const sName = sRows[0].NAME_OF_THE_STUDENT || id;
                     const transformed = getTransformedRows(sRows);
-                    const chartImgData = await generateChartImage(transformed);
-                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed);
+                    const chartImgData = includeChart ? await generateChartImage(transformed) : null;
+                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart);
                     const pdfBlob = doc.output('blob');
                     zip.file(`${sName}_Progress_Report.pdf`, pdfBlob);
                 }
 
                 const content = await zip.generateAsync({ type: "blob" });
                 saveAs(content, `${campusName}_Progress_Reports.zip`);
-                logActivity(userData, 'Downloaded Bulk Progress PDF', { count: studentIds.length, campus: campusName });
+                logActivity(userData, 'Downloaded Bulk Progress PDF', { count: studentIds.length, campus: campusName, includeChart });
             }
 
         } catch (err) {
@@ -876,7 +877,7 @@ const AverageReport = ({ filters }) => {
                         borderWidth: 1.5,
                         borderRadius: 4,
                         padding: { top: 2, bottom: 2, left: 5, right: 5 },
-                        font: { weight: 'bold', size: 11.3 }, // Exact 11.3px bold font in Web UI!
+                        font: { weight: 'bold', size: 10.3 }, // Exact 10.3px bold font in Web UI!
                         formatter: (val) => val !== null ? val : 'AB'
                     }
                 }
@@ -925,7 +926,16 @@ const AverageReport = ({ filters }) => {
                             </div>
                         )}
                     </div>
-                    <div className="button-group" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div className="button-group" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '0.86rem', color: '#334155', fontWeight: '600', userSelect: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                            <input
+                                type="checkbox"
+                                checked={includeChart}
+                                onChange={(e) => setIncludeChart(e.target.checked)}
+                                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#2563eb' }}
+                            />
+                            Include Chart & Analysis
+                        </label>
                         <button className="btn-primary" onClick={fetchData} style={{ backgroundColor: '#6366f1' }}>
                             View Report
                         </button>
@@ -1036,8 +1046,8 @@ const AverageReport = ({ filters }) => {
                             </div>
                         )}
 
-                        {/* Modern Performance Chart & Lagging Subject Marks Loss Card */}
-                        {chartData && performanceDiagnostics && (
+                        {/* Modern Performance Chart & Lagging Subject Marks Loss Card (Only shown when includeChart is true) */}
+                        {includeChart && chartData && performanceDiagnostics && (
                             <div className="ptm-analysis-card" style={{ marginTop: '24px', padding: '20px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                 <div style={{ height: '340px', marginBottom: '20px' }}>
                                     <Line data={chartData} options={chartOptions} />
