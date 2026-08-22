@@ -78,7 +78,7 @@ const analyzeLaggingSubjectAndLosses = (transformedRows) => {
     };
 };
 
-// Perfectly proportioned 2400x950 Canvas Chart Generator for crisp PDF rendering
+// Canvas Chart Generator with Smart Label Alignment (No Y-axis collisions!)
 const generateChartImage = (transformedRows) => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -121,8 +121,16 @@ const generateChartImage = (transformedRows) => {
                         fill: true,
                         datalabels: {
                             display: true,
-                            align: 'top',
-                            anchor: 'end',
+                            align: (context) => {
+                                const idx = context.dataIndex;
+                                const total = context.dataset.data.length;
+                                if (idx === 0) return 'right'; // WT-01 (656): align right of point to avoid colliding with Y-axis 700!
+                                if (idx === total - 1) return 'left'; // UT-04: align left inside chart
+                                return 'top';
+                            },
+                            anchor: (context) => {
+                                return context.dataIndex === 0 ? 'center' : 'end';
+                            },
                             offset: 6,
                             color: '#1d4ed8',
                             font: { weight: 'bold', size: 30 },
@@ -135,7 +143,7 @@ const generateChartImage = (transformedRows) => {
                 responsive: false,
                 animation: false,
                 layout: {
-                    padding: { top: 65, right: 50, bottom: 25, left: 45 }
+                    padding: { top: 65, right: 60, bottom: 25, left: 75 }
                 },
                 plugins: {
                     title: {
@@ -153,7 +161,7 @@ const generateChartImage = (transformedRows) => {
                     y: {
                         beginAtZero: true,
                         max: 780,
-                        ticks: { stepSize: 100, font: { size: 26, weight: 'bold' }, color: '#334155' },
+                        ticks: { stepSize: 100, font: { size: 26, weight: 'bold' }, color: '#334155', padding: 12 },
                         title: { display: true, text: 'Total Marks / 720', font: { size: 28, weight: 'bold' }, color: '#0f172a', padding: { bottom: 12 } },
                         grid: { color: '#cbd5e1', lineWidth: 1.5 }
                     },
@@ -861,7 +869,16 @@ const AverageReport = ({ filters }) => {
                     fill: true,
                     datalabels: {
                         display: true,
-                        align: 'top',
+                        align: (context) => {
+                            const idx = context.dataIndex;
+                            const total = context.dataset.data.length;
+                            if (idx === 0) return 'right';
+                            if (idx === total - 1) return 'left';
+                            return 'top';
+                        },
+                        anchor: (context) => {
+                            return context.dataIndex === 0 ? 'center' : 'end';
+                        },
                         color: '#1e3a8a',
                         font: { weight: 'bold', size: 12 },
                         formatter: (val) => val !== null ? val : 'AB'
@@ -879,7 +896,7 @@ const AverageReport = ({ filters }) => {
             title: { display: true, text: 'Student Performance Trend (Total Marks / 720)', font: { size: 16, weight: 'bold' } }
         },
         scales: {
-            y: { beginAtZero: true, max: 720, title: { display: true, text: 'Total Marks / 720' } },
+            y: { beginAtZero: true, max: 780, ticks: { padding: 10 }, title: { display: true, text: 'Total Marks / 720' } },
             x: { title: { display: true, text: 'Exams' } }
         }
     };
