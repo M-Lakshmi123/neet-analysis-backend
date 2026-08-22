@@ -63,18 +63,18 @@ const analyzeLaggingSubjectAndLosses = (transformedRows) => {
     const testLosses = transformedRows.map(row => {
         const testName = row.Test?.trim() || '';
         if (row.isAB) {
-            return `${testName}: AB (-${lagging.max})`;
+            return { testName, lossText: `AB (-${lagging.max})`, isAB: true };
         }
         const scored = Math.round(Number(row[lagging.key]) || 0);
         const loss = lagging.max - scored;
-        return `${testName}: -${loss}`;
+        return { testName, lossText: `-${loss}`, isAB: false };
     });
 
     return {
         laggingSubjectName: lagging.name,
         laggingAvg: lagging.avg,
         laggingMax: lagging.max,
-        marksLossString: testLosses.join(', ')
+        testLosses
     };
 };
 
@@ -152,7 +152,7 @@ const generateChartImage = (transformedRows) => {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        max: 780, // Extended max to 780 so numbers at 656/598 have ample vertical clearance!
+                        max: 780,
                         ticks: { stepSize: 100, font: { size: 26, weight: 'bold' }, color: '#334155' },
                         title: { display: true, text: 'Total Marks / 720', font: { size: 28, weight: 'bold' }, color: '#0f172a', padding: { bottom: 12 } },
                         grid: { color: '#cbd5e1', lineWidth: 1.5 }
@@ -369,7 +369,7 @@ const AverageReport = ({ filters }) => {
         doc.line(marginX, currentY, pageWidth - marginX, currentY);
         currentY += 4;
 
-        // Dynamic Header Box (Student Info) with Space & Next-Line Layout
+        // Dynamic Header Box (Student Info) with Uniform Dark Blue Field Values
         if (studentData.length > 0) {
             const student = studentData[0];
             const normalizedStream = getNormalizedStream(studentData);
@@ -399,23 +399,26 @@ const AverageReport = ({ filters }) => {
 
             const textYStart = currentY + 8;
 
-            // Student Name Label
+            // Student Name Label (Black)
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
             doc.setFontSize(11);
             doc.setTextColor(0, 0, 0);
             doc.text("Student Name:", col1X, textYStart);
 
-            // Campus Label & Value (Row 1 Right)
+            // Campus Label (Black)
             doc.text("Campus:", col2X, textYStart);
+
+            // Campus Value (Uniform Dark Blue)
             if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "normal");
+            else doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 51, 153);
             doc.text(campusStr, col2ValX, textYStart);
 
             let row2Y = textYStart + 9;
 
             if (isNameOnNextLine) {
-                // Render student name on Line 2 clearly with space
+                // Student Name Value on Line 2 (Uniform Dark Blue)
                 if (bookmanFont) doc.setFont("Bookman", "bold");
                 else doc.setFont("helvetica", "bold");
                 doc.setFontSize(11);
@@ -424,31 +427,37 @@ const AverageReport = ({ filters }) => {
 
                 row2Y = textYStart + 16;
             } else {
-                // Name on Line 1 with space after label
+                // Student Name Value on Line 1 (Uniform Dark Blue)
                 if (bookmanFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "normal");
+                else doc.setFont("helvetica", "bold");
                 doc.setFontSize(11);
-                doc.setTextColor(0, 0, 0);
+                doc.setTextColor(0, 51, 153);
                 doc.text(nameStr, col1ValX, textYStart);
             }
 
-            // Student ID & Stream
+            // Student ID Label (Black)
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
             doc.setFontSize(11);
             doc.setTextColor(0, 0, 0);
             doc.text("Student ID:", col1X, row2Y);
 
-            if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "normal");
-            doc.text(student.STUD_ID?.toString() || '', col1ValX, row2Y);
-
+            // Student ID Value (Uniform Dark Blue)
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 51, 153);
+            doc.text(student.STUD_ID?.toString() || '', col1ValX, row2Y);
+
+            // Stream Label (Black)
+            if (bookmanFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 0, 0);
             doc.text("Stream:", col2X, row2Y);
 
+            // Stream Value (Uniform Dark Blue)
             if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "normal");
+            else doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 51, 153);
             doc.text(normalizedStream, col2ValX, row2Y);
 
             currentY += boxHeight;
@@ -556,17 +565,32 @@ const AverageReport = ({ filters }) => {
         // 6. Modern Chart & Lagging Subject Marks Loss Diagnostics Section
         if (chartImgData) {
             const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
-            const chartHeight = 75; // Proportioned 190mm x 75mm box
+            const chartHeight = 75;
 
             let advisoryHeight = 24;
-            let lossLines = [];
+            let lossItems = analysis ? analysis.testLosses : [];
+            let lineCount = 1;
+
             if (analysis) {
                 if (bookmanFont) doc.setFont("Bookman", "normal");
                 else doc.setFont("helvetica", "normal");
                 doc.setFontSize(8.5);
-                const maxLossWidth = contentWidth - 8;
-                lossLines = doc.splitTextToSize(analysis.marksLossString, maxLossWidth);
-                advisoryHeight = 22 + (lossLines.length * 4.5);
+
+                const maxX = marginX + contentWidth - 4;
+                let tempX = marginX + 4;
+
+                lossItems.forEach((item, idx) => {
+                    const str = `${item.testName}: ${item.lossText}${idx < lossItems.length - 1 ? ',  ' : ''}`;
+                    const w = doc.getTextWidth(str);
+                    if (tempX + w > maxX) {
+                        lineCount++;
+                        tempX = marginX + 4 + w;
+                    } else {
+                        tempX += w;
+                    }
+                });
+
+                advisoryHeight = 22 + (lineCount * 5);
             }
 
             const totalRequiredHeight = chartHeight + advisoryHeight + 10;
@@ -609,7 +633,7 @@ const AverageReport = ({ filters }) => {
             // Render Crisp High-DPI Chart Image
             doc.addImage(chartImgData, 'PNG', marginX, chartStartY, contentWidth, chartHeight);
 
-            // Render Diagnostics Box with Exact Dynamic Label Measurement
+            // Render Diagnostics Box with Colored Highlights for Marks Loss
             if (analysis) {
                 const advisoryY = chartStartY + chartHeight + 4;
 
@@ -617,7 +641,7 @@ const AverageReport = ({ filters }) => {
                 doc.setDrawColor(203, 213, 225);
                 doc.roundedRect(marginX, advisoryY, contentWidth, advisoryHeight, 1, 1, 'FD');
 
-                // Header Bar
+                // Header Bar inside Box
                 doc.setFillColor(224, 231, 255);
                 doc.rect(marginX, advisoryY, contentWidth, 7, 'F');
                 doc.setDrawColor(203, 213, 225);
@@ -629,44 +653,74 @@ const AverageReport = ({ filters }) => {
                 doc.setTextColor(30, 58, 138);
                 doc.text("PERFORMANCE DIAGNOSTICS & MARKS LOSS ANALYSIS", marginX + 4, advisoryY + 5);
 
-                let lineY = advisoryY + 12;
+                let textY = advisoryY + 12;
 
-                // Set font to exact style BEFORE measuring label width
+                // Line 1: Primary Lagging Subject Label (Red) & Value (Dark Blue)
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                 else doc.setFont("helvetica", "bold");
                 doc.setFontSize(10);
                 doc.setTextColor(185, 28, 28);
-
                 const labelText = "Primary Lagging Subject: ";
-                doc.text(labelText, marginX + 4, lineY);
+                doc.text(labelText, marginX + 4, textY);
 
                 const labelWidth = doc.getTextWidth(labelText);
 
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setTextColor(30, 41, 59);
-                doc.text(`${analysis.laggingSubjectName} (${analysis.laggingAvg}/${analysis.laggingMax})`, marginX + 4 + labelWidth + 4, lineY);
+                doc.setTextColor(0, 51, 153); // Uniform Dark Blue for value
+                doc.text(`${analysis.laggingSubjectName} (${analysis.laggingAvg}/${analysis.laggingMax})`, marginX + 4 + labelWidth + 3, textY);
 
-                lineY += 6;
+                textY += 6;
 
-                // Line 2: Marks Loss Title
+                // Line 2: Marks Loss Header
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                 else doc.setFont("helvetica", "bold");
                 doc.setFontSize(9);
                 doc.setTextColor(30, 58, 138);
-                doc.text(`Marks Loss in ${analysis.laggingSubjectName} across Tests:`, marginX + 4, lineY);
+                doc.text(`Marks Loss in ${analysis.laggingSubjectName} across Tests:`, marginX + 4, textY);
 
-                lineY += 5;
+                textY += 5;
 
-                // Line 3+: Wrapped Test Marks Loss List
-                if (bookmanFont) doc.setFont("Bookman", "normal");
-                else doc.setFont("helvetica", "normal");
+                // Line 3+: Render Test-by-Test Loss with Highlighted RED Loss Numbers
+                let currentX = marginX + 4;
+                const maxX = marginX + contentWidth - 4;
                 doc.setFontSize(8.5);
-                doc.setTextColor(51, 65, 85);
 
-                lossLines.forEach((line) => {
-                    doc.text(line, marginX + 4, lineY);
-                    lineY += 4.5;
+                lossItems.forEach((item, idx) => {
+                    const testLabel = `${item.testName}: `;
+                    const lossValStr = item.lossText;
+                    const sepStr = (idx < lossItems.length - 1) ? ",  " : "";
+
+                    doc.setFont(bookmanBoldFont ? "Bookman" : "helvetica", "bold");
+                    const testW = doc.getTextWidth(testLabel);
+                    const lossW = doc.getTextWidth(lossValStr);
+                    doc.setFont(bookmanFont ? "Bookman" : "helvetica", "normal");
+                    const sepW = doc.getTextWidth(sepStr);
+
+                    const totalW = testW + lossW + sepW;
+
+                    if (currentX + totalW > maxX) {
+                        textY += 5;
+                        currentX = marginX + 4;
+                    }
+
+                    // Test Name in dark slate
+                    doc.setFont(bookmanBoldFont ? "Bookman" : "helvetica", "bold");
+                    doc.setTextColor(30, 41, 59);
+                    doc.text(testLabel, currentX, textY);
+                    currentX += testW;
+
+                    // Loss Value in BOLD RED HIGHLIGHT!
+                    doc.setFont(bookmanBoldFont ? "Bookman" : "helvetica", "bold");
+                    doc.setTextColor(220, 38, 38); // Highlight Red
+                    doc.text(lossValStr, currentX, textY);
+                    currentX += lossW;
+
+                    // Separator
+                    if (sepStr) {
+                        doc.setFont(bookmanFont ? "Bookman" : "helvetica", "normal");
+                        doc.setTextColor(100, 116, 139);
+                        doc.text(sepStr, currentX, textY);
+                        currentX += sepW;
+                    }
                 });
             }
         }
@@ -983,16 +1037,21 @@ const AverageReport = ({ filters }) => {
 
                                     <div style={{ marginBottom: '12px' }}>
                                         <span style={{ fontWeight: 'bold', color: '#dc2626', fontSize: '0.95rem' }}>Primary Lagging Subject: </span>
-                                        <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{performanceDiagnostics.laggingSubjectName} ({performanceDiagnostics.laggingAvg}/{performanceDiagnostics.laggingMax})</strong>
+                                        <strong style={{ fontSize: '1rem', color: '#003399' }}>{performanceDiagnostics.laggingSubjectName} ({performanceDiagnostics.laggingAvg}/{performanceDiagnostics.laggingMax})</strong>
                                     </div>
 
                                     <div style={{ background: '#f1f5f9', padding: '12px 14px', borderRadius: '6px' }}>
-                                        <span style={{ fontWeight: 'bold', color: '#1e3a8a', display: 'block', marginBottom: '6px', fontSize: '0.9rem' }}>
+                                        <span style={{ fontWeight: 'bold', color: '#1e3a8a', display: 'block', marginBottom: '8px', fontSize: '0.9rem' }}>
                                             Marks Loss in {performanceDiagnostics.laggingSubjectName} across Tests:
                                         </span>
-                                        <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', lineHeight: '1.5' }}>
-                                            {performanceDiagnostics.marksLossString}
-                                        </p>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 10px', fontSize: '0.88rem' }}>
+                                            {performanceDiagnostics.testLosses.map((item, idx) => (
+                                                <span key={idx} style={{ background: '#ffffff', padding: '2px 8px', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                                                    <span style={{ fontWeight: '600', color: '#334155' }}>{item.testName}: </span>
+                                                    <span style={{ fontWeight: 'bold', color: '#dc2626' }}>{item.lossText}</span>
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
