@@ -78,11 +78,11 @@ const analyzeLaggingSubjectAndLosses = (transformedRows) => {
     };
 };
 
-// Canvas Modern Line Chart Data URL Generator for PDF (Total Score Only)
+// High-DPI Canvas Chart Generator tailored specifically for crisp PDF export
 const generateChartImage = (transformedRows) => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
-        canvas.width = 1800;
+        canvas.width = 1900;
         canvas.height = 700;
         const ctx = canvas.getContext('2d');
 
@@ -109,21 +109,23 @@ const generateChartImage = (transformedRows) => {
                     {
                         label: 'Total Score (720)',
                         data: totalScores,
-                        borderColor: '#1e40af',
-                        backgroundColor: 'rgba(30, 64, 175, 0.10)',
-                        borderWidth: 4,
-                        pointRadius: 7,
-                        pointBackgroundColor: '#1e40af',
+                        borderColor: '#1d4ed8',
+                        backgroundColor: 'rgba(29, 78, 216, 0.12)',
+                        borderWidth: 6,
+                        pointRadius: 10,
+                        pointHoverRadius: 13,
+                        pointBackgroundColor: '#1d4ed8',
                         pointBorderColor: '#ffffff',
-                        pointBorderWidth: 2.5,
-                        tension: 0.3,
+                        pointBorderWidth: 3,
+                        tension: 0.35,
                         fill: true,
                         datalabels: {
                             display: true,
                             align: 'top',
                             anchor: 'end',
+                            offset: 6,
                             color: '#1e3a8a',
-                            font: { weight: 'bold', size: 16 },
+                            font: { weight: 'bold', size: 28 },
                             formatter: (val) => val !== null ? val : 'AB'
                         }
                     }
@@ -133,15 +135,15 @@ const generateChartImage = (transformedRows) => {
                 responsive: false,
                 animation: false,
                 layout: {
-                    padding: { top: 35, right: 30, bottom: 15, left: 20 }
+                    padding: { top: 45, right: 40, bottom: 20, left: 30 }
                 },
                 plugins: {
                     title: {
                         display: true,
-                        text: 'STUDENT PERFORMANCE TREND (TOTAL MARKS / 720)',
-                        font: { size: 22, weight: 'bold' },
+                        text: 'Student Performance Trend (Total Marks / 720)',
+                        font: { size: 34, weight: 'bold' },
                         color: '#0f172a',
-                        padding: { top: 10, bottom: 20 }
+                        padding: { top: 15, bottom: 25 }
                     },
                     legend: {
                         display: false
@@ -151,14 +153,14 @@ const generateChartImage = (transformedRows) => {
                     y: {
                         beginAtZero: true,
                         max: 720,
-                        ticks: { stepSize: 100, font: { size: 14, weight: 'bold' }, color: '#334155' },
-                        title: { display: true, text: 'Total Marks / 720', font: { size: 15, weight: 'bold' }, color: '#1e293b' },
-                        grid: { color: '#e2e8f0' }
+                        ticks: { stepSize: 100, font: { size: 24, weight: 'bold' }, color: '#334155' },
+                        title: { display: true, text: 'Total Marks / 720', font: { size: 26, weight: 'bold' }, color: '#1e293b', padding: { bottom: 10 } },
+                        grid: { color: '#e2e8f0', lineWidth: 1.5 }
                     },
                     x: {
-                        title: { display: true, text: 'Exams', font: { size: 15, weight: 'bold' }, color: '#1e293b' },
-                        grid: { color: '#f1f5f9' },
-                        ticks: { font: { size: 14, weight: 'bold' }, color: '#334155' }
+                        title: { display: true, text: 'Exams', font: { size: 26, weight: 'bold' }, color: '#1e293b', padding: { top: 10 } },
+                        grid: { color: '#f1f5f9', lineWidth: 1.5 },
+                        ticks: { font: { size: 24, weight: 'bold' }, color: '#334155' }
                     }
                 }
             },
@@ -554,7 +556,7 @@ const AverageReport = ({ filters }) => {
         // 6. Modern Chart & Lagging Subject Marks Loss Diagnostics Section
         if (chartImgData) {
             const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
-            const chartHeight = 58;
+            const chartHeight = 65;
 
             let advisoryHeight = 24;
             let lossLines = [];
@@ -604,10 +606,10 @@ const AverageReport = ({ filters }) => {
                 chartStartY += 4;
             }
 
-            // Render Chart Image
+            // Render Crisp High-DPI Chart Image
             doc.addImage(chartImgData, 'PNG', marginX, chartStartY, contentWidth, chartHeight);
 
-            // Render Diagnostics Box
+            // Render Diagnostics Box with Exact Dynamic Label Measurement
             if (analysis) {
                 const advisoryY = chartStartY + chartHeight + 4;
 
@@ -629,17 +631,20 @@ const AverageReport = ({ filters }) => {
 
                 let lineY = advisoryY + 12;
 
-                // Line 1: Primary Lagging Subject
+                // Line 1: Primary Lagging Subject with Dynamic Width Gap
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                 else doc.setFont("helvetica", "bold");
                 doc.setFontSize(9.5);
                 doc.setTextColor(185, 28, 28);
-                doc.text("Primary Lagging Subject: ", marginX + 4, lineY);
+                const labelText = "Primary Lagging Subject: ";
+                doc.text(labelText, marginX + 4, lineY);
+
+                const labelWidth = doc.getTextWidth(labelText);
 
                 if (bookmanBoldFont) doc.setFont("Bookman", "bold");
                 else doc.setFont("helvetica", "bold");
                 doc.setTextColor(30, 41, 59);
-                doc.text(`${analysis.laggingSubjectName} (${analysis.laggingAvg}/${analysis.laggingMax})`, marginX + 46, lineY);
+                doc.text(`${analysis.laggingSubjectName} (${analysis.laggingAvg}/${analysis.laggingMax})`, marginX + 4 + labelWidth + 3, lineY);
 
                 lineY += 6;
 
@@ -790,14 +795,14 @@ const AverageReport = ({ filters }) => {
                 {
                     label: 'Total Score (720)',
                     data: total,
-                    borderColor: '#1e40af',
-                    backgroundColor: 'rgba(30, 64, 175, 0.10)',
+                    borderColor: '#1d4ed8',
+                    backgroundColor: 'rgba(29, 78, 216, 0.12)',
                     borderWidth: 3,
                     pointRadius: 6,
-                    pointBackgroundColor: '#1e40af',
+                    pointBackgroundColor: '#1d4ed8',
                     pointBorderColor: '#ffffff',
                     pointBorderWidth: 2,
-                    tension: 0.3,
+                    tension: 0.35,
                     fill: true,
                     datalabels: {
                         display: true,
