@@ -78,7 +78,7 @@ const analyzeLaggingSubjectAndLosses = (transformedRows) => {
     };
 };
 
-// Canvas Chart Generator with exact 12.3pt PDF Font Size (55px canvas size) & White Badge Pills
+// Canvas Chart Generator with exact 11.3pt PDF Font Size (50px canvas size) & High-Contrast Dark Slate Navy Labels
 const generateChartImage = (transformedRows) => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -124,13 +124,13 @@ const generateChartImage = (transformedRows) => {
                             align: 'top',
                             anchor: 'end',
                             offset: 10,
-                            color: '#1d4ed8',
+                            color: '#0f172a', // High contrast Dark Navy text
                             backgroundColor: '#ffffff',
-                            borderColor: '#bfdbfe',
+                            borderColor: '#94a3b8',
                             borderWidth: 2,
                             borderRadius: 8,
-                            padding: { top: 5, bottom: 5, left: 9, right: 9 },
-                            font: { weight: 'bold', size: 55 }, // 55px canvas font = EXACT 12.3pt bold font in PDF!
+                            padding: { top: 5, bottom: 5, left: 8, right: 8 },
+                            font: { weight: 'bold', size: 50 }, // 50px canvas font = EXACT 11.3pt bold font in PDF!
                             formatter: (val) => val !== null ? val : 'AB'
                         }
                     }
@@ -140,7 +140,7 @@ const generateChartImage = (transformedRows) => {
                 responsive: false,
                 animation: false,
                 layout: {
-                    padding: { top: 95, right: 70, bottom: 25, left: 80 }
+                    padding: { top: 90, right: 70, bottom: 25, left: 80 }
                 },
                 plugins: {
                     title: {
@@ -157,13 +157,13 @@ const generateChartImage = (transformedRows) => {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        max: 800, // 800 max provides ample vertical clearance for scores like 715/705
+                        max: 800,
                         ticks: { stepSize: 100, font: { size: 32, weight: 'bold' }, color: '#334155', padding: 12 },
                         title: { display: true, text: 'Total Marks / 720', font: { size: 34, weight: 'bold' }, color: '#0f172a', padding: { bottom: 12 } },
                         grid: { color: '#cbd5e1', lineWidth: 1.5 }
                     },
                     x: {
-                        offset: true, // Crucial: shifts Point 1 away from the Y-axis line!
+                        offset: true,
                         title: { display: true, text: 'Exams', font: { size: 34, weight: 'bold' }, color: '#0f172a', padding: { top: 15 } },
                         grid: { color: '#e2e8f0', lineWidth: 1.5 },
                         ticks: { font: { size: 32, weight: 'bold' }, color: '#1e293b' }
@@ -870,13 +870,13 @@ const AverageReport = ({ filters }) => {
                         align: 'top',
                         anchor: 'end',
                         offset: 6,
-                        color: '#1d4ed8',
+                        color: '#0f172a', // High contrast Dark Navy text in Web view!
                         backgroundColor: '#ffffff',
-                        borderColor: '#bfdbfe',
-                        borderWidth: 1,
+                        borderColor: '#cbd5e1',
+                        borderWidth: 1.5,
                         borderRadius: 4,
-                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
-                        font: { weight: 'bold', size: 11 },
+                        padding: { top: 2, bottom: 2, left: 5, right: 5 },
+                        font: { weight: 'bold', size: 11.3 }, // Exact 11.3px bold font in Web UI!
                         formatter: (val) => val !== null ? val : 'AB'
                     }
                 }
