@@ -78,7 +78,7 @@ const analyzeLaggingSubjectAndLosses = (transformedRows) => {
     };
 };
 
-// Canvas Chart Generator with exact 13.5pt PDF Font Size (60px canvas size) & White Badge Pills
+// Canvas Chart Generator with exact 12.3pt PDF Font Size (55px canvas size) & White Badge Pills
 const generateChartImage = (transformedRows) => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -129,8 +129,8 @@ const generateChartImage = (transformedRows) => {
                             borderColor: '#bfdbfe',
                             borderWidth: 2,
                             borderRadius: 8,
-                            padding: { top: 6, bottom: 6, left: 10, right: 10 },
-                            font: { weight: 'bold', size: 60 }, // 60px canvas font = EXACT 13.5pt bold font in PDF!
+                            padding: { top: 5, bottom: 5, left: 9, right: 9 },
+                            font: { weight: 'bold', size: 55 }, // 55px canvas font = EXACT 12.3pt bold font in PDF!
                             formatter: (val) => val !== null ? val : 'AB'
                         }
                     }
@@ -140,7 +140,7 @@ const generateChartImage = (transformedRows) => {
                 responsive: false,
                 animation: false,
                 layout: {
-                    padding: { top: 100, right: 70, bottom: 25, left: 80 }
+                    padding: { top: 95, right: 70, bottom: 25, left: 80 }
                 },
                 plugins: {
                     title: {
