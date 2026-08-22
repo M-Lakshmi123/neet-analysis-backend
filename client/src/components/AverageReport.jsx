@@ -78,7 +78,7 @@ const analyzeLaggingSubjectAndLosses = (transformedRows) => {
     };
 };
 
-// Canvas Chart Generator with exact 10.3pt PDF Font Size (46px canvas size) & High-Contrast Dark Slate Navy Labels
+// Canvas Chart Generator with exact 10.3pt PDF Font Size ONLY (46px canvas size) & High-Contrast Dark Slate Navy Labels
 const generateChartImage = (transformedRows) => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -130,7 +130,7 @@ const generateChartImage = (transformedRows) => {
                             borderWidth: 2,
                             borderRadius: 8,
                             padding: { top: 4, bottom: 4, left: 8, right: 8 },
-                            font: { weight: 'bold', size: 46 }, // 46px canvas font = EXACT 10.3pt bold font in PDF!
+                            font: { weight: 'bold', size: 46 }, // 46px canvas font = EXACT 10.3pt bold font in PDF ONLY!
                             formatter: (val) => val !== null ? val : 'AB'
                         }
                     }
@@ -877,7 +877,7 @@ const AverageReport = ({ filters }) => {
                         borderWidth: 1.5,
                         borderRadius: 4,
                         padding: { top: 2, bottom: 2, left: 5, right: 5 },
-                        font: { weight: 'bold', size: 10.3 }, // Exact 10.3px bold font in Web UI!
+                        font: { weight: 'bold', size: 11 }, // Restored original 11px bold font in Web UI!
                         formatter: (val) => val !== null ? val : 'AB'
                     }
                 }
