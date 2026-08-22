@@ -78,7 +78,7 @@ const analyzeLaggingSubjectAndLosses = (transformedRows) => {
     };
 };
 
-// Canvas Chart Generator with Smart Label Alignment (No Y-axis collisions!)
+// Canvas Chart Generator with exact 13.5pt PDF Font Size (60px canvas size) & White Badge Pills
 const generateChartImage = (transformedRows) => {
     return new Promise((resolve) => {
         const canvas = document.createElement('canvas');
@@ -121,19 +121,16 @@ const generateChartImage = (transformedRows) => {
                         fill: true,
                         datalabels: {
                             display: true,
-                            align: (context) => {
-                                const idx = context.dataIndex;
-                                const total = context.dataset.data.length;
-                                if (idx === 0) return 'right'; // WT-01 (656): align right of point to avoid colliding with Y-axis 700!
-                                if (idx === total - 1) return 'left'; // UT-04: align left inside chart
-                                return 'top';
-                            },
-                            anchor: (context) => {
-                                return context.dataIndex === 0 ? 'center' : 'end';
-                            },
-                            offset: 6,
+                            align: 'top',
+                            anchor: 'end',
+                            offset: 10,
                             color: '#1d4ed8',
-                            font: { weight: 'bold', size: 30 },
+                            backgroundColor: '#ffffff',
+                            borderColor: '#bfdbfe',
+                            borderWidth: 2,
+                            borderRadius: 8,
+                            padding: { top: 6, bottom: 6, left: 10, right: 10 },
+                            font: { weight: 'bold', size: 60 }, // 60px canvas font = EXACT 13.5pt bold font in PDF!
                             formatter: (val) => val !== null ? val : 'AB'
                         }
                     }
@@ -143,15 +140,15 @@ const generateChartImage = (transformedRows) => {
                 responsive: false,
                 animation: false,
                 layout: {
-                    padding: { top: 65, right: 60, bottom: 25, left: 75 }
+                    padding: { top: 100, right: 70, bottom: 25, left: 80 }
                 },
                 plugins: {
                     title: {
                         display: true,
                         text: 'Student Performance Trend (Total Marks / 720)',
-                        font: { size: 36, weight: 'bold' },
+                        font: { size: 46, weight: 'bold' },
                         color: '#0f172a',
-                        padding: { top: 15, bottom: 25 }
+                        padding: { top: 15, bottom: 35 }
                     },
                     legend: {
                         display: false
@@ -160,15 +157,16 @@ const generateChartImage = (transformedRows) => {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        max: 780,
-                        ticks: { stepSize: 100, font: { size: 26, weight: 'bold' }, color: '#334155', padding: 12 },
-                        title: { display: true, text: 'Total Marks / 720', font: { size: 28, weight: 'bold' }, color: '#0f172a', padding: { bottom: 12 } },
+                        max: 800, // 800 max provides ample vertical clearance for scores like 715/705
+                        ticks: { stepSize: 100, font: { size: 32, weight: 'bold' }, color: '#334155', padding: 12 },
+                        title: { display: true, text: 'Total Marks / 720', font: { size: 34, weight: 'bold' }, color: '#0f172a', padding: { bottom: 12 } },
                         grid: { color: '#cbd5e1', lineWidth: 1.5 }
                     },
                     x: {
-                        title: { display: true, text: 'Exams', font: { size: 28, weight: 'bold' }, color: '#0f172a', padding: { top: 15 } },
+                        offset: true, // Crucial: shifts Point 1 away from the Y-axis line!
+                        title: { display: true, text: 'Exams', font: { size: 34, weight: 'bold' }, color: '#0f172a', padding: { top: 15 } },
                         grid: { color: '#e2e8f0', lineWidth: 1.5 },
-                        ticks: { font: { size: 26, weight: 'bold' }, color: '#1e293b' }
+                        ticks: { font: { size: 32, weight: 'bold' }, color: '#1e293b' }
                     }
                 }
             },
@@ -869,18 +867,16 @@ const AverageReport = ({ filters }) => {
                     fill: true,
                     datalabels: {
                         display: true,
-                        align: (context) => {
-                            const idx = context.dataIndex;
-                            const total = context.dataset.data.length;
-                            if (idx === 0) return 'right';
-                            if (idx === total - 1) return 'left';
-                            return 'top';
-                        },
-                        anchor: (context) => {
-                            return context.dataIndex === 0 ? 'center' : 'end';
-                        },
-                        color: '#1e3a8a',
-                        font: { weight: 'bold', size: 12 },
+                        align: 'top',
+                        anchor: 'end',
+                        offset: 6,
+                        color: '#1d4ed8',
+                        backgroundColor: '#ffffff',
+                        borderColor: '#bfdbfe',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        padding: { top: 2, bottom: 2, left: 4, right: 4 },
+                        font: { weight: 'bold', size: 11 },
                         formatter: (val) => val !== null ? val : 'AB'
                     }
                 }
@@ -896,8 +892,8 @@ const AverageReport = ({ filters }) => {
             title: { display: true, text: 'Student Performance Trend (Total Marks / 720)', font: { size: 16, weight: 'bold' } }
         },
         scales: {
-            y: { beginAtZero: true, max: 780, ticks: { padding: 10 }, title: { display: true, text: 'Total Marks / 720' } },
-            x: { title: { display: true, text: 'Exams' } }
+            y: { beginAtZero: true, max: 800, ticks: { padding: 10 }, title: { display: true, text: 'Total Marks / 720' } },
+            x: { offset: true, title: { display: true, text: 'Exams' } }
         }
     };
 
