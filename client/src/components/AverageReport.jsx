@@ -1,14 +1,291 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Modal from './Modal';
 import { buildQueryParams, formatDate, API_URL } from '../utils/apiHelper';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, Target, TrendingUp, Info } from 'lucide-react';
 import { logActivity } from '../utils/activityLogger';
 import { useAuth } from './auth/AuthProvider';
+
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+    LineController,
+    BarController,
+    Filler
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
+
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    Title,
+    Tooltip,
+    Legend,
+    LineController,
+    BarController,
+    Filler,
+    ChartDataLabels
+);
+
+// Performance Analysis & Advisory Helper
+const analyzeStudentPerformance = (transformedRows, allExams) => {
+    if (!transformedRows || transformedRows.length === 0) return null;
+
+    const attempted = transformedRows.filter(r => !r.isAB);
+    const count = attempted.length;
+    if (count === 0) return null;
+
+    const avgBot = Math.round(attempted.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / count);
+    const avgZoo = Math.round(attempted.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / count);
+    const avgBio = avgBot + avgZoo;
+    const avgPhy = Math.round(attempted.reduce((a, b) => a + (Number(b.Physics) || 0), 0) / count);
+    const avgChem = Math.round(attempted.reduce((a, b) => a + (Number(b.Chemistry) || 0), 0) / count);
+    const avgTotal = Math.round(attempted.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / count);
+
+    const botPct = (avgBot / 180) * 100;
+    const zooPct = (avgZoo / 180) * 100;
+    const bioPct = (avgBio / 360) * 100;
+    const phyPct = (avgPhy / 180) * 100;
+    const chemPct = (avgChem / 180) * 100;
+
+    const subjects = [
+        { name: 'Botany', avg: avgBot, max: 180, pct: botPct },
+        { name: 'Zoology', avg: avgZoo, max: 180, pct: zooPct },
+        { name: 'Physics', avg: avgPhy, max: 180, pct: phyPct },
+        { name: 'Chemistry', avg: avgChem, max: 180, pct: chemPct },
+    ];
+
+    subjects.sort((a, b) => a.pct - b.pct);
+    const weakest = subjects[0];
+    const secondWeakest = subjects[1];
+    const strongest = subjects[subjects.length - 1];
+
+    const absents = allExams ? (allExams.length - count) : 0;
+
+    const recommendations = [];
+
+    if (weakest.pct < 70) {
+        recommendations.push({
+            type: 'warning',
+            title: `Primary Focus: ${weakest.name} (Lagging)`,
+            text: `Averaging ${weakest.avg}/${weakest.max} (${weakest.pct.toFixed(1)}%). Requires focused numerical practice and formula revision.`
+        });
+    } else {
+        recommendations.push({
+            type: 'info',
+            title: `Lowest Subject: ${weakest.name}`,
+            text: `Averaging ${weakest.avg}/${weakest.max} (${weakest.pct.toFixed(1)}%). Focused revision can push score to 85%+`
+        });
+    }
+
+    if (secondWeakest.pct < 75 && secondWeakest.name !== weakest.name) {
+        recommendations.push({
+            type: 'warning',
+            title: `Secondary Focus: ${secondWeakest.name}`,
+            text: `Averaging ${secondWeakest.avg}/${secondWeakest.max} (${secondWeakest.pct.toFixed(1)}%). Pay extra attention to test error analysis.`
+        });
+    }
+
+    recommendations.push({
+        type: 'success',
+        title: `Strongest Area: ${strongest.name}`,
+        text: `Performing well at ${strongest.avg}/${strongest.max} (${strongest.pct.toFixed(1)}%). Maintain momentum while practicing weak subjects.`
+    });
+
+    const targetGain = Math.max(0, Math.round((0.80 - (weakest.pct / 100)) * weakest.max));
+    if (targetGain > 10) {
+        recommendations.push({
+            type: 'target',
+            title: `PTM Action Plan`,
+            text: `Raising ${weakest.name} to 80% (+${targetGain} marks) will boost overall average from ${avgTotal} to ${avgTotal + targetGain}/720.`
+        });
+    }
+
+    if (absents > 0) {
+        recommendations.push({
+            type: 'caution',
+            title: `Attendance Note`,
+            text: `Student missed ${absents} test(s). Regular attendance is essential for continuous score improvement.`
+        });
+    }
+
+    return {
+        avgTotal,
+        avgBot,
+        avgZoo,
+        avgBio,
+        avgPhy,
+        avgChem,
+        botPct,
+        zooPct,
+        bioPct,
+        phyPct,
+        chemPct,
+        weakest,
+        secondWeakest,
+        strongest,
+        attemptedCount: count,
+        totalExamsCount: allExams ? allExams.length : count,
+        recommendations
+    };
+};
+
+// Canvas Chart Data URL generator for PDF
+const generateChartImage = (transformedRows) => {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1600;
+        canvas.height = 650;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const labels = [];
+        const totalScores = [];
+        const bioScores = [];
+        const phyScores = [];
+        const chemScores = [];
+
+        transformedRows.forEach(row => {
+            labels.push(row.Test?.trim() || '');
+            if (!row.isAB) {
+                totalScores.push(Math.round(Number(row.Tot_720) || 0));
+                const bot = Number(row.Botany) || 0;
+                const zoo = Number(row.Zoology) || 0;
+                bioScores.push(Math.round(bot + zoo));
+                phyScores.push(Math.round(Number(row.Physics) || 0));
+                chemScores.push(Math.round(Number(row.Chemistry) || 0));
+            } else {
+                totalScores.push(null);
+                bioScores.push(null);
+                phyScores.push(null);
+                chemScores.push(null);
+            }
+        });
+
+        const chart = new ChartJS(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Total Score (720)',
+                        data: totalScores,
+                        borderColor: '#0070C0',
+                        backgroundColor: 'rgba(0, 112, 192, 0.08)',
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        pointBackgroundColor: '#0070C0',
+                        tension: 0.25,
+                        fill: true,
+                        datalabels: {
+                            display: true,
+                            align: 'top',
+                            anchor: 'end',
+                            color: '#0070C0',
+                            font: { weight: 'bold', size: 13 },
+                            formatter: (val) => val !== null ? val : 'AB'
+                        }
+                    },
+                    {
+                        label: 'Biology (360)',
+                        data: bioScores,
+                        borderColor: '#8b5cf6',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#8b5cf6',
+                        tension: 0.2,
+                        fill: false,
+                        datalabels: { display: false }
+                    },
+                    {
+                        label: 'Physics (180)',
+                        data: phyScores,
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#10b981',
+                        tension: 0.2,
+                        fill: false,
+                        datalabels: { display: false }
+                    },
+                    {
+                        label: 'Chemistry (180)',
+                        data: chemScores,
+                        borderColor: '#ef4444',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#ef4444',
+                        tension: 0.2,
+                        fill: false,
+                        datalabels: { display: false }
+                    }
+                ]
+            },
+            options: {
+                responsive: false,
+                animation: false,
+                layout: {
+                    padding: { top: 25, right: 25, bottom: 10, left: 15 }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'STUDENT PERFORMANCE TREND (PTM SUMMARY CHART)',
+                        font: { size: 20, weight: 'bold' },
+                        color: '#0f172a',
+                        padding: { top: 10, bottom: 15 }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            font: { size: 13, weight: 'bold' },
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 720,
+                        ticks: { stepSize: 100, font: { size: 12, weight: 'bold' } },
+                        title: { display: true, text: 'Marks Scored', font: { size: 14, weight: 'bold' } },
+                        grid: { color: '#e2e8f0' }
+                    },
+                    x: {
+                        title: { display: true, text: 'Test Name', font: { size: 14, weight: 'bold' } },
+                        grid: { color: '#f1f5f9' },
+                        ticks: { font: { size: 12, weight: 'bold' } }
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+
+        setTimeout(() => {
+            const dataUrl = canvas.toDataURL('image/png');
+            chart.destroy();
+            resolve(dataUrl);
+        }, 50);
+    });
+};
 
 const AverageReport = ({ filters }) => {
     const { userData } = useAuth();
@@ -19,8 +296,6 @@ const AverageReport = ({ filters }) => {
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
-
-    // Reset results when filters change to maintain consistency
     useEffect(() => {
         setHistory([]);
         setAllExams([]);
@@ -52,7 +327,6 @@ const AverageReport = ({ filters }) => {
             }
             const data = await response.json();
 
-            // Handle new response format { history, allExams }
             const historyData = data.history || [];
             const examData = data.allExams || [];
 
@@ -60,7 +334,6 @@ const AverageReport = ({ filters }) => {
             setAllExams(examData);
             setCurrentStudentIndex(0);
 
-            // Log activity
             const studentCount = new Set(historyData.map(h => h.STUD_ID)).size;
             logActivity(userData, 'Generated Progress Report', {
                 studentCount,
@@ -84,7 +357,6 @@ const AverageReport = ({ filters }) => {
         const streams = [...new Set(data.map(row => row.Stream?.trim().toUpperCase()).filter(Boolean))];
         if (streams.length === 0) return '';
 
-        // User selected stream in filters
         const selectedStream = (Array.isArray(filters.stream) ? filters.stream[0] : filters.stream)?.toString().toUpperCase() || '';
         const isFilteringJR = selectedStream.includes('JR');
         const isFilteringSR = selectedStream.includes('SR');
@@ -94,7 +366,6 @@ const AverageReport = ({ filters }) => {
         const hasJrElite = streams.includes('JR ELITE') || streams.includes('JR_ELITE');
         const hasJrAiims = streams.includes('JR AIIMS') || streams.includes('JR_AIIMS');
 
-        // IF user is filtering for JR, prioritize JR normalization
         if (isFilteringJR) {
             if (hasJrEliteAiims && hasJrElite) return 'JR ELITE';
             if (hasJrEliteAiims && hasJrAiims) return 'JR AIIMS';
@@ -102,15 +373,12 @@ const AverageReport = ({ filters }) => {
             if (hasJrAiims) return 'JR AIIMS';
         }
 
-        // IF user is filtering for SR, prioritize SR normalization
         if (isFilteringSR && hasSr) {
             return 'SR ELITE';
         }
 
-        // Fallback to original priority logic if no specific filter match or "All"
         if (hasSr) return 'SR ELITE';
 
-        // JR variants
         if (hasJrEliteAiims && hasJrElite) return 'JR ELITE';
         if (hasJrEliteAiims && hasJrAiims) return 'JR AIIMS';
         if (hasJrElite) return 'JR ELITE';
@@ -128,10 +396,9 @@ const AverageReport = ({ filters }) => {
         });
     };
 
-    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont) => {
+    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformedRows) => {
         const doc = new jsPDF('p', 'mm', 'a4');
 
-        // Add Fonts
         if (impactFont) {
             doc.addFileToVFS("unicode.impact.ttf", impactFont);
             doc.addFont("unicode.impact.ttf", "Impact", "normal");
@@ -145,31 +412,24 @@ const AverageReport = ({ filters }) => {
             doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
         }
 
-        // Plain Background - fulfill "pastel plain" by using a very subtle pastel tint
-        doc.setFillColor(255, 255, 255); // Plain White for best printability
+        doc.setFillColor(255, 255, 255);
         doc.rect(0, 0, 210, 297, 'F');
 
-        let currentY = 11; // Reduced top margin
-
-        // 1. Logo & Institution Name - Centered Together
-        // Split Title into two lines with custom colors/fonts
-        const title1 = "SRI CHAITANYA";
-        const title2 = "EDUCATIONAL INSTITUTIONS";
+        let currentY = 11;
 
         if (impactFont) {
             doc.setFont("Impact", "normal");
         } else {
             doc.setFont("helvetica", "bold");
         }
-        doc.setFontSize(22); // Consistent size as before
-        doc.setTextColor(0, 112, 192); // #0070C0
+        doc.setFontSize(22);
+        doc.setTextColor(0, 112, 192);
 
         if (logoImg) {
             const aspect = logoImg.width / logoImg.height;
             let logoH = 20;
             let logoW = logoH * aspect;
 
-            // Draw Logo Centered Top
             const logoX = (210 - logoW) / 2;
             doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
             currentY += logoH + 6;
@@ -177,12 +437,10 @@ const AverageReport = ({ filters }) => {
             currentY += 10;
         }
 
-        // Draw Single Line Header: "Sri Chaitanya" (Impact) + " Educational Institutions" (Bookman)
         const part1 = "Sri Chaitanya";
         const part2 = " Educational Institutions";
-        doc.setFontSize(26); // Adjusted size to fit A4 Portrait
+        doc.setFontSize(26);
 
-        // Measure widths
         if (impactFont) doc.setFont("Impact", "normal");
         else doc.setFont("helvetica", "bold");
         const w1 = doc.getTextWidth(part1);
@@ -194,117 +452,138 @@ const AverageReport = ({ filters }) => {
         const totalWidth = w1 + w2;
         const startX = (210 - totalWidth) / 2;
 
-        // Draw Part 1
         if (impactFont) doc.setFont("Impact", "normal");
         else doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 112, 192); // #0070C0
+        doc.setTextColor(0, 112, 192);
         doc.text(part1, startX, currentY);
 
-        // Draw Part 2
         if (bookmanFont) doc.setFont("Bookman", "normal");
         else doc.setFont("helvetica", "normal");
-        doc.setTextColor(0, 102, 204); // #0066CC
+        doc.setTextColor(0, 102, 204);
         doc.text(part2, startX + w1, currentY);
 
         currentY += 8;
 
-        // 3. Subtitle
-        if (bookmanFont) doc.setFont("Bookman", "bold"); // Changed to bold
+        if (bookmanFont) doc.setFont("Bookman", "bold");
         else doc.setFont("helvetica", "bolditalic");
         doc.setFontSize(14);
-        doc.setTextColor(0, 0, 0); // Pure Black
+        doc.setTextColor(0, 0, 0);
         const subTitle = "P R O G R E S S   R E P O R T";
         doc.text(subTitle, 105, currentY, { align: 'center' });
-        currentY += 6; // Reduced gap (was 8)
+        currentY += 6;
 
         const pageWidth = doc.internal.pageSize.getWidth();
         const contentWidth = 190;
         const marginX = (pageWidth - contentWidth) / 2;
 
-        // 4. Line
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.4);
         doc.line(marginX, currentY, pageWidth - marginX, currentY);
-        currentY += 4; // Further reduced gap below line (was 6)
+        currentY += 4;
 
-        // 5. Details Header - Pastel Background
+        // Dynamic Header Box (Student Info) with Font Scaling & Word Wrapping Fix
         if (studentData.length > 0) {
             const student = studentData[0];
-            doc.setFillColor(239, 246, 255); // Pastel Blue
-            doc.setDrawColor(0, 0, 0); // Black border
-            doc.setLineWidth(0.1);
-            doc.roundedRect(marginX, currentY, contentWidth, 24, 1, 1, 'FD'); // Centered
+            const normalizedStream = getNormalizedStream(studentData);
+
+            const col1X = marginX + 6; // 16mm
+            const col2X = marginX + 98; // 108mm
+            const col1ValX = col1X + 30; // 46mm
+            const col2ValX = col2X + 22; // 130mm
+
+            const maxNameWidth = col2X - col1ValX - 3; // 59mm
+            const nameStr = (student.NAME_OF_THE_STUDENT || '').toUpperCase().trim();
+            const campusStr = (student.CAMPUS_NAME || '').toUpperCase().trim();
 
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.setTextColor(0, 0, 0);
+
+            let nameFontSize = 11;
+            doc.setFontSize(nameFontSize);
+            let nameWidth = doc.getTextWidth(nameStr);
+
+            if (nameWidth > maxNameWidth) {
+                const scaledSize = Math.max(8.5, Math.floor((maxNameWidth / nameWidth) * 11 * 10) / 10);
+                doc.setFontSize(scaledSize);
+                nameWidth = doc.getTextWidth(nameStr);
+                if (nameWidth <= maxNameWidth) {
+                    nameFontSize = scaledSize;
+                }
+            }
+
+            doc.setFontSize(nameFontSize);
+            let nameLines = [nameStr];
+            if (doc.getTextWidth(nameStr) > maxNameWidth) {
+                nameLines = doc.splitTextToSize(nameStr, maxNameWidth);
+            }
+
+            const maxCampusWidth = (pageWidth - marginX - 5) - col2ValX;
+            let campusFontSize = 11;
+            doc.setFontSize(campusFontSize);
+            if (doc.getTextWidth(campusStr) > maxCampusWidth) {
+                campusFontSize = Math.max(8.5, Math.floor((maxCampusWidth / doc.getTextWidth(campusStr)) * 11 * 10) / 10);
+            }
+
+            const nameLineCount = nameLines.length;
+            const extraHeight = (nameLineCount - 1) * 5;
+            const boxHeight = 24 + extraHeight;
+
+            doc.setFillColor(239, 246, 255);
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.1);
+            doc.roundedRect(marginX, currentY, contentWidth, boxHeight, 1, 1, 'FD');
 
             const textYStart = currentY + 8;
-            const col1X = marginX + 6; // 6mm padding from left marginX
-            const col2X = marginX + 98; // Roughly halfway + padding
 
             // Student Name
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
+            doc.setTextColor(0, 0, 0);
             doc.text("Student Name:", col1X, textYStart);
 
-            if (bookmanFont) doc.setFont("Bookman", "bold"); // Also bold for values as per "same progress report also Bold"? Or just labels? Usually values are normal. keeping normal for values based on typical reports, but user said "same progress report also Bold". Let's assume headers/labels are bold.
+            if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "normal");
-            doc.text(student.NAME_OF_THE_STUDENT || '', col1X + 30, textYStart);
+            doc.setFontSize(nameFontSize);
+            nameLines.forEach((line, idx) => {
+                doc.text(line, col1ValX, textYStart + (idx * 5));
+            });
 
             // Campus
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
             doc.text("Campus:", col2X, textYStart);
 
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "normal");
-            doc.text(student.CAMPUS_NAME || '', col2X + 22, textYStart);
+            doc.setFontSize(campusFontSize);
+            doc.text(campusStr, col2ValX, textYStart);
 
-            const row2Y = textYStart + 9;
+            // Row 2: Student ID & Stream
+            const row2Y = textYStart + 9 + (nameLineCount - 1) * 5;
 
-            // Student ID
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
+            doc.setFontSize(11);
             doc.text("Student ID:", col1X, row2Y);
 
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "normal");
-            doc.text(student.STUD_ID?.toString() || '', col1X + 30, row2Y);
+            doc.text(student.STUD_ID?.toString() || '', col1ValX, row2Y);
 
-            // Stream (Added as per user request)
-            const normalizedStream = getNormalizedStream(studentData);
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "bold");
             doc.text("Stream:", col2X, row2Y);
 
             if (bookmanFont) doc.setFont("Bookman", "bold");
             else doc.setFont("helvetica", "normal");
-            doc.text(normalizedStream, col2X + 22, row2Y);
+            doc.text(normalizedStream, col2ValX, row2Y);
 
-            currentY += 24; // Reach exactly the bottom of the roundedRect (height is 24)
+            currentY += boxHeight;
         }
 
         const tableColumn = ["Test Name", "Date", "Total\n720", "AIR", "Bot\n180", "Zoo\n180", "Bio\n360", "Phy\n180", "Chem\n180"];
-
-        // Transform studentData to include ALL exams (even missing ones as AB)
-        const transformedRows = allExams.map(exam => {
-            const examTest = exam.Test?.trim();
-            const existing = studentData.find(r => r.Test?.trim() === examTest);
-            if (existing) {
-                return {
-                    ...existing,
-                    isAB: false
-                };
-            } else {
-                return {
-                    Test: exam.Test,
-                    DATE: exam.DATE,
-                    isAB: true
-                };
-            }
-        });
 
         const tableRows = transformedRows.map(row => {
             if (row.isAB) {
@@ -333,8 +612,7 @@ const AverageReport = ({ filters }) => {
             ];
         });
 
-        // Average - Count ONLY attempted tests
-        const attemptedRows = studentData; // Original rows only
+        const attemptedRows = studentData;
         if (attemptedRows.length > 0) {
             const avg = (key) => Math.round(attemptedRows.reduce((a, b) => a + (Number(b[key]) || 0), 0) / attemptedRows.length);
             const avgAIR = Math.round(attemptedRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / attemptedRows.length);
@@ -355,10 +633,10 @@ const AverageReport = ({ filters }) => {
         autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
-            startY: currentY + 4, // Start closer to detail header
+            startY: currentY + 4,
             theme: 'grid',
             headStyles: {
-                fillColor: [0, 0, 0], // Pure Black headers
+                fillColor: [0, 0, 0],
                 textColor: [255, 255, 255],
                 font: bookmanFont ? "Bookman" : "helvetica",
                 fontStyle: "bold",
@@ -379,39 +657,154 @@ const AverageReport = ({ filters }) => {
                 textColor: [0, 0, 0]
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 55, fontSize: 10, fontStyle: 'bold' }, // Test Name
-                1: { cellWidth: 28 }, // Date
-                2: { cellWidth: 17, fillColor: [255, 255, 204] }, // Total
-                3: { cellWidth: 15 }, // AIR
-                4: { cellWidth: 15, fillColor: [253, 233, 217] }, // Bot
-                5: { cellWidth: 15, fillColor: [218, 238, 243] }, // Zoo
-                6: { cellWidth: 15, fillColor: [224, 231, 255] }, // Bio
-                7: { cellWidth: 15, fillColor: [235, 241, 222] }, // Phy
-                8: { cellWidth: 15, fillColor: [242, 220, 219] }  // Chem
+                0: { halign: 'center', cellWidth: 55, fontSize: 10, fontStyle: 'bold' },
+                1: { cellWidth: 28 },
+                2: { cellWidth: 17, fillColor: [255, 255, 204] },
+                3: { cellWidth: 15 },
+                4: { cellWidth: 15, fillColor: [253, 233, 217] },
+                5: { cellWidth: 15, fillColor: [218, 238, 243] },
+                6: { cellWidth: 15, fillColor: [224, 231, 255] },
+                7: { cellWidth: 15, fillColor: [235, 241, 222] },
+                8: { cellWidth: 15, fillColor: [242, 220, 219] }
             },
             margin: { left: marginX, right: marginX, bottom: 15 },
             didParseCell: (data) => {
                 if (data.row.index === tableRows.length - 1) {
-                    // Start of Average Row Styling
-                    // Ensure font remains Bookman if loaded
                     if (bookmanFont) {
                         data.cell.styles.font = "Bookman";
-                        data.cell.styles.fontStyle = 'bold'; // Changed to bold
+                        data.cell.styles.fontStyle = 'bold';
                     } else {
                         data.cell.styles.fontStyle = 'bold';
                     }
-                    data.cell.styles.fillColor = [218, 238, 243]; // #DAEEF3
+                    data.cell.styles.fillColor = [218, 238, 243];
                     data.cell.styles.textColor = [0, 0, 0];
                 }
             }
         });
+
+        // 6. PTM Chart & Detailed Subject Advisory Section
+        if (chartImgData) {
+            const chartHeight = 58;
+            const advisoryHeight = 35;
+            const totalRequiredHeight = chartHeight + advisoryHeight + 10;
+            const pageHeight = 297;
+            const bottomMargin = 12;
+
+            let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY;
+            let chartStartY = finalY + 6;
+
+            if (chartStartY + totalRequiredHeight > pageHeight - bottomMargin) {
+                doc.addPage();
+                chartStartY = 14;
+
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
+                doc.setFontSize(13);
+                doc.setTextColor(0, 112, 192);
+                doc.text("SRI CHAITANYA EDUCATIONAL INSTITUTIONS", 105, chartStartY, { align: 'center' });
+
+                chartStartY += 5;
+                doc.setFontSize(10.5);
+                doc.setTextColor(0, 0, 0);
+                doc.text("PARENT TEACHER MEETING (PTM) - PERFORMANCE & IMPROVEMENT ADVISORY", 105, chartStartY, { align: 'center' });
+
+                chartStartY += 4;
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.3);
+                doc.line(marginX, chartStartY, pageWidth - marginX, chartStartY);
+
+                chartStartY += 6;
+            } else {
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
+                doc.setFontSize(11);
+                doc.setTextColor(0, 112, 192);
+                doc.text("PTM PERFORMANCE TREND CHART", marginX, chartStartY);
+                chartStartY += 4;
+            }
+
+            // Render Chart Image
+            doc.addImage(chartImgData, 'PNG', marginX, chartStartY, contentWidth, chartHeight);
+
+            // Render Detailed PTM Subject Advisory Box
+            const advisoryY = chartStartY + chartHeight + 4;
+            const analysis = analyzeStudentPerformance(transformedRows, allExams);
+
+            if (analysis) {
+                doc.setFillColor(248, 250, 252);
+                doc.setDrawColor(203, 213, 225);
+                doc.roundedRect(marginX, advisoryY, contentWidth, advisoryHeight, 1, 1, 'FD');
+
+                // Advisory Title Header Bar
+                doc.setFillColor(224, 231, 255);
+                doc.rect(marginX, advisoryY, contentWidth, 7, 'F');
+                doc.setDrawColor(203, 213, 225);
+                doc.line(marginX, advisoryY + 7, marginX + contentWidth, advisoryY + 7);
+
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
+                doc.setFontSize(9.5);
+                doc.setTextColor(30, 58, 138);
+                doc.text("PTM SUBJECT PERFORMANCE DIAGNOSTICS & IMPROVEMENT ADVISORY", marginX + 4, advisoryY + 5);
+
+                let lineY = advisoryY + 11.5;
+
+                // Row 1: Subject Averages Summary
+                if (bookmanFont) doc.setFont("Bookman", "normal");
+                else doc.setFont("helvetica", "normal");
+                doc.setFontSize(8.5);
+                doc.setTextColor(30, 41, 59);
+
+                const subjSummary = `Subject Averages:  Botany: ${analysis.avgBot}/180 (${analysis.botPct.toFixed(0)}%)  |  Zoology: ${analysis.avgZoo}/180 (${analysis.zooPct.toFixed(0)}%)  |  Physics: ${analysis.avgPhy}/180 (${analysis.phyPct.toFixed(0)}%)  |  Chemistry: ${analysis.avgChem}/180 (${analysis.chemPct.toFixed(0)}%)`;
+                doc.text(subjSummary, marginX + 4, lineY);
+                lineY += 5.5;
+
+                // Row 2: Lagging Subject Diagnosis
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
+                doc.setTextColor(185, 28, 28);
+                doc.text("Primary Lagging Subject: ", marginX + 4, lineY);
+
+                if (bookmanFont) doc.setFont("Bookman", "normal");
+                else doc.setFont("helvetica", "normal");
+                doc.setTextColor(30, 41, 59);
+                const lagMsg = `${analysis.weakest.name} is the lowest scoring area at ${analysis.weakest.avg}/${analysis.weakest.max} (${analysis.weakest.pct.toFixed(1)}%). Requires extra numerical practice & doubt resolution.`;
+                doc.text(lagMsg, marginX + 46, lineY);
+                lineY += 5.5;
+
+                // Row 3: Strongest Subject
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
+                doc.setTextColor(21, 128, 61);
+                doc.text("Strongest Subject: ", marginX + 4, lineY);
+
+                if (bookmanFont) doc.setFont("Bookman", "normal");
+                else doc.setFont("helvetica", "normal");
+                doc.setTextColor(30, 41, 59);
+                const strongMsg = `${analysis.strongest.name} is performing well at ${analysis.strongest.avg}/${analysis.strongest.max} (${analysis.strongest.pct.toFixed(1)}%). Maintain regular revision while focusing on weak topics.`;
+                doc.text(strongMsg, marginX + 38, lineY);
+                lineY += 5.5;
+
+                // Row 4: Score Boost Target Plan
+                const targetGain = Math.max(0, Math.round((0.80 - (analysis.weakest.pct / 100)) * analysis.weakest.max));
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+                else doc.setFont("helvetica", "bold");
+                doc.setTextColor(67, 56, 202);
+                doc.text("PTM Action Plan: ", marginX + 4, lineY);
+
+                if (bookmanFont) doc.setFont("Bookman", "normal");
+                else doc.setFont("helvetica", "normal");
+                doc.setTextColor(30, 41, 59);
+                const planMsg = `Improving ${analysis.weakest.name} to 80% (+${targetGain} marks) will elevate overall score from ${analysis.avgTotal} to ${analysis.avgTotal + targetGain}/720.`;
+                doc.text(planMsg, marginX + 34, lineY);
+            }
+        }
 
         return doc;
     };
 
     const downloadPDF = async () => {
         try {
-            // Helper to load font
             const loadFont = async (url) => {
                 try {
                     const res = await fetch(url);
@@ -435,7 +828,6 @@ const AverageReport = ({ filters }) => {
                 loadFont('/fonts/BOOKOSB.TTF')
             ]);
 
-            // Group by Student ID
             const grouped = history.reduce((acc, row) => {
                 const id = row.STUD_ID || 'Unknown';
                 if (!acc[id]) acc[id] = [];
@@ -446,24 +838,39 @@ const AverageReport = ({ filters }) => {
             const studentIds = Object.keys(grouped);
             if (studentIds.length === 0) return;
 
+            const getTransformedRows = (sRows) => {
+                return allExams.map(exam => {
+                    const examTest = exam.Test?.trim();
+                    const existing = sRows.find(r => r.Test?.trim() === examTest);
+                    if (existing) {
+                        return { ...existing, isAB: false };
+                    } else {
+                        return { Test: exam.Test, DATE: exam.DATE, isAB: true };
+                    }
+                });
+            };
+
             if (studentIds.length === 1) {
-                // Single Download
-                const doc = generateStudentPDF(grouped[studentIds[0]], logoImg, impactFont, bookmanFont, bookmanBoldFont);
-                const sName = grouped[studentIds[0]][0].NAME_OF_THE_STUDENT || 'Report';
+                const sRows = grouped[studentIds[0]];
+                const transformed = getTransformedRows(sRows);
+                const chartImgData = await generateChartImage(transformed);
+                const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed);
+                const sName = sRows[0].NAME_OF_THE_STUDENT || 'Report';
                 doc.save(`${sName}_Progress_Report.pdf`);
                 logActivity(userData, 'Downloaded Progress PDF', { student: sName });
             } else {
-                // Bulk Download (ZIP)
                 const zip = new JSZip();
                 const campusName = grouped[studentIds[0]][0].CAMPUS_NAME || 'Campus';
 
-                studentIds.forEach(id => {
+                for (const id of studentIds) {
                     const sRows = grouped[id];
                     const sName = sRows[0].NAME_OF_THE_STUDENT || id;
-                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont);
+                    const transformed = getTransformedRows(sRows);
+                    const chartImgData = await generateChartImage(transformed);
+                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed);
                     const pdfBlob = doc.output('blob');
                     zip.file(`${sName}_Progress_Report.pdf`, pdfBlob);
-                });
+                }
 
                 const content = await zip.generateAsync({ type: "blob" });
                 saveAs(content, `${campusName}_Progress_Reports.zip`);
@@ -482,20 +889,106 @@ const AverageReport = ({ filters }) => {
         }
     };
 
-    // UI: If multiple students, show a summary or just the first student?
-    // User requested Bulk Download, implies they might be okay seeing one or just knowing they are selected.
-    // For now, let's show the FIRST student's data as a preview if multiple are selected,
-    // possibly adding a banner saying "X Students Selected".
-
-    // Unique students logic
     const uniqueStudentIds = [...new Set(history.map(h => h.STUD_ID))];
     const uniqueStudents = uniqueStudentIds.length;
 
-    // Helper to get preview student based on navigation
     const previewStudentId = uniqueStudentIds[currentStudentIndex];
     const previewRows = previewStudentId
         ? history.filter(h => h.STUD_ID?.toString() === previewStudentId.toString())
         : [];
+
+    const transformedPreviewRows = useMemo(() => {
+        if (previewRows.length === 0 || allExams.length === 0) return [];
+        return allExams.map(exam => {
+            const examTest = exam.Test?.trim();
+            const existing = previewRows.find(r => r.Test?.trim() === examTest);
+            if (existing) {
+                return { ...existing, isAB: false };
+            } else {
+                return { Test: exam.Test, DATE: exam.DATE, isAB: true };
+            }
+        });
+    }, [previewRows, allExams]);
+
+    const performanceAnalysis = useMemo(() => {
+        return analyzeStudentPerformance(transformedPreviewRows, allExams);
+    }, [transformedPreviewRows, allExams]);
+
+    const chartData = useMemo(() => {
+        if (transformedPreviewRows.length === 0) return null;
+        const labels = transformedPreviewRows.map(r => r.Test?.trim());
+        const total = transformedPreviewRows.map(r => r.isAB ? null : Math.round(Number(r.Tot_720) || 0));
+        const bio = transformedPreviewRows.map(r => r.isAB ? null : Math.round((Number(r.Botany) || 0) + (Number(r.Zoology) || 0)));
+        const phy = transformedPreviewRows.map(r => r.isAB ? null : Math.round(Number(r.Physics) || 0));
+        const chem = transformedPreviewRows.map(r => r.isAB ? null : Math.round(Number(r.Chemistry) || 0));
+
+        return {
+            labels,
+            datasets: [
+                {
+                    label: 'Total Score (720)',
+                    data: total,
+                    borderColor: '#0070C0',
+                    backgroundColor: 'rgba(0, 112, 192, 0.08)',
+                    borderWidth: 3,
+                    pointRadius: 5,
+                    pointBackgroundColor: '#0070C0',
+                    tension: 0.25,
+                    fill: true,
+                    datalabels: {
+                        display: true,
+                        align: 'top',
+                        color: '#0070C0',
+                        font: { weight: 'bold', size: 11 },
+                        formatter: (val) => val !== null ? val : 'AB'
+                    }
+                },
+                {
+                    label: 'Biology (360)',
+                    data: bio,
+                    borderColor: '#8b5cf6',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    tension: 0.2,
+                    fill: false,
+                    datalabels: { display: false }
+                },
+                {
+                    label: 'Physics (180)',
+                    data: phy,
+                    borderColor: '#10b981',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    tension: 0.2,
+                    fill: false,
+                    datalabels: { display: false }
+                },
+                {
+                    label: 'Chemistry (180)',
+                    data: chem,
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    tension: 0.2,
+                    fill: false,
+                    datalabels: { display: false }
+                }
+            ]
+        };
+    }, [transformedPreviewRows]);
+
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'top', labels: { font: { weight: 'bold' } } },
+            title: { display: true, text: 'Parent Teacher Meeting (PTM) Performance Trend', font: { size: 16, weight: 'bold' } }
+        },
+        scales: {
+            y: { beginAtZero: true, max: 720, title: { display: true, text: 'Marks' } },
+            x: { title: { display: true, text: 'Exams' } }
+        }
+    };
 
     const handleNext = () => {
         setCurrentStudentIndex(prev => (prev + 1) % uniqueStudents);
@@ -572,7 +1065,6 @@ const AverageReport = ({ filters }) => {
                                                     {previewRows[0].NAME_OF_THE_STUDENT}
                                                 </div>
                                             </th>
-
                                         </tr>
                                         <tr className="table-main-header">
                                             <th className="w-test">Test Name</th>
@@ -636,6 +1128,64 @@ const AverageReport = ({ filters }) => {
                                 </table>
                             </div>
                         )}
+
+                        {/* PTM Performance Chart & Subject Advisory Card */}
+                        {chartData && performanceAnalysis && (
+                            <div className="ptm-analysis-card" style={{ marginTop: '24px', padding: '20px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ height: '320px', marginBottom: '20px' }}>
+                                    <Line data={chartData} options={chartOptions} />
+                                </div>
+
+                                <div className="ptm-advisory-box" style={{ background: '#ffffff', padding: '16px 20px', borderRadius: '8px', borderLeft: '5px solid #6366f1', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                    <h4 style={{ margin: '0 0 12px 0', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem' }}>
+                                        <TrendingUp size={18} color="#6366f1" /> Parent Teacher Meeting (PTM) Subject Diagnostics & Improvement Advisory
+                                    </h4>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+                                        <div style={{ background: '#f1f5f9', padding: '10px 14px', borderRadius: '6px' }}>
+                                            <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block' }}>Botany Average</span>
+                                            <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{performanceAnalysis.avgBot} / 180 ({performanceAnalysis.botPct.toFixed(0)}%)</strong>
+                                        </div>
+                                        <div style={{ background: '#f1f5f9', padding: '10px 14px', borderRadius: '6px' }}>
+                                            <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block' }}>Zoology Average</span>
+                                            <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{performanceAnalysis.avgZoo} / 180 ({performanceAnalysis.zooPct.toFixed(0)}%)</strong>
+                                        </div>
+                                        <div style={{ background: '#f1f5f9', padding: '10px 14px', borderRadius: '6px' }}>
+                                            <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block' }}>Physics Average</span>
+                                            <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{performanceAnalysis.avgPhy} / 180 ({performanceAnalysis.phyPct.toFixed(0)}%)</strong>
+                                        </div>
+                                        <div style={{ background: '#f1f5f9', padding: '10px 14px', borderRadius: '6px' }}>
+                                            <span style={{ fontSize: '0.8rem', color: '#64748b', display: 'block' }}>Chemistry Average</span>
+                                            <strong style={{ fontSize: '1rem', color: '#0f172a' }}>{performanceAnalysis.avgChem} / 180 ({performanceAnalysis.chemPct.toFixed(0)}%)</strong>
+                                        </div>
+                                    </div>
+
+                                    <div className="recommendations-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {performanceAnalysis.recommendations.map((rec, idx) => (
+                                            <div key={idx} style={{
+                                                padding: '10px 14px',
+                                                borderRadius: '6px',
+                                                fontSize: '0.88rem',
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: '10px',
+                                                backgroundColor: rec.type === 'warning' ? '#fef2f2' : rec.type === 'success' ? '#f0fdf4' : rec.type === 'target' ? '#eef2ff' : '#fffbeb',
+                                                color: rec.type === 'warning' ? '#991b1b' : rec.type === 'success' ? '#166534' : rec.type === 'target' ? '#3730a3' : '#92400e',
+                                                border: `1px solid ${rec.type === 'warning' ? '#fecaca' : rec.type === 'success' ? '#bbf7d0' : rec.type === 'target' ? '#c7d2fe' : '#fef08a'}`
+                                            }}>
+                                                {rec.type === 'warning' && <AlertTriangle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />}
+                                                {rec.type === 'success' && <CheckCircle size={16} style={{ marginTop: '2px', flexShrink: 0 }} />}
+                                                {rec.type === 'target' && <Target size={16} style={{ marginTop: '2px', flexShrink: 0 }} />}
+                                                {rec.type === 'caution' && <Info size={16} style={{ marginTop: '2px', flexShrink: 0 }} />}
+                                                <div>
+                                                    <strong>{rec.title}: </strong> {rec.text}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </div>
@@ -647,8 +1197,6 @@ const AverageReport = ({ filters }) => {
                 message={modal.message}
                 type={modal.type}
             />
-
-
         </div>
     );
 };
