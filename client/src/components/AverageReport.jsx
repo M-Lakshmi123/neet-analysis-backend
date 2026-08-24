@@ -173,11 +173,11 @@ const generateChartImage = (transformedRows) => {
             plugins: [ChartDataLabels]
         });
 
-        setTimeout(() => {
-            const dataUrl = canvas.toDataURL('image/png');
-            chart.destroy();
-            resolve(dataUrl);
-        }, 50);
+        const dataUrl = canvas.toDataURL('image/png');
+        chart.destroy();
+        canvas.width = 0;
+        canvas.height = 0;
+        resolve(dataUrl);
     });
 };
 
@@ -189,6 +189,8 @@ const AverageReport = ({ filters }) => {
     const [hasSearched, setHasSearched] = useState(false);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
     const [includeChart, setIncludeChart] = useState(true); // Toggle to include or exclude chart & diagnostics
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
     useEffect(() => {
@@ -736,6 +738,7 @@ const AverageReport = ({ filters }) => {
     };
 
     const downloadPDF = async () => {
+        setIsDownloading(true);
         try {
             const loadFont = async (url) => {
                 try {
@@ -783,29 +786,43 @@ const AverageReport = ({ filters }) => {
             };
 
             if (studentIds.length === 1) {
+                setDownloadProgress({ current: 1, total: 1 });
                 const sRows = grouped[studentIds[0]];
                 const transformed = getTransformedRows(sRows);
                 const chartImgData = includeChart ? await generateChartImage(transformed) : null;
                 const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart);
                 const sName = sRows[0].NAME_OF_THE_STUDENT || 'Report';
-                doc.save(`${sName}_Progress_Report.pdf`);
+                const sanitizedName = String(sName).replace(/[/\\?%*:|"<>]/g, '_').trim();
+                doc.save(`${sanitizedName}_Progress_Report.pdf`);
                 logActivity(userData, 'Downloaded Progress PDF', { student: sName, includeChart });
             } else {
                 const zip = new JSZip();
                 const campusName = grouped[studentIds[0]][0].CAMPUS_NAME || 'Campus';
+                const total = studentIds.length;
+                setDownloadProgress({ current: 0, total });
 
+                let count = 0;
                 for (const id of studentIds) {
+                    count++;
+                    setDownloadProgress({ current: count, total });
+                    // Yield control to UI thread so react updates button state and browser stays responsive
+                    await new Promise((resolve) => setTimeout(resolve, 0));
+
                     const sRows = grouped[id];
                     const sName = sRows[0].NAME_OF_THE_STUDENT || id;
+                    const sanitizedName = String(sName).replace(/[/\\?%*:|"<>]/g, '_').trim();
+                    const fileName = `${sanitizedName}_${id}_Progress_Report.pdf`;
+
                     const transformed = getTransformedRows(sRows);
                     const chartImgData = includeChart ? await generateChartImage(transformed) : null;
                     const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart);
                     const pdfBlob = doc.output('blob');
-                    zip.file(`${sName}_Progress_Report.pdf`, pdfBlob);
+                    zip.file(fileName, pdfBlob);
                 }
 
                 const content = await zip.generateAsync({ type: "blob" });
-                saveAs(content, `${campusName}_Progress_Reports.zip`);
+                const sanitizedCampus = String(campusName).replace(/[/\\?%*:|"<>]/g, '_').trim();
+                saveAs(content, `${sanitizedCampus}_Progress_Reports.zip`);
                 logActivity(userData, 'Downloaded Bulk Progress PDF', { count: studentIds.length, campus: campusName, includeChart });
             }
 
@@ -818,6 +835,9 @@ const AverageReport = ({ filters }) => {
                 message: "Failed to generate PDF(s).",
                 onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
             });
+        } finally {
+            setIsDownloading(false);
+            setDownloadProgress({ current: 0, total: 0 });
         }
     };
 
@@ -936,11 +956,27 @@ const AverageReport = ({ filters }) => {
                             />
                             Include Chart & Analysis
                         </label>
-                        <button className="btn-primary" onClick={fetchData} style={{ backgroundColor: '#6366f1' }}>
+                        <button className="btn-primary" onClick={fetchData} disabled={isDownloading} style={{ backgroundColor: '#6366f1' }}>
                             View Report
                         </button>
-                        <button className="btn-primary" onClick={downloadPDF} disabled={history.length === 0} style={{ backgroundColor: '#10b981' }}>
-                            {uniqueStudents > 1 ? `Download All (${uniqueStudents})` : 'Download PDF'}
+                        <button 
+                            className="btn-primary" 
+                            onClick={downloadPDF} 
+                            disabled={history.length === 0 || isDownloading} 
+                            style={{ 
+                                backgroundColor: isDownloading ? '#64748b' : '#10b981', 
+                                cursor: isDownloading ? 'wait' : 'pointer',
+                                minWidth: '160px', 
+                                transition: 'all 0.2s ease' 
+                            }}
+                        >
+                            {isDownloading ? (
+                                downloadProgress.total > 1 
+                                    ? `Preparing ${downloadProgress.current}/${downloadProgress.total}...` 
+                                    : 'Generating PDF...'
+                            ) : (
+                                uniqueStudents > 1 ? `Download All (${uniqueStudents})` : 'Download PDF'
+                            )}
                         </button>
                     </div>
                 </div>
