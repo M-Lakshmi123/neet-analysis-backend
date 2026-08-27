@@ -225,11 +225,13 @@ const AverageReport = ({ filters }) => {
         setCurrentStudentIndex(0);
     }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.studentSearch]);
 
-    const fetchStudentErpQuestionsForPdf = async (studId) => {
-        if (!studId) return [];
+    const fetchStudentErpQuestionsForPdf = async (studId, studentName = '') => {
+        if (!studId && !studentName) return [];
         try {
             const year = filters.academicYear || '2026';
-            let url = `${API_URL}/api/erp/report?academicYear=${year}&studentSearch=${studId}`;
+            let url = `${API_URL}/api/erp/report?academicYear=${year}`;
+            if (studId) url += `&studentSearch=${encodeURIComponent(studId)}`;
+            if (studentName) url += `&studentNames=${encodeURIComponent(studentName)}`;
             if (filters?.testType && Array.isArray(filters.testType) && filters.testType.length > 0) {
                 filters.testType.forEach(tt => {
                     if (tt && tt !== '__ALL__') url += `&testType=${encodeURIComponent(tt)}`;
@@ -940,10 +942,10 @@ const AverageReport = ({ filters }) => {
                 const sRows = grouped[studentIds[0]];
                 const transformed = getTransformedRows(sRows);
                 const chartImgData = includeChart ? await generateChartImage(transformed) : null;
-                const erpQ = await fetchStudentErpQuestionsForPdf(studentIds[0]);
+                const sName = sRows[0]?.NAME_OF_THE_STUDENT || '';
+                const erpQ = await fetchStudentErpQuestionsForPdf(studentIds[0], sName);
                 const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ);
-                const sName = sRows[0].NAME_OF_THE_STUDENT || 'Report';
-                const sanitizedName = String(sName).replace(/[/\\?%*:|"<>]/g, '_').trim();
+                const sanitizedName = String(sName || 'Report').replace(/[/\\?%*:|"<>]/g, '_').trim();
                 doc.save(`${sanitizedName}_Progress_Report.pdf`);
                 logActivity(userData, 'Downloaded Progress PDF', { student: sName, includeChart });
             } else {
@@ -960,13 +962,13 @@ const AverageReport = ({ filters }) => {
                     await new Promise((resolve) => setTimeout(resolve, 0));
 
                     const sRows = grouped[id];
-                    const sName = sRows[0].NAME_OF_THE_STUDENT || id;
+                    const sName = sRows[0]?.NAME_OF_THE_STUDENT || id;
                     const sanitizedName = String(sName).replace(/[/\\?%*:|"<>]/g, '_').trim();
                     const fileName = `${sanitizedName}_${id}_Progress_Report.pdf`;
 
                     const transformed = getTransformedRows(sRows);
                     const chartImgData = includeChart ? await generateChartImage(transformed) : null;
-                    const erpQ = await fetchStudentErpQuestionsForPdf(id);
+                    const erpQ = await fetchStudentErpQuestionsForPdf(id, sName);
                     const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ);
                     const pdfBlob = doc.output('blob');
                     zip.file(fileName, pdfBlob);
@@ -1009,7 +1011,8 @@ const AverageReport = ({ filters }) => {
 
         let isMounted = true;
         setErpLoading(true);
-        fetchStudentErpQuestionsForPdf(previewStudentId).then(qList => {
+        const sName = previewRows && previewRows.length > 0 ? previewRows[0].NAME_OF_THE_STUDENT : '';
+        fetchStudentErpQuestionsForPdf(previewStudentId, sName).then(qList => {
             if (isMounted) {
                 setStudentErpQuestions(qList);
                 setErpLoading(false);
@@ -1021,7 +1024,7 @@ const AverageReport = ({ filters }) => {
             }
         });
         return () => { isMounted = false; };
-    }, [previewStudentId, filters.academicYear, filters.testType]);
+    }, [previewStudentId, previewRows, filters.academicYear, filters.testType]);
 
     const handleMouseDown = (e) => {
         if (zoomScale > 1) {

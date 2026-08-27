@@ -1433,10 +1433,20 @@ app.get('/api/erp/report', async (req, res) => {
         const sNames = Array.isArray(req.query.studentNames) ? req.query.studentNames : [];
         const cleanNames = sNames.map(n => n ? n.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
 
+        let studentClauses = [];
         if (cleanIds.length > 0) {
-            clauses.push(`STUD_ID IN(${cleanIds.map(v => `'${v}'`).join(',')})`);
-        } else if (cleanNames.length > 0) {
-            clauses.push(`UPPER(TRIM(Student_Name)) IN(${cleanNames.map(v => `'${v}'`).join(',')})`);
+            cleanIds.forEach(id => {
+                studentClauses.push(`TRIM(STUD_ID) = '${id}'`);
+                studentClauses.push(`STUD_ID = '${id}'`);
+            });
+        }
+        if (cleanNames.length > 0) {
+            cleanNames.forEach(n => {
+                studentClauses.push(`UPPER(TRIM(Student_Name)) = '${n}'`);
+            });
+        }
+        if (studentClauses.length > 0) {
+            clauses.push(`(${studentClauses.join(' OR ')})`);
         } else if (quickSearch && quickSearch.trim() !== '') {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
             clauses.push(`(Student_Name LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
