@@ -1,13 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Modal from './Modal';
 import { buildQueryParams, formatDate, API_URL } from '../utils/apiHelper';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingUp, Maximize2, X } from 'lucide-react';
 import { logActivity } from '../utils/activityLogger';
 import { useAuth } from './auth/AuthProvider';
+
+const SUBJECT_ORDER = {
+    "BOTANY": 1,
+    "ZOOLOGY": 2,
+    "PHYSICS": 3,
+    "CHEMISTRY": 4
+};
+const getSubjectOrder = (sub) => SUBJECT_ORDER[String(sub || '').trim().toUpperCase()] || 99;
 
 import {
     Chart as ChartJS,
@@ -193,6 +201,23 @@ const AverageReport = ({ filters }) => {
     const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
 
+    const [studentErpQuestions, setStudentErpQuestions] = useState([]);
+    const [erpLoading, setErpLoading] = useState(false);
+    const [zoomImage, setZoomImage] = useState(null);
+
+    // Zoom and pan states for question preview
+    const [zoomScale, setZoomScale] = useState(1);
+    const [zoomOffset, setZoomOffset] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const zoomContainerRef = useRef(null);
+
+    useEffect(() => {
+        setZoomScale(1);
+        setZoomOffset({ x: 0, y: 0 });
+        setIsDragging(false);
+    }, [zoomImage]);
+
     useEffect(() => {
         setHistory([]);
         setAllExams([]);
@@ -293,7 +318,7 @@ const AverageReport = ({ filters }) => {
         });
     };
 
-    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformedRows, isChartIncluded) => {
+    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformedRows, isChartIncluded, erpQuestions = []) => {
         const doc = new jsPDF('p', 'mm', 'a4');
 
         if (impactFont) {
@@ -734,6 +759,87 @@ const AverageReport = ({ filters }) => {
             }
         }
 
+        // Render Wrong & Unattempted Questions (Topic & Subtopic Details) Table in PDF
+        if (erpQuestions && erpQuestions.length > 0) {
+            let lastY = doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY;
+            if (isChartIncluded && chartImgData) {
+                const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
+                const advisoryHeight = analysis ? 22 + (analysis.testLosses.length * 5) : 0;
+                lastY += 75 + advisoryHeight + 12;
+            } else {
+                lastY += 8;
+            }
+
+            if (lastY > 250) {
+                doc.addPage();
+                lastY = 15;
+            }
+
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold");
+            else doc.setFont("helvetica", "bold");
+            doc.setFontSize(10.5);
+            doc.setTextColor(0, 51, 153);
+            doc.text("WRONG & UNATTEMPTED QUESTIONS (TOPIC & SUBTOPIC DETAILS)", marginX, lastY);
+
+            const qTableRows = erpQuestions.map(q => [
+                q.test,
+                `Q${q.qNo}`,
+                q.subject,
+                q.topic,
+                q.subTopic || '-',
+                q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)',
+                `-${q.lost}`
+            ]);
+
+            autoTable(doc, {
+                startY: lastY + 4,
+                margin: { left: marginX, right: marginX, bottom: 15 },
+                head: [['Test', 'Q.No', 'Subject', 'Topic', 'Sub-Topic', 'Status', 'Marks Lost']],
+                body: qTableRows,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [0, 51, 153],
+                    textColor: [255, 255, 255],
+                    font: bookmanFont ? "Bookman" : "helvetica",
+                    fontStyle: 'bold',
+                    fontSize: 9,
+                    halign: 'center'
+                },
+                styles: {
+                    font: bookmanFont ? "Bookman" : "helvetica",
+                    fontSize: 8.5,
+                    cellPadding: 1.5,
+                    overflow: 'ellipsize',
+                    halign: 'left',
+                    valign: 'middle',
+                    lineColor: [0, 0, 0],
+                    lineWidth: 0.1,
+                    textColor: [0, 0, 0]
+                },
+                columnStyles: {
+                    0: { halign: 'left', fontStyle: 'bold', cellWidth: 25 },
+                    1: { halign: 'center', fontStyle: 'bold', cellWidth: 15 },
+                    2: { halign: 'left', fontStyle: 'bold', cellWidth: 25 },
+                    3: { halign: 'left', cellWidth: 48 },
+                    4: { halign: 'left', cellWidth: 42 },
+                    5: { halign: 'center', cellWidth: 23 },
+                    6: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold', cellWidth: 12 }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 5) {
+                        const cellVal = String(data.cell.raw);
+                        if (cellVal.includes('Wrong')) {
+                            data.cell.styles.textColor = [185, 28, 28];
+                            data.cell.styles.fontStyle = 'bold';
+                        } else if (cellVal.includes('Unattempted')) {
+                            data.cell.styles.textColor = [21, 128, 61];
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                    }
+                }
+            });
+        }
+
         return doc;
     };
 
@@ -785,12 +891,57 @@ const AverageReport = ({ filters }) => {
                 });
             };
 
+            const fetchStudentErpQuestionsForPdf = async (studId) => {
+                if (!studId) return [];
+                try {
+                    const year = filters.academicYear || '2026';
+                    let url = `${API_URL}/api/erp/report?academicYear=${year}&studentSearch=${studId}`;
+                    if (filters?.testType && Array.isArray(filters.testType) && filters.testType.length > 0) {
+                        filters.testType.forEach(tt => {
+                            if (tt && tt !== '__ALL__') url += `&testType=${encodeURIComponent(tt)}`;
+                        });
+                    }
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    const safeData = Array.isArray(data) ? data : [];
+                    const qList = safeData.map(row => {
+                        const status = String(row.W_U || '').trim().toUpperCase();
+                        return {
+                            test: row.Test,
+                            qNo: row.Q_No,
+                            subject: row.Subject,
+                            topic: row.Topic || 'Unknown Topic',
+                            subTopic: row.Sub_Topic || '',
+                            status: status,
+                            lost: status === 'W' ? 5 : 4,
+                            qUrl: row.Q_URL,
+                            sUrl: row.S_URL,
+                            keyValue: row.Key_Value
+                        };
+                    });
+                    qList.sort((a, b) => {
+                        const tComp = a.test.localeCompare(b.test);
+                        if (tComp !== 0) return tComp;
+                        const subComp = getSubjectOrder(a.subject) - getSubjectOrder(b.subject);
+                        if (subComp !== 0) return subComp;
+                        const topicComp = String(a.topic || '').localeCompare(String(b.topic || ''));
+                        if (topicComp !== 0) return topicComp;
+                        return (parseInt(a.qNo) || 0) - (parseInt(b.qNo) || 0);
+                    });
+                    return qList;
+                } catch (e) {
+                    console.error("Failed to fetch student ERP questions:", e);
+                    return [];
+                }
+            };
+
             if (studentIds.length === 1) {
                 setDownloadProgress({ current: 1, total: 1 });
                 const sRows = grouped[studentIds[0]];
                 const transformed = getTransformedRows(sRows);
                 const chartImgData = includeChart ? await generateChartImage(transformed) : null;
-                const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart);
+                const erpQ = await fetchStudentErpQuestionsForPdf(studentIds[0]);
+                const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ);
                 const sName = sRows[0].NAME_OF_THE_STUDENT || 'Report';
                 const sanitizedName = String(sName).replace(/[/\\?%*:|"<>]/g, '_').trim();
                 doc.save(`${sanitizedName}_Progress_Report.pdf`);
@@ -815,7 +966,8 @@ const AverageReport = ({ filters }) => {
 
                     const transformed = getTransformedRows(sRows);
                     const chartImgData = includeChart ? await generateChartImage(transformed) : null;
-                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart);
+                    const erpQ = await fetchStudentErpQuestionsForPdf(id);
+                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ);
                     const pdfBlob = doc.output('blob');
                     zip.file(fileName, pdfBlob);
                 }
@@ -848,6 +1000,51 @@ const AverageReport = ({ filters }) => {
     const previewRows = previewStudentId
         ? history.filter(h => h.STUD_ID?.toString() === previewStudentId.toString())
         : [];
+
+    useEffect(() => {
+        if (!previewStudentId) {
+            setStudentErpQuestions([]);
+            return;
+        }
+
+        let isMounted = true;
+        setErpLoading(true);
+        fetchStudentErpQuestionsForPdf(previewStudentId).then(qList => {
+            if (isMounted) {
+                setStudentErpQuestions(qList);
+                setErpLoading(false);
+            }
+        }).catch(() => {
+            if (isMounted) {
+                setStudentErpQuestions([]);
+                setErpLoading(false);
+            }
+        });
+        return () => { isMounted = false; };
+    }, [previewStudentId, filters.academicYear, filters.testType]);
+
+    const handleMouseDown = (e) => {
+        if (zoomScale > 1) {
+            setIsDragging(true);
+            setDragStart({
+                x: e.clientX - zoomOffset.x,
+                y: e.clientY - zoomOffset.y
+            });
+        }
+    };
+
+    const handleMouseMove = (e) => {
+        if (isDragging && zoomScale > 1) {
+            setZoomOffset({
+                x: e.clientX - dragStart.x,
+                y: e.clientY - dragStart.y
+            });
+        }
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
 
     const transformedPreviewRows = useMemo(() => {
         if (previewRows.length === 0 || allExams.length === 0) return [];
@@ -1115,9 +1312,117 @@ const AverageReport = ({ filters }) => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Wrong & Unattempted Questions (Topic & Subtopic Details) Table */}
+                        {previewRows.length > 0 && (
+                            <div className="drawer-subject-breakdown" style={{ marginTop: '24px', background: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
+                                    <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                        Wrong & Unattempted Questions (Topic & Subtopic Details)
+                                    </h4>
+                                    <span className="q-count-badge" style={{ background: '#eff6ff', color: '#1e40af', padding: '3px 10px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '800' }}>
+                                        {studentErpQuestions.length} items
+                                    </span>
+                                </div>
+
+                                {erpLoading ? (
+                                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
+                                        Loading Topic & Subtopic details...
+                                    </div>
+                                ) : studentErpQuestions.length > 0 ? (
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table className="drawer-mini-table topic-details-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                            <thead>
+                                                <tr style={{ background: '#1e3a8a', color: '#ffffff' }}>
+                                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: '800' }}>Test</th>
+                                                    <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: '800' }}>Q.No</th>
+                                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: '800' }}>Subject</th>
+                                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: '800' }}>Topic</th>
+                                                    <th style={{ textAlign: 'left', padding: '10px 14px', fontWeight: '800' }}>Sub-Topic</th>
+                                                    <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: '800' }}>Status</th>
+                                                    <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: '800' }}>Marks Lost</th>
+                                                    <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: '800' }}>Key</th>
+                                                    <th style={{ textAlign: 'center', padding: '10px 14px', fontWeight: '800' }}>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {studentErpQuestions.map((q, idx) => (
+                                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                        <td style={{ padding: '10px 14px', fontWeight: 'bold' }}>{q.test}</td>
+                                                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 'bold' }}>Q{q.qNo}</td>
+                                                        <td style={{ padding: '10px 14px', fontWeight: 'bold' }}>{q.subject}</td>
+                                                        <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1e293b' }}>{q.topic}</td>
+                                                        <td style={{ padding: '10px 14px', color: '#475569' }}>{q.subTopic || '-'}</td>
+                                                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                                            <span className={`status-badge ${q.status.toLowerCase()}`}>
+                                                                {q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 'bold', color: '#dc2626' }}>
+                                                            -{q.lost}
+                                                        </td>
+                                                        <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 'bold', color: '#16a34a' }}>
+                                                            {q.keyValue || '-'}
+                                                        </td>
+                                                        <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                                            {q.qUrl ? (
+                                                                <button 
+                                                                    className="q-preview-btn-sm"
+                                                                    onClick={() => setZoomImage({ url: q.qUrl, title: `${q.test} - Q${q.qNo} (${q.subject}): ${q.topic}` })}
+                                                                >
+                                                                    <Maximize2 size={12} /> View
+                                                                </button>
+                                                            ) : '-'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
+                                        No wrong or unattempted questions recorded for this student.
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </>
                 )}
             </div>
+
+            {/* Question Image Zoom Modal */}
+            {zoomImage && (
+                <div className="zoom-modal-overlay" onClick={() => setZoomImage(null)}>
+                    <div className="zoom-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <div className="zoom-modal-header">
+                            <h5>{zoomImage.title}</h5>
+                            <button className="zoom-close-btn" onClick={() => setZoomImage(null)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div 
+                            className="zoom-modal-body"
+                            ref={zoomContainerRef}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                            style={{ cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
+                        >
+                            <img 
+                                src={zoomImage.url} 
+                                alt={zoomImage.title} 
+                                className="zoomable-image"
+                                style={{
+                                    transform: `translate(${zoomOffset.x}px, ${zoomOffset.y}px) scale(${zoomScale})`,
+                                    transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                                }}
+                                draggable={false}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <Modal
                 isOpen={modal.isOpen}

@@ -954,11 +954,16 @@ const estimateWU = (lost) => {
                         },
                         y: {
                             grid: { display: true, color: '#e2e8f0' },
-                            max: 180,
-                            ticks: { font: { size: 20, weight: 'bold' }, color: '#64748b', stepSize: 45 }
+                            max: 205,
+                            ticks: { 
+                                font: { size: 20, weight: 'bold' }, 
+                                color: '#64748b', 
+                                stepSize: 45,
+                                callback: (val) => val <= 180 ? val : ''
+                            }
                         }
                     },
-                    layout: { padding: { top: 45, bottom: 10, left: 15, right: 15 } }
+                    layout: { padding: { top: 55, bottom: 10, left: 15, right: 15 } }
                 },
                 750,
                 550
@@ -1740,10 +1745,18 @@ const estimateWU = (lost) => {
                                                         },
                                                         scales: {
                                                             x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } },
-                                                            y: { grid: { display: true, color: '#f1f5f9' }, max: 180, ticks: { font: { size: 9 }, stepSize: 45 } }
+                                                            y: { 
+                                                                grid: { display: true, color: '#f1f5f9' }, 
+                                                                max: 205, 
+                                                                ticks: { 
+                                                                    font: { size: 9 }, 
+                                                                    stepSize: 45,
+                                                                    callback: (val) => val <= 180 ? val : ''
+                                                                } 
+                                                            }
                                                         },
                                                         layout: {
-                                                            padding: { top: 15 }
+                                                            padding: { top: 25 }
                                                         }
                                                     }}
                                                 />
