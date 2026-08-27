@@ -225,8 +225,27 @@ const AverageReport = ({ filters }) => {
         setCurrentStudentIndex(0);
     }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.studentSearch]);
 
-    const fetchStudentErpQuestionsForPdf = async (studId, studentName = '') => {
-        if (!studId && !studentName) return [];
+    const estimateWU = (lost) => {
+        if (!lost || lost <= 0) return { w: 0, wLost: 0, u: 0, uLost: 0 };
+        let w = Math.floor(lost / 5);
+        let rem = lost % 5;
+        let u = 0;
+        if (rem === 4) {
+            u = 1;
+        } else if (rem === 3 && w > 0) {
+            w -= 1;
+            u = 2;
+        } else if (rem === 2 && w >= 2) {
+            w -= 2;
+            u = 3;
+        }
+        const wLost = w * 5;
+        const uLost = u * 4;
+        return { w, wLost, u, uLost };
+    };
+
+    const fetchStudentErpQuestionsForPdf = async (studId, studentName = '', studentHistoryRows = []) => {
+        if (!studId && !studentName && (!studentHistoryRows || studentHistoryRows.length === 0)) return [];
         try {
             const year = filters.academicYear || '2026';
             let url = `${API_URL}/api/erp/report?academicYear=${year}`;
@@ -245,21 +264,100 @@ const AverageReport = ({ filters }) => {
                 });
             }
 
-            const qList = safeData.map(row => {
-                const status = String(row.W_U || '').trim().toUpperCase();
-                return {
-                    test: row.Test,
-                    qNo: row.Q_No,
-                    subject: row.Subject,
-                    topic: row.Topic || 'Unknown Topic',
-                    subTopic: row.Sub_Topic || '',
-                    status: status,
-                    lost: status === 'W' ? 5 : 4,
-                    qUrl: row.Q_URL,
-                    sUrl: row.S_URL,
-                    keyValue: row.Key_Value
-                };
-            });
+            let qList = [];
+
+            if (safeData.length > 0) {
+                qList = safeData.map(row => {
+                    const status = String(row.W_U || '').trim().toUpperCase();
+                    return {
+                        test: row.Test,
+                        qNo: row.Q_No,
+                        subject: row.Subject,
+                        topic: row.Topic || 'Unknown Topic',
+                        subTopic: row.Sub_Topic || '',
+                        status: status,
+                        lost: status === 'W' ? 5 : 4,
+                        qUrl: row.Q_URL,
+                        sUrl: row.S_URL,
+                        keyValue: row.Key_Value
+                    };
+                });
+            } else if (studentHistoryRows && studentHistoryRows.length > 0) {
+                // Fallback: Fetch master question definitions from ERP_REPORT for student's exams
+                const testNames = [...new Set(studentHistoryRows.map(r => r.Test).filter(Boolean))];
+                if (testNames.length > 0) {
+                    let masterUrl = `${API_URL}/api/erp/report?academicYear=${year}`;
+                    testNames.forEach(t => masterUrl += `&test=${encodeURIComponent(t)}`);
+                    const mRes = await fetch(masterUrl);
+                    const mData = await mRes.json();
+                    const masterRows = Array.isArray(mData) ? mData : [];
+
+                    studentHistoryRows.forEach(exam => {
+                        const tName = exam.Test;
+                        const subLosses = [
+                            { subject: 'BOTANY', scored: Number(exam.Botany) || 0, max: 180 },
+                            { subject: 'ZOOLOGY', scored: Number(exam.Zoology) || 0, max: 180 },
+                            { subject: 'PHYSICS', scored: Number(exam.Physics) || 0, max: 180 },
+                            { subject: 'CHEMISTRY', scored: Number(exam.Chemistry) || 0, max: 180 }
+                        ];
+
+                        subLosses.forEach(s => {
+                            const lost = Math.max(0, s.max - Math.round(s.scored));
+                            if (lost > 0) {
+                                const { w, u } = estimateWU(lost);
+                                if (w > 0 || u > 0) {
+                                    const masterForSub = masterRows.filter(m => 
+                                        m.Test?.trim().toUpperCase() === tName.trim().toUpperCase() && 
+                                        m.Subject?.trim().toUpperCase() === s.subject
+                                    );
+
+                                    const uniqueMaster = [];
+                                    const seenQNo = new Set();
+                                    masterForSub.forEach(m => {
+                                        if (!seenQNo.has(m.Q_No)) {
+                                            seenQNo.add(m.Q_No);
+                                            uniqueMaster.push(m);
+                                        }
+                                    });
+
+                                    let index = 0;
+                                    for (let i = 0; i < w && index < uniqueMaster.length; i++, index++) {
+                                        const mq = uniqueMaster[index];
+                                        qList.push({
+                                            test: tName,
+                                            qNo: mq.Q_No,
+                                            subject: mq.Subject,
+                                            topic: mq.Topic || 'Unknown Topic',
+                                            subTopic: mq.Sub_Topic || '',
+                                            status: 'W',
+                                            lost: 5,
+                                            qUrl: mq.Q_URL,
+                                            sUrl: mq.S_URL,
+                                            keyValue: mq.Key_Value
+                                        });
+                                    }
+                                    for (let i = 0; i < u && index < uniqueMaster.length; i++, index++) {
+                                        const mq = uniqueMaster[index];
+                                        qList.push({
+                                            test: tName,
+                                            qNo: mq.Q_No,
+                                            subject: mq.Subject,
+                                            topic: mq.Topic || 'Unknown Topic',
+                                            subTopic: mq.Sub_Topic || '',
+                                            status: 'U',
+                                            lost: 4,
+                                            qUrl: mq.Q_URL,
+                                            sUrl: mq.S_URL,
+                                            keyValue: mq.Key_Value
+                                        });
+                                    }
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+
             qList.sort((a, b) => {
                 const tComp = String(a.test || '').localeCompare(String(b.test || ''));
                 if (tComp !== 0) return tComp;
@@ -948,7 +1046,7 @@ const AverageReport = ({ filters }) => {
                 const transformed = getTransformedRows(sRows);
                 const chartImgData = includeChart ? await generateChartImage(transformed) : null;
                 const sName = sRows[0]?.NAME_OF_THE_STUDENT || '';
-                const erpQ = await fetchStudentErpQuestionsForPdf(studentIds[0], sName);
+                const erpQ = await fetchStudentErpQuestionsForPdf(studentIds[0], sName, sRows);
                 const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ);
                 const sanitizedName = String(sName || 'Report').replace(/[/\\?%*:|"<>]/g, '_').trim();
                 doc.save(`${sanitizedName}_Progress_Report.pdf`);
@@ -973,7 +1071,7 @@ const AverageReport = ({ filters }) => {
 
                     const transformed = getTransformedRows(sRows);
                     const chartImgData = includeChart ? await generateChartImage(transformed) : null;
-                    const erpQ = await fetchStudentErpQuestionsForPdf(id, sName);
+                    const erpQ = await fetchStudentErpQuestionsForPdf(id, sName, sRows);
                     const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ);
                     const pdfBlob = doc.output('blob');
                     zip.file(fileName, pdfBlob);
@@ -1020,7 +1118,7 @@ const AverageReport = ({ filters }) => {
 
         let isMounted = true;
         setErpLoading(true);
-        fetchStudentErpQuestionsForPdf(previewStudentId, previewStudentName).then(qList => {
+        fetchStudentErpQuestionsForPdf(previewStudentId, previewStudentName, previewRows).then(qList => {
             if (isMounted) {
                 setStudentErpQuestions(qList);
                 setErpLoading(false);
