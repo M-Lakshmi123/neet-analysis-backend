@@ -958,7 +958,7 @@ const AverageReport = ({ filters }) => {
                     font: bookmanFont ? "Bookman" : "helvetica",
                     fontSize: 8.5,
                     cellPadding: 1.5,
-                    overflow: 'ellipsize',
+                    overflow: 'linebreak',
                     halign: 'left',
                     valign: 'middle',
                     lineColor: [0, 0, 0],
@@ -966,12 +966,12 @@ const AverageReport = ({ filters }) => {
                     textColor: [0, 0, 0]
                 },
                 columnStyles: {
-                    0: { halign: 'left', fontStyle: 'bold', cellWidth: 25 },
-                    1: { halign: 'center', fontStyle: 'bold', cellWidth: 15 },
-                    2: { halign: 'left', fontStyle: 'bold', cellWidth: 25 },
-                    3: { halign: 'left', cellWidth: 48 },
-                    4: { halign: 'left', cellWidth: 42 },
-                    5: { halign: 'center', cellWidth: 23 },
+                    0: { halign: 'left', fontStyle: 'bold', cellWidth: 20 },
+                    1: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
+                    2: { halign: 'left', fontStyle: 'bold', cellWidth: 24 },
+                    3: { halign: 'left', cellWidth: 52 },
+                    4: { halign: 'left', cellWidth: 48 },
+                    5: { halign: 'center', cellWidth: 20 },
                     6: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold', cellWidth: 12 }
                 },
                 didParseCell: (data) => {
@@ -1461,8 +1461,8 @@ const AverageReport = ({ filters }) => {
                                                         <td style={{ padding: '10px 14px', fontWeight: 'bold' }}>{q.test}</td>
                                                         <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 'bold' }}>Q{q.qNo}</td>
                                                         <td style={{ padding: '10px 14px', fontWeight: 'bold' }}>{q.subject}</td>
-                                                        <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1e293b' }}>{q.topic}</td>
-                                                        <td style={{ padding: '10px 14px', color: '#475569' }}>{q.subTopic || '-'}</td>
+                                                        <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1e293b', whiteSpace: 'normal', wordBreak: 'break-word' }}>{q.topic}</td>
+                                                        <td style={{ padding: '10px 14px', color: '#475569', whiteSpace: 'normal', wordBreak: 'break-word' }}>{q.subTopic || '-'}</td>
                                                         <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                                                             <span className={`status-badge ${q.status.toLowerCase()}`}>
                                                                 {q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)'}
