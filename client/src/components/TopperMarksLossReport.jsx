@@ -814,9 +814,10 @@ const estimateWU = (lost) => {
             // Right Column
             const academicYr = filters.academicYear || '2026';
             const studentStream = selectedStudent.stream || selectedStudent.Stream || (erpData && erpData.length > 0 ? erpData.find(r => r.Stream)?.Stream : null) || (filters.stream && filters.stream.length > 0 ? filters.stream.join(', ') : '-');
-            const testNameText = selectedErpTests.length === uniqueTests.length 
-                ? `All Exams (${uniqueTests.length})` 
-                : selectedErpTests.join(', ');
+            const isSpecificTestFilter = filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__';
+            const testNameText = isSpecificTestFilter
+                ? (selectedErpTests.length > 0 ? selectedErpTests.join(', ') : filters.test.join(', '))
+                : (selectedErpTests.length > 1 ? `All Exams (${selectedErpTests.length})` : (selectedErpTests[0] || 'All Exams'));
 
             doc.setFont("helvetica", "bold");
             doc.text("Academic Year:", col2X, y + 6);
@@ -1210,7 +1211,10 @@ const estimateWU = (lost) => {
                                                             fontSize: '0.75rem',
                                                             fontWeight: '800'
                                                         }}>
-                                                            {selectedErpTests.length === uniqueTests.length ? 'All Exams Selected' : `${selectedErpTests.length} Selected`}
+                                                            {(filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__')
+                                                                ? (selectedErpTests.length === 1 ? selectedErpTests[0] : `${selectedErpTests.length} Exams Selected`) 
+                                                                : (selectedErpTests.length > 1 ? 'All Exams Selected' : (selectedErpTests[0] || 'All Exams'))
+                                                            }
                                                         </span>
                                                     </div>
                                                 </div>
