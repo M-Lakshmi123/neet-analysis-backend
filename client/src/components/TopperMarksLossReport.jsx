@@ -403,6 +403,14 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
         fetchErpData();
     }, [selectedStudent, filters.academicYear, filters.test, filters.testType, allFilterExams]);
 
+const SUBJECT_ORDER = {
+    "BOTANY": 1,
+    "ZOOLOGY": 2,
+    "PHYSICS": 3,
+    "CHEMISTRY": 4
+};
+const getSubjectOrder = (sub) => SUBJECT_ORDER[String(sub || '').trim().toUpperCase()] || 99;
+
 const estimateWU = (lost) => {
     if (!lost || lost <= 0) return { w: 0, wLost: 0, u: 0, uLost: 0 };
     let w = Math.floor(lost / 5);
@@ -557,7 +565,15 @@ const estimateWU = (lost) => {
             wrongLost,
             unattemptedCount,
             unattemptedLost,
-            questions: questionsList.sort((a, b) => a.test.localeCompare(b.test) || a.qNo - b.qNo),
+            questions: questionsList.sort((a, b) => {
+                const tComp = a.test.localeCompare(b.test);
+                if (tComp !== 0) return tComp;
+                const subComp = getSubjectOrder(a.subject) - getSubjectOrder(b.subject);
+                if (subComp !== 0) return subComp;
+                const topicComp = String(a.topic || '').localeCompare(String(b.topic || ''));
+                if (topicComp !== 0) return topicComp;
+                return (parseInt(a.qNo) || 0) - (parseInt(b.qNo) || 0);
+            }),
             subjects: subMap,
             scoredMarks,
             totalScored
@@ -916,15 +932,85 @@ const estimateWU = (lost) => {
                 }
             });
 
-            // 8. Single Clean Footer (Fixed X positions so left and right text never overlap)
-            doc.setDrawColor(226, 232, 240);
-            doc.setLineWidth(0.3);
-            doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
-            doc.setFontSize(7.5);
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(100, 116, 139);
-            doc.text("Generated automatically via Sri Chaitanya Medicon Analytics Platform", margin, pageHeight - 7);
-            doc.text(`Page 1 of 1`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+            // 8. Wrong & Unattempted Questions Topic & Subtopic Details Table
+            if (erpAnalysis.questions && erpAnalysis.questions.length > 0) {
+                let questionsY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : y + 30;
+                
+                if (questionsY > pageHeight - 40) {
+                    doc.addPage();
+                    questionsY = 20;
+                }
+
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(15, 23, 42);
+                doc.text("WRONG & UNATTEMPTED QUESTIONS (TOPIC & SUBTOPIC DETAILS)", margin, questionsY);
+
+                const qTableRows = erpAnalysis.questions.map(q => [
+                    q.test,
+                    `Q${q.qNo}`,
+                    q.subject,
+                    q.topic,
+                    q.subTopic || '-',
+                    q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)',
+                    `-${q.lost}`
+                ]);
+
+                autoTable(doc, {
+                    startY: questionsY + 4,
+                    margin: { left: margin, right: margin },
+                    head: [['Test', 'Q.No', 'Subject', 'Topic', 'Sub-Topic', 'Status', 'Marks Lost']],
+                    body: qTableRows,
+                    theme: 'grid',
+                    headStyles: {
+                        fillColor: [30, 58, 138],
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold',
+                        fontSize: 8.5,
+                        halign: 'center'
+                    },
+                    bodyStyles: {
+                        fontSize: 8,
+                        textColor: [30, 41, 59],
+                        halign: 'left'
+                    },
+                    columnStyles: {
+                        0: { halign: 'left', fontStyle: 'bold', cellWidth: 25 },
+                        1: { halign: 'center', fontStyle: 'bold', cellWidth: 15 },
+                        2: { halign: 'left', fontStyle: 'bold', cellWidth: 25 },
+                        3: { halign: 'left', cellWidth: 45 },
+                        4: { halign: 'left', cellWidth: 40 },
+                        5: { halign: 'center', cellWidth: 23 },
+                        6: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold', cellWidth: 13 }
+                    },
+                    didParseCell: (data) => {
+                        if (data.section === 'body' && data.column.index === 5) {
+                            const cellVal = String(data.cell.raw);
+                            if (cellVal.includes('Wrong')) {
+                                data.cell.styles.textColor = [180, 83, 9];
+                                data.cell.styles.fontStyle = 'bold';
+                            } else if (cellVal.includes('Unattempted')) {
+                                data.cell.styles.textColor = [21, 128, 61];
+                                data.cell.styles.fontStyle = 'bold';
+                            }
+                        }
+                    }
+                });
+            }
+
+            // 9. Clean Footer across all pages
+            const totalPages = doc.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setDrawColor(226, 232, 240);
+                doc.setLineWidth(0.3);
+                doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+                doc.setFontSize(7.5);
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(100, 116, 139);
+                doc.text("Generated automatically via Sri Chaitanya Medicon Analytics Platform", margin, pageHeight - 7);
+                doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+            }
 
             const cleanFileName = `${selectedStudent.name.replace(/[^a-zA-Z0-9]/g, '_')}_Marks_Loss_Report.pdf`;
             doc.save(cleanFileName);
@@ -1279,56 +1365,72 @@ const estimateWU = (lost) => {
                                                         </tr>
                                                     </tfoot>
                                                 </table>
+                                             <div className="drawer-subject-breakdown" style={{ marginTop: '20px' }}>
+                                                 <div className="drawer-section-header">
+                                                     <h4 className="drawer-section-title" style={{ margin: 0 }}>
+                                                         Wrong & Unattempted Questions (Topic & Subtopic Details)
+                                                     </h4>
+                                                     <span className="q-count-badge">{erpAnalysis.questions.length} items</span>
+                                                 </div>
+
+                                                 {erpAnalysis.questions.length > 0 ? (
+                                                     <div style={{ overflowX: 'auto', marginTop: '12px' }}>
+                                                         <table className="drawer-mini-table topic-details-table">
+                                                             <thead>
+                                                                 <tr>
+                                                                     <th style={{ textAlign: 'left', width: '12%' }}>Test</th>
+                                                                     <th style={{ textAlign: 'center', width: '8%' }}>Q.No</th>
+                                                                     <th style={{ textAlign: 'left', width: '12%' }}>Subject</th>
+                                                                     <th style={{ textAlign: 'left', width: '22%' }}>Topic</th>
+                                                                     <th style={{ textAlign: 'left', width: '20%' }}>Sub-Topic</th>
+                                                                     <th style={{ textAlign: 'center', width: '12%' }}>Status</th>
+                                                                     <th style={{ textAlign: 'center', width: '10%' }}>Marks Lost</th>
+                                                                     <th style={{ textAlign: 'center', width: '6%' }}>Key</th>
+                                                                     <th style={{ textAlign: 'center', width: '8%' }}>Action</th>
+                                                                 </tr>
+                                                             </thead>
+                                                             <tbody>
+                                                                 {erpAnalysis.questions.map((q, idx) => (
+                                                                     <tr key={idx}>
+                                                                         <td className="font-bold">{q.test}</td>
+                                                                         <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Q{q.qNo}</td>
+                                                                         <td className="font-bold">{q.subject}</td>
+                                                                         <td style={{ fontWeight: '600', color: '#1e293b' }}>{q.topic}</td>
+                                                                         <td style={{ color: '#475569' }}>{q.subTopic || '-'}</td>
+                                                                         <td style={{ textAlign: 'center' }}>
+                                                                             <span className={`status-badge ${q.status.toLowerCase()}`}>
+                                                                                 {q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)'}
+                                                                             </span>
+                                                                         </td>
+                                                                         <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#dc2626' }}>
+                                                                             -{q.lost}
+                                                                         </td>
+                                                                         <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#16a34a' }}>
+                                                                             {q.keyValue || '-'}
+                                                                         </td>
+                                                                         <td style={{ textAlign: 'center' }}>
+                                                                             {q.qUrl ? (
+                                                                                 <button 
+                                                                                     className="q-preview-btn-sm"
+                                                                                     onClick={() => setZoomImage({ url: q.qUrl, title: `${q.test} - Q${q.qNo} (${q.subject}): ${q.topic}` })}
+                                                                                 >
+                                                                                     <Maximize2 size={12} /> View
+                                                                                 </button>
+                                                                             ) : '-'}
+                                                                         </td>
+                                                                     </tr>
+                                                                 ))}
+                                                             </tbody>
+                                                         </table>
+                                                     </div>
+                                                 ) : (
+                                                     <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
+                                                         No wrong or unattempted questions recorded for the selected test(s).
+                                                     </div>
+                                                 )}
+                                             </div>
                                             </div>
 
-                                            {/* Question Details Grid - Only rendered when question items exist */}
-                                            {erpAnalysis.questions.length > 0 && (
-                                                <div className="drawer-questions-list">
-                                                    <div className="drawer-section-header">
-                                                        <h4 className="drawer-section-title">Incorrect / Skipped Questions</h4>
-                                                        <span className="q-count-badge">{erpAnalysis.questions.length} items</span>
-                                                    </div>
-                                                    
-                                                    <div className="questions-grid-wrapper">
-                                                        {erpAnalysis.questions.map((q, idx) => (
-                                                            <div className={`q-detail-card ${q.status.toLowerCase()}`} key={idx}>
-                                                                <div className="q-card-top">
-                                                                    <div className="q-identifier">
-                                                                        <span className="q-badge-test">{q.test}</span>
-                                                                        <span className="q-badge-subject">{q.subject}</span>
-                                                                        <span className="q-num">Q{q.qNo}</span>
-                                                                    </div>
-                                                                    <div className={`q-status-tag ${q.status.toLowerCase()}`}>
-                                                                        {q.status === 'W' ? 'Wrong (-5)' : 'Unattempted (-4)'}
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="q-topic-line">
-                                                                    <strong>Topic:</strong> {q.topic}
-                                                                    {q.subTopic && <span className="q-subtopic"> • {q.subTopic}</span>}
-                                                                </div>
-
-                                                                {q.keyValue && (
-                                                                    <div className="q-key-line" style={{ marginTop: '4px', fontSize: '0.78rem', color: '#475569' }}>
-                                                                        <strong>Correct Answer:</strong> <span style={{ color: '#16a34a', fontWeight: 'bold' }}>{q.keyValue}</span>
-                                                                    </div>
-                                                                )}
-
-                                                                {q.qUrl && (
-                                                                    <div className="q-actions-bar">
-                                                                        <button 
-                                                                            className="q-preview-btn"
-                                                                            onClick={() => setZoomImage({ url: q.qUrl, title: `${q.test} - Q${q.qNo} (${q.subject})` })}
-                                                                        >
-                                                                            <Maximize2 size={13} /> View Question
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
                                         </>
                                     )}
                                 </div>
@@ -1999,6 +2101,47 @@ const estimateWU = (lost) => {
                 .q-preview-btn.solution:hover {
                     border-color: #10b981;
                     color: #10b981;
+                }
+
+                .status-badge {
+                    display: inline-block;
+                    padding: 3px 10px;
+                    border-radius: 12px;
+                    font-size: 0.75rem;
+                    font-weight: 800;
+                }
+
+                .status-badge.w {
+                    background: #fffbeb;
+                    color: #b45309;
+                    border: 1px solid #fde68a;
+                }
+
+                .status-badge.u {
+                    background: #f0fdf4;
+                    color: #15803d;
+                    border: 1px solid #bbf7d0;
+                }
+
+                .q-preview-btn-sm {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    border: 1px solid #cbd5e1;
+                    background: #ffffff;
+                    color: #475569;
+                    font-size: 0.72rem;
+                    font-weight: 700;
+                    padding: 4px 10px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+
+                .q-preview-btn-sm:hover {
+                    background: #eff6ff;
+                    border-color: #3b82f6;
+                    color: #1e40af;
                 }
 
                 /* Zoom Modal */
