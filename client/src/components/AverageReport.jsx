@@ -232,14 +232,19 @@ const AverageReport = ({ filters }) => {
             let url = `${API_URL}/api/erp/report?academicYear=${year}`;
             if (studId) url += `&studentSearch=${encodeURIComponent(studId)}`;
             if (studentName) url += `&studentNames=${encodeURIComponent(studentName)}`;
-            if (filters?.testType && Array.isArray(filters.testType) && filters.testType.length > 0) {
-                filters.testType.forEach(tt => {
-                    if (tt && tt !== '__ALL__') url += `&testType=${encodeURIComponent(tt)}`;
-                });
-            }
+
             const res = await fetch(url);
             const data = await res.json();
-            const safeData = Array.isArray(data) ? data : [];
+            let safeData = Array.isArray(data) ? data : [];
+
+            if (filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__') {
+                const filterTestsLower = filters.test.map(t => String(t).trim().toLowerCase());
+                safeData = safeData.filter(r => {
+                    const tLower = String(r.Test || '').trim().toLowerCase();
+                    return filterTestsLower.some(ft => ft === tLower || tLower.includes(ft) || ft.includes(tLower));
+                });
+            }
+
             const qList = safeData.map(row => {
                 const status = String(row.W_U || '').trim().toUpperCase();
                 return {
@@ -256,7 +261,7 @@ const AverageReport = ({ filters }) => {
                 };
             });
             qList.sort((a, b) => {
-                const tComp = a.test.localeCompare(b.test);
+                const tComp = String(a.test || '').localeCompare(String(b.test || ''));
                 if (tComp !== 0) return tComp;
                 const subComp = getSubjectOrder(a.subject) - getSubjectOrder(b.subject);
                 if (subComp !== 0) return subComp;
@@ -999,32 +1004,36 @@ const AverageReport = ({ filters }) => {
     const uniqueStudents = uniqueStudentIds.length;
 
     const previewStudentId = uniqueStudentIds[currentStudentIndex];
-    const previewRows = previewStudentId
-        ? history.filter(h => h.STUD_ID?.toString() === previewStudentId.toString())
-        : [];
+    const previewRows = useMemo(() => {
+        if (!previewStudentId) return [];
+        return history.filter(h => h.STUD_ID?.toString() === previewStudentId.toString());
+    }, [history, previewStudentId]);
+
+    const previewStudentName = previewRows[0]?.NAME_OF_THE_STUDENT || '';
 
     useEffect(() => {
         if (!previewStudentId) {
             setStudentErpQuestions([]);
+            setErpLoading(false);
             return;
         }
 
         let isMounted = true;
         setErpLoading(true);
-        const sName = previewRows && previewRows.length > 0 ? previewRows[0].NAME_OF_THE_STUDENT : '';
-        fetchStudentErpQuestionsForPdf(previewStudentId, sName).then(qList => {
+        fetchStudentErpQuestionsForPdf(previewStudentId, previewStudentName).then(qList => {
             if (isMounted) {
                 setStudentErpQuestions(qList);
                 setErpLoading(false);
             }
-        }).catch(() => {
+        }).catch((err) => {
+            console.error("ERP question loading error:", err);
             if (isMounted) {
                 setStudentErpQuestions([]);
                 setErpLoading(false);
             }
         });
         return () => { isMounted = false; };
-    }, [previewStudentId, previewRows, filters.academicYear, filters.testType]);
+    }, [previewStudentId, previewStudentName, filters.academicYear, filters.test]);
 
     const handleMouseDown = (e) => {
         if (zoomScale > 1) {
