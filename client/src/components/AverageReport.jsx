@@ -225,6 +225,50 @@ const AverageReport = ({ filters }) => {
         setCurrentStudentIndex(0);
     }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.studentSearch]);
 
+    const fetchStudentErpQuestionsForPdf = async (studId) => {
+        if (!studId) return [];
+        try {
+            const year = filters.academicYear || '2026';
+            let url = `${API_URL}/api/erp/report?academicYear=${year}&studentSearch=${studId}`;
+            if (filters?.testType && Array.isArray(filters.testType) && filters.testType.length > 0) {
+                filters.testType.forEach(tt => {
+                    if (tt && tt !== '__ALL__') url += `&testType=${encodeURIComponent(tt)}`;
+                });
+            }
+            const res = await fetch(url);
+            const data = await res.json();
+            const safeData = Array.isArray(data) ? data : [];
+            const qList = safeData.map(row => {
+                const status = String(row.W_U || '').trim().toUpperCase();
+                return {
+                    test: row.Test,
+                    qNo: row.Q_No,
+                    subject: row.Subject,
+                    topic: row.Topic || 'Unknown Topic',
+                    subTopic: row.Sub_Topic || '',
+                    status: status,
+                    lost: status === 'W' ? 5 : 4,
+                    qUrl: row.Q_URL,
+                    sUrl: row.S_URL,
+                    keyValue: row.Key_Value
+                };
+            });
+            qList.sort((a, b) => {
+                const tComp = a.test.localeCompare(b.test);
+                if (tComp !== 0) return tComp;
+                const subComp = getSubjectOrder(a.subject) - getSubjectOrder(b.subject);
+                if (subComp !== 0) return subComp;
+                const topicComp = String(a.topic || '').localeCompare(String(b.topic || ''));
+                if (topicComp !== 0) return topicComp;
+                return (parseInt(a.qNo) || 0) - (parseInt(b.qNo) || 0);
+            });
+            return qList;
+        } catch (e) {
+            console.error("Failed to fetch student ERP questions:", e);
+            return [];
+        }
+    };
+
     const fetchData = async () => {
         if (!filters.studentSearch || filters.studentSearch.length === 0) {
             setModal({
@@ -889,50 +933,6 @@ const AverageReport = ({ filters }) => {
                         return { Test: exam.Test, DATE: exam.DATE, isAB: true };
                     }
                 });
-            };
-
-            const fetchStudentErpQuestionsForPdf = async (studId) => {
-                if (!studId) return [];
-                try {
-                    const year = filters.academicYear || '2026';
-                    let url = `${API_URL}/api/erp/report?academicYear=${year}&studentSearch=${studId}`;
-                    if (filters?.testType && Array.isArray(filters.testType) && filters.testType.length > 0) {
-                        filters.testType.forEach(tt => {
-                            if (tt && tt !== '__ALL__') url += `&testType=${encodeURIComponent(tt)}`;
-                        });
-                    }
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    const safeData = Array.isArray(data) ? data : [];
-                    const qList = safeData.map(row => {
-                        const status = String(row.W_U || '').trim().toUpperCase();
-                        return {
-                            test: row.Test,
-                            qNo: row.Q_No,
-                            subject: row.Subject,
-                            topic: row.Topic || 'Unknown Topic',
-                            subTopic: row.Sub_Topic || '',
-                            status: status,
-                            lost: status === 'W' ? 5 : 4,
-                            qUrl: row.Q_URL,
-                            sUrl: row.S_URL,
-                            keyValue: row.Key_Value
-                        };
-                    });
-                    qList.sort((a, b) => {
-                        const tComp = a.test.localeCompare(b.test);
-                        if (tComp !== 0) return tComp;
-                        const subComp = getSubjectOrder(a.subject) - getSubjectOrder(b.subject);
-                        if (subComp !== 0) return subComp;
-                        const topicComp = String(a.topic || '').localeCompare(String(b.topic || ''));
-                        if (topicComp !== 0) return topicComp;
-                        return (parseInt(a.qNo) || 0) - (parseInt(b.qNo) || 0);
-                    });
-                    return qList;
-                } catch (e) {
-                    console.error("Failed to fetch student ERP questions:", e);
-                    return [];
-                }
             };
 
             if (studentIds.length === 1) {
