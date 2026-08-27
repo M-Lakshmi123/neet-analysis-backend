@@ -197,6 +197,7 @@ const AverageReport = ({ filters }) => {
     const [hasSearched, setHasSearched] = useState(false);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
     const [includeChart, setIncludeChart] = useState(true); // Toggle to include or exclude chart & diagnostics
+    const [includeTopicDetails, setIncludeTopicDetails] = useState(true); // Toggle to include or exclude Topic & Subtopic details
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
@@ -467,7 +468,7 @@ const AverageReport = ({ filters }) => {
         });
     };
 
-    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformedRows, isChartIncluded, erpQuestions = []) => {
+    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformedRows, isChartIncluded, erpQuestions = [], isTopicDetailsIncluded = true) => {
         const doc = new jsPDF('p', 'mm', 'a4');
 
         if (impactFont) {
@@ -909,7 +910,7 @@ const AverageReport = ({ filters }) => {
         }
 
         // Render Wrong & Unattempted Questions (Topic & Subtopic Details) Table in PDF
-        if (erpQuestions && erpQuestions.length > 0) {
+        if (isTopicDetailsIncluded && erpQuestions && erpQuestions.length > 0) {
             let lastY = doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY;
             if (isChartIncluded && chartImgData) {
                 const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
@@ -1047,10 +1048,10 @@ const AverageReport = ({ filters }) => {
                 const chartImgData = includeChart ? await generateChartImage(transformed) : null;
                 const sName = sRows[0]?.NAME_OF_THE_STUDENT || '';
                 const erpQ = await fetchStudentErpQuestionsForPdf(studentIds[0], sName, sRows);
-                const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ);
+                const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ, includeTopicDetails);
                 const sanitizedName = String(sName || 'Report').replace(/[/\\?%*:|"<>]/g, '_').trim();
                 doc.save(`${sanitizedName}_Progress_Report.pdf`);
-                logActivity(userData, 'Downloaded Progress PDF', { student: sName, includeChart });
+                logActivity(userData, 'Downloaded Progress PDF', { student: sName, includeChart, includeTopicDetails });
             } else {
                 const zip = new JSZip();
                 const campusName = grouped[studentIds[0]][0].CAMPUS_NAME || 'Campus';
@@ -1072,7 +1073,7 @@ const AverageReport = ({ filters }) => {
                     const transformed = getTransformedRows(sRows);
                     const chartImgData = includeChart ? await generateChartImage(transformed) : null;
                     const erpQ = await fetchStudentErpQuestionsForPdf(id, sName, sRows);
-                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ);
+                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ, includeTopicDetails);
                     const pdfBlob = doc.output('blob');
                     zip.file(fileName, pdfBlob);
                 }
@@ -1263,6 +1264,15 @@ const AverageReport = ({ filters }) => {
                             />
                             Include Chart & Analysis
                         </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '0.86rem', color: '#334155', fontWeight: '600', userSelect: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                            <input
+                                type="checkbox"
+                                checked={includeTopicDetails}
+                                onChange={(e) => setIncludeTopicDetails(e.target.checked)}
+                                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#2563eb' }}
+                            />
+                            Include Topic & Subtopic Details
+                        </label>
                         <button className="btn-primary" onClick={fetchData} disabled={isDownloading} style={{ backgroundColor: '#6366f1' }}>
                             View Report
                         </button>
@@ -1424,7 +1434,7 @@ const AverageReport = ({ filters }) => {
                         )}
 
                         {/* Wrong & Unattempted Questions (Topic & Subtopic Details) Table */}
-                        {previewRows.length > 0 && (
+                        {includeTopicDetails && previewRows.length > 0 && (
                             <div className="drawer-subject-breakdown" style={{ marginTop: '24px', background: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
                                     <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
@@ -1505,10 +1515,15 @@ const AverageReport = ({ filters }) => {
                 <div className="zoom-modal-overlay" onClick={() => setZoomImage(null)}>
                     <div className="zoom-modal-content" onClick={(e) => e.stopPropagation()}>
                         <div className="zoom-modal-header">
-                            <h5>{zoomImage.title}</h5>
-                            <button className="zoom-close-btn" onClick={() => setZoomImage(null)}>
-                                <X size={20} />
-                            </button>
+                            <h5 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>{zoomImage.title}</h5>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem', fontWeight: '700' }} onClick={() => setZoomScale(prev => Math.min(prev + 0.5, 4))}>+</button>
+                                <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem', fontWeight: '700' }} onClick={() => setZoomScale(prev => Math.max(prev - 0.5, 1))}>-</button>
+                                <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: '0.8rem', fontWeight: '700' }} onClick={() => { setZoomScale(1); setZoomOffset({ x: 0, y: 0 }); }}>Reset</button>
+                                <button className="zoom-close-btn" onClick={() => setZoomImage(null)}>
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
                         <div 
                             className="zoom-modal-body"
@@ -1541,6 +1556,88 @@ const AverageReport = ({ filters }) => {
                 message={modal.message}
                 type={modal.type}
             />
+
+            <style>{`
+                .q-preview-btn-sm {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    background: #eff6ff;
+                    color: #1d4ed8;
+                    border: 1px solid #bfdbfe;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    font-size: 0.78rem;
+                    font-weight: 700;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+                .q-preview-btn-sm:hover {
+                    background: #dbeafe;
+                    color: #1e40af;
+                }
+                .zoom-modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.8);
+                    backdrop-filter: blur(4px);
+                    z-index: 100000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }
+                .zoom-modal-content {
+                    background: white;
+                    border-radius: 14px;
+                    width: 90%;
+                    max-width: 1100px;
+                    height: 85vh;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
+                }
+                .zoom-modal-header {
+                    padding: 14px 20px;
+                    background: #f8fafc;
+                    border-bottom: 1px solid #cbd5e1;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .zoom-close-btn {
+                    border: none;
+                    background: transparent;
+                    color: #475569;
+                    cursor: pointer;
+                    padding: 4px;
+                    border-radius: 50%;
+                }
+                .zoom-close-btn:hover {
+                    background: #e2e8f0;
+                }
+                .zoom-modal-body {
+                    padding: 20px;
+                    flex: 1;
+                    overflow: auto;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    background: #f1f5f9;
+                    position: relative;
+                }
+                .zoomable-image {
+                    max-width: 100%;
+                    max-height: 75vh;
+                    object-fit: contain;
+                    border-radius: 6px;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+                }
+            `}</style>
         </div>
     );
 };
