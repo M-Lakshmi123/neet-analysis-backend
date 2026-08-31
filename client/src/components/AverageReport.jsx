@@ -5,7 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { ChevronLeft, ChevronRight, TrendingUp, Maximize2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingUp, Maximize2, X, Edit3 } from 'lucide-react';
 import { logActivity } from '../utils/activityLogger';
 import { useAuth } from './auth/AuthProvider';
 
@@ -206,6 +206,60 @@ const AverageReport = ({ filters }) => {
     const [erpLoading, setErpLoading] = useState(false);
     const [zoomImage, setZoomImage] = useState(null);
 
+    // Key editing states
+    const [editingKeyItem, setEditingKeyItem] = useState(null);
+    const [newKeyValue, setNewKeyValue] = useState('');
+    const [isUpdatingKey, setIsUpdatingKey] = useState(false);
+
+    const handleEditKey = (q) => {
+        setEditingKeyItem(q);
+        setNewKeyValue(q.keyValue || '');
+    };
+
+    const saveUpdatedKey = async () => {
+        if (!editingKeyItem) return;
+        setIsUpdatingKey(true);
+        try {
+            const year = filters.academicYear || '2026';
+            const res = await fetch(`${API_URL}/api/erp/update-key`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    academicYear: year,
+                    test: editingKeyItem.test,
+                    qNo: editingKeyItem.qNo,
+                    subject: editingKeyItem.subject,
+                    newKey: newKeyValue.trim()
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to update key in database.');
+
+            const updatedVal = newKeyValue.trim();
+
+            setStudentErpQuestions(prev => prev.map(q => {
+                if (q.test === editingKeyItem.test && String(q.qNo) === String(editingKeyItem.qNo) && String(q.subject).toUpperCase() === String(editingKeyItem.subject).toUpperCase()) {
+                    return { ...q, keyValue: updatedVal };
+                }
+                return q;
+            }));
+
+            setEditingKeyItem(null);
+            logActivity(userData, 'Updated Answer Key', { test: editingKeyItem.test, qNo: editingKeyItem.qNo, subject: editingKeyItem.subject, newKey: updatedVal });
+        } catch (err) {
+            console.error("Key update error:", err);
+            setModal({
+                isOpen: true,
+                type: 'danger',
+                title: 'Update Error',
+                message: 'Failed to update key in database.',
+                onClose: () => setModal(p => ({ ...p, isOpen: false }))
+            });
+        } finally {
+            setIsUpdatingKey(false);
+        }
+    };
+
     // Zoom and pan states for question preview
     const [zoomScale, setZoomScale] = useState(1);
     const [zoomOffset, setZoomOffset] = useState({ x: 0, y: 0 });
@@ -226,34 +280,16 @@ const AverageReport = ({ filters }) => {
         setCurrentStudentIndex(0);
     }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.studentSearch]);
 
-    const estimateWU = (lost) => {
-        if (!lost || lost <= 0) return { w: 0, wLost: 0, u: 0, uLost: 0 };
-        let w = Math.floor(lost / 5);
-        let rem = lost % 5;
-        let u = 0;
-        if (rem === 4) {
-            u = 1;
-        } else if (rem === 3 && w > 0) {
-            w -= 1;
-            u = 2;
-        } else if (rem === 2 && w >= 2) {
-            w -= 2;
-            u = 3;
-        }
-        const wLost = w * 5;
-        const uLost = u * 4;
-        return { w, wLost, u, uLost };
-    };
-
-    const fetchStudentErpQuestionsForPdf = async (studId, studentName = '', studentHistoryRows = []) => {
-        if (!studId && !studentName && (!studentHistoryRows || studentHistoryRows.length === 0)) return [];
+    const fetchStudentErpQuestionsForPdf = async (studId, studentName = '') => {
+        if (!studId && !studentName) return [];
         try {
-            const year = filters.academicYear || '2026';
-            let url = `${API_URL}/api/erp/report?academicYear=${year}`;
-            if (studId) url += `&studentSearch=${encodeURIComponent(studId)}`;
-            if (studentName) url += `&studentNames=${encodeURIComponent(studentName)}`;
+            const params = buildQueryParams(filters);
+            params.delete('studentSearch');
+            params.delete('studentNames');
+            if (studId) params.append('studentSearch', studId);
+            if (studentName) params.append('studentNames', studentName);
 
-            const res = await fetch(url);
+            const res = await fetch(`${API_URL}/api/erp/report?${params.toString()}`);
             const data = await res.json();
             let safeData = Array.isArray(data) ? data : [];
 
@@ -283,80 +319,6 @@ const AverageReport = ({ filters }) => {
                         keyValue: row.Key_Value
                     };
                 });
-            } else if (studentHistoryRows && studentHistoryRows.length > 0) {
-                // Fallback: Fetch master question definitions from ERP_REPORT for student's exams
-                const testNames = [...new Set(studentHistoryRows.map(r => r.Test).filter(Boolean))];
-                if (testNames.length > 0) {
-                    let masterUrl = `${API_URL}/api/erp/report?academicYear=${year}`;
-                    testNames.forEach(t => masterUrl += `&test=${encodeURIComponent(t)}`);
-                    const mRes = await fetch(masterUrl);
-                    const mData = await mRes.json();
-                    const masterRows = Array.isArray(mData) ? mData : [];
-
-                    studentHistoryRows.forEach(exam => {
-                        const tName = exam.Test;
-                        const subLosses = [
-                            { subject: 'BOTANY', scored: Number(exam.Botany) || 0, max: 180 },
-                            { subject: 'ZOOLOGY', scored: Number(exam.Zoology) || 0, max: 180 },
-                            { subject: 'PHYSICS', scored: Number(exam.Physics) || 0, max: 180 },
-                            { subject: 'CHEMISTRY', scored: Number(exam.Chemistry) || 0, max: 180 }
-                        ];
-
-                        subLosses.forEach(s => {
-                            const lost = Math.max(0, s.max - Math.round(s.scored));
-                            if (lost > 0) {
-                                const { w, u } = estimateWU(lost);
-                                if (w > 0 || u > 0) {
-                                    const masterForSub = masterRows.filter(m => 
-                                        m.Test?.trim().toUpperCase() === tName.trim().toUpperCase() && 
-                                        m.Subject?.trim().toUpperCase() === s.subject
-                                    );
-
-                                    const uniqueMaster = [];
-                                    const seenQNo = new Set();
-                                    masterForSub.forEach(m => {
-                                        if (!seenQNo.has(m.Q_No)) {
-                                            seenQNo.add(m.Q_No);
-                                            uniqueMaster.push(m);
-                                        }
-                                    });
-
-                                    let index = 0;
-                                    for (let i = 0; i < w && index < uniqueMaster.length; i++, index++) {
-                                        const mq = uniqueMaster[index];
-                                        qList.push({
-                                            test: tName,
-                                            qNo: mq.Q_No,
-                                            subject: mq.Subject,
-                                            topic: mq.Topic || 'Unknown Topic',
-                                            subTopic: mq.Sub_Topic || '',
-                                            status: 'W',
-                                            lost: 5,
-                                            qUrl: mq.Q_URL,
-                                            sUrl: mq.S_URL,
-                                            keyValue: mq.Key_Value
-                                        });
-                                    }
-                                    for (let i = 0; i < u && index < uniqueMaster.length; i++, index++) {
-                                        const mq = uniqueMaster[index];
-                                        qList.push({
-                                            test: tName,
-                                            qNo: mq.Q_No,
-                                            subject: mq.Subject,
-                                            topic: mq.Topic || 'Unknown Topic',
-                                            subTopic: mq.Sub_Topic || '',
-                                            status: 'U',
-                                            lost: 4,
-                                            qUrl: mq.Q_URL,
-                                            sUrl: mq.S_URL,
-                                            keyValue: mq.Key_Value
-                                        });
-                                    }
-                                }
-                            }
-                        });
-                    });
-                }
             }
 
             qList.sort((a, b) => {
@@ -910,7 +872,7 @@ const AverageReport = ({ filters }) => {
         }
 
         // Render Wrong & Unattempted Questions (Topic & Subtopic Details) Table in PDF
-        if (isTopicDetailsIncluded && erpQuestions && erpQuestions.length > 0) {
+        if (isTopicDetailsIncluded) {
             let lastY = doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY;
             if (isChartIncluded && chartImgData) {
                 const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
@@ -931,63 +893,71 @@ const AverageReport = ({ filters }) => {
             doc.setTextColor(0, 51, 153);
             doc.text("WRONG & UNATTEMPTED QUESTIONS (TOPIC & SUBTOPIC DETAILS)", marginX, lastY);
 
-            const qTableRows = erpQuestions.map(q => [
-                q.test,
-                `Q${q.qNo}`,
-                q.subject,
-                q.topic,
-                q.subTopic || '-',
-                q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)',
-                `-${q.lost}`
-            ]);
+            if (erpQuestions && erpQuestions.length > 0) {
+                const qTableRows = erpQuestions.map(q => [
+                    q.test,
+                    `Q${q.qNo}`,
+                    q.subject,
+                    q.topic,
+                    q.subTopic || '-',
+                    q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)',
+                    `-${q.lost}`
+                ]);
 
-            autoTable(doc, {
-                startY: lastY + 4,
-                margin: { left: marginX, right: marginX, bottom: 15 },
-                head: [['Test', 'Q.No', 'Subject', 'Topic', 'Sub-Topic', 'Status', 'Marks Lost']],
-                body: qTableRows,
-                theme: 'grid',
-                headStyles: {
-                    fillColor: [0, 51, 153],
-                    textColor: [255, 255, 255],
-                    font: bookmanFont ? "Bookman" : "helvetica",
-                    fontStyle: 'bold',
-                    fontSize: 9,
-                    halign: 'center'
-                },
-                styles: {
-                    font: bookmanFont ? "Bookman" : "helvetica",
-                    fontSize: 8.5,
-                    cellPadding: 1.5,
-                    overflow: 'linebreak',
-                    halign: 'left',
-                    valign: 'middle',
-                    lineColor: [0, 0, 0],
-                    lineWidth: 0.1,
-                    textColor: [0, 0, 0]
-                },
-                columnStyles: {
-                    0: { halign: 'left', fontStyle: 'bold', cellWidth: 20 },
-                    1: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
-                    2: { halign: 'left', fontStyle: 'bold', cellWidth: 24 },
-                    3: { halign: 'left', cellWidth: 52 },
-                    4: { halign: 'left', cellWidth: 48 },
-                    5: { halign: 'center', cellWidth: 20 },
-                    6: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold', cellWidth: 12 }
-                },
-                didParseCell: (data) => {
-                    if (data.section === 'body' && data.column.index === 5) {
-                        const cellVal = String(data.cell.raw);
-                        if (cellVal.includes('Wrong')) {
-                            data.cell.styles.textColor = [185, 28, 28];
-                            data.cell.styles.fontStyle = 'bold';
-                        } else if (cellVal.includes('Unattempted')) {
-                            data.cell.styles.textColor = [21, 128, 61];
-                            data.cell.styles.fontStyle = 'bold';
+                autoTable(doc, {
+                    startY: lastY + 4,
+                    margin: { left: marginX, right: marginX, bottom: 15 },
+                    head: [['Test', 'Q.No', 'Subject', 'Topic', 'Sub-Topic', 'Status', 'Marks Lost']],
+                    body: qTableRows,
+                    theme: 'grid',
+                    headStyles: {
+                        fillColor: [0, 51, 153],
+                        textColor: [255, 255, 255],
+                        font: bookmanFont ? "Bookman" : "helvetica",
+                        fontStyle: 'bold',
+                        fontSize: 9,
+                        halign: 'center'
+                    },
+                    styles: {
+                        font: bookmanFont ? "Bookman" : "helvetica",
+                        fontSize: 8.5,
+                        cellPadding: 1.5,
+                        overflow: 'linebreak',
+                        halign: 'left',
+                        valign: 'middle',
+                        lineColor: [0, 0, 0],
+                        lineWidth: 0.1,
+                        textColor: [0, 0, 0]
+                    },
+                    columnStyles: {
+                        0: { halign: 'left', fontStyle: 'bold', cellWidth: 20 },
+                        1: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
+                        2: { halign: 'left', fontStyle: 'bold', cellWidth: 24 },
+                        3: { halign: 'left', cellWidth: 52 },
+                        4: { halign: 'left', cellWidth: 48 },
+                        5: { halign: 'center', cellWidth: 20 },
+                        6: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold', cellWidth: 12 }
+                    },
+                    didParseCell: (data) => {
+                        if (data.section === 'body' && data.column.index === 5) {
+                            const cellVal = String(data.cell.raw);
+                            if (cellVal.includes('Wrong')) {
+                                data.cell.styles.textColor = [185, 28, 28];
+                                data.cell.styles.fontStyle = 'bold';
+                            } else if (cellVal.includes('Unattempted')) {
+                                data.cell.styles.textColor = [21, 128, 61];
+                                data.cell.styles.fontStyle = 'bold';
+                            }
                         }
                     }
-                }
-            });
+                });
+            } else {
+                if (bookmanFont) doc.setFont("Bookman", "normal");
+                else doc.setFont("helvetica", "normal");
+                doc.setFontSize(9);
+                doc.setTextColor(100, 116, 139);
+                doc.text("This test has no topic or subtopics.", marginX, lastY + 6);
+            }
         }
 
         return doc;
@@ -1047,7 +1017,7 @@ const AverageReport = ({ filters }) => {
                 const transformed = getTransformedRows(sRows);
                 const chartImgData = includeChart ? await generateChartImage(transformed) : null;
                 const sName = sRows[0]?.NAME_OF_THE_STUDENT || '';
-                const erpQ = await fetchStudentErpQuestionsForPdf(studentIds[0], sName, sRows);
+                const erpQ = await fetchStudentErpQuestionsForPdf(studentIds[0], sName);
                 const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ, includeTopicDetails);
                 const sanitizedName = String(sName || 'Report').replace(/[/\\?%*:|"<>]/g, '_').trim();
                 doc.save(`${sanitizedName}_Progress_Report.pdf`);
@@ -1072,7 +1042,7 @@ const AverageReport = ({ filters }) => {
 
                     const transformed = getTransformedRows(sRows);
                     const chartImgData = includeChart ? await generateChartImage(transformed) : null;
-                    const erpQ = await fetchStudentErpQuestionsForPdf(id, sName, sRows);
+                    const erpQ = await fetchStudentErpQuestionsForPdf(id, sName);
                     const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ, includeTopicDetails);
                     const pdfBlob = doc.output('blob');
                     zip.file(fileName, pdfBlob);
@@ -1119,7 +1089,7 @@ const AverageReport = ({ filters }) => {
 
         let isMounted = true;
         setErpLoading(true);
-        fetchStudentErpQuestionsForPdf(previewStudentId, previewStudentName, previewRows).then(qList => {
+        fetchStudentErpQuestionsForPdf(previewStudentId, previewStudentName).then(qList => {
             if (isMounted) {
                 setStudentErpQuestions(qList);
                 setErpLoading(false);
@@ -1132,7 +1102,7 @@ const AverageReport = ({ filters }) => {
             }
         });
         return () => { isMounted = false; };
-    }, [previewStudentId, previewStudentName, filters.academicYear, filters.test]);
+    }, [previewStudentId, previewStudentName, filters.academicYear, filters.campus, filters.stream, filters.testType, filters.test, filters.topAll]);
 
     const handleMouseDown = (e) => {
         if (zoomScale > 1) {
@@ -1482,7 +1452,27 @@ const AverageReport = ({ filters }) => {
                                                             -{q.lost}
                                                         </td>
                                                         <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 'bold', color: '#16a34a' }}>
-                                                            {q.keyValue || '-'}
+                                                            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                                                <span>{q.keyValue || '-'}</span>
+                                                                <button
+                                                                    title="Edit Answer Key"
+                                                                    className="key-edit-pen-btn"
+                                                                    style={{
+                                                                        background: '#f1f5f9',
+                                                                        border: '1px solid #cbd5e1',
+                                                                        borderRadius: '4px',
+                                                                        padding: '3px 5px',
+                                                                        cursor: 'pointer',
+                                                                        color: '#475569',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center'
+                                                                    }}
+                                                                    onClick={() => handleEditKey(q)}
+                                                                >
+                                                                    <Edit3 size={12} color="#2563eb" />
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                         <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                                                             {q.qUrl ? (
@@ -1500,8 +1490,8 @@ const AverageReport = ({ filters }) => {
                                         </table>
                                     </div>
                                 ) : (
-                                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
-                                        No wrong or unattempted questions recorded for this student.
+                                    <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.9rem', fontWeight: '500' }}>
+                                        This test has no topic or subtopics.
                                     </div>
                                 )}
                             </div>
@@ -1509,6 +1499,35 @@ const AverageReport = ({ filters }) => {
                     </>
                 )}
             </div>
+
+            {/* Edit Key Modal */}
+            {editingKeyItem && (
+                <div className="zoom-modal-overlay" onClick={() => setEditingKeyItem(null)}>
+                    <div style={{ background: 'white', borderRadius: '14px', width: '90%', maxWidth: '420px', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.3)' }} onClick={(e) => e.stopPropagation()}>
+                        <h4 style={{ margin: '0 0 6px 0', color: '#0f172a', fontSize: '1.05rem', fontWeight: '800' }}>Edit Answer Key</h4>
+                        <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: '#64748b' }}>
+                            Test: <strong style={{ color: '#1e3a8a' }}>{editingKeyItem.test}</strong> | Q.No: <strong style={{ color: '#1e3a8a' }}>Q{editingKeyItem.qNo}</strong> ({editingKeyItem.subject})
+                        </p>
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>Correct Answer Key Option</label>
+                            <input
+                                type="text"
+                                value={newKeyValue}
+                                onChange={(e) => setNewKeyValue(e.target.value)}
+                                placeholder="Enter key (e.g. 1, 2, 3, 4)"
+                                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', fontWeight: 'bold', boxSizing: 'border-box' }}
+                                autoFocus
+                            />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                            <button className="btn-secondary" onClick={() => setEditingKeyItem(null)} disabled={isUpdatingKey}>Cancel</button>
+                            <button className="btn-primary" onClick={saveUpdatedKey} disabled={isUpdatingKey} style={{ backgroundColor: '#2563eb' }}>
+                                {isUpdatingKey ? 'Saving...' : 'Save Key'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Question Image Zoom Modal */}
             {zoomImage && (

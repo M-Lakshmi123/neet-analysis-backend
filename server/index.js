@@ -1483,6 +1483,40 @@ app.get('/api/erp/report', async (req, res) => {
     }
 });
 
+// Update Answer Key in ERP_REPORT database table
+app.post('/api/erp/update-key', async (req, res) => {
+    try {
+        const { academicYear, test, qNo, subject, newKey } = req.body;
+        if (!test || !qNo || !subject || newKey === undefined) {
+            return res.status(400).json({ error: 'Missing required parameters (test, qNo, subject, newKey).' });
+        }
+
+        const year = academicYear || '2026';
+        const pool = await connectToDb(year);
+
+        const safeTest = String(test).trim().replace(/'/g, "''");
+        const safeQNo = String(qNo).trim().replace(/'/g, "''");
+        const safeSubject = String(subject).trim().replace(/'/g, "''");
+        const safeKey = String(newKey).trim().replace(/'/g, "''");
+
+        const updateQuery = `
+            UPDATE ERP_REPORT 
+            SET Key_Value = '${safeKey}' 
+            WHERE UPPER(TRIM(Test)) = UPPER('${safeTest}') 
+            AND CAST(Q_No AS CHAR) = '${safeQNo}' 
+            AND UPPER(TRIM(Subject)) = UPPER('${safeSubject}')
+        `;
+
+        logQuery(updateQuery, req.body);
+        const result = await pool.request().query(updateQuery);
+
+        res.json({ success: true, updatedRows: result.rowsAffected || 1, message: 'Answer key updated successfully across all reports.' });
+    } catch (err) {
+        console.error("[ERP Key Update] ERROR:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 // New endpoint: Error Count report (Test wise counts)
 app.get('/api/erp/error-count-report', async (req, res) => {
