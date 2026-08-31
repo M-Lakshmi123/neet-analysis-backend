@@ -871,8 +871,8 @@ const AverageReport = ({ filters }) => {
             }
         }
 
-        // Render Wrong & Unattempted Questions (Topic & Subtopic Details) Table in PDF
-        if (isTopicDetailsIncluded) {
+        // Render Wrong & Unattempted Questions (Topic & Subtopic Details) Table in PDF only if topic details exist
+        if (isTopicDetailsIncluded && erpQuestions && erpQuestions.length > 0) {
             let lastY = doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY;
             if (isChartIncluded && chartImgData) {
                 const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
@@ -893,71 +893,63 @@ const AverageReport = ({ filters }) => {
             doc.setTextColor(0, 51, 153);
             doc.text("WRONG & UNATTEMPTED QUESTIONS (TOPIC & SUBTOPIC DETAILS)", marginX, lastY);
 
-            if (erpQuestions && erpQuestions.length > 0) {
-                const qTableRows = erpQuestions.map(q => [
-                    q.test,
-                    `Q${q.qNo}`,
-                    q.subject,
-                    q.topic,
-                    q.subTopic || '-',
-                    q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)',
-                    `-${q.lost}`
-                ]);
+            const qTableRows = erpQuestions.map(q => [
+                q.test,
+                `Q${q.qNo}`,
+                q.subject,
+                q.topic,
+                q.subTopic || '-',
+                q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)',
+                `-${q.lost}`
+            ]);
 
-                autoTable(doc, {
-                    startY: lastY + 4,
-                    margin: { left: marginX, right: marginX, bottom: 15 },
-                    head: [['Test', 'Q.No', 'Subject', 'Topic', 'Sub-Topic', 'Status', 'Marks Lost']],
-                    body: qTableRows,
-                    theme: 'grid',
-                    headStyles: {
-                        fillColor: [0, 51, 153],
-                        textColor: [255, 255, 255],
-                        font: bookmanFont ? "Bookman" : "helvetica",
-                        fontStyle: 'bold',
-                        fontSize: 9,
-                        halign: 'center'
-                    },
-                    styles: {
-                        font: bookmanFont ? "Bookman" : "helvetica",
-                        fontSize: 8.5,
-                        cellPadding: 1.5,
-                        overflow: 'linebreak',
-                        halign: 'left',
-                        valign: 'middle',
-                        lineColor: [0, 0, 0],
-                        lineWidth: 0.1,
-                        textColor: [0, 0, 0]
-                    },
-                    columnStyles: {
-                        0: { halign: 'left', fontStyle: 'bold', cellWidth: 20 },
-                        1: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
-                        2: { halign: 'left', fontStyle: 'bold', cellWidth: 24 },
-                        3: { halign: 'left', cellWidth: 52 },
-                        4: { halign: 'left', cellWidth: 48 },
-                        5: { halign: 'center', cellWidth: 20 },
-                        6: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold', cellWidth: 12 }
-                    },
-                    didParseCell: (data) => {
-                        if (data.section === 'body' && data.column.index === 5) {
-                            const cellVal = String(data.cell.raw);
-                            if (cellVal.includes('Wrong')) {
-                                data.cell.styles.textColor = [185, 28, 28];
-                                data.cell.styles.fontStyle = 'bold';
-                            } else if (cellVal.includes('Unattempted')) {
-                                data.cell.styles.textColor = [21, 128, 61];
-                                data.cell.styles.fontStyle = 'bold';
-                            }
+            autoTable(doc, {
+                startY: lastY + 4,
+                margin: { left: marginX, right: marginX, bottom: 15 },
+                head: [['Test', 'Q.No', 'Subject', 'Topic', 'Sub-Topic', 'Status', 'Marks Lost']],
+                body: qTableRows,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [0, 51, 153],
+                    textColor: [255, 255, 255],
+                    font: bookmanFont ? "Bookman" : "helvetica",
+                    fontStyle: 'bold',
+                    fontSize: 9,
+                    halign: 'center'
+                },
+                styles: {
+                    font: bookmanFont ? "Bookman" : "helvetica",
+                    fontSize: 8.5,
+                    cellPadding: 1.5,
+                    overflow: 'linebreak',
+                    halign: 'left',
+                    valign: 'middle',
+                    lineColor: [0, 0, 0],
+                    lineWidth: 0.1,
+                    textColor: [0, 0, 0]
+                },
+                columnStyles: {
+                    0: { halign: 'left', fontStyle: 'bold', cellWidth: 20 },
+                    1: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
+                    2: { halign: 'left', fontStyle: 'bold', cellWidth: 24 },
+                    3: { halign: 'left', cellWidth: 52 },
+                    4: { halign: 'left', cellWidth: 48 },
+                    5: { halign: 'center', cellWidth: 20 },
+                    6: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold', cellWidth: 12 }
+                },
+                didParseCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 5) {
+                        const cellVal = String(data.cell.raw);
+                        if (cellVal.includes('Wrong')) {
+                            data.cell.styles.textColor = [185, 28, 28];
+                            data.cell.styles.fontStyle = 'bold';
+                        } else if (cellVal.includes('Unattempted')) {
+                            data.cell.styles.textColor = [21, 128, 61];
+                            data.cell.styles.fontStyle = 'bold';
                         }
                     }
-                });
-            } else {
-                if (bookmanFont) doc.setFont("Bookman", "normal");
-                else doc.setFont("helvetica", "normal");
-                doc.setFontSize(9);
-                doc.setTextColor(100, 116, 139);
-                doc.text("This test has no topic or subtopics.", marginX, lastY + 6);
-            }
+                }
+            });
         }
 
         return doc;
