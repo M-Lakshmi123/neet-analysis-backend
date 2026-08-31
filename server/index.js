@@ -434,6 +434,41 @@ app.post('/api/files/sanitize-vault', async (req, res) => {
 
 // Legacy Excel Preview Endpoints Removed in favor of High-Fidelity Office View
 
+app.post('/api/files/bulk-delete', async (req, res) => {
+    try {
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+        const { ids } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'No file IDs provided' });
+        }
+
+        // 1. Get drive file IDs
+        const [meta] = await pool.rawPool.query('SELECT id, filename FROM uploaded_files WHERE id IN (?)', [ids]);
+        for (const file of meta) {
+            if (file.filename && file.filename !== 'PENDING' && file.filename !== 'DATABASE_ONLY') {
+                try {
+                    await drive.files.delete({ fileId: file.filename });
+                    console.log(`[BulkDriveDelete] Deleted file ${file.filename} from Drive.`);
+                } catch (driveErr) {
+                    console.error(`[BulkDriveDelete] Failed to delete file ${file.filename} from Drive:`, driveErr.message);
+                }
+            }
+        }
+
+        // 2. Clean up chunks, latest_updates, and uploaded_files in bulk
+        await pool.rawPool.query('DELETE FROM file_chunks WHERE file_id IN (?)', [ids]);
+        await pool.rawPool.query('DELETE FROM latest_updates WHERE file_id IN (?)', [ids]);
+        await pool.rawPool.query('DELETE FROM uploaded_files WHERE id IN (?)', [ids]);
+
+        res.json({ success: true, count: ids.length, message: `Successfully deleted ${ids.length} files` });
+    } catch (err) {
+        console.error(`[BulkFileDelete][${req.query.academicYear}] ERROR:`, err);
+        res.status(500).json({ error: 'Failed to delete files' });
+    }
+});
+
 app.delete('/api/files/:id', async (req, res) => {
     try {
         const year = req.query.academicYear || '2026';

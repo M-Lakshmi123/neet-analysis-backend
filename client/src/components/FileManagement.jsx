@@ -31,6 +31,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     ];
 
     const [files, setFiles] = useState([]);
+    const [selectedFileIds, setSelectedFileIds] = useState([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [statusAction, setStatusAction] = useState(null);
@@ -43,6 +44,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const scrollContainerRef = useRef(null);
 
     useEffect(() => {
+        setSelectedFileIds([]);
         fetchFiles();
     }, [academicYear, activeCategory]);
 
@@ -197,6 +199,45 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         input.click();
     };
 
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedFileIds(files.map(f => f.id));
+        } else {
+            setSelectedFileIds([]);
+        }
+    };
+
+    const handleToggleSelect = (id) => {
+        setSelectedFileIds(prev =>
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
+    };
+
+    const handleBulkDelete = async () => {
+        if (!isMainAdmin || selectedFileIds.length === 0) return;
+        if (!window.confirm(`Are you sure you want to delete ${selectedFileIds.length} selected file(s)?`)) return;
+
+        setLoading(true);
+        try {
+            const response = await fetch(`${API_URL}/api/files/bulk-delete?academicYear=${academicYear}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedFileIds })
+            });
+            if (response.ok) {
+                showStatus('success', `Deleted ${selectedFileIds.length} file(s)`);
+                setSelectedFileIds([]);
+                fetchFiles();
+            } else {
+                showStatus('error', 'Bulk delete failed');
+            }
+        } catch (err) {
+            showStatus('error', 'Network failure during delete');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleDelete = async (e, id) => {
         e.preventDefault();
         e.stopPropagation();
@@ -207,6 +248,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
             const response = await fetch(`${API_URL}/api/files/${id}?academicYear=${academicYear}`, { method: 'DELETE' });
             if (response.ok) {
                 showStatus('success', 'File deleted');
+                setSelectedFileIds(prev => prev.filter(item => item !== id));
                 fetchFiles();
             } else {
                 showStatus('error', 'Delete failed');
@@ -266,6 +308,11 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
 
                     {isMainAdmin && (
                         <>
+                            {selectedFileIds.length > 0 && (
+                                <button className="delete-btn-compact" onClick={handleBulkDelete} title="Delete selected files">
+                                    <Trash2 size={16} /> DELETE ({selectedFileIds.length})
+                                </button>
+                            )}
                             <button className="flat-btn-outline" onClick={sanitizeVault} title="Fix all comma/apostrophe errors in vault">
                                 <FileCode size={16} /> FIX NAMES
                             </button>
@@ -293,6 +340,17 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                     <table className="clean-table">
                         <thead>
                             <tr>
+                                {isMainAdmin && (
+                                    <th className="w-10 text-center" style={{ width: '40px', padding: '10px 8px' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={files.length > 0 && selectedFileIds.length === files.length}
+                                            onChange={handleSelectAll}
+                                            style={{ cursor: 'pointer', transform: 'scale(1.1)' }}
+                                            title="Select All"
+                                        />
+                                    </th>
+                                )}
                                 <th className="w-12 text-center">MODE</th>
                                 <th>FILE NAME</th>
                                 {isMainAdmin && <th className="w-48 text-right">UPLOAD DATE</th>}
@@ -300,24 +358,45 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {files.map(file => (
-                                <tr key={file.id} onClick={() => openPreview(file)}>
-                                    <td className="text-center">{getFileIcon(file.file_type)}</td>
-                                    <td><span className="file-name-text">{file.original_name}</span></td>
-                                    {isMainAdmin && <td className="date-text text-right">{new Date(file.upload_date).toLocaleString()}</td>}
-                                    <td className="text-right">
-                                        <div className="flex items-center justify-end gap-3" onClick={e => e.stopPropagation()}>
-                                            <button onClick={() => openPreview(file)} className="icon-link view" title="View Preview"><Eye size={16} /></button>
-                                            {isMainAdmin && (
-                                                <>
-                                                    <a href={`${API_URL}/api/files/v/${file.id}/${file.original_name}?academicYear=${academicYear}&download=true`} className="icon-link download" download><Download size={16} /></a>
-                                                    <button onClick={(e) => handleDelete(e, file.id)} className="icon-link delete"><Trash2 size={16} /></button>
-                                                </>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {files.map(file => {
+                                const isSelected = selectedFileIds.includes(file.id);
+                                return (
+                                    <tr 
+                                        key={file.id} 
+                                        onClick={() => openPreview(file)}
+                                        style={{ backgroundColor: isSelected ? '#eff6ff' : undefined }}
+                                    >
+                                        {isMainAdmin && (
+                                            <td 
+                                                className="text-center" 
+                                                style={{ width: '40px', padding: '10px 8px' }} 
+                                                onClick={e => e.stopPropagation()}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => handleToggleSelect(file.id)}
+                                                    style={{ cursor: 'pointer', transform: 'scale(1.1)' }}
+                                                />
+                                            </td>
+                                        )}
+                                        <td className="text-center">{getFileIcon(file.file_type)}</td>
+                                        <td><span className="file-name-text">{file.original_name}</span></td>
+                                        {isMainAdmin && <td className="date-text text-right">{new Date(file.upload_date).toLocaleString()}</td>}
+                                        <td className="text-right">
+                                            <div className="flex items-center justify-end gap-3" onClick={e => e.stopPropagation()}>
+                                                <button onClick={() => openPreview(file)} className="icon-link view" title="View Preview"><Eye size={16} /></button>
+                                                {isMainAdmin && (
+                                                    <>
+                                                        <a href={`${API_URL}/api/files/v/${file.id}/${file.original_name}?academicYear=${academicYear}&download=true`} className="icon-link download" download><Download size={16} /></a>
+                                                        <button onClick={(e) => handleDelete(e, file.id)} className="icon-link delete"><Trash2 size={16} /></button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 )}
@@ -457,6 +536,8 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .v-divider { width: 1px; height: 16px; background: #cbd5e1; margin: 0 4px; }
                 .upload-btn-compact { background: #172554; color: white; padding: 6px 14px; border-radius: 8px; border: none; font-size: 10px; font-weight: 900; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; }
                 .upload-btn-compact:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+                .delete-btn-compact { background: #dc2626; color: white; padding: 6px 14px; border-radius: 8px; border: none; font-size: 10px; font-weight: 900; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; }
+                .delete-btn-compact:hover { background: #b91c1c; transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.2); }
                 
                 .inline-feedback { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 6px 12px; border-radius: 6px; }
                 .inline-feedback.success { color: #059669; border: 1px solid #d1fae5; background: #f0fdf4; }
