@@ -273,12 +273,29 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
         }, 50);
     };
 
+    const formatFileSize = (bytes) => {
+        if (!bytes || bytes === 0) return null;
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
+
+    const formatDate = (dateStr) => {
+        if (!dateStr) return { date: '-', time: '' };
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return { date: String(dateStr), time: '' };
+        const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return { date, time };
+    };
+
     const getFileIcon = (type) => {
         switch (type) {
-            case 'pdf': return <FileText size={18} className="text-red-500" />;
+            case 'pdf': return <FileText size={19} className="file-type-icon pdf" />;
             case 'xlsx':
-            case 'xls': return <ExcelIcon size={18} className="text-green-600" />;
-            default: return <FileCode size={18} className="text-slate-400" />;
+            case 'xls': return <ExcelIcon size={19} className="file-type-icon xls" />;
+            default: return <FileCode size={19} className="file-type-icon other" />;
         }
     };
 
@@ -341,55 +358,99 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                         <thead>
                             <tr>
                                 {isMainAdmin && (
-                                    <th className="w-10 text-center" style={{ width: '40px', padding: '10px 8px' }}>
+                                    <th className="w-10 text-center checkbox-th">
                                         <input
                                             type="checkbox"
                                             checked={files.length > 0 && selectedFileIds.length === files.length}
                                             onChange={handleSelectAll}
-                                            style={{ cursor: 'pointer', transform: 'scale(1.1)' }}
+                                            className="row-checkbox"
                                             title="Select All"
                                         />
                                     </th>
                                 )}
-                                <th className="w-12 text-center">MODE</th>
-                                <th>FILE NAME</th>
+                                <th className="w-16 text-center">TYPE</th>
+                                <th>DOCUMENT DETAILS</th>
                                 {isMainAdmin && <th className="w-48 text-right">UPLOAD DATE</th>}
-                                <th className="w-32 text-right">ACTION</th>
+                                <th className="w-44 text-right">ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
                             {files.map(file => {
                                 const isSelected = selectedFileIds.includes(file.id);
+                                const { date, time } = formatDate(file.upload_date);
+                                const sizeStr = formatFileSize(file.size);
                                 return (
                                     <tr 
                                         key={file.id} 
                                         onClick={() => openPreview(file)}
-                                        style={{ backgroundColor: isSelected ? '#eff6ff' : undefined }}
+                                        className={`file-row-item ${isSelected ? 'row-selected' : ''}`}
                                     >
                                         {isMainAdmin && (
                                             <td 
-                                                className="text-center" 
-                                                style={{ width: '40px', padding: '10px 8px' }} 
+                                                className="text-center checkbox-td" 
                                                 onClick={e => e.stopPropagation()}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     checked={isSelected}
                                                     onChange={() => handleToggleSelect(file.id)}
-                                                    style={{ cursor: 'pointer', transform: 'scale(1.1)' }}
+                                                    className="row-checkbox"
                                                 />
                                             </td>
                                         )}
-                                        <td className="text-center">{getFileIcon(file.file_type)}</td>
-                                        <td><span className="file-name-text">{file.original_name}</span></td>
-                                        {isMainAdmin && <td className="date-text text-right">{new Date(file.upload_date).toLocaleString()}</td>}
-                                        <td className="text-right">
-                                            <div className="flex items-center justify-end gap-3" onClick={e => e.stopPropagation()}>
-                                                <button onClick={() => openPreview(file)} className="icon-link view" title="View Preview"><Eye size={16} /></button>
+                                        <td className="text-center icon-td">
+                                            <div className={`file-badge-box ${file.file_type}`}>
+                                                {getFileIcon(file.file_type)}
+                                            </div>
+                                        </td>
+                                        <td className="file-name-td">
+                                            <div className="file-card-content">
+                                                <span className="file-primary-title" title={file.original_name}>
+                                                    {file.original_name}
+                                                </span>
+                                                <div className="file-meta-tags">
+                                                    <span className={`file-format-chip ${file.file_type}`}>
+                                                        {(file.file_type || 'FILE').toUpperCase()}
+                                                    </span>
+                                                    {sizeStr && (
+                                                        <span className="file-size-chip">
+                                                            {sizeStr}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        {isMainAdmin && (
+                                            <td className="date-td text-right">
+                                                <div className="date-box">
+                                                    <span className="date-primary">{date}</span>
+                                                    {time && <span className="date-secondary">{time}</span>}
+                                                </div>
+                                            </td>
+                                        )}
+                                        <td className="actions-td text-right">
+                                            <div className="actions-group" onClick={e => e.stopPropagation()}>
+                                                <button onClick={() => openPreview(file)} className="btn-action-pill view" title="Preview Document">
+                                                    <Eye size={13} />
+                                                    <span>View</span>
+                                                </button>
                                                 {isMainAdmin && (
                                                     <>
-                                                        <a href={`${API_URL}/api/files/v/${file.id}/${file.original_name}?academicYear=${academicYear}&download=true`} className="icon-link download" download><Download size={16} /></a>
-                                                        <button onClick={(e) => handleDelete(e, file.id)} className="icon-link delete"><Trash2 size={16} /></button>
+                                                        <a 
+                                                            href={`${API_URL}/api/files/v/${file.id}/${encodeURIComponent(file.original_name)}?academicYear=${academicYear}&download=true`} 
+                                                            className="btn-action-icon download" 
+                                                            download
+                                                            title="Download File"
+                                                        >
+                                                            <Download size={14} />
+                                                        </a>
+                                                        <button 
+                                                            onClick={(e) => handleDelete(e, file.id)} 
+                                                            className="btn-action-icon delete" 
+                                                            title="Delete File"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </>
                                                 )}
                                             </div>
@@ -528,37 +589,237 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
             </AnimatePresence>
 
             <style jsx>{`
-                .file-mgmt-clean { padding: 0; }
-                .top-control-row { display: flex; justify-content: space-between; align-items: center; background: white; padding: 6px 16px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #e2e8f0; min-height: fit-content; }
-                .button-group-flat { display: flex; align-items: center; gap: 4px; background: #f8fafc; padding: 3px; border-radius: 8px; border: 1px solid #f1f5f9; height: fit-content; }
-                .flat-btn { padding: 6px 12px; font-size: 10px; font-weight: 800; color: #64748b; border: none; background: transparent; border-radius: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-                .flat-btn.active { background: #172554; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                .file-mgmt-clean { 
+                    padding: 0; 
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                }
+                .top-control-row { display: flex; justify-content: space-between; align-items: center; background: white; padding: 8px 16px; border-radius: 12px; margin-bottom: 14px; border: 1px solid #e2e8f0; min-height: fit-content; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+                .button-group-flat { display: flex; align-items: center; gap: 4px; background: #f8fafc; padding: 4px; border-radius: 8px; border: 1px solid #f1f5f9; height: fit-content; }
+                .flat-btn { padding: 6px 14px; font-size: 11px; font-weight: 800; color: #64748b; border: none; background: transparent; border-radius: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+                .flat-btn.active { background: #172554; color: white; box-shadow: 0 2px 6px rgba(23, 37, 84, 0.2); }
                 .v-divider { width: 1px; height: 16px; background: #cbd5e1; margin: 0 4px; }
-                .upload-btn-compact { background: #172554; color: white; padding: 6px 14px; border-radius: 8px; border: none; font-size: 10px; font-weight: 900; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; }
-                .upload-btn-compact:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-                .delete-btn-compact { background: #dc2626; color: white; padding: 6px 14px; border-radius: 8px; border: none; font-size: 10px; font-weight: 900; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; }
-                .delete-btn-compact:hover { background: #b91c1c; transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.2); }
                 
-                .inline-feedback { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 6px 12px; border-radius: 6px; }
+                .upload-btn-compact { background: #172554; color: white; padding: 7px 16px; border-radius: 8px; border: none; font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em; }
+                .upload-btn-compact:hover { transform: translateY(-1px); box-shadow: 0 8px 16px -4px rgba(23, 37, 84, 0.3); }
+                .delete-btn-compact { background: #dc2626; color: white; padding: 7px 16px; border-radius: 8px; border: none; font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; }
+                .delete-btn-compact:hover { background: #b91c1c; transform: translateY(-1px); box-shadow: 0 8px 16px -4px rgba(220, 38, 38, 0.3); }
+                
+                .inline-feedback { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 6px 14px; border-radius: 8px; }
                 .inline-feedback.success { color: #059669; border: 1px solid #d1fae5; background: #f0fdf4; }
                 .inline-feedback.error { color: #dc2626; border: 1px solid #fee2e2; background: #fef2f2; }
                 .inline-feedback.loading { color: #0f172a; border: 1px solid #e2e8f0; background: #f8fafc; }
 
-                .compact-table-container { background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); font-family: Arial, sans-serif; }
-                .clean-table { width: 100%; border-collapse: collapse; font-family: Arial, Helvetica, sans-serif; }
-                .clean-table th { text-align: left; padding: 10px 20px; background: #f8fafc; font-size: 9px; font-weight: 800; color: #94a3b8; border-bottom: 2px solid #f1f5f9; text-transform: uppercase; letter-spacing: 0.05em; font-family: Arial, sans-serif; }
-                .clean-table td { padding: 10px 20px; border-bottom: 1px solid #f8fafc; cursor: pointer; font-family: Arial, sans-serif; }
-                .clean-table tr:hover td { background: #f8fafc; }
-                .file-name-text { font-weight: 700; color: #1e293b; font-size: 12px; }
-                .date-text { font-size: 10px; color: #94a3b8; font-weight: 600; }
+                .compact-table-container { 
+                    background: white; 
+                    border-radius: 14px; 
+                    border: 1px solid #e2e8f0; 
+                    overflow: hidden; 
+                    box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02); 
+                }
+                .clean-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+                .clean-table th { 
+                    text-align: left; 
+                    padding: 12px 18px; 
+                    background: #f8fafc; 
+                    font-size: 10.5px; 
+                    font-weight: 800; 
+                    color: #64748b; 
+                    border-bottom: 1px solid #e2e8f0; 
+                    text-transform: uppercase; 
+                    letter-spacing: 0.06em; 
+                }
+                .clean-table td { 
+                    padding: 12px 18px; 
+                    border-bottom: 1px solid #f1f5f9; 
+                    vertical-align: middle; 
+                }
                 
-                .icon-link { color: #cbd5e1; transition: all 0.2s; border: none; background: transparent; cursor: pointer; padding: 6px; border-radius: 6px; }
-                .icon-link:hover { background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-                .icon-link.view:hover { color: #172554; }
-                .icon-link.download:hover { color: #3b82f6; }
-                .icon-link.delete:hover { color: #ef4444; }
+                .file-row-item { 
+                    cursor: pointer; 
+                    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1); 
+                }
+                .file-row-item:hover { 
+                    background: #f8fafc; 
+                }
+                .file-row-item.row-selected { 
+                    background: #f0f7ff !important; 
+                }
+                .file-row-item:hover .file-primary-title { 
+                    color: #1d4ed8; 
+                }
 
-                /* CRITICAL: Increased z-index to 9999 to cover global Logout/Header */
+                .checkbox-th, .checkbox-td {
+                    width: 44px;
+                    padding: 12px 12px !important;
+                }
+                .row-checkbox {
+                    width: 17px;
+                    height: 17px;
+                    border-radius: 4px;
+                    accent-color: #172554;
+                    cursor: pointer;
+                    vertical-align: middle;
+                }
+
+                .icon-td {
+                    width: 60px;
+                    padding-right: 6px !important;
+                }
+                .file-badge-box {
+                    width: 38px;
+                    height: 38px;
+                    border-radius: 10px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: transform 0.2s ease;
+                }
+                .file-badge-box.pdf {
+                    background: #fff1f2;
+                    border: 1px solid #fecdd3;
+                    color: #e11d48;
+                }
+                .file-badge-box.xlsx, .file-badge-box.xls {
+                    background: #f0fdf4;
+                    border: 1px solid #bbf7d0;
+                    color: #16a34a;
+                }
+                .file-badge-box.other {
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    color: #64748b;
+                }
+                .file-row-item:hover .file-badge-box {
+                    transform: scale(1.06);
+                }
+
+                .file-name-td {
+                    padding-left: 8px !important;
+                }
+                .file-card-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 3px;
+                }
+                .file-primary-title {
+                    font-size: 13.5px;
+                    font-weight: 700;
+                    color: #0f172a;
+                    letter-spacing: -0.01em;
+                    line-height: 1.35;
+                    transition: color 0.15s ease;
+                    word-break: break-word;
+                }
+                .file-meta-tags {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .file-format-chip {
+                    font-size: 9px;
+                    font-weight: 800;
+                    letter-spacing: 0.05em;
+                    padding: 2px 7px;
+                    border-radius: 4px;
+                    text-transform: uppercase;
+                    display: inline-flex;
+                    align-items: center;
+                }
+                .file-format-chip.pdf {
+                    background: #fee2e2;
+                    color: #991b1b;
+                }
+                .file-format-chip.xlsx, .file-format-chip.xls {
+                    background: #dcfce7;
+                    color: #15803d;
+                }
+                .file-format-chip.other {
+                    background: #f1f5f9;
+                    color: #475569;
+                }
+                .file-size-chip {
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: #64748b;
+                    display: inline-flex;
+                    align-items: center;
+                }
+
+                .date-box {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: flex-end;
+                    gap: 2px;
+                }
+                .date-primary {
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #1e293b;
+                    letter-spacing: -0.01em;
+                }
+                .date-secondary {
+                    font-size: 10.5px;
+                    font-weight: 500;
+                    color: #94a3b8;
+                }
+
+                .actions-group {
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    gap: 6px;
+                }
+                .btn-action-pill {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    padding: 6px 12px;
+                    border-radius: 8px;
+                    font-size: 11.5px;
+                    font-weight: 700;
+                    border: 1px solid #dbeafe;
+                    background: #eff6ff;
+                    color: #1d4ed8;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+                .btn-action-pill:hover {
+                    background: #1d4ed8;
+                    color: #ffffff;
+                    border-color: #1d4ed8;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 10px -2px rgba(29, 78, 216, 0.25);
+                }
+                .btn-action-icon {
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 8px;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: 1px solid #e2e8f0;
+                    background: #ffffff;
+                    color: #64748b;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                    text-decoration: none;
+                }
+                .btn-action-icon.download:hover {
+                    background: #f0fdf4;
+                    border-color: #bbf7d0;
+                    color: #16a34a;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 8px -2px rgba(22, 163, 74, 0.15);
+                }
+                .btn-action-icon.delete:hover {
+                    background: #fef2f2;
+                    border-color: #fecdd3;
+                    color: #dc2626;
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 8px -2px rgba(220, 38, 38, 0.15);
+                }
+
+                /* Modal Overlay */
                 .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px; transition: all 0.3s; }
                 .modal-overlay.immersive { background: rgba(0, 0, 0, 0.95); padding: 0; backdrop-filter: none; }
                 
