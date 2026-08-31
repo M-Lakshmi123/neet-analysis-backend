@@ -157,6 +157,19 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 const fileType = ext ? ext.substring(1).toLowerCase() : 'bin';
                 const sanitizedOriginalName = file.originalname.replace(/[,']/g, '');
 
+                // Check if file already exists in database for this category
+                const [existing] = await pool.rawPool.query(
+                    "SELECT id FROM uploaded_files WHERE category = ? AND (TRIM(LOWER(original_name)) = TRIM(LOWER(?)) OR TRIM(LOWER(original_name)) = TRIM(LOWER(?))) LIMIT 1",
+                    [category || 'schedules', sanitizedOriginalName, file.originalname]
+                );
+
+                if (existing && existing.length > 0) {
+                    console.log(`[STABILITY][UPLOAD] Duplicate skipped: "${file.originalname}" already exists as ID ${existing[0].id}`);
+                    try { if (file.path && fs.existsSync(file.path)) fs.unlinkSync(file.path); } catch (e) { }
+                    failDetails.push({ name: file.originalname, error: 'Duplicate: File already exists', isDuplicate: true });
+                    continue;
+                }
+
                 // 1. Create Entry in Database
                 const [metaResult] = await pool.rawPool.query(
                     "INSERT INTO uploaded_files (filename, original_name, category, file_type, size) VALUES (?, ?, ?, ?, ?)",

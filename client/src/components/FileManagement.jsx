@@ -92,17 +92,49 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
             const selectedFiles = Array.from(e.target.files);
             if (selectedFiles.length === 0) return;
 
+            // Existing file names for quick duplicate check
+            const existingCleanNames = new Set(
+                files.map(f => (f.original_name || '').replace(/[,']/g, '').trim().toLowerCase())
+            );
+
+            const uniqueToUpload = [];
+            const duplicateNames = [];
+            const seenInBatch = new Set();
+
+            for (const file of selectedFiles) {
+                const cleanName = file.name.replace(/[,']/g, '').trim().toLowerCase();
+                if (seenInBatch.has(cleanName)) {
+                    duplicateNames.push(file.name);
+                    continue;
+                }
+                seenInBatch.add(cleanName);
+
+                if (existingCleanNames.has(cleanName) || files.some(f => (f.original_name || '').replace(/[,']/g, '').trim().toLowerCase() === cleanName)) {
+                    duplicateNames.push(file.name);
+                } else {
+                    uniqueToUpload.push(file);
+                }
+            }
+
+            if (uniqueToUpload.length === 0) {
+                const msg = duplicateNames.length === 1
+                    ? `"${duplicateNames[0]}" is already uploaded.`
+                    : `All ${duplicateNames.length} selected files are already uploaded.`;
+                showStatus('error', msg);
+                return;
+            }
+
             setUploading(true);
             let successCount = 0;
             let failCount = 0;
             let serverErrorMessage = null;
 
-            for (let i = 0; i < selectedFiles.length; i++) {
-                const file = selectedFiles[i];
+            for (let i = 0; i < uniqueToUpload.length; i++) {
+                const file = uniqueToUpload[i];
                 const fileSizeMB = file.size / (1024 * 1024);
 
                 // UX: Update status with progress
-                showStatus('loading', `Uploading ${i + 1}/${selectedFiles.length}: ${file.name}`);
+                showStatus('loading', `Uploading ${i + 1}/${uniqueToUpload.length}: ${file.name}`);
 
                 if (fileSizeMB > 250) {
                     failCount++;
@@ -150,7 +182,8 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
             }
 
             if (successCount > 0) {
-                showStatus('success', `Saved ${successCount} files`);
+                const dupMsg = duplicateNames.length > 0 ? ` (${duplicateNames.length} duplicate${duplicateNames.length > 1 ? 's' : ''} skipped)` : '';
+                showStatus('success', `Saved ${successCount} file${successCount > 1 ? 's' : ''}${dupMsg}`);
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 fetchFiles();
             }
