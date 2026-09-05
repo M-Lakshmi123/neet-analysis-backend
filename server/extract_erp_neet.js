@@ -197,7 +197,6 @@ async function processErp() {
                         if (!forcedTest) {
                             const matchedTest = tests.find(t => searchStringNorm.includes(normalizeForMatch(t)));
                             if (matchedTest) testName = matchedTest;
-                            else if (tests.length > 0) testName = tests[0];
                         }
                     } else if (streams.length > 0) {
                         // Fallback to first stream if no match
@@ -205,7 +204,8 @@ async function processErp() {
                         if (!forcedTest) {
                             const streamPath = path.join(picsBaseDir, streamFromMetadata);
                             const tests = fs.readdirSync(streamPath).filter(f => fs.statSync(path.join(streamPath, f)).isDirectory());
-                            if (tests.length > 0) testName = tests[0];
+                            const matchedTest = tests.find(t => searchStringNorm.includes(normalizeForMatch(t)));
+                            if (matchedTest) testName = matchedTest;
                         }
                     }
                 }
@@ -307,6 +307,9 @@ async function processErp() {
 
             // D. Load Meta Data from PICS subfolder
             const picsSubDir = findPicsSubFolder(ERP_BASE_DIR, streamFromMetadata, testName);
+            if (!picsSubDir) {
+                console.warn(`  ⚠️ [WARNING] PICS folder for Stream "${streamFromMetadata}", Test "${testName}" not found!`);
+            }
             const { meta: questionMeta } = loadZeroReport(picsSubDir);
             const keysMap = loadKeys(path.join(picsSubDir, 'K.xlsx'));
 
@@ -319,7 +322,13 @@ async function processErp() {
                 continue;
             }
 
-            const urlSubMap = (urlMapping.mappings[streamFromMetadata] && urlMapping.mappings[streamFromMetadata][testName]) || { Q: {}, S: {} };
+            const urlSubMap = getTestUrlSubMap(urlMapping, streamFromMetadata, testName);
+            const qCount = Object.keys(urlSubMap.Q || {}).length;
+            if (qCount === 0) {
+                console.warn(`  ⚠️ [WARNING] No question URLs found for ${streamFromMetadata} / ${testName} in url_mapping_neet.json!`);
+            } else {
+                console.log(`  [URLS] Loaded ${qCount} unique question image URLs for ${testName}.`);
+            }
             const rowsToUpload = [];
 
             // Find where student data actually starts
@@ -497,20 +506,83 @@ function identifyStudErpHeaders(data) {
     return colMap;
 }
 
+function getTestUrlSubMap(urlMapping, stream, test) {
+    const norm = (s) => String(s || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const normStream = norm(stream);
+    const normTest = norm(test);
+
+    let rawSubMap = { Q: {}, S: {} };
+    for (const s in (urlMapping.mappings || {})) {
+        if (norm(s) === normStream) {
+            for (const t in urlMapping.mappings[s]) {
+                if (norm(t) === normTest) {
+                    rawSubMap = urlMapping.mappings[s][t] || { Q: {}, S: {} };
+                    break;
+                }
+            }
+        }
+    }
+
+    // Build map of URLs used in OTHER tests to strictly guarantee uniqueness
+    const otherUrls = new Map();
+    for (const s in (urlMapping.mappings || {})) {
+        for (const t in urlMapping.mappings[s]) {
+            if (norm(s) === normStream && norm(t) === normTest) continue;
+            for (const type of ['Q', 'S']) {
+                const map = urlMapping.mappings[s][t][type] || {};
+                for (const q in map) {
+                    if (map[q]) otherUrls.set(map[q], `${s}/${t} (${type}${q})`);
+                }
+            }
+        }
+    }
+
+    const uniqueSubMap = { Q: {}, S: {} };
+    let strippedCount = 0;
+    for (const q in (rawSubMap.Q || {})) {
+        const u = rawSubMap.Q[q];
+        if (otherUrls.has(u)) {
+            console.warn(`  ⚠️ [URL COLLISION] Q${q} URL (${u}) belongs to other test "${otherUrls.get(u)}". Discarding to maintain test uniqueness.`);
+            strippedCount++;
+        } else {
+            uniqueSubMap.Q[q] = u;
+        }
+    }
+    for (const q in (rawSubMap.S || {})) {
+        const u = rawSubMap.S[q];
+        if (otherUrls.has(u)) {
+            console.warn(`  ⚠️ [URL COLLISION] S${q} URL (${u}) belongs to other test "${otherUrls.get(u)}". Discarding to maintain test uniqueness.`);
+            strippedCount++;
+        } else {
+            uniqueSubMap.S[q] = u;
+        }
+    }
+
+    if (strippedCount > 0) {
+        console.warn(`  ⚠️ [SECURITY] Filtered out ${strippedCount} non-unique URLs for ${stream}/${test}.`);
+    }
+
+    return uniqueSubMap;
+}
+
 function findPicsSubFolder(base, stream, test) {
     const picsDir = path.join(base, 'PICS');
     if (!fs.existsSync(picsDir)) return "";
+
+    const norm = (s) => String(s || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const normStream = norm(stream);
+    const normTest = norm(test);
 
     // Exact matches first
     const path1 = path.join(picsDir, stream, test);
     if (fs.existsSync(path1)) return path1;
 
-    // Case-insensitive search
+    // Normalized case-insensitive search
     const streams = fs.readdirSync(picsDir);
-    const sMatch = streams.find(s => s.toUpperCase() === stream.toUpperCase());
+    const sMatch = streams.find(s => norm(s) === normStream);
     if (sMatch) {
         const tests = fs.readdirSync(path.join(picsDir, sMatch));
-        const tMatch = tests.find(t => t.toUpperCase() === test.toUpperCase());
+        const tMatch = tests.find(t => norm(t) === normTest);
         if (tMatch) return path.join(picsDir, sMatch, tMatch);
     }
 

@@ -627,6 +627,105 @@ const buildWhereClause = (req, options = {}) => {
     return where;
 };
 
+// Master fallback campuses list to ensure full availability
+const MASTER_CAMPUSES = [
+    "BALLARI BOYS",
+    "BALLARI GIRLS",
+    "BANASWADI",
+    "BANNERGHATTA ROAD",
+    "BASAVESWARA NAGAR COACHING CENTER",
+    "BELAGAVI",
+    "BELAGAVI COACHING CENTER",
+    "BELLANDUR",
+    "BHAGATHSINGH NAGAR",
+    "DAVANAGERE",
+    "DAVANAGERE 2",
+    "DR BS RAO VIDYASOUDHA MYSORE",
+    "DUNLOP",
+    "ECITY NEET BOYS",
+    "ELECTRONIC CITY",
+    "ELECTRONIC CITY DS",
+    "ELECTRONIC CITY INTERNATIONAL",
+    "HEBBAL",
+    "HEGDENAGAR",
+    "HORAMAVU",
+    "HSR LAYOUT BANGALORE",
+    "HUBLI",
+    "HUBLI 2",
+    "J P NAGAR",
+    "JAYA NAGAR COACHING CENTER",
+    "KAGGADASAPURA",
+    "KAGGADASPURA",
+    "KALYAN NAGAR",
+    "KALYAN NAGAR COACHING CENTER",
+    "KANAKAPURA ROAD",
+    "KOLAR",
+    "KORAMANGALA",
+    "KR PURAM",
+    "KUDLU",
+    "KUDLU 2",
+    "MAGADI ROAD",
+    "MAHALAKSHMI LAYOUT",
+    "MANDYA",
+    "MANGALORE",
+    "MANGALURU",
+    "MARTHAHALLI",
+    "MARTHAHALLI C-120",
+    "MYSORE",
+    "NAGARBHAVI",
+    "PEENYA DASARAHALLI",
+    "RAJAJI NAGAR",
+    "RAJAJINAGAR",
+    "RAM MURTHY NAGAR 3",
+    "SAHAKARA NAGAR",
+    "SARJAPURA",
+    "SESHADRIPURAM",
+    "SHIMOGA",
+    "SHIVAMOGGA",
+    "SR SECONDARY KARUR",
+    "TUMKUR",
+    "TUMKUR 3",
+    "UDUPI",
+    "ULLAL",
+    "UTTARAHALLI",
+    "VARTHUR",
+    "VIDYARANYAPURA",
+    "WHITEFIELD",
+    "YELAHANKA",
+    "YELLAHANKA",
+    "YESHWANTHPUR"
+];
+
+// Get All Available Campuses across all years and tables
+app.get('/api/campuses', async (req, res) => {
+    try {
+        const cached = cache.get('all_campuses_list');
+        if (cached) {
+            return res.json({ campuses: cached });
+        }
+
+        const campusSet = new Set(MASTER_CAMPUSES);
+        for (const yr of ['2025', '2026']) {
+            try {
+                const pool = await connectToDb(yr);
+                const qRes = await pool.request().query("SELECT DISTINCT TRIM(CAMPUS_NAME) as CAMPUS_NAME FROM MEDICAL_RESULT WHERE CAMPUS_NAME IS NOT NULL AND CAMPUS_NAME != ''");
+                (qRes.recordset || []).forEach(r => {
+                    if (r.CAMPUS_NAME) campusSet.add(r.CAMPUS_NAME.trim().toUpperCase());
+                });
+            } catch (err) {
+                console.warn(`[Campuses] Could not fetch DB campuses for ${yr}:`, err.message);
+            }
+        }
+
+        const sorted = Array.from(campusSet).sort((a, b) => a.localeCompare(b));
+        cache.set('all_campuses_list', sorted, 3600); // 1 hour cache
+        return res.json({ campuses: sorted });
+    } catch (err) {
+        console.error('[Campuses] Error:', err);
+        return res.json({ campuses: MASTER_CAMPUSES.sort() });
+    }
+});
+
 // Get Filter Options
 app.get('/api/filters', async (req, res) => {
     try {

@@ -22,7 +22,10 @@ const UserApprovals = ({ academicYear }) => {
 
     const fetchCampuses = async () => {
         try {
-            const res = await fetch(`${API_URL}/api/filters?academicYear=${academicYear || '2026'}`);
+            let res = await fetch(`${API_URL}/api/campuses`);
+            if (!res.ok) {
+                res = await fetch(`${API_URL}/api/filters?academicYear=${academicYear || '2026'}`);
+            }
             const data = await res.json();
             if (data.campuses) {
                 setAllCampuses(data.campuses.map(c => ({ value: c, label: c })));

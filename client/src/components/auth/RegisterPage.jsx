@@ -10,6 +10,74 @@ import { AnimatePresence } from 'framer-motion';
 import Toast from '../Toast';
 import Modal from '../Modal';
 
+const ALL_CAMPUSES = [
+    "BALLARI BOYS",
+    "BALLARI GIRLS",
+    "BANASWADI",
+    "BANNERGHATTA ROAD",
+    "BASAVESWARA NAGAR COACHING CENTER",
+    "BELAGAVI",
+    "BELAGAVI COACHING CENTER",
+    "BELLANDUR",
+    "BHAGATHSINGH NAGAR",
+    "DAVANAGERE",
+    "DAVANAGERE 2",
+    "DR BS RAO VIDYASOUDHA MYSORE",
+    "DUNLOP",
+    "ECITY NEET BOYS",
+    "ELECTRONIC CITY",
+    "ELECTRONIC CITY DS",
+    "ELECTRONIC CITY INTERNATIONAL",
+    "HEBBAL",
+    "HEGDENAGAR",
+    "HORAMAVU",
+    "HSR LAYOUT BANGALORE",
+    "HUBLI",
+    "HUBLI 2",
+    "J P NAGAR",
+    "JAYA NAGAR COACHING CENTER",
+    "KAGGADASAPURA",
+    "KAGGADASPURA",
+    "KALYAN NAGAR",
+    "KALYAN NAGAR COACHING CENTER",
+    "KANAKAPURA ROAD",
+    "KOLAR",
+    "KORAMANGALA",
+    "KR PURAM",
+    "KUDLU",
+    "KUDLU 2",
+    "MAGADI ROAD",
+    "MAHALAKSHMI LAYOUT",
+    "MANDYA",
+    "MANGALORE",
+    "MANGALURU",
+    "MARTHAHALLI",
+    "MARTHAHALLI C-120",
+    "MYSORE",
+    "NAGARBHAVI",
+    "PEENYA DASARAHALLI",
+    "RAJAJI NAGAR",
+    "RAJAJINAGAR",
+    "RAM MURTHY NAGAR 3",
+    "SAHAKARA NAGAR",
+    "SARJAPURA",
+    "SESHADRIPURAM",
+    "SHIMOGA",
+    "SHIVAMOGGA",
+    "SR SECONDARY KARUR",
+    "TUMKUR",
+    "TUMKUR 3",
+    "UDUPI",
+    "ULLAL",
+    "UTTARAHALLI",
+    "VARTHUR",
+    "VIDYARANYAPURA",
+    "WHITEFIELD",
+    "YELAHANKA",
+    "YELLAHANKA",
+    "YESHWANTHPUR"
+].sort();
+
 const RegisterPage = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -17,7 +85,7 @@ const RegisterPage = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [phone, setPhone] = useState('');
     const [campus, setCampus] = useState('');
-    const [campuses, setCampuses] = useState([]);
+    const [campuses, setCampuses] = useState(ALL_CAMPUSES);
     const [loading, setLoading] = useState(false);
     const [currentSlide, setCurrentSlide] = useState(0);
     const [toast, setToast] = useState(null);
@@ -66,42 +134,21 @@ const RegisterPage = () => {
 
     useEffect(() => {
         const fetchCampuses = async () => {
-            const apiUrl = `${API_URL}/api/filters?academicYear=2026`;
             try {
-                const res = await fetch(apiUrl);
+                // Try dedicated campuses endpoint first, fallback to filters
+                let res = await fetch(`${API_URL}/api/campuses`);
+                if (!res.ok) {
+                    res = await fetch(`${API_URL}/api/filters?academicYear=2026`);
+                }
                 if (!res.ok) throw new Error("Backend unreachable");
                 const data = await res.json();
                 if (data.campuses && data.campuses.length > 0) {
-                    setCampuses(data.campuses);
-                } else {
-                    throw new Error("No campuses found in API response");
+                    const merged = Array.from(new Set([...ALL_CAMPUSES, ...data.campuses])).sort();
+                    setCampuses(merged);
                 }
             } catch (err) {
-                console.warn("Backend unreachable, using fallback campus list:", err);
-                // Failover to hardcoded list so the UI still works
-                setCampuses([
-                    "BALLARI BOYS",
-                    "BALLARI GIRLS",
-                    "BANASWADI",
-                    "BANNERGHATTA ROAD",
-                    "BELAGAVI",
-                    "HEBBAL",
-                    "HEGDENAGAR",
-                    "HORAMAVU",
-                    "HUBLI",
-                    "HUBLI 2",
-                    "J P NAGAR",
-                    "KALYAN NAGAR",
-                    "MANGALURU",
-                    "RAJAJINAGAR",
-                    "SAHAKARA NAGAR",
-                    "SARJAPURA",
-                    "SHIMOGA",
-                    "UDUPI",
-                    "WHITEFIELD",
-                    "YELAHANKA"
-                ].sort());
-                // Optional: Don't show error toast to keep UI clean, or show a mild "Offline Mode" toast
+                console.warn("Using master campus list:", err);
+                setCampuses(ALL_CAMPUSES);
             }
         };
         fetchCampuses();

@@ -127,18 +127,61 @@ async function extractAlbumImagesFromImgBB(page, albumUrl) {
     return extracted;
 }
 
+function getOtherTestsUrls(session, currentStream, currentTest) {
+    const used = new Map(); // url -> "stream / test (type qNo)"
+    for (const stream in session.mappings || {}) {
+        for (const test in session.mappings[stream] || {}) {
+            if (currentStream && currentTest && stream === currentStream && test === currentTest) continue;
+            for (const type of ['Q', 'S']) {
+                const qMap = session.mappings[stream][test][type] || {};
+                for (const qNo in qMap) {
+                    const u = qMap[qNo];
+                    if (u && typeof u === 'string' && u.startsWith('http')) {
+                        used.set(u, `${stream} / ${test} (${type}${qNo})`);
+                    }
+                }
+            }
+        }
+    }
+    return used;
+}
+
+function sanitizeMappingsUniqueness(session) {
+    const seen = new Map();
+    let removedCount = 0;
+    for (const stream in session.mappings || {}) {
+        for (const test in session.mappings[stream] || {}) {
+            for (const type of ['Q', 'S']) {
+                const qMap = session.mappings[stream][test][type] || {};
+                for (const qNo in qMap) {
+                    const u = qMap[qNo];
+                    if (!u || typeof u !== 'string' || !u.startsWith('http')) continue;
+                    if (seen.has(u)) {
+                        console.warn(`[INTEGRITY] Found duplicate URL ${u} in ${stream}/${test} (${type}${qNo}), originally assigned to ${seen.get(u)}. Purging duplicate.`);
+                        delete qMap[qNo];
+                        removedCount++;
+                    } else {
+                        seen.set(u, `${stream}/${test} (${type}${qNo})`);
+                    }
+                }
+            }
+        }
+    }
+    return removedCount;
+}
+
 async function uploadToImgBB() {
     const ERP_BASE = path.resolve(__dirname, '..', 'ERP Report');
     const picsBaseDir = path.join(ERP_BASE, 'PICS');
 
     if (!fs.existsSync(picsBaseDir)) {
-        console.error("PICS directory not found: " + picsBaseDir);
+        console.error("❌ PICS directory not found: " + picsBaseDir);
         process.exit(1);
     }
 
     const args = process.argv.slice(2);
-    const targetTest = args[0];
-    const targetType = args[1];
+    const targetTest = args[0] ? args[0].trim() : null;
+    const targetType = args[1] ? args[1].trim() : null;
 
     if (targetTest) {
         console.log(`[FILTER] Searching for Test: ${targetTest} across all streams.`);
@@ -148,6 +191,32 @@ async function uploadToImgBB() {
         return fs.statSync(path.join(picsBaseDir, f)).isDirectory();
     });
 
+    const norm = (s) => String(s || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+    // Validate if target test folder exists locally in PICS
+    if (targetTest) {
+        let foundTestCount = 0;
+        for (const stream of streams) {
+            const streamPath = path.join(picsBaseDir, stream);
+            const tests = fs.readdirSync(streamPath).filter(f => {
+                return fs.statSync(path.join(streamPath, f)).isDirectory() && norm(f) === norm(targetTest);
+            });
+            foundTestCount += tests.length;
+        }
+
+        if (foundTestCount === 0) {
+            console.error(`\n❌ [ERROR] Test folder "${targetTest}" was NOT found in any stream under "${picsBaseDir}".`);
+            console.error(`Available streams and tests in PICS:`);
+            for (const stream of streams) {
+                const streamPath = path.join(picsBaseDir, stream);
+                const tests = fs.readdirSync(streamPath).filter(f => fs.statSync(path.join(streamPath, f)).isDirectory());
+                console.error(`  - ${stream}: ${tests.length > 0 ? tests.join(', ') : '(no folders)'}`);
+            }
+            console.error(`\nPlease create the folder "ERP Report/PICS/<STREAM>/${targetTest}" with question images in a "Q" subfolder and try again.`);
+            process.exit(1);
+        }
+    }
+
     const mappingPath = path.join(__dirname, 'url_mapping_neet.json');
     let session = {
         mappings: {}
@@ -156,6 +225,11 @@ async function uploadToImgBB() {
     if (fs.existsSync(mappingPath)) {
         try {
             session = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+            const cleaned = sanitizeMappingsUniqueness(session);
+            if (cleaned > 0) {
+                fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
+                console.log(`[CLEANUP] Purged ${cleaned} non-unique URL mappings from url_mapping_neet.json.`);
+            }
         } catch (e) {
             console.warn("Could not parse mapping cache, starting fresh.");
         }
@@ -165,13 +239,15 @@ async function uploadToImgBB() {
     let hasExistingMappings = false;
     if (targetTest) {
         for (const stream in session.mappings) {
-            if (session.mappings[stream][targetTest]) {
-                const testMap = session.mappings[stream][targetTest];
-                const qCount = Object.keys(testMap.Q || {}).length;
-                const sCount = Object.keys(testMap.S || {}).length;
-                if (qCount > 0 || sCount > 0) {
-                    hasExistingMappings = true;
-                    break;
+            for (const test in session.mappings[stream]) {
+                if (norm(test) === norm(targetTest)) {
+                    const testMap = session.mappings[stream][test];
+                    const qCount = Object.keys(testMap.Q || {}).length;
+                    const sCount = Object.keys(testMap.S || {}).length;
+                    if (qCount > 0 || sCount > 0) {
+                        hasExistingMappings = true;
+                        break;
+                    }
                 }
             }
         }
@@ -183,8 +259,10 @@ async function uploadToImgBB() {
         if (answer === 'y' || answer === 'yes') {
             console.log(`[RESET] Deleting existing local mappings for Test "${targetTest}"...`);
             for (const stream in session.mappings) {
-                if (session.mappings[stream][targetTest]) {
-                    delete session.mappings[stream][targetTest];
+                for (const test in session.mappings[stream]) {
+                    if (norm(test) === norm(targetTest)) {
+                        delete session.mappings[stream][test];
+                    }
                 }
             }
             fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
@@ -227,15 +305,18 @@ async function uploadToImgBB() {
         await page.waitForNavigation({ waitUntil: 'networkidle2' });
         console.log("Login successful.");
 
+        let processedTestsCount = 0;
+
         for (const stream of streams) {
             const streamPath = path.join(picsBaseDir, stream);
             const tests = fs.readdirSync(streamPath).filter(f => {
                 const isDir = fs.statSync(path.join(streamPath, f)).isDirectory();
-                if (targetTest) return isDir && f === targetTest;
+                if (targetTest) return isDir && norm(f) === norm(targetTest);
                 return isDir;
             });
 
             for (const test of tests) {
+                processedTestsCount++;
                 const testPath = path.join(streamPath, test);
                 const qDir = path.join(testPath, 'Q');
                 const sDir = path.join(testPath, 'S');
@@ -251,16 +332,31 @@ async function uploadToImgBB() {
                 if (!session.mappings[stream]) session.mappings[stream] = {};
                 if (!session.mappings[stream][test]) session.mappings[stream][test] = { Q: {}, S: {} };
 
+                // Clean any URLs in this test's mappings that were assigned to other tests
+                const otherUrls = getOtherTestsUrls(session, stream, test);
+                for (const type of ['Q', 'S']) {
+                    const qMap = session.mappings[stream][test][type] || {};
+                    for (const qNo in qMap) {
+                        if (otherUrls.has(qMap[qNo])) {
+                            console.warn(`[PURGE] Removing duplicate URL for ${stream}/${test} ${type}${qNo} (belongs to ${otherUrls.get(qMap[qNo])})`);
+                            delete qMap[qNo];
+                        }
+                    }
+                }
+
                 const qFiles = fs.readdirSync(qDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg'));
                 const sFiles = fs.existsSync(sDir) ? fs.readdirSync(sDir).filter(f => f.toLowerCase().endsWith('.png') || f.toLowerCase().endsWith('.jpg')) : [];
 
                 // --- SEARCH / CREATE ALBUM ---
+                // Strict exact match for album name
                 const findAlbumOnPage = async (name) => {
                     return await page.evaluate((targetName) => {
-                        const elements = Array.from(document.querySelectorAll('.list-item-desc-title-link, .album-name, .name, a.name, a[href*="/album/"]'));
+                        const clean = (s) => String(s || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        const targetClean = clean(targetName);
+                        const elements = Array.from(document.querySelectorAll('.list-item-desc-title-link, .album-name, .name, a.name'));
                         const target = elements.find(el => {
                             const txt = (el.innerText || el.getAttribute('title') || '').trim();
-                            return txt === targetName || txt.includes(targetName);
+                            return clean(txt) === targetClean;
                         });
                         if (!target) return null;
                         return target.tagName === 'A' ? target.href : target.closest('a')?.href;
@@ -320,7 +416,7 @@ async function uploadToImgBB() {
                 }
 
                 if (!albumUrl) {
-                    console.error(`Could not find or create album: ${ALBUM_NAME}`);
+                    console.error(`❌ Could not find or create album: ${ALBUM_NAME}`);
                     continue;
                 }
 
@@ -329,9 +425,35 @@ async function uploadToImgBB() {
                     console.log(`  Album "${ALBUM_NAME}" already exists on ImgBB. Checking images in album...`);
                     const extractedData = await extractAlbumImagesFromImgBB(page, albumUrl);
 
+                    // Validate that extracted URLs are NOT used by other tests
+                    const currentOtherUrls = getOtherTestsUrls(session, stream, test);
+                    let nonUniqueFound = 0;
+                    for (const qNo in extractedData.Q) {
+                        const u = extractedData.Q[qNo];
+                        if (currentOtherUrls.has(u)) {
+                            console.warn(`  ⚠️ [NON-UNIQUE URL] Q${qNo} in album "${ALBUM_NAME}" is already used by ${currentOtherUrls.get(u)}. Discarding.`);
+                            delete extractedData.Q[qNo];
+                            extractedData.total--;
+                            nonUniqueFound++;
+                        }
+                    }
+                    for (const qNo in extractedData.S) {
+                        const u = extractedData.S[qNo];
+                        if (currentOtherUrls.has(u)) {
+                            console.warn(`  ⚠️ [NON-UNIQUE URL] S${qNo} in album "${ALBUM_NAME}" is already used by ${currentOtherUrls.get(u)}. Discarding.`);
+                            delete extractedData.S[qNo];
+                            extractedData.total--;
+                            nonUniqueFound++;
+                        }
+                    }
+
+                    if (nonUniqueFound > 0) {
+                        console.warn(`  ⚠️ Discarded ${nonUniqueFound} shared/duplicate URLs to ensure unique images for ${stream}/${test}.`);
+                    }
+
                     if (extractedData.total > 0) {
                         console.log(`\n======================================================================`);
-                        console.log(`[ALBUM FOUND] Album "${ALBUM_NAME}" already exists on ImgBB with ${extractedData.total} images!`);
+                        console.log(`[ALBUM FOUND] Album "${ALBUM_NAME}" has ${extractedData.total} verified unique images on ImgBB!`);
                         console.log(`======================================================================`);
                         console.log(`Options:`);
                         console.log(`  1) Take/use existing album images only (Extract URLs & skip re-uploading) [DEFAULT]`);
@@ -343,14 +465,14 @@ async function uploadToImgBB() {
                         const selectedOption = (choice === '2') ? '2' : ((choice === '3') ? '3' : '1');
 
                         if (selectedOption === '1') {
-                            console.log(`\n[TAKE ALBUM] Using existing ${extractedData.total} images from ImgBB album for "${ALBUM_NAME}"...`);
+                            console.log(`\n[TAKE ALBUM] Using existing ${extractedData.total} unique images from ImgBB album for "${ALBUM_NAME}"...`);
                             Object.assign(session.mappings[stream][test].Q, extractedData.Q);
                             Object.assign(session.mappings[stream][test].S, extractedData.S);
                             fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
-                            console.log(`✅ [INSTANT] Successfully mapped ${extractedData.total} images from existing album "${ALBUM_NAME}". Skipping upload.`);
+                            console.log(`✅ [INSTANT] Successfully mapped ${extractedData.total} unique images from album "${ALBUM_NAME}". Skipping upload.`);
                             continue; // Skip uploading for this album!
                         } else if (selectedOption === '2') {
-                            console.log(`\n[MERGE ALBUM] Merging ${extractedData.total} existing images from ImgBB for "${ALBUM_NAME}"...`);
+                            console.log(`\n[MERGE ALBUM] Merging ${extractedData.total} unique images from ImgBB for "${ALBUM_NAME}"...`);
                             Object.assign(session.mappings[stream][test].Q, extractedData.Q);
                             Object.assign(session.mappings[stream][test].S, extractedData.S);
                             fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
@@ -360,7 +482,7 @@ async function uploadToImgBB() {
                             fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2), 'utf8');
                         }
                     } else {
-                        console.log(`  [INFO] Album "${ALBUM_NAME}" exists on ImgBB but is empty.`);
+                        console.log(`  [INFO] Album "${ALBUM_NAME}" has no existing unique images to reuse. Proceeding to upload.`);
                     }
                 }
 
@@ -376,7 +498,7 @@ async function uploadToImgBB() {
                 });
 
                 if (missingQ.length === 0 && missingS.length === 0) {
-                    console.log(`[INSTANT] All images for ${stream}/${test} are already mapped.`);
+                    console.log(`[INSTANT] All images for ${stream}/${test} are already mapped with unique URLs.`);
                     continue;
                 }
 
@@ -437,25 +559,38 @@ async function uploadToImgBB() {
 
                     const links = linksText.split('\n').map(l => l.trim()).filter(l => l);
 
+                    const currentOtherUrls = getOtherTestsUrls(session, stream, test);
                     missing.forEach((file, idx) => {
                         const qNo = file.replace(/[QS]/i, '').replace(/\.(png|jpg)/i, '');
-                        if (links[idx]) session.mappings[stream][test][type][qNo] = links[idx];
+                        const newUrl = links[idx];
+                        if (newUrl) {
+                            if (currentOtherUrls.has(newUrl)) {
+                                console.warn(`  ⚠️ [COLLISION] Uploaded link ${newUrl} is already used by ${currentOtherUrls.get(newUrl)}! Rejecting duplicate.`);
+                            } else {
+                                session.mappings[stream][test][type][qNo] = newUrl;
+                            }
+                        }
                     });
 
-                    console.log(`  [+] Successfully mapped ${links.length} links for ${type}.`);
+                    console.log(`  [+] Successfully mapped ${links.length} unique links for ${type}.`);
 
                     fs.writeFileSync(mappingPath, JSON.stringify(session, null, 2));
                 }
             }
         }
 
+        if (processedTestsCount === 0) {
+            console.error(`\n❌ No tests were processed. Check your test name and folder structure.`);
+            process.exit(1);
+        }
+
         console.log(`\n✅ Upload complete. Final mapping saved to ${mappingPath}`);
 
     } catch (err) {
-        console.error("Upload Error:", err);
+        console.error("❌ Upload Error:", err);
+        process.exit(1);
     } finally {
         if (browser) await browser.close();
-        process.exit(0);
     }
 }
 
