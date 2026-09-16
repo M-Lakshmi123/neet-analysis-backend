@@ -1968,6 +1968,83 @@ app.get('/api/erp/students', async (req, res) => {
     }
 });
 
+// --- TOP 18 STUDENTS API ---
+app.get('/api/config/top-18', async (req, res) => {
+    try {
+        const XLSX = require('xlsx');
+        const configPath = path.join(__dirname, '..', 'Uploader_Config.xlsx');
+        if (!fs.existsSync(configPath)) {
+            return res.status(404).json({ error: "Uploader_Config.xlsx not found" });
+        }
+
+        const wb = XLSX.readFile(configPath);
+        const sheetName = wb.SheetNames.find(s => s.trim().toUpperCase() === 'TOP 18' || s.trim().toUpperCase().includes('TOP 18'));
+        if (!sheetName) {
+            return res.status(404).json({ error: "TOP 18 sheet not found in Uploader_Config.xlsx" });
+        }
+
+        const ws = wb.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(ws);
+        const ids = [];
+        data.forEach(row => {
+            const rawId = row['TOP 18'] || row['STUD_ID'] || row['ID'] || row['stud_id'] || Object.values(row)[0];
+            if (rawId) {
+                const cleanId = String(rawId).trim();
+                if (cleanId && !isNaN(cleanId)) {
+                    ids.push(cleanId);
+                }
+            }
+        });
+
+        const uniqueIds = [...new Set(ids)];
+        if (uniqueIds.length === 0) {
+            return res.json({ studentIds: [], students: [] });
+        }
+
+        const year = req.query.academicYear || '2026';
+        const pool = await connectToDb(year);
+        const idListStr = uniqueIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
+
+        const query = `
+            SELECT 
+                CAST(STUD_ID AS CHAR) as id,
+                MAX(TRIM(Student_Name)) as name,
+                MAX(TRIM(Branch)) as campus,
+                MAX(TRIM(Stream)) as stream,
+                COUNT(DISTINCT Test) as totalTests
+            FROM ERP_REPORT
+            WHERE STUD_ID IN (${idListStr})
+            GROUP BY STUD_ID
+            ORDER BY name
+        `;
+
+        const result = await pool.request().query(query);
+        const students = result.recordset || [];
+
+        // If any ID from Excel was not found in ERP_REPORT, include placeholder
+        const foundIdSet = new Set(students.map(s => String(s.id)));
+        uniqueIds.forEach(id => {
+            if (!foundIdSet.has(String(id))) {
+                students.push({
+                    id: String(id),
+                    name: `Student (${id})`,
+                    campus: 'N/A',
+                    stream: 'N/A',
+                    totalTests: 0
+                });
+            }
+        });
+
+        res.json({
+            studentIds: uniqueIds,
+            students: students
+        });
+    } catch (err) {
+        console.error("[TOP 18 API] ERROR:", err);
+        res.status(500).json({ error: "Failed to load TOP 18 students", details: err.message });
+    }
+});
+
 // SERVE REACT APP FOR ANY OTHER ROUTE
 // app.get('*', (req, res) => {
 //     res.sendFile(path.join(__dirname, '../client/dist/index.html'));

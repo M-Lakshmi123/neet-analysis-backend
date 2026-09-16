@@ -27,6 +27,7 @@ const ErrorReport = ({ filters, setFilters }) => {
     const { userData, isAdmin } = useAuth();
     // Use props filters
     const [subjectFilter, setSubjectFilter] = useState({ value: 'ALL', label: 'All Subjects' });
+    const [topLimitFilter, setTopLimitFilter] = useState({ value: 100, label: 'Top 100 Students' });
     const [reportData, setReportData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -43,6 +44,19 @@ const ErrorReport = ({ filters, setFilters }) => {
         { value: 'CHEMISTRY', label: 'Chemistry' },
         { value: 'BOTANY', label: 'Botany' },
         { value: 'ZOOLOGY', label: 'Zoology' }
+    ];
+
+    // Top Limit Options
+    const topLimitOptions = [
+        { value: 5, label: 'Top 5 Students' },
+        { value: 10, label: 'Top 10 Students' },
+        { value: 15, label: 'Top 15 Students' },
+        { value: 18, label: 'Top 18 Students' },
+        { value: 20, label: 'Top 20 Students' },
+        { value: 25, label: 'Top 25 Students' },
+        { value: 50, label: 'Top 50 Students' },
+        { value: 100, label: 'Top 100 Students' },
+        { value: 'ALL', label: 'All Students' }
     ];
 
     // Clear Report Data when filters change to avoid mismatch
@@ -102,7 +116,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                 grouped[studKey].tests[testKey].questions.push(row);
             });
 
-            // Process & Sort
+            // Process & Sort Tests & Questions
             const processed = Object.values(grouped).map(student => {
                 let testsArr = Object.values(student.tests);
 
@@ -149,7 +163,42 @@ const ErrorReport = ({ filters, setFilters }) => {
                     return t;
                 });
 
-                return { ...student, tests: testsArr };
+                // Calculate summary metrics for topper ranking
+                let sumTot = 0;
+                let bestAir = 999999;
+                let maxTot = 0;
+                testsArr.forEach(t => {
+                    const tot = parseFloat(t.meta?.tot) || 0;
+                    const air = parseFloat(t.meta?.air) || 999999;
+                    sumTot += tot;
+                    if (tot > maxTot) maxTot = tot;
+                    if (air > 0 && air < bestAir) bestAir = air;
+                });
+                const avgTot = testsArr.length > 0 ? (sumTot / testsArr.length) : 0;
+
+                return { 
+                    ...student, 
+                    tests: testsArr,
+                    avgTot,
+                    bestAir,
+                    maxTot
+                };
+            });
+
+            // TOPPER RANKING LOGIC:
+            // When filters/all tests are selected, rank students by average marks from all tests (descending),
+            // with best AIR as tiebreaker (ascending), then maxTot, then student name.
+            processed.sort((a, b) => {
+                if (Math.abs(b.avgTot - a.avgTot) > 0.001) {
+                    return b.avgTot - a.avgTot;
+                }
+                if (a.bestAir !== b.bestAir) {
+                    return a.bestAir - b.bestAir;
+                }
+                if (b.maxTot !== a.maxTot) {
+                    return b.maxTot - a.maxTot;
+                }
+                return (a.info?.name || '').localeCompare(b.info?.name || '');
             });
 
             setReportData(processed);
@@ -157,7 +206,8 @@ const ErrorReport = ({ filters, setFilters }) => {
             // Log activity
             logActivity(userData, 'Generated Error Report', {
                 studentCount: processed.length,
-                subject: subjectFilter.label
+                subject: subjectFilter.label,
+                topLimit: topLimitFilter.label
             });
 
         } catch (err) {
@@ -638,13 +688,22 @@ const ErrorReport = ({ filters, setFilters }) => {
         return doc;
     };
 
+    const displayedStudents = React.useMemo(() => {
+        if (!reportData || reportData.length === 0) return [];
+        if (topLimitFilter.value === 'ALL') return reportData;
+        const limitNum = Number(topLimitFilter.value);
+        if (isNaN(limitNum) || limitNum <= 0) return reportData;
+        return reportData.slice(0, limitNum);
+    }, [reportData, topLimitFilter]);
+
     const generatePDF = async (limitCount = null) => {
         if (reportData.length === 0) return;
         setGeneratingPdf(true);
         setPdfProgress('Loading Resources...');
 
-        // Ensure limitCount is parsed as a number if passed as an event or non-number
+        // Determine target students: if limitCount passed, slice; otherwise use displayedStudents
         const actualLimit = typeof limitCount === 'number' ? limitCount : null;
+        const targetStudents = actualLimit ? reportData.slice(0, actualLimit) : displayedStudents;
 
         try {
             const [impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
@@ -655,37 +714,6 @@ const ErrorReport = ({ filters, setFilters }) => {
             const logoImg = await loadImage('/logo.png');
 
             const fonts = { impactFont, bookmanFont, bookmanBoldFont };
-
-            // Helper to extract numeric AIR (default to 999999 for missing/invalid ranks)
-            const getAIR = (t) => {
-                if (!t || !t.meta) return 999999;
-                const airVal = t.meta.air;
-                if (airVal === null || airVal === undefined || airVal === '') return 999999;
-                const parsed = parseInt(airVal, 10);
-                return isNaN(parsed) ? 999999 : parsed;
-            };
-
-            // Helper to extract numeric Total Marks (default to 0)
-            const getTot = (t) => {
-                if (!t || !t.meta) return 0;
-                const totVal = t.meta.tot;
-                if (totVal === null || totVal === undefined || totVal === '') return 0;
-                const parsed = parseInt(totVal, 10);
-                return isNaN(parsed) ? 0 : parsed;
-            };
-
-            // Sort students: Best All India Rank (AIR) first, then highest total score
-            const sortedStudents = [...reportData].sort((a, b) => {
-                const airA = Math.min(...a.tests.map(getAIR));
-                const airB = Math.min(...b.tests.map(getAIR));
-                if (airA !== airB) return airA - airB;
-
-                const totA = Math.max(...a.tests.map(getTot));
-                const totB = Math.max(...b.tests.map(getTot));
-                return totB - totA;
-            });
-
-            const targetStudents = actualLimit ? sortedStudents.slice(0, actualLimit) : reportData;
 
             if (targetStudents.length === 1) {
                 const doc = await createStudentPDF(targetStudents[0], fonts, logoImg);
@@ -704,9 +732,8 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 setPdfProgress('Compressing...');
                 const zipContent = await zip.generateAsync({ type: 'blob' });
-                const zipName = actualLimit 
-                    ? `Error_Reports_Top_${actualLimit}_${subjectFilter.value}.zip`
-                    : `Error_Reports_${subjectFilter.value}.zip`;
+                const zipLimit = actualLimit ? `Top_${actualLimit}` : (topLimitFilter.value !== 'ALL' ? `Top_${topLimitFilter.value}` : 'All');
+                const zipName = `Error_Reports_${zipLimit}_${subjectFilter.value}.zip`;
                 saveAs(zipContent, zipName);
                 logActivity(userData, 'Downloaded Bulk Error Reports', { count: targetStudents.length, subject: subjectFilter.label });
             } else {
@@ -884,6 +911,8 @@ const ErrorReport = ({ filters, setFilters }) => {
 
     const generateExcel = async () => {
         if (reportData.length === 0) return;
+        const targetStudents = displayedStudents;
+        if (targetStudents.length === 0) return;
         setGeneratingExcel(true);
         setExcelProgress('Loading Resources...');
 
@@ -898,8 +927,8 @@ const ErrorReport = ({ filters, setFilters }) => {
                 console.error("Failed to load Excel template", e);
             }
 
-            if (reportData.length === 1) {
-                const student = reportData[0];
+            if (targetStudents.length === 1) {
+                const student = targetStudents[0];
                 setExcelProgress(`Generating Excel for ${student.info.name}...`);
                 const workbook = await createStudentExcel(student, templateBuffer);
                 const buffer = await workbook.xlsx.writeBuffer();
@@ -909,9 +938,9 @@ const ErrorReport = ({ filters, setFilters }) => {
             } else {
                 const zip = new JSZip();
 
-                for (let i = 0; i < reportData.length; i++) {
-                    const student = reportData[i];
-                    setExcelProgress(`Generating Excel for ${student.info.name} (${i + 1}/${reportData.length})...`);
+                for (let i = 0; i < targetStudents.length; i++) {
+                    const student = targetStudents[i];
+                    setExcelProgress(`Generating Excel for ${student.info.name} (${i + 1}/${targetStudents.length})...`);
                     const workbook = await createStudentExcel(student, templateBuffer);
                     const buffer = await workbook.xlsx.writeBuffer();
                     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -920,8 +949,9 @@ const ErrorReport = ({ filters, setFilters }) => {
 
                 setExcelProgress('Compressing ZIP...');
                 const zipContent = await zip.generateAsync({ type: 'blob' });
-                saveAs(zipContent, `Error_Excel_Reports_${subjectFilter.value}.zip`);
-                logActivity(userData, 'Downloaded Bulk Error Excels', { count: reportData.length, subject: subjectFilter.label });
+                const zipLimit = topLimitFilter.value !== 'ALL' ? `Top_${topLimitFilter.value}` : 'All';
+                saveAs(zipContent, `Error_Excel_Reports_${zipLimit}_${subjectFilter.value}.zip`);
+                logActivity(userData, 'Downloaded Bulk Error Excels', { count: targetStudents.length, subject: subjectFilter.label });
             }
         } catch (err) {
             console.error("Excel/ZIP Error", err);
@@ -939,161 +969,136 @@ const ErrorReport = ({ filters, setFilters }) => {
     return (
         <div style={{ padding: '20px', backgroundColor: '#808080', fontFamily: '"Bookman Old Style", "Times New Roman", serif', minHeight: '100vh', boxSizing: 'border-box', overflow: 'auto' }}>
             <div className="no-print" style={{ maxWidth: '100%', margin: '0 auto 20px auto', backgroundColor: 'white', padding: '15px', borderRadius: '5px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', fontFamily: 'Arial, sans-serif' }}>
-                {/* Removed FilterBar from here as it is now in App.jsx */}
-
-                {/* SUBJECT FILTER & ACTION BUTTONS */}
-                <div style={{ marginTop: '15px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <span style={{ marginRight: '10px', fontWeight: 'bold' }}>Subject:</span>
-                        <div style={{ width: '250px' }}>
-                            <Select
-                                options={subjectOptions}
-                                value={subjectFilter}
-                                onChange={setSubjectFilter}
-                            />
-                        </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    {/* Row 1: Top Limit Quick Pill Buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '14px', marginRight: '6px', color: '#333' }}>Top Students Filter:</span>
+                        {topLimitOptions.map((opt) => {
+                            const isActive = topLimitFilter.value === opt.value;
+                            return (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => setTopLimitFilter(opt)}
+                                    style={{
+                                        padding: '5px 14px',
+                                        borderRadius: '20px',
+                                        border: isActive ? '1px solid #0056b3' : '1px solid #ced4da',
+                                        backgroundColor: isActive ? '#0070c0' : '#f8f9fa',
+                                        color: isActive ? '#ffffff' : '#333333',
+                                        fontWeight: isActive ? 'bold' : '500',
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease-in-out',
+                                        boxShadow: isActive ? '0 2px 6px rgba(0,112,192,0.35)' : 'none'
+                                    }}
+                                >
+                                    {opt.value === 'ALL' ? 'ALL' : `TOP ${opt.value}`}
+                                </button>
+                            );
+                        })}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #dee2e6' }}>
-                        <span style={{ fontWeight: 'bold', fontSize: '13px', marginRight: '5px' }}>Zoom:</span>
-                        <button onClick={handleZoomOut} style={{ padding: '2px 8px', cursor: 'pointer' }}>-</button>
-                        <span style={{ minWidth: '45px', textAlign: 'center', fontWeight: 'bold' }}>{Math.round(zoom * 100)}%</span>
-                        <button onClick={handleZoomIn} style={{ padding: '2px 8px', cursor: 'pointer' }}>+</button>
-                        <button onClick={handleZoomReset} style={{ padding: '2px 8px', cursor: 'pointer', marginLeft: '5px', fontSize: '12px' }}>Reset</button>
-                    </div>
-
-                    {/* View Report Button */}
-                    <button
-                        onClick={handleViewReport}
-                        disabled={loading}
-                        style={{
-                            backgroundColor: '#28a745',
-                            color: 'white',
-                            border: 'none',
-                            padding: '10px 20px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px'
-                        }}
-                    >
-                        {loading ? 'Loading...' : 'View Report'}
-                    </button>
-
-                    {/* Download Buttons - Only visible if data is loaded */}
-                    {reportData.length > 0 && (
-                        <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto', alignItems: 'center' }}>
-                            {reportData.length > 1 && (
-                                <div style={{ display: 'flex', gap: '6px', marginRight: '5px', paddingRight: '10px', borderRight: '1px solid #ddd' }}>
-                                    <button
-                                        onClick={() => generatePDF(10)}
-                                        disabled={generatingPdf || generatingExcel}
-                                        style={{
-                                            background: 'linear-gradient(135deg, #ffeef0 0%, #ffd0d6 100%)',
-                                            color: '#b31b2c',
-                                            border: '1px solid #ffccd3',
-                                            padding: '8px 12px',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            fontWeight: 'bold',
-                                            fontSize: '13px',
-                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                            transition: 'all 0.2s ease',
-                                            opacity: (generatingPdf || generatingExcel) ? 0.6 : 1
-                                        }}
-                                        title="Download Top 10 Student PDF Reports"
-                                    >
-                                        Top 10 PDF
-                                    </button>
-                                    <button
-                                        onClick={() => generatePDF(20)}
-                                        disabled={generatingPdf || generatingExcel}
-                                        style={{
-                                            background: 'linear-gradient(135deg, #eef5ff 0%, #d0e4ff 100%)',
-                                            color: '#0052cc',
-                                            border: '1px solid #ccdfff',
-                                            padding: '8px 12px',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            fontWeight: 'bold',
-                                            fontSize: '13px',
-                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                            transition: 'all 0.2s ease',
-                                            opacity: (generatingPdf || generatingExcel) ? 0.6 : 1
-                                        }}
-                                        title="Download Top 20 Student PDF Reports"
-                                    >
-                                        Top 20 PDF
-                                    </button>
-                                    <button
-                                        onClick={() => generatePDF(50)}
-                                        disabled={generatingPdf || generatingExcel}
-                                        style={{
-                                            background: 'linear-gradient(135deg, #effaf3 0%, #d1f4e0 100%)',
-                                            color: '#107c41',
-                                            border: '1px solid #c1eed5',
-                                            padding: '8px 12px',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            fontWeight: 'bold',
-                                            fontSize: '13px',
-                                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                            transition: 'all 0.2s ease',
-                                            opacity: (generatingPdf || generatingExcel) ? 0.6 : 1
-                                        }}
-                                        title="Download Top 50 Student PDF Reports"
-                                    >
-                                        Top 50 PDF
-                                    </button>
+                    {/* Row 2: Selectors, Zoom, View Report & Download Buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '15px', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <span style={{ marginRight: '8px', fontWeight: 'bold', fontSize: '14px' }}>Top Limit:</span>
+                                <div style={{ width: '180px' }}>
+                                    <Select options={topLimitOptions} value={topLimitFilter} onChange={setTopLimitFilter} />
                                 </div>
-                            )}
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <span style={{ marginRight: '8px', fontWeight: 'bold', fontSize: '14px' }}>Subject:</span>
+                                <div style={{ width: '180px' }}>
+                                    <Select options={subjectOptions} value={subjectFilter} onChange={setSubjectFilter} />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#f8f9fa', padding: '5px 10px', borderRadius: '4px', border: '1px solid #dee2e6' }}>
+                                <span style={{ fontWeight: 'bold', fontSize: '13px', marginRight: '5px' }}>Zoom:</span>
+                                <button onClick={handleZoomOut} style={{ padding: '2px 8px', cursor: 'pointer' }}>-</button>
+                                <span style={{ minWidth: '45px', textAlign: 'center', fontWeight: 'bold' }}>{Math.round(zoom * 100)}%</span>
+                                <button onClick={handleZoomIn} style={{ padding: '2px 8px', cursor: 'pointer' }}>+</button>
+                                <button onClick={handleZoomReset} style={{ padding: '2px 8px', cursor: 'pointer', marginLeft: '5px', fontSize: '12px' }}>Reset</button>
+                            </div>
+
                             <button
-                                onClick={generatePDF}
-                                disabled={generatingPdf || generatingExcel}
+                                onClick={handleViewReport}
+                                disabled={loading}
                                 style={{
-                                    backgroundColor: '#0070c0',
+                                    backgroundColor: '#28a745',
                                     color: 'white',
                                     border: 'none',
-                                    padding: '10px 20px',
+                                    padding: '9px 20px',
                                     borderRadius: '4px',
                                     cursor: 'pointer',
-                                    fontWeight: 'bold'
+                                    fontWeight: 'bold',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '5px'
                                 }}
                             >
-                                {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download ${reportData.length > 1 ? 'All (ZIP)' : 'PDF'}`}
-                            </button>
-                            <button
-                                onClick={generateExcel}
-                                disabled={generatingPdf || generatingExcel}
-                                style={{
-                                    backgroundColor: '#107c41',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '10px 20px',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontWeight: 'bold'
-                                }}
-                            >
-                                {generatingExcel ? excelProgress || 'Generating...' : `⬇ Download ${reportData.length > 1 ? 'All Excel (ZIP)' : 'Excel'}`}
+                                {loading ? 'Loading...' : 'View Report'}
                             </button>
                         </div>
-                    )}
+
+                        {reportData.length > 0 && (
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={() => generatePDF()}
+                                    disabled={generatingPdf || generatingExcel}
+                                    style={{
+                                        backgroundColor: '#0070c0',
+                                        color: 'white',
+                                        border: 'none',
+                                        padding: '9px 18px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold',
+                                        boxShadow: '0 2px 4px rgba(0,112,192,0.25)'
+                                    }}
+                                >
+                                    {generatingPdf ? pdfProgress || 'Generating...' : `⬇ Download ${displayedStudents.length > 1 ? `PDF (${displayedStudents.length} ZIP)` : 'PDF'}`}
+                                </button>
+                                <button
+                                    onClick={generateExcel}
+                                    disabled={generatingPdf || generatingExcel}
+                                    style={{
+                                        backgroundColor: '#107c41',
+                                        color: 'white',
+                                        border: 'none',
+                                        padding: '9px 18px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontWeight: 'bold',
+                                        boxShadow: '0 2px 4px rgba(16,124,65,0.25)'
+                                    }}
+                                >
+                                    {generatingExcel ? excelProgress || 'Generating...' : `⬇ Download ${displayedStudents.length > 1 ? `Excel (${displayedStudents.length} ZIP)` : 'Excel'}`}
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #ccc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 'bold', color: '#333' }}>
-                        {reportData.length > 0 ? `${reportData.length} Student(s) Loaded` : 'No report loaded. Select filters and click "View Report".'}
+                        {reportData.length > 0 
+                            ? `${reportData.length} Student(s) Total | Displaying ${topLimitFilter.value !== 'ALL' ? `Top ${displayedStudents.length}` : `All ${displayedStudents.length}`} Student(s)`
+                            : 'No report loaded. Select filters and click "View Report".'}
                     </span>
+                    {reportData.length > 0 && (
+                        <span style={{ fontSize: '12px', color: '#666' }}>
+                            Sorted by: Highest Average Score across filtered tests & Best AIR
+                        </span>
+                    )}
                 </div>
             </div>
 
             <LoadingTimer isLoading={loading} />
 
-            {!loading && reportData.map((student, sIdx) => {
+            {!loading && displayedStudents.map((student, sIdx) => {
 
                 // Filter questions for rendering
 
@@ -1289,11 +1294,10 @@ const ErrorReport = ({ filters, setFilters }) => {
                 );
             })}
 
-            {!loading && reportData.length > 20 && (
+            {!loading && displayedStudents.length > 50 && (
                 <div style={{ textAlign: 'center', margin: '20px auto', maxWidth: '800px', padding: '15px', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '8px', color: '#856404' }}>
-                    <strong>Showing first 20 students only.</strong><br />
-                    {reportData.length - 20} more students are hidden for better performance.<br />
-                    Please use the filters to narrow down your search or download the PDF/ZIP to view all reports.
+                    <strong>Showing {displayedStudents.length} students.</strong><br />
+                    For best performance, you can select a smaller Top Limit (e.g., Top 5, Top 10, Top 18, Top 20) or download the PDF/Excel report.
                 </div>
             )}
         </div>

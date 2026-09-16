@@ -88,26 +88,37 @@ async function run() {
             
             let targetSheet = "";
             if (studentYear === '2025') {
-                if (['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02'].includes(normalizedStream)) {
+                if (['SR ELITE', 'SR_ELITE_SET_01', 'SR_ELITE_SET_02', 'SR_ELITE(S - I)'].some(s => normalizedStream.includes(s))) {
                     targetSheet = "SR ELITE(2025)";
-                } else if (normalizedStream === 'JR ELITE') {
+                } else if (normalizedStream.includes('JR ELITE')) {
                     targetSheet = "JR ELITE(2025)";
                 }
             } else if (studentYear === '2026') {
-                if (normalizedStream === 'SR ELITE') {
+                if (normalizedStream.includes('SR ELITE') || normalizedStream.includes('SR_ELITE')) {
                     targetSheet = "SR ELITE (2026)";
                 }
             }
 
+            const checkMatch = (sheetMap) => {
+                if (!sheetMap) return null;
+                if (sheetMap.has(sid)) return sheetMap.get(sid);
+                for (const [k, v] of sheetMap.entries()) {
+                    if (k === sid || k.endsWith(sid) || sid.endsWith(k)) return v;
+                }
+                return null;
+            };
+
             // 1. Try Specific Sheet
-            if (targetSheet && configData[studentYear] && configData[studentYear][targetSheet] && configData[studentYear][targetSheet].has(sid)) {
-                return configData[studentYear][targetSheet].get(sid);
+            if (targetSheet && configData[studentYear] && configData[studentYear][targetSheet]) {
+                const match = checkMatch(configData[studentYear][targetSheet]);
+                if (match) return match;
             }
 
             // 2. Fallback: Check ALL sheets for that year
             const yearSheets = configData[studentYear] || {};
             for (const sName in yearSheets) {
-                if (yearSheets[sName].has(sid)) return yearSheets[sName].get(sid);
+                const match = checkMatch(yearSheets[sName]);
+                if (match) return match;
             }
 
             return "ALL";
@@ -166,6 +177,19 @@ function cleanCampusName(name) {
     return cleaned.trim();
 }
 
+const KNOWN_KARNATAKA_CAMPUSES = [
+    'BALLARI', 'BANASWADI', 'BANNERGHATTA', 'BASAVESWARA', 'BELAGAVI', 'BELLANDUR',
+    'BHAGATHSINGH', 'DAVANAGERE', 'DUNLOP', 'ECITY', 'ELECTRONIC CITY',
+    'HEBBAL', 'HEGDENAGAR', 'HORAMAVU', 'HSR', 'HUBLI', 'J P NAGAR', 'JP NAGAR',
+    'JAYA NAGAR', 'JAYANAGAR', 'KAGGADASAPURA', 'KALYAN NAGAR', 'KANAKAPURA',
+    'KOLAR', 'KORAMANGALA', 'KR PURAM', 'KUDLU', 'MAGADI', 'MAHALAKSHMI',
+    'MANDYA', 'MANGALORE', 'MANGALURU', 'MARTHAHALLI', 'MYSORE', 'NAGARBHAVI',
+    'PEENYA', 'RAJAJI NAGAR', 'RAJAJINAGAR', 'RAM MURTHY', 'SAHAKARA',
+    'SARJAPURA', 'SESHADRIPURAM', 'SHIMOGA', 'SHIVAMOGGA', 'TUMKUR',
+    'UDUPI', 'ULLAL', 'UTTARAHALLI', 'VARTHUR', 'VIDYARANYAPURA', 'WHITEFIELD',
+    'YELAHANKA', 'YELLAHANKA', 'YESHWANTHPUR'
+];
+
 function isKarnatakaCampus(name, allowedCampuses) {
     if (!name) return false;
     const upper = name.toUpperCase().trim();
@@ -180,17 +204,35 @@ function isKarnatakaCampus(name, allowedCampuses) {
         'BAG/', 'GAD/', 'DHAD/', 'HASS/', 'CHI/', 'CHIT/', 'RAI/',
         'BIJ/', 'KOP/', 'YAD/', 'UDU/', 'KOD/', 'HAW/'
     ];
-    return keywords.some(k => upper.includes(k));
+    if (keywords.some(k => upper.includes(k))) return true;
+
+    // 3. Check cleaned campus name against allowed campuses
+    const cleaned = cleanCampusName(upper);
+    if (allowedCampuses) {
+        for (const ac of allowedCampuses) {
+            const cleanAc = cleanCampusName(ac);
+            if (cleanAc === cleaned || ac.includes(cleaned) || cleaned.includes(ac)) return true;
+        }
+    }
+
+    // 4. Check known Karnataka campus list
+    if (KNOWN_KARNATAKA_CAMPUSES.some(k => cleaned.includes(k) || upper.includes(k))) return true;
+
+    return false;
 }
 
 async function processResultFile(filePath, streamFromFolder, pool, getMappedCategory, allowedCampuses, year, manualTestType, manualTestName, customHeading) {
 
     const wb = XLSX.readFile(filePath);
 
-    // 1. Marks List Sheet
-    const marksWs = wb.Sheets['Marks List'];
+    // 1. Marks List Sheet (case-insensitive & trimmed)
+    const marksSheetName = wb.SheetNames.find(s => {
+        const clean = s.trim().toLowerCase();
+        return clean === 'marks list' || clean.includes('marks list') || clean.includes('marks');
+    });
+    const marksWs = marksSheetName ? wb.Sheets[marksSheetName] : null;
     if (!marksWs) {
-        console.log(`  [SKIP] "Marks List" sheet not found in ${path.basename(filePath)}`);
+        console.log(`  [SKIP] "Marks List" sheet not found in ${path.basename(filePath)} (Available sheets: ${wb.SheetNames.join(', ')})`);
         return;
     }
     const marksData = XLSX.utils.sheet_to_json(marksWs, { header: 1 });
@@ -238,10 +280,10 @@ async function processResultFile(filePath, streamFromFolder, pool, getMappedCate
                 testType = 'NST';
             }
         } else {
-            const testMatch = metaStr.match(/([a-zA-Z]{1,5}[-_]\d{1,3}[a-zA-Z]*)/);
+            const testMatch = metaStr.match(/([a-zA-Z]{1,5})\s*[-_]\s*(\d{1,3}[a-zA-Z]*)/);
             if (testMatch) {
-                testName = testMatch[1];
-                testType = testName.split(/[-_]/)[0].trim();
+                testType = testMatch[1].toUpperCase();
+                testName = `${testType}-${testMatch[2]}`;
             } else {
                 // Fallback: If no regex match, split by '__'
                 const parts = metaStr.split('__');
@@ -269,25 +311,29 @@ async function processResultFile(filePath, streamFromFolder, pool, getMappedCate
     const row5 = marksData[4] || [];
     const row6 = marksData[5] || [];
 
-    const colMap = {};
-    const findInRows = (text, rows) => {
-        for (const row of rows) {
-            const idx = row.findIndex(h => normalizeHeader(h).includes(normalizeHeader(text)));
-            if (idx !== -1) return idx;
+    const findInRows = (patterns, rows) => {
+        if (!Array.isArray(patterns)) patterns = [patterns];
+        for (const pattern of patterns) {
+            const normPattern = normalizeHeader(pattern);
+            for (const row of rows) {
+                const idx = row.findIndex(h => normalizeHeader(h).includes(normPattern));
+                if (idx !== -1) return idx;
+            }
         }
         return -1;
     };
 
-    colMap.STUD_ID = findInRows('STUD_ID', [row4]);
-    colMap.NAME = findInRows('NAME OF THE STUDENT', [row4]) || findInRows('STUDENT NAME', [row4]);
-    colMap.CAMPUS = findInRows('CAMPUS NAME', [row4]) || findInRows('CAMPUS', [row4]);
-    colMap.TOT = findInRows('Tot 720', [row5]) || findInRows('TOT', [row5]);
-    colMap.AIR = findInRows('AIR', [row5]);
-    colMap.BOT = findInRows('Botany', [row5, row6]);
-    colMap.ZOO = findInRows('Zoology', [row5, row6]);
-    colMap.BIO = findInRows('Biology', [row5, row6]) || findInRows('BIO LOGY', [row5, row6]);
-    colMap.PHY = findInRows('Physics', [row5, row6]);
-    colMap.CHE = findInRows('Chemistry', [row5, row6]);
+    const colMap = {};
+    colMap.STUD_ID = findInRows(['STUD_ID', 'STUD ID', 'STUDENT ID'], [row4]);
+    colMap.NAME = findInRows(['NAME OF THE STUDENT', 'STUDENT NAME', 'NAME'], [row4]);
+    colMap.CAMPUS = findInRows(['CAMPUS NAME', 'CAMPUS'], [row4]);
+    colMap.TOT = findInRows(['Tot 720', 'TOT 720', 'TOT', 'TOTAL'], [row5]);
+    colMap.AIR = findInRows(['AIR', 'ALL INDIA RANK'], [row5]);
+    colMap.BOT = findInRows(['Botany'], [row5, row6]);
+    colMap.ZOO = findInRows(['Zoology'], [row5, row6]);
+    colMap.BIO = findInRows(['Biology', 'BIO LOGY', 'BIOLOGY'], [row5, row6]);
+    colMap.PHY = findInRows(['Physics'], [row5, row6]);
+    colMap.CHE = findInRows(['Chemistry'], [row5, row6]);
 
     // Rank columns
     const findRankAfter = (idx) => {
@@ -307,14 +353,18 @@ async function processResultFile(filePath, streamFromFolder, pool, getMappedCate
 
     // Errors Identification from "NEET(Micro)"
     const errorMap = new Map(); // STUD_ID -> { bot, zoo, phy, che }
-    const microWs = wb.Sheets['NEET(Micro)'];
+    const microSheetName = wb.SheetNames.find(s => {
+        const clean = s.trim().toLowerCase();
+        return clean.includes('micro') || clean.includes('neet(micro)');
+    });
+    const microWs = microSheetName ? wb.Sheets[microSheetName] : null;
     if (microWs) {
         const microData = XLSX.utils.sheet_to_json(microWs, { header: 1 });
         const mRow4 = microData[3] || [];
         const mRow5 = microData[4] || [];
         const mRow6 = microData[5] || [];
 
-        const mStudIdCol = mRow4.findIndex(h => normalizeHeader(h) === 'STUD_ID');
+        const mStudIdCol = mRow4.findIndex(h => normalizeHeader(h) === 'STUD_ID' || normalizeHeader(h) === 'STUD ID');
 
         const findWQsForSubject = (subjectPattern) => {
             const sIdx = mRow5.findIndex(h => normalizeHeader(h).includes(normalizeHeader(subjectPattern)));

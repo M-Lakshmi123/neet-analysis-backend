@@ -54,10 +54,15 @@ const UserApprovals = ({ academicYear }) => {
 
 
     const initiationApproval = (user) => {
-        // Default to the requested campus as pre-selected
-        const defaultSelection = user.campus && user.campus !== 'All'
-            ? [{ value: user.campus, label: user.campus }]
-            : []; // Or select all if 'All'? Better to let Admin choose.
+        // Default to the requested campuses as pre-selected
+        let userCampuses = [];
+        if (Array.isArray(user.allowedCampuses) && user.allowedCampuses.length > 0) {
+            userCampuses = user.allowedCampuses;
+        } else if (user.campus && user.campus !== 'All') {
+            userCampuses = user.campus.split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        const defaultSelection = userCampuses.map(c => ({ value: c, label: c }));
 
         setApprovalModal({
             isOpen: true,
@@ -73,6 +78,7 @@ const UserApprovals = ({ academicYear }) => {
         const user = approvalModal.user;
         const allowedCampuses = approvalModal.selectedCampuses.map(c => c.value);
         const role = approvalModal.role;
+        const campusString = allowedCampuses.join(', ');
 
         setApprovalModal({ isOpen: false, user: null, selectedCampuses: [], role: 'principal' });
 
@@ -83,6 +89,7 @@ const UserApprovals = ({ academicYear }) => {
             isApproved: true,
             approvedAt: new Date().toISOString(),
             allowedCampuses: allowedCampuses,
+            campus: campusString,
             role: role
         };
 
@@ -99,11 +106,12 @@ const UserApprovals = ({ academicYear }) => {
         });
 
         try {
-            // 1. Approve in Firestore with allowedCampuses
+            // 1. Approve in Firestore with allowedCampuses and campus string
             await updateDoc(doc(db, "users", user.id), {
                 isApproved: true,
                 approvedAt: new Date().toISOString(),
                 allowedCampuses: allowedCampuses,
+                campus: campusString,
                 role: role
             });
 
@@ -182,7 +190,11 @@ const UserApprovals = ({ academicYear }) => {
                                         <div className="item-info">
                                             <h5>{user.name}</h5>
                                             <span className="info-sub"><Mail size={12} /> {user.email}</span>
-                                            <span className="info-sub"><School size={12} /> {user.campus}</span>
+                                            <span className="info-sub"><School size={12} /> {
+                                                Array.isArray(user.allowedCampuses) && user.allowedCampuses.length > 0
+                                                    ? (user.allowedCampuses.length > 3 ? `${user.allowedCampuses.length} Campuses (${user.allowedCampuses.slice(0, 2).join(', ')}...)` : user.allowedCampuses.join(', '))
+                                                    : (user.campus || 'N/A')
+                                            }</span>
                                             {user.phone && <span className="info-sub"><MessageSquare size={12} /> +91 {user.phone}</span>}
                                         </div>
                                         <div className="item-btns">
@@ -252,7 +264,10 @@ const UserApprovals = ({ academicYear }) => {
                                                     <button
                                                         className="btn-whatsapp"
                                                         onClick={() => {
-                                                        const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                                                        const campusDisplay = user.allowedCampuses && user.allowedCampuses.length > 0
+                                                            ? (user.allowedCampuses.length > 5 ? `${user.allowedCampuses.length} Campuses` : user.allowedCampuses.join(', '))
+                                                            : (user.campus || "All Campuses");
+                                                        const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${campusDisplay}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
                                                             const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
                                                             window.open(whatsappUrl, '_blank');
                                                         }}
@@ -333,10 +348,14 @@ const UserApprovals = ({ academicYear }) => {
                                 border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.25rem'
                             }}>
                                 <span style={{ fontSize: '0.7rem', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                    REQUESTED CAMPUS
+                                    REQUESTED CAMPUS(ES)
                                 </span>
                                 <span style={{ fontSize: '1rem', fontWeight: '700', color: '#334155' }}>
-                                    {approvalModal.user?.campus || "N/A"}
+                                    {
+                                        Array.isArray(approvalModal.user?.allowedCampuses) && approvalModal.user.allowedCampuses.length > 0
+                                            ? approvalModal.user.allowedCampuses.join(', ')
+                                            : (approvalModal.user?.campus || "N/A")
+                                    }
                                 </span>
                             </div>
 

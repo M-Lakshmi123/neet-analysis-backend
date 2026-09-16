@@ -1,6 +1,6 @@
 @echo off
 echo ========================================================
-echo   NEET RESULT EXCEL EXTRACTOR & UPLOADER
+echo   NEET RESULT EXCEL EXTRACTOR ^& UPLOADER
 echo ========================================================
 echo.
 

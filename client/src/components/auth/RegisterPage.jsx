@@ -7,6 +7,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 import { UserPlus, Mail, Lock, School, ArrowRight, Award, TrendingUp, Users } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
+import Select from 'react-select';
 import Toast from '../Toast';
 import Modal from '../Modal';
 
@@ -84,7 +85,7 @@ const RegisterPage = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [phone, setPhone] = useState('');
-    const [campus, setCampus] = useState('');
+    const [selectedCampuses, setSelectedCampuses] = useState([]);
     const [campuses, setCampuses] = useState(ALL_CAMPUSES);
     const [loading, setLoading] = useState(false);
     const [currentSlide, setCurrentSlide] = useState(0);
@@ -179,10 +180,13 @@ const RegisterPage = () => {
             return;
         }
 
-        if (!campus) {
-            showToast("Please select your campus", "error");
+        if (!selectedCampuses || selectedCampuses.length === 0) {
+            showToast("Please select at least one campus", "error");
             return;
         }
+
+        const campusList = selectedCampuses.map(c => c.value);
+        const campusString = campusList.join(', ');
 
         setLoading(true);
         try {
@@ -194,7 +198,8 @@ const RegisterPage = () => {
                 name,
                 email,
                 phone,
-                campus,
+                campus: campusString,
+                allowedCampuses: campusList,
                 role: 'principal',
                 isApproved: false,
                 createdAt: new Date().toISOString()
@@ -204,7 +209,7 @@ const RegisterPage = () => {
             fetch(`${API_URL}/api/notify-registration`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, campus, phone, role: 'principal' })
+                body: JSON.stringify({ name, email, campus: campusString, allowedCampuses: campusList, phone, role: 'principal' })
             }).catch(err => console.error("Failed to notify admin:", err));
 
             // Mark session as active since they are now logged in
@@ -249,7 +254,7 @@ const RegisterPage = () => {
                                     <h3 className="slide-quote">{slide.quote}</h3>
                                     <div className="slide-stats">
                                         {slide.stats.map((stat, sIndex) => (
-                                            <div key={sIndex} className="stat-item">
+                                             <div key={sIndex} className="stat-item">
                                                 <h4>{stat.value}</h4>
                                                 <p>{stat.label}</p>
                                             </div>
@@ -321,19 +326,97 @@ const RegisterPage = () => {
                                 </div>
 
                                 <div className="form-group">
-                                    <label>Campus Name</label>
-                                    <div className="input-with-icon">
-                                        <School size={16} className="icon" />
-                                        <select
-                                            value={campus}
-                                            onChange={(e) => setCampus(e.target.value)}
-                                            required
-                                        >
-                                            <option value="">Select your campus</option>
-                                            {campuses.map(c => (
-                                                <option key={c} value={c}>{c}</option>
-                                            ))}
-                                        </select>
+                                    <label>Campus / Campuses</label>
+                                    <div className="input-with-icon" style={{ position: 'relative' }}>
+                                        <School size={16} className="icon" style={{ zIndex: 2, pointerEvents: 'none', top: '13px', transform: 'none' }} />
+                                        <div style={{ flex: 1, width: '100%' }}>
+                                            <Select
+                                                isMulti
+                                                options={campuses.map(c => ({ value: c, label: c }))}
+                                                value={selectedCampuses}
+                                                onChange={(selected) => setSelectedCampuses(selected || [])}
+                                                placeholder="Select campus(es)..."
+                                                closeMenuOnSelect={false}
+                                                styles={{
+                                                    container: (base) => ({
+                                                        ...base,
+                                                        width: '100%'
+                                                    }),
+                                                    control: (base, state) => ({
+                                                        ...base,
+                                                        width: '100%',
+                                                        minHeight: '42px',
+                                                        paddingLeft: '2.4rem',
+                                                        paddingRight: '0.4rem',
+                                                        backgroundColor: '#f8fafc',
+                                                        border: state.isFocused ? '1.5px solid var(--accent, #6366f1)' : '1.5px solid #e2e8f0',
+                                                        borderRadius: '12px',
+                                                        boxShadow: state.isFocused ? '0 0 0 4px rgba(99, 102, 241, 0.1)' : 'none',
+                                                        fontSize: '0.85rem',
+                                                        transition: 'all 0.2s',
+                                                        '&:hover': {
+                                                            borderColor: '#cbd5e1'
+                                                        }
+                                                    }),
+                                                    valueContainer: (base) => ({
+                                                        ...base,
+                                                        padding: '2px 0',
+                                                        gap: '3px'
+                                                    }),
+                                                    menu: (base) => ({
+                                                        ...base,
+                                                        borderRadius: '12px',
+                                                        boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                                                        zIndex: 9999,
+                                                        fontSize: '0.85rem',
+                                                        border: '1px solid #e2e8f0',
+                                                        overflow: 'hidden'
+                                                    }),
+                                                    menuList: (base) => ({
+                                                        ...base,
+                                                        maxHeight: '190px',
+                                                        padding: '4px'
+                                                    }),
+                                                    option: (base, state) => ({
+                                                        ...base,
+                                                        backgroundColor: state.isSelected ? '#eff6ff' : state.isFocused ? '#f1f5f9' : 'transparent',
+                                                        color: state.isSelected ? '#1d4ed8' : '#334155',
+                                                        fontWeight: state.isSelected ? 600 : 400,
+                                                        borderRadius: '8px',
+                                                        marginBottom: '2px',
+                                                        cursor: 'pointer'
+                                                    }),
+                                                    multiValue: (base) => ({
+                                                        ...base,
+                                                        backgroundColor: '#eff6ff',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #dbeafe',
+                                                        margin: '2px'
+                                                    }),
+                                                    multiValueLabel: (base) => ({
+                                                        ...base,
+                                                        color: '#1e40af',
+                                                        fontWeight: 600,
+                                                        fontSize: '0.72rem',
+                                                        padding: '2px 5px'
+                                                    }),
+                                                    multiValueRemove: (base) => ({
+                                                        ...base,
+                                                        color: '#3b82f6',
+                                                        cursor: 'pointer',
+                                                        ':hover': {
+                                                            backgroundColor: '#dbeafe',
+                                                            color: '#1e40af'
+                                                        }
+                                                    }),
+                                                    placeholder: (base) => ({
+                                                        ...base,
+                                                        color: '#94a3b8',
+                                                        fontSize: '0.85rem'
+                                                    })
+                                                }}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
