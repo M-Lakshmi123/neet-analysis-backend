@@ -338,12 +338,13 @@ const AverageReport = ({ filters }) => {
     };
 
     const fetchData = async () => {
-        if (!filters.studentSearch || filters.studentSearch.length === 0) {
+        // Allow generating if either studentSearch is specified OR campus/stream filter is active
+        if ((!filters.studentSearch || filters.studentSearch.length === 0) && (!filters.campus || filters.campus.length === 0) && (!filters.stream || filters.stream.length === 0)) {
             setModal({
                 isOpen: true,
                 type: 'info',
-                title: 'Select Student',
-                message: 'Please select a student from the filters first.',
+                title: 'Select Filter',
+                message: 'Please select a Campus, Stream, or Student from the filters first.',
                 onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
             });
             return;
@@ -352,9 +353,19 @@ const AverageReport = ({ filters }) => {
         setLoading(true);
         setHasSearched(true);
         try {
-            const params = buildQueryParams(filters);
-            params.append('includeExams', 'true');
-            const response = await fetch(`${API_URL}/api/history?${params.toString()}`);
+            const bodyPayload = {
+                ...filters,
+                includeExams: 'true',
+                academicYear: filters.academicYear || '2026'
+            };
+
+            // Use POST to avoid HTTP GET URL length limit (8KB) when hundreds of students are selected
+            const response = await fetch(`${API_URL}/api/history`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bodyPayload)
+            });
+
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(errorText || `Status: ${response.status}`);
@@ -1020,6 +1031,54 @@ const AverageReport = ({ filters }) => {
                 const total = studentIds.length;
                 setDownloadProgress({ current: 0, total });
 
+                // High Performance: Pre-fetch all ERP questions in a single batch request to avoid hundreds of sequential HTTP calls
+                const erpMap = {};
+                if (includeTopicDetails) {
+                    try {
+                        const erpPayload = {
+                            ...filters,
+                            academicYear: filters.academicYear || '2026'
+                        };
+                        const erpRes = await fetch(`${API_URL}/api/erp/report`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(erpPayload)
+                        });
+                        if (erpRes.ok) {
+                            const erpData = await erpRes.json();
+                            if (Array.isArray(erpData)) {
+                                erpData.forEach(row => {
+                                    const sid = String(row.STUD_ID || '').trim();
+                                    const sname = String(row.Student_Name || '').trim().toUpperCase();
+                                    const status = String(row.W_U || '').trim().toUpperCase();
+                                    const qObj = {
+                                        test: row.Test,
+                                        qNo: row.Q_No,
+                                        subject: row.Subject,
+                                        topic: row.Topic || 'Unknown Topic',
+                                        subTopic: row.Sub_Topic || '',
+                                        status: status,
+                                        lost: status === 'W' ? 5 : 4,
+                                        qUrl: row.Q_URL,
+                                        sUrl: row.S_URL,
+                                        keyValue: row.Key_Value
+                                    };
+                                    if (sid) {
+                                        if (!erpMap[sid]) erpMap[sid] = [];
+                                        erpMap[sid].push(qObj);
+                                    }
+                                    if (sname) {
+                                        if (!erpMap[sname]) erpMap[sname] = [];
+                                        erpMap[sname].push(qObj);
+                                    }
+                                });
+                            }
+                        }
+                    } catch (erpBatchErr) {
+                        console.warn("[Bulk PDF] Batch ERP questions fetch failed, will fallback:", erpBatchErr);
+                    }
+                }
+
                 let count = 0;
                 for (const id of studentIds) {
                     count++;
@@ -1034,7 +1093,14 @@ const AverageReport = ({ filters }) => {
 
                     const transformed = getTransformedRows(sRows);
                     const chartImgData = includeChart ? await generateChartImage(transformed) : null;
-                    const erpQ = await fetchStudentErpQuestionsForPdf(id, sName);
+
+                    // Use pre-fetched batch ERP map if available, otherwise fallback
+                    let erpQ = erpMap[id] || (sName ? erpMap[sName.toUpperCase()] : null);
+                    if (!erpQ && includeTopicDetails && studentIds.length <= 25) {
+                        erpQ = await fetchStudentErpQuestionsForPdf(id, sName);
+                    }
+                    erpQ = erpQ || [];
+
                     const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ, includeTopicDetails);
                     const pdfBlob = doc.output('blob');
                     zip.file(fileName, pdfBlob);

@@ -132,7 +132,7 @@ const upload = multer({
 });
 
 // File Management Routes (Hybrid Storage: Database Chunks + Google Drive Backup)
-app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
+app.post('/api/files/upload', upload.array('files', 1000), async (req, res) => {
     console.log(`[STABILITY][UPLOAD] Request Received. Memory: ${Math.round(process.memoryUsage().rss / 1024 / 1024)} MB`);
     try {
         const { category } = req.body;
@@ -540,9 +540,9 @@ app.use((req, res, next) => {
 
 
 // Helper to build WHERE clause
-// Helper to build WHERE clause
 const buildWhereClause = (req, options = {}) => {
-    const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
+    const params = req.body && Object.keys(req.body).length > 0 ? { ...req.query, ...req.body } : req.query;
+    const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = params;
     let clauses = [];
 
     const addClause = (field, value) => {
@@ -963,11 +963,12 @@ app.get('/api/performance', async (req, res) => {
 });
 
 // Get Student History (Average Report)
-app.get('/api/history', async (req, res) => {
+app.all('/api/history', async (req, res) => {
     try {
-        const year = req.query.academicYear || '2026';
+        const params = req.body && Object.keys(req.body).length > 0 ? { ...req.query, ...req.body } : req.query;
+        const year = params.academicYear || '2026';
         const pool = await connectToDb(year);
-        const { id, name, campus, includeExams } = req.query; // Search params
+        const { id, name, campus, includeExams } = params; // Search params
 
         let whereClause = '';
         if (id) whereClause = `WHERE STUD_ID = ${id}`;
@@ -1541,11 +1542,12 @@ app.get('/api/erp/filters', async (req, res) => {
 });
 
 // Get ERP Data Report
-app.get('/api/erp/report', async (req, res) => {
+app.all('/api/erp/report', async (req, res) => {
     try {
-        const year = req.query.academicYear || '2026';
+        const params = req.body && Object.keys(req.body).length > 0 ? { ...req.query, ...req.body } : req.query;
+        const year = params.academicYear || '2026';
         const pool = await connectToDb(year);
-        const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = req.query;
+        const { campus, stream, test, testType, topAll, studentSearch, quickSearch } = params;
 
         let clauses = [];
         const addClause = (field, value) => {
