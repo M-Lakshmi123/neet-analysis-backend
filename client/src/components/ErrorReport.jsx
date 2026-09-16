@@ -228,14 +228,55 @@ const ErrorReport = ({ filters, setFilters }) => {
         return questions.filter(q => q.Subject && q.Subject.toUpperCase() === subjectFilter.value);
     };
 
-    // Helper: Load Image
+    // Helper: Load Image with memory-safe downsampling to prevent ArrayBuffer overflow
     const loadImage = (src) => {
         if (!src) return Promise.resolve(null);
         return new Promise((resolve) => {
             const img = new Image();
             img.crossOrigin = "Anonymous";
             img.src = src;
-            img.onload = () => resolve(img);
+            img.onload = () => {
+                try {
+                    // Downscale large question/solution images to max 700px with JPEG compression
+                    // This prevents browser memory blowup (Array buffer allocation failed) on bulk downloads
+                    const MAX_DIM = 700;
+                    if (img.width > MAX_DIM || img.height > MAX_DIM) {
+                        const canvas = document.createElement('canvas');
+                        let w = img.width;
+                        let h = img.height;
+                        if (w > h) {
+                            if (w > MAX_DIM) {
+                                h = Math.round((h * MAX_DIM) / w);
+                                w = MAX_DIM;
+                            }
+                        } else {
+                            if (h > MAX_DIM) {
+                                w = Math.round((w * MAX_DIM) / h);
+                                h = MAX_DIM;
+                            }
+                        }
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, w, h);
+                        ctx.drawImage(img, 0, 0, w, h);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                        const optimizedImg = new Image();
+                        optimizedImg.onload = () => {
+                            canvas.width = 0;
+                            canvas.height = 0;
+                            resolve(optimizedImg);
+                        };
+                        optimizedImg.onerror = () => resolve(img);
+                        optimizedImg.src = dataUrl;
+                        return;
+                    }
+                } catch (e) {
+                    // Fallback to original image if canvas fails
+                }
+                resolve(img);
+            };
             img.onerror = () => {
                 resolve(null);
             };
@@ -664,7 +705,11 @@ const ErrorReport = ({ filters, setFilters }) => {
                     const asp = img.width / img.height;
                     let w = h * asp;
                     const offX = (halfImgW - w) / 2;
-                    try { doc.addImage(img, 'PNG', x + offX, y + 1, w, h); } catch (e) { }
+                    try {
+                        doc.addImage(img, 'JPEG', x + offX, y + 1, w, h, undefined, 'FAST');
+                    } catch (e) {
+                        try { doc.addImage(img, 'PNG', x + offX, y + 1, w, h); } catch (e2) { }
+                    }
                 };
 
                 if (qImg) drwImg(qImg, ibx, iby, qH);
@@ -732,10 +777,20 @@ const ErrorReport = ({ filters, setFilters }) => {
                     const doc = await createStudentPDF(student, fonts, logoImg);
                     const blob = doc.output('blob');
                     zip.file(`${student.info.name}_${student.info.branch}.pdf`, blob);
+                    // Yield control to UI thread so garbage collection can run and prevent memory overflow
+                    await new Promise(r => setTimeout(r, 10));
                 }
 
-                setPdfProgress('Compressing...');
-                const zipContent = await zip.generateAsync({ type: 'blob' });
+                setPdfProgress('Creating ZIP package...');
+                const zipContent = await zip.generateAsync({
+                    type: 'blob',
+                    compression: 'STORE',
+                    streamFiles: true
+                }, (metadata) => {
+                    if (metadata.percent) {
+                        setPdfProgress(`Compressing: ${Math.round(metadata.percent)}%`);
+                    }
+                });
                 const zipLimit = actualLimit ? `Top_${actualLimit}` : (topLimitFilter.value !== 'ALL' ? `Top_${topLimitFilter.value}` : 'All');
                 const zipName = `Error_Reports_${zipLimit}_${subjectFilter.value}.zip`;
                 saveAs(zipContent, zipName);
