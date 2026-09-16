@@ -216,7 +216,12 @@ app.post('/api/files/upload', upload.array('files', 20), async (req, res) => {
                 successCount++;
                 try { fs.unlinkSync(file.path); } catch (e) { }
 
-                const categoryLabel = (category || 'schedules') === 'schedules' ? 'Schedules & Time Tables' : 'Average Files';
+                const categoryLabelMap = {
+                    'schedules': 'Schedules & Time Tables',
+                    'weekly_syllabus': 'Weekly Syllabus',
+                    'averages': 'Average Files'
+                };
+                const categoryLabel = categoryLabelMap[category] || category || 'Schedules & Time Tables';
                 await logUpdateNotification(pool, {
                     title: `New File Uploaded`,
                     description: `Admin uploaded "${sanitizedOriginalName}" under ${categoryLabel}.`,

@@ -7,6 +7,7 @@ import {
     X,
     Calendar,
     BarChart,
+    BookOpen,
     Loader2,
     Trash2,
     FileCode,
@@ -27,6 +28,7 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
     const [activeCategory, setActiveCategory] = useState('schedules');
     const categories = [
         { id: 'schedules', label: 'Schedules & Time Tables', icon: <Calendar size={16} />, color: '#172554' },
+        { id: 'weekly_syllabus', label: 'Weekly Syllabus', icon: <BookOpen size={16} />, color: '#172554' },
         { id: 'averages', label: 'Average Files from CO-HYD', icon: <BarChart size={16} />, color: '#172554' }
     ];
 
