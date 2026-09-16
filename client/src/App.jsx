@@ -9,7 +9,6 @@ import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import AnalysisReport from './components/AnalysisReport';
 import ToppersPerformanceReport from './components/ToppersPerformanceReport';
-import Top18Report from './components/Top18Report';
 import TopperMarksLossReport from './components/TopperMarksLossReport';
 import TestWiseImprovements from './components/TestWiseImprovements';
 import AverageReport from './components/AverageReport';
@@ -304,7 +303,6 @@ const Dashboard = () => {
             const pageNames = {
                 'analysis': 'Analysis Report',
                 'toppers_performance': 'Toppers Performance Report',
-                'top_18': 'TOP 18 Exclusive Report',
                 'topper_marks_loss': 'Topper Marks Loss',
                 'test_improvements': 'Test Wise Improvements',
                 'averages': 'Average Marks Report',
@@ -342,8 +340,6 @@ const Dashboard = () => {
                         <ToppersPerformanceReport filters={globalFilters} setFilters={setGlobalFilters} setActivePage={setActivePage} />
                     </div>
                 );
-            case 'top_18':
-                return <Top18Report academicYear={academicYear} />;
             case 'topper_marks_loss':
                 return (
                     <div className="report-sections">
@@ -428,7 +424,6 @@ const Dashboard = () => {
                         activePage === 'principal_dashboard' ? 'Principal Dashboard' :
                         activePage === 'analysis' ? 'Analysis Report' :
                         activePage === 'toppers_performance' ? 'Toppers Performance Report' :
-                        activePage === 'top_18' ? 'TOP 18 Exclusive Report' :
                         activePage === 'topper_marks_loss' ? 'Topper Marks Loss Report' :
                             activePage === 'test_improvements' ? 'Test Wise Improvements' :
                                 activePage === 'averages' ? 'Average Marks Report' :

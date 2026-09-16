@@ -21,6 +21,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         topAll: []
     });
     const [students, setStudents] = useState([]);
+    const [top18List, setTop18List] = useState([]);
     const [loadingFilters, setLoadingFilters] = useState(false);
     const [loadingStudents, setLoadingStudents] = useState(false);
 
@@ -29,6 +30,17 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         filters: apiEndpoints.filters || '/api/filters',
         students: apiEndpoints.students || '/api/studentsByCampus'
     };
+
+    useEffect(() => {
+        fetch(`${API_URL}/api/config/top-18`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && Array.isArray(data.students) && data.students.length > 0) {
+                    setTop18List(data.students);
+                }
+            })
+            .catch(err => console.error("Error fetching top 18 config:", err));
+    }, []);
 
     // Transform string array to { value, label } for React Select
     const toOptions = (arr) => {
@@ -45,13 +57,15 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
             return [{ value: "SELECT_ALL", label: "ALL SELECTED" }];
         }
 
-        // For studentSearch, map IDs back to labels using the students list or quickSearch label
+        // For studentSearch, map IDs back to labels using the students list or top18 list or quickSearch label
         if (field === 'studentSearch') {
             return val.map(v => {
-                const s = students.find(st => st.id.toString() === v.toString());
+                const s = students.find(st => st.id?.toString() === v.toString()) || top18List.find(st => (st.STUD_ID || st.id)?.toString() === v.toString());
                 if (s) {
-                    const labelText = s.name ? (s.name.includes('(') ? s.name : `${s.name} (${s.id})`) : s.id;
-                    return { value: s.id, label: labelText };
+                    const name = s.name || s.STUD_NAME || s.NAME;
+                    const id = s.id || s.STUD_ID;
+                    const labelText = name ? (name.includes('(') ? name : `${name} (${id})`) : id;
+                    return { value: id, label: labelText };
                 }
                 if (filters.quickSearch && filters.quickSearch.toString().includes(v.toString())) {
                     return { value: v, label: filters.quickSearch };
@@ -379,6 +393,33 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         }),
     };
 
+    const handleToggleTop18 = () => {
+        const isCurrentlyActive = filters.isTop18 || (filters.studentSearch && filters.studentSearch.length === 18 && filters.quickSearch?.includes('TOP 18'));
+
+        if (isCurrentlyActive) {
+            // Toggle OFF
+            setFilters(prev => ({
+                ...prev,
+                isTop18: false,
+                studentSearch: [],
+                quickSearch: ''
+            }));
+            if (userData) logActivity(userData, 'Deactivated TOP 18 Filter');
+        } else {
+            // Toggle ON
+            const fallbackIds = ['257403546', '257404738', '257403653', '257427698', '213309261', '246556423', '246555884', '246555726', '257407693', '246556345', '213307653', '257420307', '257400127', '257403537', '257409631', '257402548', '257405810', '257406595'];
+            const ids = top18List.length > 0 ? top18List.map(s => String(s.STUD_ID || s.id)) : fallbackIds;
+
+            setFilters(prev => ({
+                ...prev,
+                isTop18: true,
+                studentSearch: ids,
+                quickSearch: '⭐ TOP 18 Members (18 Selected)'
+            }));
+            if (userData) logActivity(userData, 'Activated TOP 18 Filter');
+        }
+    };
+
     const resetFilters = () => {
         setFilters({
             campus: [], // Principals now start empty as requested
@@ -387,13 +428,14 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
             test: [],
             topAll: [],
             studentSearch: [],
-            quickSearch: ''
+            quickSearch: '',
+            isTop18: false
         });
     };
 
     return (
         <div className="filter-bar-container compact-mode">
-            {/* Top Action Row: Years, Search, Clear */}
+            {/* Top Action Row: Years, Top 18, Search, Clear */}
             <div className="filter-top-row">
                 <div className="year-selector-nav">
                     <button
@@ -413,6 +455,14 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         }}
                     >
                         ACADEMIC YEAR 2026
+                    </button>
+                    <button
+                        type="button"
+                        className={`year-nav-btn top18-nav-btn ${filters.isTop18 ? 'active' : ''}`}
+                        onClick={handleToggleTop18}
+                        title="Filter all reports for TOP 18 students"
+                    >
+                        ⭐ TOP 18
                     </button>
                 </div>
 
@@ -436,10 +486,11 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                                     stream: opt.streams && opt.streams.length > 0 ? opt.streams : [],
                                     testType: [],
                                     test: [],
-                                    topAll: []
+                                    topAll: [],
+                                    isTop18: false
                                 }));
                             } else {
-                                setFilters(prev => ({ ...prev, studentSearch: [], quickSearch: '', campus: [] }));
+                                setFilters(prev => ({ ...prev, studentSearch: [], quickSearch: '', campus: [], isTop18: false }));
                             }
                         }}
                         styles={{
@@ -452,7 +503,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                             })
                         }}
                         isClearable
-                        value={filters.studentSearch && filters.studentSearch.length > 0 ? { value: filters.studentSearch[0], label: filters.quickSearch } : null}
+                        value={filters.isTop18 ? { value: 'TOP_18', label: '⭐ TOP 18 Members (18 Selected)' } : (filters.studentSearch && filters.studentSearch.length === 1 ? { value: filters.studentSearch[0], label: filters.quickSearch } : null)}
                     />
                 </div>
 

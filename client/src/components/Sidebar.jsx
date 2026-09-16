@@ -6,8 +6,7 @@ import {
     Users,
     Activity,
     FileWarning,
-    FileText,
-    Award
+    FileText
 } from 'lucide-react';
 
 const Sidebar = ({ activePage, setActivePage }) => {
@@ -18,7 +17,6 @@ const Sidebar = ({ activePage, setActivePage }) => {
     const baseItems = [
         { id: 'analysis', label: 'Analysis Report', icon: <BarChart3 size={18} /> },
         { id: 'toppers_performance', label: 'Toppers Performance Report', icon: <BarChart3 size={18} /> },
-        { id: 'top_18', label: 'TOP 18 Report', icon: <Award size={18} /> },
         { id: 'topper_marks_loss', label: 'Topper Marks Loss', icon: <FileText size={18} /> },
         { id: 'test_improvements', label: 'Test Wise Improvements', icon: <Activity size={18} /> },
         { id: 'progress', label: 'Progress Report', icon: <Users size={18} /> },
