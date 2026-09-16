@@ -135,7 +135,7 @@ const ErrorReport = ({ filters, setFilters }) => {
                     return parseDate(a.meta.date) - parseDate(b.meta.date);
                 });
 
-                // Sort Questions by Subject, and then alphabetically by Topic
+                // Sort Questions by Subject, and then strictly in ascending numerical order of Question Number (Q_No: 1, 2, 3, 4...)
                 testsArr = testsArr.map(t => {
                     t.questions.sort((a, b) => {
                         // 1. Sort by Subject (BOTANY -> ZOOLOGY -> PHYSICS -> CHEMISTRY)
@@ -143,22 +143,26 @@ const ErrorReport = ({ filters, setFilters }) => {
                         const subB = getSubjectOrder(b.Subject);
                         if (subA !== subB) return subA - subB;
 
-                        // 2. Sort by Topic (A to Z)
+                        // 2. Sort strictly by Question Number (1, 2, 3, 4...)
+                        const getQNum = (val) => {
+                            if (!val) return 0;
+                            const clean = String(val).replace(/\D/g, '');
+                            return parseInt(clean, 10) || 0;
+                        };
+                        const qNoA = getQNum(a.Q_No);
+                        const qNoB = getQNum(b.Q_No);
+                        if (qNoA !== qNoB) return qNoA - qNoB;
+
+                        // 3. Fallback to Topic (A to Z)
                         const topicA = String(a.Topic || '').trim().toUpperCase();
                         const topicB = String(b.Topic || '').trim().toUpperCase();
                         const topicComp = topicA.localeCompare(topicB);
                         if (topicComp !== 0) return topicComp;
 
-                        // 3. Fallback to Sub Topic (A to Z)
+                        // 4. Fallback to Sub Topic (A to Z)
                         const subTopicA = String(a.Sub_Topic || '').trim().toUpperCase();
                         const subTopicB = String(b.Sub_Topic || '').trim().toUpperCase();
-                        const subTopicComp = subTopicA.localeCompare(subTopicB);
-                        if (subTopicComp !== 0) return subTopicComp;
-
-                        // 4. Fallback to Q_No
-                        const qNoA = parseInt(a.Q_No) || 0;
-                        const qNoB = parseInt(b.Q_No) || 0;
-                        return qNoA - qNoB;
+                        return subTopicA.localeCompare(subTopicB);
                     });
                     return t;
                 });

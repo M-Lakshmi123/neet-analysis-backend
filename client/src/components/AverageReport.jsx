@@ -338,8 +338,10 @@ const AverageReport = ({ filters }) => {
     };
 
     const fetchData = async () => {
+        const effectiveCampus = (filters.campus && filters.campus.length > 0) ? filters.campus : (filters._allowedCampuses || []);
+
         // Allow generating if either studentSearch is specified OR campus/stream filter is active
-        if ((!filters.studentSearch || filters.studentSearch.length === 0) && (!filters.campus || filters.campus.length === 0) && (!filters.stream || filters.stream.length === 0)) {
+        if ((!filters.studentSearch || filters.studentSearch.length === 0) && (!effectiveCampus || effectiveCampus.length === 0) && (!filters.stream || filters.stream.length === 0)) {
             setModal({
                 isOpen: true,
                 type: 'info',
@@ -355,6 +357,7 @@ const AverageReport = ({ filters }) => {
         try {
             const bodyPayload = {
                 ...filters,
+                campus: effectiveCampus,
                 includeExams: 'true',
                 academicYear: filters.academicYear || '2026'
             };
@@ -375,6 +378,16 @@ const AverageReport = ({ filters }) => {
             const historyData = data.history || [];
             const examData = data.allExams || [];
 
+            if (historyData.length === 0) {
+                setModal({
+                    isOpen: true,
+                    type: 'info',
+                    title: 'No Data Found',
+                    message: 'No student progress records found for the selected filter criteria.',
+                    onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
+                });
+            }
+
             setHistory(historyData);
             setAllExams(examData);
             setCurrentStudentIndex(0);
@@ -382,7 +395,7 @@ const AverageReport = ({ filters }) => {
             const studentCount = new Set(historyData.map(h => h.STUD_ID)).size;
             logActivity(userData, 'Generated Progress Report', {
                 studentCount,
-                campus: filters.campus
+                campus: effectiveCampus
             });
         } catch (err) {
             console.error("Fetch Error:", err);
@@ -1033,10 +1046,12 @@ const AverageReport = ({ filters }) => {
 
                 // High Performance: Pre-fetch all ERP questions in a single batch request to avoid hundreds of sequential HTTP calls
                 const erpMap = {};
+                const effectiveCampus = (filters.campus && filters.campus.length > 0) ? filters.campus : (filters._allowedCampuses || []);
                 if (includeTopicDetails) {
                     try {
                         const erpPayload = {
                             ...filters,
+                            campus: effectiveCampus,
                             academicYear: filters.academicYear || '2026'
                         };
                         const erpRes = await fetch(`${API_URL}/api/erp/report`, {

@@ -585,7 +585,11 @@ const buildWhereClause = (req, options = {}) => {
         clauses.push(`UPPER(TRIM(${field})) IN (${list})`);
     };
 
-    if (!options.ignoreCampus) addClause('CAMPUS_NAME', campus);
+    const effectiveCampus = (campus && (Array.isArray(campus) ? campus.length > 0 : String(campus).trim() !== ''))
+        ? campus
+        : (params._allowedCampuses || []);
+
+    if (!options.ignoreCampus) addClause('CAMPUS_NAME', effectiveCampus);
     if (!options.ignoreStream) addClause('Stream', stream);
     if (!options.ignoreTest) addClause('Test', test);
     if (!options.ignoreTestType) addClause('Test_Type', testType);
@@ -1575,7 +1579,10 @@ app.all('/api/erp/report', async (req, res) => {
         };
 
         // Map filters to ERP columns
-        addClause('Branch', campus);
+        const effectiveCampus = (campus && (Array.isArray(campus) ? campus.length > 0 : String(campus).trim() !== ''))
+            ? campus
+            : (params._allowedCampuses || []);
+        addClause('Branch', effectiveCampus);
         addClause('Stream', stream);
         addClause('Test', test);
         addClause('Test_Type', testType);
@@ -1621,9 +1628,10 @@ app.all('/api/erp/report', async (req, res) => {
         FROM ERP_REPORT 
             ${where}
             ORDER BY
-        Student_Name,
-            STR_TO_DATE(REPLACE(Exam_Date, '/', '-'), '%d-%m-%Y') DESC,
+                Student_Name,
+                STR_TO_DATE(REPLACE(Exam_Date, '/', '-'), '%d-%m-%Y') DESC,
                 Subject,
+                CAST(Q_No AS UNSIGNED) ASC,
                 Q_No ASC
             LIMIT 50000
         `;
