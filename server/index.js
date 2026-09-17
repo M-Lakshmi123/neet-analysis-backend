@@ -601,7 +601,7 @@ const buildWhereClause = (req, options = {}) => {
         const cleanIds = sSearch
             .filter(id => id && id !== 'null' && id !== 'undefined')
             .map(id => id.toString().trim().toUpperCase().replace(/'/g, "''"))
-            .filter(v => v !== '');
+            .filter(v => v !== '' && v !== '__ALL__' && v !== 'SELECT_ALL');
 
         if (cleanIds.length > 0) {
             const list = cleanIds.map(v => `'${v}'`).join(',');
@@ -1589,7 +1589,7 @@ app.all('/api/erp/report', async (req, res) => {
         addClause('Top_ALL', topAll);
 
         const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
-        const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+        const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(v => Boolean(v) && v !== '__ALL__' && v !== 'SELECT_ALL');
 
         const sNames = Array.isArray(req.query.studentNames) ? req.query.studentNames : [];
         const cleanNames = sNames.map(n => n ? n.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
@@ -1722,7 +1722,7 @@ app.get('/api/erp/error-count-report', async (req, res) => {
         addClause('Top_ALL', topAll);
 
         const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
-        const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(Boolean);
+        const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(v => Boolean(v) && v !== '__ALL__' && v !== 'SELECT_ALL');
 
         if (cleanIds.length > 0) {
             clauses.push(`STUD_ID IN(${cleanIds.map(v => `'${v}'`).join(',')})`);
