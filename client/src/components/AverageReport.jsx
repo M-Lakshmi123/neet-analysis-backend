@@ -109,83 +109,88 @@ const generateChartImage = (transformedRows) => {
             }
         });
 
-        const chart = new ChartJS(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Total Score (720)',
-                        data: totalScores,
-                        borderColor: '#1d4ed8',
-                        backgroundColor: 'rgba(29, 78, 216, 0.10)',
-                        borderWidth: 5,
-                        pointRadius: 10,
-                        pointHoverRadius: 13,
-                        pointBackgroundColor: '#1d4ed8',
-                        pointBorderColor: '#ffffff',
-                        pointBorderWidth: 2.5,
-                        tension: 0.35,
-                        fill: true,
-                        datalabels: {
+        try {
+            const chart = new ChartJS(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Total Score (720)',
+                            data: totalScores,
+                            borderColor: '#1d4ed8',
+                            backgroundColor: 'rgba(29, 78, 216, 0.10)',
+                            borderWidth: 5,
+                            pointRadius: 10,
+                            pointHoverRadius: 13,
+                            pointBackgroundColor: '#1d4ed8',
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 2.5,
+                            tension: 0.35,
+                            fill: true,
+                            datalabels: {
+                                display: true,
+                                align: 'top',
+                                anchor: 'end',
+                                offset: 10,
+                                color: '#0f172a',
+                                backgroundColor: '#ffffff',
+                                borderColor: '#94a3b8',
+                                borderWidth: 2,
+                                borderRadius: 8,
+                                padding: { top: 4, bottom: 4, left: 8, right: 8 },
+                                font: { weight: 'bold', size: 46 },
+                                formatter: (val) => val !== null ? val : 'AB'
+                            }
+                        }
+                    ]
+                },
+                options: {
+                    responsive: false,
+                    animation: false,
+                    layout: {
+                        padding: { top: 85, right: 70, bottom: 25, left: 80 }
+                    },
+                    plugins: {
+                        title: {
                             display: true,
-                            align: 'top',
-                            anchor: 'end',
-                            offset: 10,
-                            color: '#0f172a', // High contrast Dark Navy text
-                            backgroundColor: '#ffffff',
-                            borderColor: '#94a3b8',
-                            borderWidth: 2,
-                            borderRadius: 8,
-                            padding: { top: 4, bottom: 4, left: 8, right: 8 },
-                            font: { weight: 'bold', size: 46 }, // 46px canvas font = EXACT 10.3pt bold font in PDF ONLY!
-                            formatter: (val) => val !== null ? val : 'AB'
+                            text: 'Student Performance Trend (Total Marks / 720)',
+                            font: { size: 44, weight: 'bold' },
+                            color: '#0f172a',
+                            padding: { top: 15, bottom: 30 }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 800,
+                            ticks: { stepSize: 100, font: { size: 32, weight: 'bold' }, color: '#334155', padding: 12 },
+                            title: { display: true, text: 'Total Marks / 720', font: { size: 34, weight: 'bold' }, color: '#0f172a', padding: { bottom: 12 } },
+                            grid: { color: '#cbd5e1', lineWidth: 1.5 }
+                        },
+                        x: {
+                            offset: true,
+                            title: { display: true, text: 'Exams', font: { size: 34, weight: 'bold' }, color: '#0f172a', padding: { top: 15 } },
+                            grid: { color: '#e2e8f0', lineWidth: 1.5 },
+                            ticks: { font: { size: 32, weight: 'bold' }, color: '#1e293b' }
                         }
                     }
-                ]
-            },
-            options: {
-                responsive: false,
-                animation: false,
-                layout: {
-                    padding: { top: 85, right: 70, bottom: 25, left: 80 }
                 },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Student Performance Trend (Total Marks / 720)',
-                        font: { size: 44, weight: 'bold' },
-                        color: '#0f172a',
-                        padding: { top: 15, bottom: 30 }
-                    },
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 800,
-                        ticks: { stepSize: 100, font: { size: 32, weight: 'bold' }, color: '#334155', padding: 12 },
-                        title: { display: true, text: 'Total Marks / 720', font: { size: 34, weight: 'bold' }, color: '#0f172a', padding: { bottom: 12 } },
-                        grid: { color: '#cbd5e1', lineWidth: 1.5 }
-                    },
-                    x: {
-                        offset: true,
-                        title: { display: true, text: 'Exams', font: { size: 34, weight: 'bold' }, color: '#0f172a', padding: { top: 15 } },
-                        grid: { color: '#e2e8f0', lineWidth: 1.5 },
-                        ticks: { font: { size: 32, weight: 'bold' }, color: '#1e293b' }
-                    }
-                }
-            },
-            plugins: [ChartDataLabels]
-        });
+                plugins: [ChartDataLabels]
+            });
 
-        const dataUrl = canvas.toDataURL('image/png');
-        chart.destroy();
-        canvas.width = 0;
-        canvas.height = 0;
-        resolve(dataUrl);
+            const dataUrl = canvas.toDataURL('image/png');
+            chart.destroy();
+            canvas.width = 0;
+            canvas.height = 0;
+            resolve(dataUrl);
+        } catch (chartErr) {
+            console.warn("[Bulk PDF] Chart generation error for student, continuing without chart:", chartErr);
+            resolve(null);
+        }
     });
 };
 
@@ -1099,26 +1104,31 @@ const AverageReport = ({ filters }) => {
                     count++;
                     setDownloadProgress({ current: count, total });
                     // Yield control to UI thread so react updates button state and browser stays responsive
-                    await new Promise((resolve) => setTimeout(resolve, 0));
+                    await new Promise((resolve) => setTimeout(resolve, count % 10 === 0 ? 20 : 0));
 
-                    const sRows = grouped[id];
-                    const sName = sRows[0]?.NAME_OF_THE_STUDENT || id;
-                    const sanitizedName = String(sName).replace(/[/\\?%*:|"<>]/g, '_').trim();
-                    const fileName = `${sanitizedName}_${id}_Progress_Report.pdf`;
+                    try {
+                        const sRows = grouped[id];
+                        if (!sRows || sRows.length === 0) continue;
+                        const sName = sRows[0]?.NAME_OF_THE_STUDENT || id;
+                        const sanitizedName = String(sName).replace(/[/\\?%*:|"<>]/g, '_').trim();
+                        const fileName = `${sanitizedName}_${id}_Progress_Report.pdf`;
 
-                    const transformed = getTransformedRows(sRows);
-                    const chartImgData = includeChart ? await generateChartImage(transformed) : null;
+                        const transformed = getTransformedRows(sRows);
+                        const chartImgData = includeChart ? await generateChartImage(transformed) : null;
 
-                    // Use pre-fetched batch ERP map if available, otherwise fallback
-                    let erpQ = erpMap[id] || (sName ? erpMap[sName.toUpperCase()] : null);
-                    if (!erpQ && includeTopicDetails && studentIds.length <= 25) {
-                        erpQ = await fetchStudentErpQuestionsForPdf(id, sName);
+                        // Use pre-fetched batch ERP map if available, otherwise fallback
+                        let erpQ = erpMap[id] || (sName ? erpMap[sName.toUpperCase()] : null);
+                        if (!erpQ && includeTopicDetails && studentIds.length <= 25) {
+                            erpQ = await fetchStudentErpQuestionsForPdf(id, sName);
+                        }
+                        erpQ = erpQ || [];
+
+                        const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ, includeTopicDetails);
+                        const pdfArrayBuffer = doc.output('arraybuffer');
+                        zip.file(fileName, pdfArrayBuffer);
+                    } catch (singleStudentErr) {
+                        console.warn(`[Bulk PDF] Failed generating PDF for student ID ${id}:`, singleStudentErr);
                     }
-                    erpQ = erpQ || [];
-
-                    const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ, includeTopicDetails);
-                    const pdfBlob = doc.output('blob');
-                    zip.file(fileName, pdfBlob);
                 }
 
                 const content = await zip.generateAsync({ type: "blob" });
@@ -1133,7 +1143,7 @@ const AverageReport = ({ filters }) => {
                 isOpen: true,
                 type: 'danger',
                 title: 'PDF Error',
-                message: "Failed to generate PDF(s).",
+                message: `Failed to generate PDF(s): ${err.message || 'Browser memory limit reached.'}`,
                 onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
             });
         } finally {
