@@ -1131,7 +1131,12 @@ const AverageReport = ({ filters }) => {
                     }
                 }
 
-                const content = await zip.generateAsync({ type: "blob" });
+                const content = await zip.generateAsync({
+                    type: 'blob',
+                    compression: 'DEFLATE',
+                    compressionOptions: { level: 1 },
+                    streamFiles: true
+                });
                 const sanitizedCampus = String(campusName).replace(/[/\\?%*:|"<>]/g, '_').trim();
                 saveAs(content, `${sanitizedCampus}_Progress_Reports.zip`);
                 logActivity(userData, 'Downloaded Bulk Progress PDF', { count: studentIds.length, campus: campusName, includeChart });
