@@ -206,6 +206,7 @@ const AverageReport = ({ filters }) => {
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
+    const [whatsappNumber, setWhatsappNumber] = useState('');
 
     const [studentErpQuestions, setStudentErpQuestions] = useState([]);
     const [erpLoading, setErpLoading] = useState(false);
@@ -984,7 +985,7 @@ const AverageReport = ({ filters }) => {
         return doc;
     };
 
-    const downloadPDF = async () => {
+    const downloadPDF = async (targetStudentId = null) => {
         setIsDownloading(true);
         try {
             const loadFont = async (url) => {
@@ -1017,7 +1018,8 @@ const AverageReport = ({ filters }) => {
                 return acc;
             }, {});
 
-            const studentIds = Object.keys(grouped);
+            const allStudentIds = Object.keys(grouped);
+            const studentIds = targetStudentId ? allStudentIds.filter(id => String(id) === String(targetStudentId)) : allStudentIds;
             if (studentIds.length === 0) return;
 
             const getTransformedRows = (sRows) => {
@@ -1192,6 +1194,65 @@ const AverageReport = ({ filters }) => {
         return () => { isMounted = false; };
     }, [previewStudentId, previewStudentName, filters.academicYear, filters.campus, filters.stream, filters.testType, filters.test, filters.topAll]);
 
+    useEffect(() => {
+        if (previewRows && previewRows.length > 0) {
+            const student = previewRows[0];
+            const parentPhone = student.PARENT_MOBILE || student.PARENT_PHONE || student.MOBILE || student.MOB_NO || student.PHONE || '';
+            if (parentPhone) {
+                setWhatsappNumber(String(parentPhone).trim());
+            }
+        }
+    }, [previewStudentId, previewRows]);
+
+    const handleSendWhatsApp = async () => {
+        const rawNumber = String(whatsappNumber || '').trim().replace(/\D/g, '');
+        if (!rawNumber || rawNumber.length < 10) {
+            setModal({
+                isOpen: true,
+                type: 'info',
+                title: 'Invalid WhatsApp Number',
+                message: 'Please enter a valid 10-digit parent WhatsApp phone number.',
+                onClose: () => setModal(p => ({ ...p, isOpen: false }))
+            });
+            return;
+        }
+
+        const cleanPhone = rawNumber.length === 10 ? `91${rawNumber}` : rawNumber;
+        const studentName = previewRows[0]?.NAME_OF_THE_STUDENT || 'Student';
+        const studentId = previewRows[0]?.STUD_ID || '';
+        const campus = previewRows[0]?.CAMPUS_NAME || '';
+        const stream = getNormalizedStream(previewRows);
+
+        const avgScore = previewRows.length > 0 
+            ? Math.round(previewRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / previewRows.length)
+            : 0;
+        const latestRow = previewRows[previewRows.length - 1];
+        const latestTest = latestRow?.Test || '';
+        const latestScore = Math.round(Number(latestRow?.Tot_720) || 0);
+
+        const message = `*SRI CHAITANYA EDUCATIONAL INSTITUTIONS*\n` +
+            `*Progress Report Summary*\n\n` +
+            `*Student Name:* ${studentName}\n` +
+            `*Student ID:* ${studentId}\n` +
+            `*Campus:* ${campus}\n` +
+            (stream ? `*Stream:* ${stream}\n` : '') +
+            `\n*Latest Test (${latestTest}):* ${latestScore} / 720\n` +
+            `*Average Score:* ${avgScore} / 720\n\n` +
+            `Dear Parent,\n` +
+            `Please review the detailed Progress Report PDF for *${studentName}* attached with this message.\n\n` +
+            `Best Regards,\n` +
+            `*Sri Chaitanya Academic Team*`;
+
+        if (previewStudentId) {
+            await downloadPDF(previewStudentId);
+        } else {
+            await downloadPDF();
+        }
+
+        const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+    };
+
     const handleMouseDown = (e) => {
         if (zoomScale > 1) {
             setIsDragging(true);
@@ -1312,7 +1373,7 @@ const AverageReport = ({ filters }) => {
                             </div>
                         )}
                     </div>
-                    <div className="button-group" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    <div className="button-group" style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '0.86rem', color: '#334155', fontWeight: '600', userSelect: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                             <input
                                 type="checkbox"
@@ -1336,7 +1397,7 @@ const AverageReport = ({ filters }) => {
                         </button>
                         <button 
                             className="btn-primary" 
-                            onClick={downloadPDF} 
+                            onClick={() => downloadPDF()} 
                             disabled={history.length === 0 || isDownloading} 
                             style={{ 
                                 backgroundColor: isDownloading ? '#64748b' : '#10b981', 
@@ -1353,6 +1414,49 @@ const AverageReport = ({ filters }) => {
                                 uniqueStudents > 1 ? `Download All (${uniqueStudents})` : 'Download PDF'
                             )}
                         </button>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f0fdf4', padding: '4px 8px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                            <input
+                                type="tel"
+                                placeholder="Parent WhatsApp No."
+                                value={whatsappNumber}
+                                onChange={(e) => setWhatsappNumber(e.target.value)}
+                                disabled={history.length === 0 || isDownloading}
+                                maxLength={13}
+                                style={{
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #86efac',
+                                    fontSize: '0.85rem',
+                                    width: '165px',
+                                    outline: 'none',
+                                    background: 'white',
+                                    color: '#1e293b',
+                                    fontWeight: '500'
+                                }}
+                            />
+                            <button
+                                type="button"
+                                className="btn-whatsapp"
+                                onClick={handleSendWhatsApp}
+                                disabled={history.length === 0 || isDownloading}
+                                title="Download PDF & Open WhatsApp"
+                                style={{
+                                    cursor: (history.length === 0 || isDownloading) ? 'not-allowed' : 'pointer',
+                                    opacity: (history.length === 0 || isDownloading) ? 0.6 : 1,
+                                    padding: '7px 14px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    textTransform: 'none'
+                                }}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.573-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.99c-.002 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                                </svg>
+                                Send WhatsApp
+                            </button>
+                        </div>
                     </div>
                 </div>
 
