@@ -1204,6 +1204,23 @@ const AverageReport = ({ filters }) => {
         }
     }, [previewStudentId, previewRows]);
 
+    const transformedPreviewRows = useMemo(() => {
+        if (previewRows.length === 0 || allExams.length === 0) return [];
+        return allExams.map(exam => {
+            const examTest = exam.Test?.trim();
+            const existing = previewRows.find(r => r.Test?.trim() === examTest);
+            if (existing) {
+                return { ...existing, isAB: false };
+            } else {
+                return { Test: exam.Test, DATE: exam.DATE, isAB: true };
+            }
+        });
+    }, [previewRows, allExams]);
+
+    const performanceDiagnostics = useMemo(() => {
+        return analyzeLaggingSubjectAndLosses(transformedPreviewRows);
+    }, [transformedPreviewRows]);
+
     const handleSendWhatsApp = async () => {
         const rawNumber = String(whatsappNumber || '').trim().replace(/\D/g, '');
         if (!rawNumber || rawNumber.length < 10) {
@@ -1226,9 +1243,18 @@ const AverageReport = ({ filters }) => {
         const avgScore = previewRows.length > 0 
             ? Math.round(previewRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / previewRows.length)
             : 0;
-        const latestRow = previewRows[previewRows.length - 1];
-        const latestTest = latestRow?.Test || '';
-        const latestScore = Math.round(Number(latestRow?.Tot_720) || 0);
+
+        const examRows = (transformedPreviewRows && transformedPreviewRows.length > 0) ? transformedPreviewRows : previewRows;
+        const examSummaryLines = examRows.map(row => {
+            const testName = row.Test?.trim() || 'Exam';
+            if (row.isAB) {
+                return `• *${testName}:* AB (Absent)`;
+            } else {
+                const total = Math.round(Number(row.Tot_720) || 0);
+                const air = (row.AIR && !isNaN(row.AIR) && Number(row.AIR) > 0) ? ` (AIR: ${Math.round(row.AIR)})` : '';
+                return `• *${testName}:* ${total} / 720${air}`;
+            }
+        }).join('\n');
 
         const message = `*SRI CHAITANYA EDUCATIONAL INSTITUTIONS*\n` +
             `*Progress Report Summary*\n\n` +
@@ -1236,8 +1262,9 @@ const AverageReport = ({ filters }) => {
             `*Student ID:* ${studentId}\n` +
             `*Campus:* ${campus}\n` +
             (stream ? `*Stream:* ${stream}\n` : '') +
-            `\n*Latest Test (${latestTest}):* ${latestScore} / 720\n` +
-            `*Average Score:* ${avgScore} / 720\n\n` +
+            `\n*EXAM WISE RESULTS:*\n` +
+            `${examSummaryLines}\n\n` +
+            `*OVERALL AVERAGE SCORE:* ${avgScore} / 720\n\n` +
             `Dear Parent,\n` +
             `Please review the detailed Progress Report PDF for *${studentName}* attached with this message.\n\n` +
             `Best Regards,\n` +
@@ -1252,46 +1279,6 @@ const AverageReport = ({ filters }) => {
         const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
         window.open(whatsappUrl, '_blank');
     };
-
-    const handleMouseDown = (e) => {
-        if (zoomScale > 1) {
-            setIsDragging(true);
-            setDragStart({
-                x: e.clientX - zoomOffset.x,
-                y: e.clientY - zoomOffset.y
-            });
-        }
-    };
-
-    const handleMouseMove = (e) => {
-        if (isDragging && zoomScale > 1) {
-            setZoomOffset({
-                x: e.clientX - dragStart.x,
-                y: e.clientY - dragStart.y
-            });
-        }
-    };
-
-    const handleMouseUp = () => {
-        setIsDragging(false);
-    };
-
-    const transformedPreviewRows = useMemo(() => {
-        if (previewRows.length === 0 || allExams.length === 0) return [];
-        return allExams.map(exam => {
-            const examTest = exam.Test?.trim();
-            const existing = previewRows.find(r => r.Test?.trim() === examTest);
-            if (existing) {
-                return { ...existing, isAB: false };
-            } else {
-                return { Test: exam.Test, DATE: exam.DATE, isAB: true };
-            }
-        });
-    }, [previewRows, allExams]);
-
-    const performanceDiagnostics = useMemo(() => {
-        return analyzeLaggingSubjectAndLosses(transformedPreviewRows);
-    }, [transformedPreviewRows]);
 
     const chartData = useMemo(() => {
         if (transformedPreviewRows.length === 0) return null;
