@@ -31,7 +31,21 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         students: apiEndpoints.students || '/api/studentsByCampus'
     };
 
+    const isTop18Allowed = userData?.email === 'yenjarappa.s@varsitymgmt.com';
+
     useEffect(() => {
+        if (!isTop18Allowed && filters?.isTop18) {
+            setFilters(prev => ({
+                ...prev,
+                isTop18: false,
+                studentSearch: [],
+                quickSearch: ''
+            }));
+        }
+    }, [isTop18Allowed, filters?.isTop18, setFilters]);
+
+    useEffect(() => {
+        if (!isTop18Allowed) return;
         fetch(`${API_URL}/api/config/top-18`)
             .then(res => res.json())
             .then(data => {
@@ -40,7 +54,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                 }
             })
             .catch(err => console.error("Error fetching top 18 config:", err));
-    }, []);
+    }, [isTop18Allowed]);
 
     // Transform string array to { value, label } for React Select
     const toOptions = (arr) => {
@@ -456,14 +470,16 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                     >
                         ACADEMIC YEAR 2026
                     </button>
-                    <button
-                        type="button"
-                        className={`year-nav-btn top18-nav-btn ${filters.isTop18 ? 'active' : ''}`}
-                        onClick={handleToggleTop18}
-                        title="Filter all reports for TOP 18 students"
-                    >
-                        ⭐ TOP 18
-                    </button>
+                    {isTop18Allowed && (
+                        <button
+                            type="button"
+                            className={`year-nav-btn top18-nav-btn ${filters.isTop18 ? 'active' : ''}`}
+                            onClick={handleToggleTop18}
+                            title="Filter all reports for TOP 18 students"
+                        >
+                            ⭐ TOP 18
+                        </button>
+                    )}
                 </div>
 
                 <div className="search-engine-compact">
