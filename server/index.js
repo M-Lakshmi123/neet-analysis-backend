@@ -1954,7 +1954,12 @@ app.get('/api/erp/students', async (req, res) => {
         const finalTopAll = topAll || TOP_ALL;
         addClause('Top_ALL', finalTopAll);
 
-        if (quickSearch && quickSearch.trim() !== '') {
+        const sSearch = Array.isArray(studentSearch) ? studentSearch : (studentSearch ? [studentSearch] : []);
+        const cleanIds = sSearch.map(id => id ? id.toString().trim().toUpperCase().replace(/'/g, "''") : '').filter(v => Boolean(v) && v !== '__ALL__' && v !== 'SELECT_ALL' && !v.includes('TOP_18'));
+
+        if (cleanIds.length > 0) {
+            clauses.push(`TRIM(STUD_ID) IN (${cleanIds.map(v => `'${v}'`).join(',')})`);
+        } else if (quickSearch && quickSearch.trim() !== '' && !quickSearch.toUpperCase().includes('TOP 18') && !quickSearch.toUpperCase().includes('TOP_18')) {
             const safeSearch = quickSearch.trim().replace(/'/g, "''").toUpperCase();
             clauses.push(`(UPPER(Student_Name) LIKE '%${safeSearch}%' OR STUD_ID LIKE '%${safeSearch}%')`);
         }

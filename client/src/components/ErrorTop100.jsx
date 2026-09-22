@@ -44,12 +44,19 @@ const ErrorTop100 = ({ filters, setFilters }) => {
         { value: 5, label: 'Top 5 Students' },
         { value: 10, label: 'Top 10 Students' },
         { value: 15, label: 'Top 15 Students' },
+        { value: 18, label: 'Top 18 Students' },
         { value: 20, label: 'Top 20 Students' },
         { value: 25, label: 'Top 25 Students' },
         { value: 50, label: 'Top 50 Students' },
         { value: 100, label: 'Top 100 Students' },
         { value: 'ALL', label: 'All Students' }
     ];
+
+    useEffect(() => {
+        if (filters?.isTop18) {
+            setTopLimitFilter({ value: 18, label: 'Top 18 Students' });
+        }
+    }, [filters?.isTop18]);
 
     // Fetch Report Data
     useEffect(() => {
