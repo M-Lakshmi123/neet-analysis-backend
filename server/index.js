@@ -1916,7 +1916,7 @@ app.get('/api/erp/students', async (req, res) => {
     try {
         const year = req.query.academicYear || '2026';
         const pool = await connectToDb(year);
-        const { quickSearch, campus, stream, test, testType, topAll, TOP_ALL } = req.query;
+        const { quickSearch, campus, stream, test, testType, topAll, TOP_ALL, studentSearch } = req.query;
 
         // Helper to add clauses
         let clauses = [];
