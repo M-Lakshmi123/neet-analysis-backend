@@ -73,7 +73,7 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 const studentsRes = await fetch(`${API_URL}/api/erp/students?${studentParams.toString()}`);
                 const studentsData = await studentsRes.json();
                 
-                const currentTopNames = studentsData.map(s => s.name).filter(Boolean);
+                const currentTopNames = Array.isArray(studentsData) ? studentsData.map(s => s.name).filter(Boolean) : [];
                 
                 if (currentTopNames.length === 0) {
                     setReportData([]);
@@ -86,7 +86,8 @@ const ErrorTop100 = ({ filters, setFilters }) => {
                 const erpParams = buildQueryParams(erpFilters);
 
                 const res = await fetch(`${API_URL}/api/erp/report?${erpParams.toString()}`);
-                const errorData = await res.json();
+                const rawErrorData = await res.json();
+                const errorData = Array.isArray(rawErrorData) ? rawErrorData : [];
 
                 // 3. Fetch total participants count for these tests
                 const participantsRes = await fetch(`${API_URL}/api/erp/participants?${erpParams.toString()}`);
