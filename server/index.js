@@ -1483,6 +1483,21 @@ app.get('/api/erp/filters', async (req, res) => {
         const testTypeClause = buildOptionClause('Test_Type', testType);
         const testClause = buildOptionClause('Test', test);
 
+        const sWhere = branchClause ? `WHERE ${branchClause}` : 'WHERE 1=1';
+
+        let ttClauses = [];
+        if (branchClause) ttClauses.push(branchClause);
+        if (streamClause) ttClauses.push(streamClause);
+        const ttWhere = ttClauses.length > 0 ? `WHERE ${ttClauses.join(' AND ')}` : 'WHERE 1=1';
+
+        let tClauses = [...ttClauses];
+        if (testTypeClause) tClauses.push(testTypeClause);
+        const tWhere = tClauses.length > 0 ? `WHERE ${tClauses.join(' AND ')}` : 'WHERE 1=1';
+
+        let topClauses = [...tClauses];
+        if (testClause) topClauses.push(testClause);
+        const topWhere = topClauses.length > 0 ? `WHERE ${topClauses.join(' AND ')}` : 'WHERE 1=1';
+
         const queryDistinct = async (column, whereStr) => {
             const cleanWhere = whereStr ? whereStr : 'WHERE 1=1';
             try {
@@ -1496,7 +1511,8 @@ app.get('/api/erp/filters', async (req, res) => {
                 const res = await pool.request().query(q);
                 return (res.recordset || []).map(r => ({ [column]: r.val }));
             } catch (e) {
-                const fallbackQ = `SELECT DISTINCT TRIM(${column}) as ${column} FROM ERP_REPORT ${cleanWhere} AND ${column} IS NOT NULL AND ${column} != '' ORDER BY ${column}`;
+                console.error(`[queryDistinct Fallback for ${column}]:`, e.message);
+                const fallbackQ = `SELECT DISTINCT TRIM(${column}) as ${column} FROM ERP_ERROR_COUNTS ${cleanWhere} AND ${column} IS NOT NULL AND ${column} != '' ORDER BY ${column}`;
                 const res = await pool.request().query(fallbackQ);
                 return res.recordset || [];
             }
