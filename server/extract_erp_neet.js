@@ -377,6 +377,17 @@ async function processErp() {
                         const qNo = qColObj.qNo;
                         const meta = questionMeta[qNo] || {};
 
+                        const getSubject = (qNoStr, metaSubject) => {
+                            const s = String(metaSubject || '').trim().toUpperCase();
+                            if (s && s !== '--' && s !== 'NULL' && s !== 'UNDEFINED') return s;
+                            const q = parseInt(qNoStr);
+                            if (q >= 1 && q <= 45) return 'BOTANY';
+                            if (q >= 46 && q <= 90) return 'ZOOLOGY';
+                            if (q >= 91 && q <= 135) return 'PHYSICS';
+                            if (q >= 136 && q <= 200) return 'CHEMISTRY';
+                            return '--';
+                        };
+
                         rowsToUpload.push({
                             STUD_ID: studId, Student_Name: studentName, Branch: branchName,
                             Exam_Date: formatDateToSQL(rawExamDate), Test_Type: testType, Test: testName,
@@ -388,7 +399,7 @@ async function processErp() {
                             Q_No: parseInt(qNo), W_U: val,
                             National_Wide_Error: (nationalErrorMap[qNo] ? (val === 'W' ? nationalErrorMap[qNo].W : nationalErrorMap[qNo].U) : '--'),
                             Q_URL: urlSubMap.Q[qNo] || '', S_URL: urlSubMap.S[qNo] || DEFAULT_S_URL,
-                            Key_Value: keysMap[qNo] || '', Subject: meta.Subject || '--',
+                            Key_Value: keysMap[qNo] || '', Subject: getSubject(qNo, meta.Subject),
                             Topic: meta.Topic || '--', Sub_Topic: meta.Sub_Topic || '--',
                             Question_Type: meta.Question_Type || '--', Statement: meta.Statement || '--',
                             Year: year, Top_ALL: targetType, Stream: streamFromMetadata,

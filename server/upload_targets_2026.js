@@ -24,6 +24,9 @@ async function uploadTargets() {
 
         console.log(`Found ${data.length} rows to upload.`);
 
+        // Clear existing 2026 targets first
+        await connection.execute("DELETE FROM TARGETS WHERE Year = '2026' OR Year IS NULL");
+
         // The query
         const query = `
             INSERT INTO TARGETS 

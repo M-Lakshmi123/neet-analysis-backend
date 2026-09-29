@@ -1483,45 +1483,38 @@ app.get('/api/erp/filters', async (req, res) => {
         const testTypeClause = buildOptionClause('Test_Type', testType);
         const testClause = buildOptionClause('Test', test);
 
-        // 1. Branches Query - Should we filter this? 
-        // For restricted users, the frontend handles it, but let's keep it open for admins to see all.
-        const branchesQuery = 'SELECT DISTINCT TRIM(Branch) as Branch FROM ERP_REPORT WHERE Branch IS NOT NULL AND Branch != \'\' ORDER BY Branch';
+        const queryDistinct = async (column, whereStr) => {
+            const cleanWhere = whereStr ? whereStr : 'WHERE 1=1';
+            try {
+                const q = `
+                    SELECT DISTINCT val FROM (
+                        SELECT TRIM(${column}) as val FROM ERP_REPORT ${cleanWhere} AND ${column} IS NOT NULL AND ${column} != ''
+                        UNION
+                        SELECT TRIM(${column}) as val FROM ERP_ERROR_COUNTS ${cleanWhere} AND ${column} IS NOT NULL AND ${column} != ''
+                    ) AS combined ORDER BY val
+                `;
+                const res = await pool.request().query(q);
+                return (res.recordset || []).map(r => ({ [column]: r.val }));
+            } catch (e) {
+                const fallbackQ = `SELECT DISTINCT TRIM(${column}) as ${column} FROM ERP_REPORT ${cleanWhere} AND ${column} IS NOT NULL AND ${column} != '' ORDER BY ${column}`;
+                const res = await pool.request().query(fallbackQ);
+                return res.recordset || [];
+            }
+        };
 
-        // 2. Streams - Dependent on Branch
-        const sWhere = branchClause ? `WHERE ${branchClause} ` : 'WHERE 1=1';
-        const streamsQuery = `SELECT DISTINCT TRIM(Stream) as Stream FROM ERP_REPORT ${sWhere} AND Stream IS NOT NULL AND Stream != '' ORDER BY Stream`;
-
-        // 3. Test Types - Dependent on Branch + Stream
-        let ttClauses = [];
-        if (branchClause) ttClauses.push(branchClause);
-        if (streamClause) ttClauses.push(streamClause);
-        const ttWhere = ttClauses.length > 0 ? `WHERE ${ttClauses.join(' AND ')} ` : 'WHERE 1=1';
-        const testTypesQuery = `SELECT DISTINCT TRIM(Test_Type) as Test_Type FROM ERP_REPORT ${ttWhere} AND Test_Type IS NOT NULL AND Test_Type != '' ORDER BY Test_Type`;
-
-        // 4. Tests - Dependent on Branch + Stream + Test_Type
-        let tClauses = [...ttClauses];
-        if (testTypeClause) tClauses.push(testTypeClause);
-        const tWhere = tClauses.length > 0 ? `WHERE ${tClauses.join(' AND ')} ` : 'WHERE 1=1';
-        const testsQuery = `SELECT DISTINCT TRIM(Test) as Test FROM ERP_REPORT ${tWhere} AND Test IS NOT NULL AND Test != '' ORDER BY Test`;
-
-        // 5. Top_ALL - Dependent on Branch + Stream + Test_Type + Test
-        let topClauses = [...tClauses];
-        if (testClause) topClauses.push(testClause);
-        const topWhere = topClauses.length > 0 ? `WHERE ${topClauses.join(' AND ')} ` : 'WHERE 1=1';
-        const topQuery = `SELECT DISTINCT TRIM(Top_ALL) as Top_ALL FROM ERP_REPORT ${topWhere} AND Top_ALL IS NOT NULL AND Top_ALL != '' ORDER BY Top_ALL`;
-
-        console.log(`[ERP Filters] Streams Query: ${streamsQuery}`);
-        console.log(`[ERP Filters] TestTypes Query: ${testTypesQuery}`);
-        console.log(`[ERP Filters] Tests Query: ${testsQuery}`);
-        console.log(`[ERP Filters] Top_ALL Query: ${topQuery}`);
-
-        const [branchesRes, streamsRes, testTypesRes, testsRes, topRes] = await Promise.all([
-            pool.request().query(branchesQuery),
-            pool.request().query(streamsQuery),
-            pool.request().query(testTypesQuery),
-            pool.request().query(testsQuery),
-            pool.request().query(topQuery)
+        const [branchesList, streamsList, testTypesList, testsList, topList] = await Promise.all([
+            queryDistinct('Branch', ''),
+            queryDistinct('Stream', sWhere),
+            queryDistinct('Test_Type', ttWhere),
+            queryDistinct('Test', tWhere),
+            queryDistinct('Top_ALL', topWhere)
         ]);
+
+        const branchesRes = { recordset: branchesList };
+        const streamsRes = { recordset: streamsList };
+        const testTypesRes = { recordset: testTypesList };
+        const testsRes = { recordset: testsList };
+        const topRes = { recordset: topList };
 
         // SMART PRUNING for Admin Dashboard
         let prunedTopAll = (topRes.recordset || []).map(r => r.Top_ALL).filter(Boolean);
@@ -1733,39 +1726,84 @@ app.get('/api/erp/error-count-report', async (req, res) => {
 
         const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')} ` : '';
 
-        const query = `
-        SELECT
-            CAST(STUD_ID AS CHAR) as STUD_ID,
-            MAX(Student_Name) as name,
-            MAX(Branch) as campus,
-            Test,
-            MAX(CASE WHEN Tot_720 != '' THEN Tot_720 + 0 ELSE 0 END) as tot,
-            MAX(CASE WHEN AIR != '' THEN AIR + 0 ELSE 0 END) as air,
-            MAX(CASE WHEN Botany != '' THEN Botany + 0 ELSE 0 END) as bot,
-            MAX(CASE WHEN B_Rank != '' THEN B_Rank + 0 ELSE 0 END) as bot_rank,
-            MAX(CASE WHEN Zoology != '' THEN Zoology + 0 ELSE 0 END) as zoo,
-            MAX(CASE WHEN Z_Rank != '' THEN Z_Rank + 0 ELSE 0 END) as zoo_rank,
-            MAX(CASE WHEN Physics != '' THEN Physics + 0 ELSE 0 END) as phy,
-            MAX(CASE WHEN P_Rank != '' THEN P_Rank + 0 ELSE 0 END) as phy_rank,
-            MAX(CASE WHEN Chemistry != '' THEN Chemistry + 0 ELSE 0 END) as che,
-            MAX(CASE WHEN C_Rank != '' THEN C_Rank + 0 ELSE 0 END) as che_rank,
-            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as bot_w,
-            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as bot_u,
-            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as zoo_w,
-            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as zoo_u,
-            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as phy_w,
-            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as phy_u,
-            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as che_w,
-            SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as che_u
-            FROM ERP_REPORT 
-            ${where}
-            GROUP BY STUD_ID, Test
-            ORDER BY name, Test
-            LIMIT 2000
-            `;
+        let recordset = [];
 
-        logQuery(query, req.query);
-        const result = await pool.request().query(query);
+        try {
+            const countsQuery = `
+                SELECT
+                    CAST(STUD_ID AS CHAR) as STUD_ID,
+                    Student_Name as name,
+                    Branch as campus,
+                    Test,
+                    Tot_720 as tot,
+                    AIR as air,
+                    Botany as bot,
+                    B_Rank as bot_rank,
+                    Bot_W as bot_w,
+                    Bot_U as bot_u,
+                    Zoology as zoo,
+                    Z_Rank as zoo_rank,
+                    Zoo_W as zoo_w,
+                    Zoo_U as zoo_u,
+                    Physics as phy,
+                    P_Rank as phy_rank,
+                    Phy_W as phy_w,
+                    Phy_U as phy_u,
+                    Chemistry as che,
+                    C_Rank as che_rank,
+                    Che_W as che_w,
+                    Che_U as che_u
+                FROM ERP_ERROR_COUNTS
+                ${where}
+                ORDER BY Student_Name, Test
+                LIMIT 2000
+            `;
+            logQuery(countsQuery, req.query);
+            const countsRes = await pool.request().query(countsQuery);
+            if (countsRes.recordset && countsRes.recordset.length > 0) {
+                recordset = countsRes.recordset;
+            }
+        } catch (e) {
+            // Fallback to ERP_REPORT if table ERP_ERROR_COUNTS doesn't exist yet
+        }
+
+        if (recordset.length === 0) {
+            const fallbackQuery = `
+            SELECT
+                CAST(STUD_ID AS CHAR) as STUD_ID,
+                MAX(Student_Name) as name,
+                MAX(Branch) as campus,
+                Test,
+                MAX(CASE WHEN Tot_720 != '' THEN Tot_720 + 0 ELSE 0 END) as tot,
+                MAX(CASE WHEN AIR != '' THEN AIR + 0 ELSE 0 END) as air,
+                MAX(CASE WHEN Botany != '' THEN Botany + 0 ELSE 0 END) as bot,
+                MAX(CASE WHEN B_Rank != '' THEN B_Rank + 0 ELSE 0 END) as bot_rank,
+                MAX(CASE WHEN Zoology != '' THEN Zoology + 0 ELSE 0 END) as zoo,
+                MAX(CASE WHEN Z_Rank != '' THEN Z_Rank + 0 ELSE 0 END) as zoo_rank,
+                MAX(CASE WHEN Physics != '' THEN Physics + 0 ELSE 0 END) as phy,
+                MAX(CASE WHEN P_Rank != '' THEN P_Rank + 0 ELSE 0 END) as phy_rank,
+                MAX(CASE WHEN Chemistry != '' THEN Chemistry + 0 ELSE 0 END) as che,
+                MAX(CASE WHEN C_Rank != '' THEN C_Rank + 0 ELSE 0 END) as che_rank,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as bot_w,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'BOTANY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as bot_u,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as zoo_w,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'ZOOLOGY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as zoo_u,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as phy_w,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'PHYSICS' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as phy_u,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'W' THEN 1 ELSE 0 END) as che_w,
+                SUM(CASE WHEN UPPER(TRIM(Subject)) = 'CHEMISTRY' AND UPPER(TRIM(W_U)) = 'U' THEN 1 ELSE 0 END) as che_u
+                FROM ERP_REPORT 
+                ${where}
+                GROUP BY STUD_ID, Test
+                ORDER BY name, Test
+                LIMIT 2000
+            `;
+            logQuery(fallbackQuery, req.query);
+            const fallbackRes = await pool.request().query(fallbackQuery);
+            recordset = fallbackRes.recordset || [];
+        }
+
+        const result = { recordset };
 
         // Group results by student for easier side-by-side rendering
         const studentsMap = {};
