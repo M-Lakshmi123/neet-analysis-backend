@@ -4,7 +4,8 @@ import { db, auth } from '../../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, deleteDoc, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import {
     Users, CheckCircle, XCircle, LogOut, Shield, Mail, School,
-    BarChart3, Activity, Clock, Search, Filter as FilterIcon, MessageSquare
+    BarChart3, Activity, Clock, Search, Filter as FilterIcon, MessageSquare,
+    Lock, Eye, EyeOff, Copy, Check
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import FilterBar from '../FilterBar';
@@ -36,6 +37,20 @@ const AdminDashboard = () => {
         test: []
     });
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '', onConfirm: null });
+    const [showPasswords, setShowPasswords] = useState({});
+    const [copiedId, setCopiedId] = useState(null);
+
+    const togglePasswordVisibility = (userId) => {
+        setShowPasswords(prev => ({ ...prev, [userId]: !prev[userId] }));
+    };
+
+    const handleCopyPassword = (pwd, idKey) => {
+        if (!pwd) return;
+        navigator.clipboard.writeText(pwd);
+        setCopiedId(idKey);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
+
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -85,7 +100,8 @@ const AdminDashboard = () => {
 
             // 2. Open WhatsApp Web for notification
             if (user.phone) {
-                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                const credentialsText = user.password ? `\n\n*Login Credentials:*\nEmail: ${user.email}\nPassword: ${user.password}` : '';
+                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.${credentialsText}\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
                 const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
                 window.open(whatsappUrl, '_blank');
             } else {
@@ -217,6 +233,32 @@ const AdminDashboard = () => {
                                                     <div className="item-info">
                                                         <h5>{user.name}</h5>
                                                         <span className="info-sub"><Mail size={12} /> {user.email}</span>
+                                                        <span className="info-sub" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Lock size={12} /> Password: 
+                                                            <strong style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#0f172a', letterSpacing: showPasswords[user.id] ? 'normal' : '2px' }}>
+                                                                {showPasswords[user.id] ? (user.password || 'N/A') : '••••••••'}
+                                                            </strong>
+                                                            {user.password && (
+                                                                <>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => togglePasswordVisibility(user.id)}
+                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', padding: '0 2px' }}
+                                                                        title={showPasswords[user.id] ? "Hide Password" : "Show Password"}
+                                                                    >
+                                                                        {showPasswords[user.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleCopyPassword(user.password, `admin_pending_${user.id}`)}
+                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: copiedId === `admin_pending_${user.id}` ? '#16a34a' : '#64748b', display: 'inline-flex', alignItems: 'center', padding: '0 2px' }}
+                                                                        title="Copy Password"
+                                                                    >
+                                                                        {copiedId === `admin_pending_${user.id}` ? <Check size={13} /> : <Copy size={13} />}
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </span>
                                                         <span className="info-sub"><School size={12} /> {user.campus}</span>
                                                         {user.phone && <span className="info-sub"><MessageSquare size={12} /> +91 {user.phone}</span>}
                                                     </div>
@@ -242,6 +284,7 @@ const AdminDashboard = () => {
                                             <tr>
                                                 <th>Name</th>
                                                 <th>Email</th>
+                                                <th>Password</th>
                                                 <th>Campus Assigned</th>
                                                 <th>Approved Date</th>
                                                 <th>Action</th>
@@ -252,6 +295,42 @@ const AdminDashboard = () => {
                                                 <tr key={user.id}>
                                                     <td>{user.name}</td>
                                                     <td>{user.email}</td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <span style={{
+                                                                fontFamily: 'monospace',
+                                                                fontSize: '0.85rem',
+                                                                backgroundColor: '#f1f5f9',
+                                                                padding: '2px 6px',
+                                                                borderRadius: '4px',
+                                                                color: '#334155',
+                                                                letterSpacing: showPasswords[user.id] ? 'normal' : '2px',
+                                                                fontWeight: '600'
+                                                            }}>
+                                                                {showPasswords[user.id] ? (user.password || 'N/A') : '••••••••'}
+                                                            </span>
+                                                            {user.password && (
+                                                                <>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => togglePasswordVisibility(user.id)}
+                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
+                                                                        title={showPasswords[user.id] ? "Hide Password" : "Show Password"}
+                                                                    >
+                                                                        {showPasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleCopyPassword(user.password, `admin_app_${user.id}`)}
+                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: copiedId === `admin_app_${user.id}` ? '#16a34a' : '#64748b', display: 'flex', alignItems: 'center' }}
+                                                                        title="Copy Password"
+                                                                    >
+                                                                        {copiedId === `admin_app_${user.id}` ? <Check size={14} /> : <Copy size={14} />}
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
                                                     <td><span className="campus-tag">{user.campus}</span></td>
                                                     <td>{new Date(user.approvedAt).toLocaleDateString()}</td>
                                                     <td>
@@ -260,7 +339,8 @@ const AdminDashboard = () => {
                                                                 <button
                                                                     className="btn-whatsapp"
                                                                     onClick={() => {
-                                                                        const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                                                                        const credentialsText = user.password ? `\n\n*Login Credentials:*\nEmail: ${user.email}\nPassword: ${user.password}` : '';
+                                                                        const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${user.campus}* dashboard has been *APPROVED*.${credentialsText}\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
                                                                         const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
                                                                         window.open(whatsappUrl, '_blank');
                                                                     }}

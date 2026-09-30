@@ -1908,7 +1908,7 @@ app.get('/api/erp/participants', async (req, res) => {
 const nodemailer = require('nodemailer');
 
 app.post('/api/notify-registration', async (req, res) => {
-    const { name, email, campus, phone, role } = req.body;
+    const { name, email, password, campus, phone, role } = req.body;
     console.log(`[Email] Sending registration notification via Brevo API for ${name}...`);
 
     const API_KEY = process.env.BREVO_API_KEY;
@@ -1940,6 +1940,7 @@ app.post('/api/notify-registration', async (req, res) => {
                             <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold; width: 30%;">Name:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${name}</td></tr>
                             <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Campus:</td><td style="padding: 8px; border-bottom: 1px solid #eee; color: #0284c7; font-weight: 600;">${campus}</td></tr>
                             <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Email:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${email}</td></tr>
+                            <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Password:</td><td style="padding: 8px; border-bottom: 1px solid #eee; font-family: monospace; font-weight: bold; color: #dc2626;">${password || 'N/A'}</td></tr>
                             <tr><td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;">Phone:</td><td style="padding: 8px; border-bottom: 1px solid #eee;">${phone || 'N/A'}</td></tr>
                         </table>
 

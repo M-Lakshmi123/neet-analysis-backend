@@ -197,6 +197,7 @@ const RegisterPage = () => {
                 uid: user.uid,
                 name,
                 email,
+                password,
                 phone,
                 campus: campusString,
                 allowedCampuses: campusList,
@@ -209,7 +210,7 @@ const RegisterPage = () => {
             fetch(`${API_URL}/api/notify-registration`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, email, campus: campusString, allowedCampuses: campusList, phone, role: 'principal' })
+                body: JSON.stringify({ name, email, password, campus: campusString, allowedCampuses: campusList, phone, role: 'principal' })
             }).catch(err => console.error("Failed to notify admin:", err));
 
             // Mark session as active since they are now logged in

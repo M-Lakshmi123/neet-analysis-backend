@@ -3,7 +3,7 @@ import { API_URL, ADMIN_WHATSAPP } from '../../utils/apiHelper';
 import Modal from '../Modal';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
-import { Mail, School, CheckCircle, Clock, MessageSquare, Edit } from 'lucide-react';
+import { Mail, School, CheckCircle, Clock, MessageSquare, Edit, Lock, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import Select from 'react-select'; // Import Select for campus choosing
 
 const UserApprovals = ({ academicYear }) => {
@@ -14,6 +14,19 @@ const UserApprovals = ({ academicYear }) => {
 
     const [allCampuses, setAllCampuses] = useState([]);
     const [approvalModal, setApprovalModal] = useState({ isOpen: false, user: null, selectedCampuses: [] });
+    const [showPasswords, setShowPasswords] = useState({});
+    const [copiedId, setCopiedId] = useState(null);
+
+    const togglePasswordVisibility = (userId) => {
+        setShowPasswords(prev => ({ ...prev, [userId]: !prev[userId] }));
+    };
+
+    const handleCopyPassword = (pwd, idKey) => {
+        if (!pwd) return;
+        navigator.clipboard.writeText(pwd);
+        setCopiedId(idKey);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
 
     useEffect(() => {
         fetchUsers();
@@ -118,7 +131,8 @@ const UserApprovals = ({ academicYear }) => {
             // 2. Open WhatsApp Web for notification (Only for new approvals)
             if (!user.isApproved && user.phone) {
                 const campusText = allowedCampuses.length > 5 ? `${allowedCampuses.length} Campuses` : allowedCampuses.join(', ');
-                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the dashboard has been *APPROVED*.\n\nAccess granted for: *${campusText || "All Campuses"}*\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                const credentialsText = user.password ? `\n\n*Login Credentials:*\nEmail: ${user.email}\nPassword: ${user.password}` : '';
+                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the dashboard has been *APPROVED*.\n\nAccess granted for: *${campusText || "All Campuses"}*${credentialsText}\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
                 const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
                 window.open(whatsappUrl, '_blank');
             }
@@ -190,6 +204,32 @@ const UserApprovals = ({ academicYear }) => {
                                         <div className="item-info">
                                             <h5>{user.name}</h5>
                                             <span className="info-sub"><Mail size={12} /> {user.email}</span>
+                                            <span className="info-sub" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                <Lock size={12} /> Password: 
+                                                <strong style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#0f172a', letterSpacing: showPasswords[user.id] ? 'normal' : '2px' }}>
+                                                    {showPasswords[user.id] ? (user.password || 'N/A') : '••••••••'}
+                                                </strong>
+                                                {user.password && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => togglePasswordVisibility(user.id)}
+                                                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'inline-flex', alignItems: 'center', padding: '0 2px' }}
+                                                            title={showPasswords[user.id] ? "Hide Password" : "Show Password"}
+                                                        >
+                                                            {showPasswords[user.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleCopyPassword(user.password, `pending_${user.id}`)}
+                                                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: copiedId === `pending_${user.id}` ? '#16a34a' : '#64748b', display: 'inline-flex', alignItems: 'center', padding: '0 2px' }}
+                                                            title="Copy Password"
+                                                        >
+                                                            {copiedId === `pending_${user.id}` ? <Check size={13} /> : <Copy size={13} />}
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </span>
                                             <span className="info-sub"><School size={12} /> {
                                                 Array.isArray(user.allowedCampuses) && user.allowedCampuses.length > 0
                                                     ? (user.allowedCampuses.length > 3 ? `${user.allowedCampuses.length} Campuses (${user.allowedCampuses.slice(0, 2).join(', ')}...)` : user.allowedCampuses.join(', '))
@@ -219,6 +259,7 @@ const UserApprovals = ({ academicYear }) => {
                                 <tr>
                                     <th>Name</th>
                                     <th>Email</th>
+                                    <th>Password</th>
                                     <th>Role</th>
                                     <th>Campus Assigned</th>
                                     <th>Approved Date</th>
@@ -230,6 +271,42 @@ const UserApprovals = ({ academicYear }) => {
                                     <tr key={user.id}>
                                         <td>{user.name}</td>
                                         <td>{user.email}</td>
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{
+                                                    fontFamily: 'monospace',
+                                                    fontSize: '0.85rem',
+                                                    backgroundColor: '#f1f5f9',
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px',
+                                                    color: '#334155',
+                                                    letterSpacing: showPasswords[user.id] ? 'normal' : '2px',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {showPasswords[user.id] ? (user.password || 'N/A') : '••••••••'}
+                                                </span>
+                                                {user.password && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => togglePasswordVisibility(user.id)}
+                                                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
+                                                            title={showPasswords[user.id] ? "Hide Password" : "Show Password"}
+                                                        >
+                                                            {showPasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleCopyPassword(user.password, `app_${user.id}`)}
+                                                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: copiedId === `app_${user.id}` ? '#16a34a' : '#64748b', display: 'flex', alignItems: 'center' }}
+                                                            title="Copy Password"
+                                                        >
+                                                            {copiedId === `app_${user.id}` ? <Check size={14} /> : <Copy size={14} />}
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td>
                                             <span style={{
                                                 fontSize: '0.75rem',
@@ -267,7 +344,8 @@ const UserApprovals = ({ academicYear }) => {
                                                         const campusDisplay = user.allowedCampuses && user.allowedCampuses.length > 0
                                                             ? (user.allowedCampuses.length > 5 ? `${user.allowedCampuses.length} Campuses` : user.allowedCampuses.join(', '))
                                                             : (user.campus || "All Campuses");
-                                                        const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${campusDisplay}* dashboard has been *APPROVED*.\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                                                        const credentialsText = user.password ? `\n\n*Login Credentials:*\nEmail: ${user.email}\nPassword: ${user.password}` : '';
+                                                        const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the *${campusDisplay}* dashboard has been *APPROVED*.${credentialsText}\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
                                                             const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
                                                             window.open(whatsappUrl, '_blank');
                                                         }}
