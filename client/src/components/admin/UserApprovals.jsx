@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL, ADMIN_WHATSAPP } from '../../utils/apiHelper';
 import Modal from '../Modal';
-import { db } from '../../firebase';
+import { auth, db } from '../../firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
-import { Mail, School, CheckCircle, Clock, MessageSquare, Edit, Lock, Eye, EyeOff, Copy, Check } from 'lucide-react';
+import { Mail, School, CheckCircle, Clock, MessageSquare, Edit, Lock, Eye, EyeOff, Copy, Check, Key } from 'lucide-react';
 import Select from 'react-select'; // Import Select for campus choosing
 
 const UserApprovals = ({ academicYear }) => {
@@ -13,7 +14,7 @@ const UserApprovals = ({ academicYear }) => {
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '', onConfirm: null });
 
     const [allCampuses, setAllCampuses] = useState([]);
-    const [approvalModal, setApprovalModal] = useState({ isOpen: false, user: null, selectedCampuses: [] });
+    const [approvalModal, setApprovalModal] = useState({ isOpen: false, user: null, selectedCampuses: [], newPassword: '' });
     const [showPasswords, setShowPasswords] = useState({});
     const [copiedId, setCopiedId] = useState(null);
 
@@ -26,6 +27,28 @@ const UserApprovals = ({ academicYear }) => {
         navigator.clipboard.writeText(pwd);
         setCopiedId(idKey);
         setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const handleSendResetEmail = async (email) => {
+        if (!email) return;
+        try {
+            await sendPasswordResetEmail(auth, email);
+            setModal({
+                isOpen: true,
+                type: 'success',
+                title: 'Reset Link Sent',
+                message: `An official password reset link has been sent to ${email}.`,
+                onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
+            });
+        } catch (err) {
+            setModal({
+                isOpen: true,
+                type: 'danger',
+                title: 'Error',
+                message: `Could not send reset email: ${err.message}`,
+                onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
+            });
+        }
     };
 
     useEffect(() => {
@@ -81,7 +104,8 @@ const UserApprovals = ({ academicYear }) => {
             isOpen: true,
             user: user,
             selectedCampuses: defaultSelection,
-            role: user.role || 'principal'
+            role: user.role || 'principal',
+            newPassword: user.password || ''
         });
     };
 
@@ -91,19 +115,20 @@ const UserApprovals = ({ academicYear }) => {
         const user = approvalModal.user;
         const allowedCampuses = approvalModal.selectedCampuses.map(c => c.value);
         const role = approvalModal.role;
+        const newPassword = approvalModal.newPassword ? approvalModal.newPassword.trim() : (user.password || '');
         const campusString = allowedCampuses.join(', ');
 
-        setApprovalModal({ isOpen: false, user: null, selectedCampuses: [], role: 'principal' });
+        setApprovalModal({ isOpen: false, user: null, selectedCampuses: [], role: 'principal', newPassword: '' });
 
         // Optimistic Update: Move user immediately in UI
-        // We update the local object to reflect the new allowedCampuses
         const approvedUser = {
             ...user,
             isApproved: true,
             approvedAt: new Date().toISOString(),
             allowedCampuses: allowedCampuses,
             campus: campusString,
-            role: role
+            role: role,
+            password: newPassword
         };
 
         // Update Pending List (Remove if present)
@@ -120,19 +145,24 @@ const UserApprovals = ({ academicYear }) => {
 
         try {
             // 1. Approve in Firestore with allowedCampuses and campus string
-            await updateDoc(doc(db, "users", user.id), {
+            const updatePayload = {
                 isApproved: true,
                 approvedAt: new Date().toISOString(),
                 allowedCampuses: allowedCampuses,
                 campus: campusString,
                 role: role
-            });
+            };
+            if (newPassword) {
+                updatePayload.password = newPassword;
+            }
 
-            // 2. Open WhatsApp Web for notification (Only for new approvals)
-            if (!user.isApproved && user.phone) {
+            await updateDoc(doc(db, "users", user.id), updatePayload);
+
+            // 2. Open WhatsApp Web for notification
+            if (user.phone) {
                 const campusText = allowedCampuses.length > 5 ? `${allowedCampuses.length} Campuses` : allowedCampuses.join(', ');
-                const credentialsText = user.password ? `\n\n*Login Credentials:*\nEmail: ${user.email}\nPassword: ${user.password}` : '';
-                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nWe are pleased to inform you that your request for access to the dashboard has been *APPROVED*.\n\nAccess granted for: *${campusText || "All Campuses"}*${credentialsText}\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
+                const credentialsText = newPassword ? `\n\n*Login Credentials:*\nEmail: ${user.email}\nPassword: ${newPassword}` : '';
+                const message = `*Welcome to Sri Chaitanya*\n\nDear *${user.name}*,\n\nYour access request / credentials for the dashboard have been *UPDATED / APPROVED*.\n\nAccess granted for: *${campusText || "All Campuses"}*${credentialsText}\n\nLogin now: https://medical-2026-srichaitanya.web.app/\n\nBest Regards,\n*Anand Dean*\n+91${ADMIN_WHATSAPP}`;
                 const whatsappUrl = `https://wa.me/91${user.phone}?text=${encodeURIComponent(message)}`;
                 window.open(whatsappUrl, '_blank');
             }
@@ -145,7 +175,7 @@ const UserApprovals = ({ academicYear }) => {
                 isOpen: true,
                 type: 'danger',
                 title: 'Error',
-                message: "Error approving user: " + err.message,
+                message: "Error updating user: " + err.message,
                 onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
             });
         }
@@ -272,40 +302,59 @@ const UserApprovals = ({ academicYear }) => {
                                         <td>{user.name}</td>
                                         <td>{user.email}</td>
                                         <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <span style={{
-                                                    fontFamily: 'monospace',
-                                                    fontSize: '0.85rem',
-                                                    backgroundColor: '#f1f5f9',
-                                                    padding: '2px 6px',
-                                                    borderRadius: '4px',
-                                                    color: '#334155',
-                                                    letterSpacing: showPasswords[user.id] ? 'normal' : '2px',
-                                                    fontWeight: '600'
-                                                }}>
-                                                    {showPasswords[user.id] ? (user.password || 'N/A') : '••••••••'}
-                                                </span>
-                                                {user.password && (
-                                                    <>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => togglePasswordVisibility(user.id)}
-                                                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
-                                                            title={showPasswords[user.id] ? "Hide Password" : "Show Password"}
-                                                        >
-                                                            {showPasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleCopyPassword(user.password, `app_${user.id}`)}
-                                                            style={{ border: 'none', background: 'none', cursor: 'pointer', color: copiedId === `app_${user.id}` ? '#16a34a' : '#64748b', display: 'flex', alignItems: 'center' }}
-                                                            title="Copy Password"
-                                                        >
-                                                            {copiedId === `app_${user.id}` ? <Check size={14} /> : <Copy size={14} />}
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
+                                            {user.password ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span style={{
+                                                        fontFamily: 'monospace',
+                                                        fontSize: '0.85rem',
+                                                        backgroundColor: '#f1f5f9',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '6px',
+                                                        color: '#334155',
+                                                        letterSpacing: showPasswords[user.id] ? 'normal' : '2px',
+                                                        fontWeight: '600'
+                                                    }}>
+                                                        {showPasswords[user.id] ? user.password : '••••••••'}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => togglePasswordVisibility(user.id)}
+                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', padding: '2px' }}
+                                                        title={showPasswords[user.id] ? "Hide Password" : "Show Password"}
+                                                    >
+                                                        {showPasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopyPassword(user.password, `app_${user.id}`)}
+                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: copiedId === `app_${user.id}` ? '#16a34a' : '#64748b', display: 'flex', alignItems: 'center', padding: '2px' }}
+                                                        title="Copy Password"
+                                                    >
+                                                        {copiedId === `app_${user.id}` ? <Check size={14} /> : <Copy size={14} />}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => initiationApproval(user)}
+                                                    style={{
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: '600',
+                                                        padding: '3px 8px',
+                                                        borderRadius: '6px',
+                                                        backgroundColor: '#eff6ff',
+                                                        color: '#2563eb',
+                                                        border: '1px solid #bfdbfe',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}
+                                                    title="Set password for this principal"
+                                                >
+                                                    <Key size={12} /> Set Password
+                                                </button>
+                                            )}
                                         </td>
                                         <td>
                                             <span style={{
@@ -511,6 +560,42 @@ const UserApprovals = ({ academicYear }) => {
                                     {approvalModal.role === 'co_admin'
                                         ? 'Co-Admins have access to the Top 100% Error Report.'
                                         : 'Principals have regular access to dashboard reports.'}
+                                </p>
+                            </div>
+                            <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: '700', color: '#1e293b' }}>
+                                    Set / Reset Login Password
+                                </label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input
+                                        type="text"
+                                        value={approvalModal.newPassword || ''}
+                                        onChange={(e) => setApprovalModal(prev => ({ ...prev, newPassword: e.target.value }))}
+                                        placeholder={approvalModal.user?.password ? "Enter new password to reset" : "Set password for user"}
+                                        style={{
+                                            flex: 1, padding: '0.6rem 0.85rem', borderRadius: '8px',
+                                            border: '1.5px solid #cbd5e1', fontSize: '0.88rem', fontFamily: 'monospace',
+                                            color: '#0f172a'
+                                        }}
+                                    />
+                                    {approvalModal.user?.email && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSendResetEmail(approvalModal.user.email)}
+                                            style={{
+                                                padding: '0.6rem 0.85rem', borderRadius: '8px',
+                                                backgroundColor: '#eff6ff', border: '1px solid #bfdbfe',
+                                                fontSize: '0.75rem', fontWeight: '700', color: '#1d4ed8',
+                                                cursor: 'pointer', whiteSpace: 'nowrap'
+                                            }}
+                                            title="Send Firebase password reset email link"
+                                        >
+                                            Send Reset Link
+                                        </button>
+                                    )}
+                                </div>
+                                <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>
+                                    Saving here updates password in database and sends details via WhatsApp notification.
                                 </p>
                             </div>
                         </div>

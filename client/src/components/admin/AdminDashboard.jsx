@@ -296,40 +296,42 @@ const AdminDashboard = () => {
                                                     <td>{user.name}</td>
                                                     <td>{user.email}</td>
                                                     <td>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                            <span style={{
-                                                                fontFamily: 'monospace',
-                                                                fontSize: '0.85rem',
-                                                                backgroundColor: '#f1f5f9',
-                                                                padding: '2px 6px',
-                                                                borderRadius: '4px',
-                                                                color: '#334155',
-                                                                letterSpacing: showPasswords[user.id] ? 'normal' : '2px',
-                                                                fontWeight: '600'
-                                                            }}>
-                                                                {showPasswords[user.id] ? (user.password || 'N/A') : '••••••••'}
+                                                        {user.password ? (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                <span style={{
+                                                                    fontFamily: 'monospace',
+                                                                    fontSize: '0.85rem',
+                                                                    backgroundColor: '#f1f5f9',
+                                                                    padding: '2px 8px',
+                                                                    borderRadius: '6px',
+                                                                    color: '#334155',
+                                                                    letterSpacing: showPasswords[user.id] ? 'normal' : '2px',
+                                                                    fontWeight: '600'
+                                                                }}>
+                                                                    {showPasswords[user.id] ? user.password : '••••••••'}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => togglePasswordVisibility(user.id)}
+                                                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', padding: '2px' }}
+                                                                    title={showPasswords[user.id] ? "Hide Password" : "Show Password"}
+                                                                >
+                                                                    {showPasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleCopyPassword(user.password, `admin_app_${user.id}`)}
+                                                                    style={{ border: 'none', background: 'none', cursor: 'pointer', color: copiedId === `admin_app_${user.id}` ? '#16a34a' : '#64748b', display: 'flex', alignItems: 'center', padding: '2px' }}
+                                                                    title="Copy Password"
+                                                                >
+                                                                    {copiedId === `admin_app_${user.id}` ? <Check size={14} /> : <Copy size={14} />}
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', italic: 'true' }}>
+                                                                Not recorded
                                                             </span>
-                                                            {user.password && (
-                                                                <>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => togglePasswordVisibility(user.id)}
-                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center' }}
-                                                                        title={showPasswords[user.id] ? "Hide Password" : "Show Password"}
-                                                                    >
-                                                                        {showPasswords[user.id] ? <EyeOff size={14} /> : <Eye size={14} />}
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleCopyPassword(user.password, `admin_app_${user.id}`)}
-                                                                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: copiedId === `admin_app_${user.id}` ? '#16a34a' : '#64748b', display: 'flex', alignItems: 'center' }}
-                                                                        title="Copy Password"
-                                                                    >
-                                                                        {copiedId === `admin_app_${user.id}` ? <Check size={14} /> : <Copy size={14} />}
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
+                                                        )}
                                                     </td>
                                                     <td><span className="campus-tag">{user.campus}</span></td>
                                                     <td>{new Date(user.approvedAt).toLocaleDateString()}</td>
