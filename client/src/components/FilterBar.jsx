@@ -63,12 +63,14 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
     };
 
     // Helper to get current value for React Select from simple array in state
-    const getValue = (field, currentOptions) => {
+    const getValue = (field, currentOptions = []) => {
         const val = filters[field];
         if (!val || val.length === 0) return [];
 
         if (val.length === 1 && val[0] === "__ALL__") {
-            return [{ value: "SELECT_ALL", label: "ALL SELECTED" }];
+            const raw = Array.isArray(currentOptions) ? currentOptions : [];
+            const formatted = raw.map(item => typeof item === 'object' ? item : { value: item, label: item });
+            return [{ value: "SELECT_ALL", label: "ALL SELECTED" }, ...formatted];
         }
 
         // For studentSearch, map IDs back to labels using the students list or top18 list or quickSearch label
@@ -293,14 +295,47 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         return filters[field] && filters[field].length === 1 && filters[field][0] === "__ALL__";
     };
 
+    // Custom Option component with visible checkboxes
+    const CheckboxOption = (props) => {
+        return (
+            <components.Option {...props}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', width: '100%' }}>
+                    <input
+                        type="checkbox"
+                        checked={props.isSelected}
+                        onChange={() => null}
+                        style={{
+                            margin: 0,
+                            cursor: 'pointer',
+                            accentColor: '#1e40af',
+                            pointerEvents: 'none',
+                            width: '14px',
+                            height: '14px',
+                            flexShrink: 0
+                        }}
+                    />
+                    <span style={{
+                        fontSize: '0.8rem',
+                        color: props.isSelected ? '#1e40af' : '#1e293b',
+                        fontWeight: props.isSelected ? '600' : '400',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                    }}>
+                        {props.label}
+                    </span>
+                </div>
+            </components.Option>
+        );
+    };
+
     // Custom ValueContainer to show summary when too many items are selected
     const CompactValueContainer = ({ children, ...props }) => {
         const selected = props.getValue();
-        if (selected.length > 3) {
-            // Check if it's the "Select All" special case
-            if (selected.length === 1 && selected[0].value === "SELECT_ALL") {
-                return <components.ValueContainer {...props}>{children}</components.ValueContainer>;
-            }
+        const hasSelectAll = selected.some(opt => opt.value === "SELECT_ALL");
+        const realSelectedCount = hasSelectAll ? selected.length - 1 : selected.length;
+
+        if (realSelectedCount > 3 || hasSelectAll) {
             return (
                 <components.ValueContainer {...props}>
                     <div style={{
@@ -316,11 +351,10 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         gap: '4px'
                     }}>
                         <span style={{ opacity: 0.7 }}>📊</span>
-                        {selected.length} Selected
+                        {hasSelectAll ? 'ALL SELECTED' : `${realSelectedCount} Selected`}
                     </div>
-                    {children.map(child => child && child.type?.name === 'Input' ? child : null)}
                     {/* Ensure we still render the input part for searchability */}
-                    {Array.isArray(children) ? children.filter(c => c && (c.key === 'placeholder' || (c.props && c.props.editable))) : children}
+                    {Array.isArray(children) ? children.filter(c => c && (c.key === 'placeholder' || (c.props && (c.props.editable || (c.props.className && c.props.className.includes('input')))))) : children}
                 </components.ValueContainer>
             );
         }
@@ -387,6 +421,20 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
             ...base,
             padding: '0 2px',
             ':hover': { backgroundColor: '#ef4444', color: 'white' },
+        }),
+        option: (base, state) => ({
+            ...base,
+            backgroundColor: state.isSelected
+                ? '#eff6ff'
+                : state.isFocused
+                    ? '#f8fafc'
+                    : 'white',
+            color: state.isSelected ? '#1e40af' : '#1e293b',
+            cursor: 'pointer',
+            padding: '6px 12px',
+            ':active': {
+                backgroundColor: '#dbeafe',
+            },
         })
     };
 
@@ -536,13 +584,15 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isMulti
                         name="campus"
                         options={withSelectAll(options.campuses, "Campuses")}
-                        value={getValue('campus')}
+                        value={getValue('campus', options.campuses)}
                         onChange={(opts, meta) => handleSelectChange('campus', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
-                        components={{ ValueContainer: CompactValueContainer }}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={isRestricted && allowedCampuses.length === 1}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
                     />
                 </div>
 
@@ -552,13 +602,15 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isMulti
                         name="stream"
                         options={withSelectAll(options.streams, "Streams")}
-                        value={getValue('stream')}
+                        value={getValue('stream', options.streams)}
                         onChange={(opts, meta) => handleSelectChange('stream', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
-                        components={{ ValueContainer: CompactValueContainer }}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={loadingFilters || (!isRestricted && filters.campus.length === 0)}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
                     />
                 </div>
 
@@ -568,13 +620,15 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isMulti
                         name="testType"
                         options={withSelectAll(options.testTypes, "Types")}
-                        value={getValue('testType')}
+                        value={getValue('testType', options.testTypes)}
                         onChange={(opts, meta) => handleSelectChange('testType', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
-                        components={{ ValueContainer: CompactValueContainer }}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={loadingFilters || filters.stream.length === 0}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
                     />
                 </div>
 
@@ -584,13 +638,15 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isMulti
                         name="test"
                         options={withSelectAll(options.tests, "Tests")}
-                        value={getValue('test')}
+                        value={getValue('test', options.tests)}
                         onChange={(opts, meta) => handleSelectChange('test', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
-                        components={{ ValueContainer: CompactValueContainer }}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={loadingFilters || filters.testType.length === 0}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
                     />
                 </div>
 
@@ -600,13 +656,15 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isMulti
                         name="topAll"
                         options={withSelectAll(options.topAll || [], "Top_ALL")}
-                        value={getValue('topAll')}
+                        value={getValue('topAll', options.topAll || [])}
                         onChange={(opts, meta) => handleSelectChange('topAll', opts, meta)}
                         isLoading={loadingFilters}
                         styles={compactStyles}
-                        components={{ ValueContainer: CompactValueContainer }}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
                         placeholder="Select..."
                         isDisabled={loadingFilters || filters.test.length === 0}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
                     />
                 </div>
 
@@ -618,13 +676,15 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         cacheOptions
                         defaultOptions={studentOptions}
                         loadOptions={loadStudentOptions}
-                        value={getValue('studentSearch')}
+                        value={getValue('studentSearch', studentOptions)}
                         onChange={(opts, meta) => handleSelectChange('studentSearch', opts, meta)}
                         isLoading={loadingStudents}
                         styles={compactStyles}
-                        components={{ ValueContainer: CompactValueContainer }}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
                         placeholder="Select Students..."
                         isDisabled={loadingStudents || filters.test.length === 0}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
                     />
                 </div>
             </div>
