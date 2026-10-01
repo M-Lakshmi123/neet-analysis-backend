@@ -295,11 +295,14 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         return filters[field] && filters[field].length === 1 && filters[field][0] === "__ALL__";
     };
 
-    // Custom Option component with visible checkboxes
+    // Custom Option component with visible checkboxes & full label popup tooltip on hover
     const CheckboxOption = (props) => {
         return (
             <components.Option {...props}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', width: '100%' }}>
+                <div 
+                    title={props.label} 
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', width: '100%' }}
+                >
                     <input
                         type="checkbox"
                         checked={props.isSelected}
@@ -314,14 +317,17 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                             flexShrink: 0
                         }}
                     />
-                    <span style={{
-                        fontSize: '0.8rem',
-                        color: props.isSelected ? '#1e40af' : '#1e293b',
-                        fontWeight: props.isSelected ? '600' : '400',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                    }}>
+                    <span 
+                        title={props.label}
+                        style={{
+                            fontSize: '0.8rem',
+                            color: props.isSelected ? '#1e40af' : '#1e293b',
+                            fontWeight: props.isSelected ? '600' : '400',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}
+                    >
                         {props.label}
                     </span>
                 </div>
@@ -435,6 +441,14 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
             ':active': {
                 backgroundColor: '#dbeafe',
             },
+        }),
+        menuPortal: (base) => ({
+            ...base,
+            zIndex: 99999
+        }),
+        menu: (base) => ({
+            ...base,
+            zIndex: 99999
         })
     };
 
@@ -537,6 +551,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         loadOptions={loadStudentOptions}
                         defaultOptions={[]}
                         placeholder="Search Student..."
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         onChange={(opt) => {
                             if (opt) {
                                 const finalCampus = isRestricted
@@ -593,6 +608,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isDisabled={isRestricted && allowedCampuses.length === 1}
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                     />
                 </div>
 
@@ -611,6 +627,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isDisabled={loadingFilters || (!isRestricted && filters.campus.length === 0)}
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                     />
                 </div>
 
@@ -629,6 +646,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isDisabled={loadingFilters || filters.stream.length === 0}
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                     />
                 </div>
 
@@ -647,6 +665,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isDisabled={loadingFilters || filters.testType.length === 0}
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                     />
                 </div>
 
@@ -665,6 +684,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isDisabled={loadingFilters || filters.test.length === 0}
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                     />
                 </div>
 
@@ -685,6 +705,7 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         isDisabled={loadingStudents || filters.test.length === 0}
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                     />
                 </div>
             </div>
