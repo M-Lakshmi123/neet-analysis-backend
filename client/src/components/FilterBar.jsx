@@ -577,7 +577,6 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         menuIsOpen={openMenu === 'quickSearch'}
                         onMenuOpen={() => setOpenMenu('quickSearch')}
-                        onMenuClose={() => setOpenMenu(prev => prev === 'quickSearch' ? null : prev)}
                         onChange={(opt) => {
                             if (opt) {
                                 const finalCampus = isRestricted
@@ -637,7 +636,6 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         menuIsOpen={openMenu === 'campus'}
                         onMenuOpen={() => setOpenMenu('campus')}
-                        onMenuClose={() => setOpenMenu(prev => prev === 'campus' ? null : prev)}
                     />
                 </div>
 
@@ -659,7 +657,6 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         menuIsOpen={openMenu === 'stream'}
                         onMenuOpen={() => setOpenMenu('stream')}
-                        onMenuClose={() => setOpenMenu(prev => prev === 'stream' ? null : prev)}
                     />
                 </div>
 
@@ -681,7 +678,6 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         menuIsOpen={openMenu === 'testType'}
                         onMenuOpen={() => setOpenMenu('testType')}
-                        onMenuClose={() => setOpenMenu(prev => prev === 'testType' ? null : prev)}
                     />
                 </div>
 
@@ -703,7 +699,6 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         menuIsOpen={openMenu === 'test'}
                         onMenuOpen={() => setOpenMenu('test')}
-                        onMenuClose={() => setOpenMenu(prev => prev === 'test' ? null : prev)}
                     />
                 </div>
 
@@ -725,7 +720,6 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         menuIsOpen={openMenu === 'topAll'}
                         onMenuOpen={() => setOpenMenu('topAll')}
-                        onMenuClose={() => setOpenMenu(prev => prev === 'topAll' ? null : prev)}
                     />
                 </div>
 
@@ -749,7 +743,6 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         menuIsOpen={openMenu === 'studentSearch'}
                         onMenuOpen={() => setOpenMenu('studentSearch')}
-                        onMenuClose={() => setOpenMenu(prev => prev === 'studentSearch' ? null : prev)}
                     />
                 </div>
             </div>
