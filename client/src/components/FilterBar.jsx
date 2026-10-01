@@ -24,6 +24,29 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
     const [top18List, setTop18List] = useState([]);
     const [loadingFilters, setLoadingFilters] = useState(false);
     const [loadingStudents, setLoadingStudents] = useState(false);
+    const [openMenu, setOpenMenu] = useState(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            const isInsideFilterBar = event.target.closest('.filter-bar-container');
+            const isInsidePortalMenu = event.target.closest('[class*="-Menu"]') || 
+                                       event.target.closest('[class*="-menu"]') || 
+                                       event.target.closest('[class*="option"]') ||
+                                       event.target.closest('.react-select__menu') ||
+                                       event.target.closest('.react-select__option');
+
+            if (!isInsideFilterBar && !isInsidePortalMenu) {
+                setOpenMenu(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, []);
 
     // Default Endpoints
     const endpoints = {
@@ -552,6 +575,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         defaultOptions={[]}
                         placeholder="Search Student..."
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'quickSearch'}
+                        onMenuOpen={() => setOpenMenu('quickSearch')}
+                        onMenuClose={() => setOpenMenu(prev => prev === 'quickSearch' ? null : prev)}
                         onChange={(opt) => {
                             if (opt) {
                                 const finalCampus = isRestricted
@@ -609,6 +635,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'campus'}
+                        onMenuOpen={() => setOpenMenu('campus')}
+                        onMenuClose={() => setOpenMenu(prev => prev === 'campus' ? null : prev)}
                     />
                 </div>
 
@@ -628,6 +657,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'stream'}
+                        onMenuOpen={() => setOpenMenu('stream')}
+                        onMenuClose={() => setOpenMenu(prev => prev === 'stream' ? null : prev)}
                     />
                 </div>
 
@@ -647,6 +679,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'testType'}
+                        onMenuOpen={() => setOpenMenu('testType')}
+                        onMenuClose={() => setOpenMenu(prev => prev === 'testType' ? null : prev)}
                     />
                 </div>
 
@@ -666,6 +701,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'test'}
+                        onMenuOpen={() => setOpenMenu('test')}
+                        onMenuClose={() => setOpenMenu(prev => prev === 'test' ? null : prev)}
                     />
                 </div>
 
@@ -685,6 +723,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'topAll'}
+                        onMenuOpen={() => setOpenMenu('topAll')}
+                        onMenuClose={() => setOpenMenu(prev => prev === 'topAll' ? null : prev)}
                     />
                 </div>
 
@@ -706,6 +747,9 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
                         closeMenuOnSelect={false}
                         hideSelectedOptions={false}
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'studentSearch'}
+                        onMenuOpen={() => setOpenMenu('studentSearch')}
+                        onMenuClose={() => setOpenMenu(prev => prev === 'studentSearch' ? null : prev)}
                     />
                 </div>
             </div>

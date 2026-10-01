@@ -57,6 +57,7 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, isMulti
                     {options.map((option, idx) => (
                         <div
                             key={idx}
+                            title={option}
                             className={`dropdown-option ${Array.isArray(selected) ? selected.includes(option) ? 'selected' : '' : selected === option ? 'selected' : ''}`}
                             onClick={() => handleSelect(option)}
                         >

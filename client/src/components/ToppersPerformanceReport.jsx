@@ -108,7 +108,7 @@ ChartJS.register(
 const CheckboxOption = (props) => {
     return (
         <components.Option {...props}>
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <div title={props.label} style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', width: '100%' }}>
                 <input
                     type="checkbox"
                     checked={props.isSelected}
@@ -120,7 +120,7 @@ const CheckboxOption = (props) => {
                         pointerEvents: 'none'
                     }}
                 />
-                <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '500' }}>{props.label}</span>
+                <span title={props.label} style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{props.label}</span>
             </div>
         </components.Option>
     );
