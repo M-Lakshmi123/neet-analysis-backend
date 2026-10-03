@@ -804,13 +804,13 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 y = doc.lastAutoTable.finalY + 6;
             }
 
-            // 4. Where He Is Lagging
+            // 4. Where the Student Is Lagging
             if (y > pageHeight - 50) { doc.addPage(); y = 14; }
 
             doc.setFontSize(11);
             if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
             doc.setTextColor(136, 19, 55);
-            doc.text("4. Where He Is Lagging (Simple Analysis)", margin, y);
+            doc.text("4. Where the Student Is Lagging (Simple Analysis)", margin, y);
             y += 4;
 
             autoTable(doc, {
@@ -1109,9 +1109,9 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                         )}
                     </div>
 
-                    {/* Section 4: Where He Is Lagging in Simple Words */}
+                    {/* Section 4: Where the Student Is Lagging in Simple Words */}
                     <div className="pdf-section">
-                        <h3 className="section-heading">4. Where He Is Lagging (Simple Analysis)</h3>
+                        <h3 className="section-heading">4. Where the Student Is Lagging (Simple Analysis)</h3>
                         <p className="narrative-text small" style={{ marginBottom: '10px', color: '#475569' }}>
                             This table identifies why marks were lost in each subject—distinguishing between incorrect attempts (negative marking) and skipped questions (unattempted).
                         </p>
