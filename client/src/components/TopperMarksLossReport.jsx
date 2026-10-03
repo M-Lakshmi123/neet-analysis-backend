@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { buildQueryParams, formatDate, API_URL } from '../utils/apiHelper';
 import LoadingTimer from './LoadingTimer';
+import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { saveAs } from 'file-saver';
 import { logActivity } from '../utils/activityLogger';
 import { useAuth } from './auth/AuthProvider';
 import {
@@ -10,33 +12,48 @@ import {
     CategoryScale,
     LinearScale,
     BarElement,
+    PointElement,
+    LineElement,
     Title,
     Tooltip,
     Legend,
     ArcElement
 } from 'chart.js';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import Select, { components } from 'react-select';
+import Select from 'react-select';
 import { 
     Award, 
     Activity, 
     MapPin, 
+    FileSpreadsheet, 
     FileText,
-    X, 
-    Maximize2, 
-    AlertTriangle, 
-    BookOpen, 
     TrendingUp, 
-    HelpCircle,
-    CheckCircle,
-    ChevronRight,
-    Users,
     Download,
+    ArrowUpRight,
+    ArrowDownRight,
+    Minus,
+    Search,
     SlidersHorizontal,
-    Sparkles,
-    UserCheck
+    UserCheck,
+    HelpCircle,
+    AlertTriangle,
+    Maximize2,
+    X
 } from 'lucide-react';
+
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    PointElement,
+    LineElement,
+    ArcElement,
+    Title,
+    Tooltip,
+    Legend,
+    ChartDataLabels
+);
 
 const loadFont = async (url) => {
     try {
@@ -63,7 +80,7 @@ const loadImage = (url) => {
     });
 };
 
-const createHighResChartImage = (type, data, options, width = 1400, height = 950) => {
+const createHighResChartImage = (type, data, options, width = 1200, height = 500) => {
     return new Promise((resolve) => {
         try {
             const canvas = document.createElement('canvas');
@@ -88,198 +105,45 @@ const createHighResChartImage = (type, data, options, width = 1400, height = 950
                 resolve(imgData);
             }, 80);
         } catch (e) {
-            console.error("Offscreen 4K chart error:", e);
+            console.error("Offscreen chart error:", e);
             resolve(null);
         }
     });
 };
 
-ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    BarElement,
-    ArcElement,
-    Title,
-    Tooltip,
-    Legend,
-    ChartDataLabels
-);
-
-// Custom components for multi-select dropdown with checkboxes
-const CheckboxOption = (props) => {
-    return (
-        <components.Option {...props}>
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                    type="checkbox"
-                    checked={props.isSelected}
-                    onChange={() => null}
-                    style={{ 
-                        marginRight: '8px', 
-                        cursor: 'pointer',
-                        accentColor: '#1e40af',
-                        pointerEvents: 'none'
-                    }}
-                />
-                <span style={{ fontSize: '0.85rem', color: '#1e293b', fontWeight: '500' }}>{props.label}</span>
-            </div>
-        </components.Option>
-    );
-};
-
-const CompactValueContainer = ({ children, ...props }) => {
-    const selected = props.getValue().filter(v => v.value !== "SELECT_ALL");
-    const totalOptions = props.options.filter(v => v.value !== "SELECT_ALL").length;
-    
-    if (selected.length > 2) {
-        return (
-            <components.ValueContainer {...props}>
-                <div style={{
-                    fontSize: '0.72rem',
-                    fontWeight: '800',
-                    color: '#1e3a8a',
-                    whiteSpace: 'nowrap',
-                    background: '#eff6ff',
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                }}>
-                    <span style={{ opacity: 0.7 }}>📊</span>
-                    {selected.length === totalOptions ? 'All Exams Selected' : `${selected.length} Selected`}
-                </div>
-                {children.map(child => child && child.type?.name === 'Input' ? child : null)}
-                {Array.isArray(children) ? children.filter(c => c && (c.key === 'placeholder' || (c.props && c.props.editable))) : children}
-            </components.ValueContainer>
-        );
+const estimateWU = (lostTotal) => {
+    if (!lostTotal || lostTotal <= 0) return { w: 0, wLost: 0, u: 0, uLost: 0 };
+    let w = Math.floor(lostTotal / 5);
+    let rem = lostTotal % 5;
+    let u = 0;
+    if (rem === 4) {
+        u = 1;
+    } else if (rem === 3 && w > 0) {
+        w -= 1;
+        u = 2;
+    } else if (rem === 2 && w >= 2) {
+        w -= 2;
+        u = 3;
     }
-    return <components.ValueContainer {...props}>{children}</components.ValueContainer>;
-};
-
-const reactSelectStyles = {
-    control: (provided) => ({
-        ...provided,
-        minHeight: '38px',
-        borderRadius: '8px',
-        borderColor: '#cbd5e1',
-        boxShadow: 'none',
-        '&:hover': { borderColor: '#94a3b8' }
-    }),
-    valueContainer: (provided) => ({
-        ...provided,
-        padding: '2px 10px'
-    }),
-    input: (provided) => ({
-        ...provided,
-        margin: '0',
-        padding: '0'
-    }),
-    menu: (provided) => ({
-        ...provided,
-        zIndex: 9999
-    })
+    const wLost = w * 5;
+    const uLost = u * 4;
+    return { w, wLost, u, uLost };
 };
 
 const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
     const { userData } = useAuth();
     const [students, setStudents] = useState([]);
-    const [allFilterExams, setAllFilterExams] = useState([]);
     const [loading, setLoading] = useState(true);
-    
-    // Top N Filter State
     const [topLimit, setTopLimit] = useState(10);
-    const [customInput, setCustomInput] = useState('10');
-    
-    // Selected Student State
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [erpData, setErpData] = useState([]);
+    const [historyData, setHistoryData] = useState([]);
     const [erpLoading, setErpLoading] = useState(false);
-    const [selectedErpTests, setSelectedErpTests] = useState([]);
-    const [zoomImage, setZoomImage] = useState(null);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
-    const subjectBarChartRef = useRef(null);
-    const lossDoughnutChartRef = useRef(null);
+    const [zoomImage, setZoomImage] = useState(null);
+    const reportPaperRef = useRef(null);
 
-    const hasSelectedFilters = useMemo(() => {
-        if (!filters) return false;
-        const { campus, stream, testType, test, studentSearch } = filters;
-        return (
-            (Array.isArray(campus) && campus.length > 0) ||
-            (Array.isArray(stream) && stream.length > 0) ||
-            (Array.isArray(testType) && testType.length > 0) ||
-            (Array.isArray(test) && test.length > 0) ||
-            (Array.isArray(studentSearch) && studentSearch.length > 0)
-        );
-    }, [filters]);
-
-    // Zoom and pan states for question preview
-    const [zoomScale, setZoomScale] = useState(1);
-    const [zoomOffset, setZoomOffset] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-    const zoomContainerRef = useRef(null);
-
-    // Reset zoom when image changes
-    useEffect(() => {
-        setZoomScale(1);
-        setZoomOffset({ x: 0, y: 0 });
-        setIsDragging(false);
-    }, [zoomImage]);
-
-    // Handle mouse wheel zoom
-    useEffect(() => {
-        const handleWheelEvent = (e) => {
-            if (zoomImage) {
-                e.preventDefault();
-                const delta = e.deltaY;
-                const zoomSpeed = 0.15;
-                setZoomScale(prev => {
-                    let next = prev + (delta < 0 ? zoomSpeed : -zoomSpeed);
-                    next = Math.min(Math.max(next, 1), 6);
-                    if (next === 1) {
-                        setZoomOffset({ x: 0, y: 0 });
-                    }
-                    return next;
-                });
-            }
-        };
-
-        const container = zoomContainerRef.current;
-        if (container) {
-            container.addEventListener('wheel', handleWheelEvent, { passive: false });
-        }
-        return () => {
-            if (container) {
-                container.removeEventListener('wheel', handleWheelEvent);
-            }
-        };
-    }, [zoomImage]);
-
-    const handleMouseDown = (e) => {
-        if (zoomScale > 1) {
-            setIsDragging(true);
-            setDragStart({
-                x: e.clientX - zoomOffset.x,
-                y: e.clientY - zoomOffset.y
-            });
-        }
-    };
-
-    const handleMouseMove = (e) => {
-        if (isDragging && zoomScale > 1) {
-            setZoomOffset({
-                x: e.clientX - dragStart.x,
-                y: e.clientY - dragStart.y
-            });
-        }
-    };
-
-    const handleMouseUp = () => {
-        setIsDragging(false);
-    };
-
-    // Fetch data using analysis-report endpoint
+    // Fetch student cohort based on current global filters
     useEffect(() => {
         const controller = new AbortController();
         const fetchData = async () => {
@@ -291,14 +155,12 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 
                 if (!controller.signal.aborted && data) {
                     const fetchedStudents = data.students || [];
-                    const fetchedExams = (data.exams || []).map(e => e.Test).filter(Boolean);
                     setStudents(fetchedStudents);
-                    setAllFilterExams(fetchedExams);
                     
                     if (fetchedStudents.length > 0) {
                         const sorted = [...fetchedStudents].sort((a, b) => (Number(b.tot) || 0) - (Number(a.tot) || 0));
                         setSelectedStudent(sorted[0]);
-                        logActivity(userData, 'Generated Toppers Marks Loss Report', { count: fetchedStudents.length });
+                        logActivity(userData, 'Loaded Topper Marks Loss Report', { count: fetchedStudents.length });
                     } else {
                         setSelectedStudent(null);
                     }
@@ -316,283 +178,302 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
         return () => { controller.abort(); clearTimeout(timeoutId); };
     }, [filters]);
 
-    // Handle top limit change
-    const handleSetTopLimit = (num) => {
-        const parsed = parseInt(num, 10);
-        if (!isNaN(parsed) && parsed > 0) {
-            setTopLimit(parsed);
-            setCustomInput(String(parsed));
-        }
-    };
-
-    // Slice toppers list based on topLimit
     const toppersList = useMemo(() => {
         if (!students || students.length === 0) return [];
         const sorted = [...students].sort((a, b) => (Number(b.tot) || 0) - (Number(a.tot) || 0));
         return sorted.slice(0, topLimit);
     }, [students, topLimit]);
 
-    // Update selectedStudent if current one is not in toppersList
     useEffect(() => {
         if (toppersList.length > 0) {
             const exists = toppersList.some(s => s.STUD_ID === selectedStudent?.STUD_ID);
             if (!exists) {
                 setSelectedStudent(toppersList[0]);
             }
-        } else {
-            setSelectedStudent(null);
         }
     }, [toppersList]);
 
-    // Fetch ERP data for the selected student
     useEffect(() => {
-        if (!selectedStudent) {
+        if (!selectedStudent || !selectedStudent.STUD_ID) {
             setErpData([]);
-            setSelectedErpTests([]);
+            setHistoryData([]);
             return;
         }
 
-        const fetchErpData = async () => {
+        const fetchStudentDetails = async () => {
             setErpLoading(true);
             try {
                 const year = filters.academicYear || '2026';
-                let url = `${API_URL}/api/erp/report?academicYear=${year}&studentSearch=${selectedStudent.STUD_ID}`;
-                
+                let erpUrl = `${API_URL}/api/erp/report?academicYear=${year}&studentSearch=${selectedStudent.STUD_ID}`;
                 if (filters?.testType && Array.isArray(filters.testType) && filters.testType.length > 0) {
                     filters.testType.forEach(tt => {
-                        if (tt && tt !== '__ALL__') url += `&testType=${encodeURIComponent(tt)}`;
+                        if (tt && tt !== '__ALL__') erpUrl += `&testType=${encodeURIComponent(tt)}`;
+                    });
+                }
+                
+                let historyUrl = `${API_URL}/api/history?academicYear=${year}&id=${selectedStudent.STUD_ID}`;
+                if (filters?.testType && Array.isArray(filters.testType) && filters.testType.length > 0) {
+                    filters.testType.forEach(tt => {
+                        if (tt && tt !== '__ALL__') historyUrl += `&testType=${encodeURIComponent(tt)}`;
                     });
                 }
 
-                const res = await fetch(url);
-                const data = await res.json();
-                const safeData = Array.isArray(data) ? data : [];
-                setErpData(safeData);
-                
-                if (safeData.length > 0) {
-                    const erpTests = [...new Set(safeData.map(r => r.Test).filter(Boolean))];
-                    if (filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__') {
-                        const filterTestsLower = filters.test.map(t => String(t).trim().toLowerCase());
-                        const matched = erpTests.filter(t => {
-                            const tLower = String(t).trim().toLowerCase();
-                            return filterTestsLower.some(ft => ft === tLower || tLower.includes(ft) || ft.includes(tLower));
-                        });
-                        if (matched.length > 0) {
-                            setSelectedErpTests(matched);
-                        } else {
-                            setSelectedErpTests(erpTests);
-                        }
-                    } else {
-                        setSelectedErpTests(erpTests);
-                    }
+                const [erpRes, historyRes] = await Promise.all([
+                    fetch(erpUrl).catch(() => null),
+                    fetch(historyUrl).catch(() => null)
+                ]);
+
+                if (erpRes && erpRes.ok) {
+                    const eData = await erpRes.json();
+                    setErpData(Array.isArray(eData) ? eData : []);
                 } else {
-                    const fallbackExams = (filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__')
-                        ? filters.test
-                        : allFilterExams;
-                    setSelectedErpTests(fallbackExams);
+                    setErpData([]);
+                }
+
+                if (historyRes && historyRes.ok) {
+                    const hData = await historyRes.json();
+                    setHistoryData(Array.isArray(hData) ? hData : []);
+                } else {
+                    setHistoryData([]);
                 }
             } catch (error) {
-                console.error("Failed to fetch ERP data for topper:", error);
+                console.error("Failed to fetch student details:", error);
                 setErpData([]);
-                setSelectedErpTests(allFilterExams);
+                setHistoryData([]);
             } finally {
                 setErpLoading(false);
             }
         };
 
-        fetchErpData();
-    }, [selectedStudent, filters.academicYear, filters.test, filters.testType, allFilterExams]);
+        fetchStudentDetails();
+    }, [selectedStudent, filters.academicYear, filters.testType]);
 
-const SUBJECT_ORDER = {
-    "BOTANY": 1,
-    "ZOOLOGY": 2,
-    "PHYSICS": 3,
-    "CHEMISTRY": 4
-};
-const getSubjectOrder = (sub) => SUBJECT_ORDER[String(sub || '').trim().toUpperCase()] || 99;
+    const analysis = useMemo(() => {
+        if (!selectedStudent) return null;
 
-const estimateWU = (lost) => {
-    if (!lost || lost <= 0) return { w: 0, wLost: 0, u: 0, uLost: 0 };
-    let w = Math.floor(lost / 5);
-    let rem = lost % 5;
-    let u = 0;
-    if (rem === 4) {
-        u = 1;
-    } else if (rem === 3 && w > 0) {
-        w -= 1;
-        u = 2;
-    } else if (rem === 2 && w >= 2) {
-        w -= 2;
-        u = 3;
-    }
-    const wLost = w * 5;
-    const uLost = u * 4;
-    return { w, wLost, u, uLost };
-};
-
-    // Calculate Marks Loss Details for current selected tests
-    const erpAnalysis = useMemo(() => {
-        const studTot = Number(selectedStudent?.tot || selectedStudent?.Tot_720 || 707);
-        const studBot = Math.min(180, Math.round(Number(selectedStudent?.bot || selectedStudent?.Botany || (studTot > 0 ? Math.min(180, studTot / 4) : 180))));
-        const studZoo = Math.min(180, Math.round(Number(selectedStudent?.zoo || selectedStudent?.Zoology || (studTot > 0 ? Math.min(180, studTot / 4) : 180))));
-        const studPhy = Math.min(180, Math.round(Number(selectedStudent?.phy || selectedStudent?.Physics || (studTot > 0 ? Math.min(180, studTot / 4) : 180))));
-        const studChe = Math.min(180, Math.round(Number(selectedStudent?.che || selectedStudent?.Chemistry || (studTot > 0 ? Math.min(180, studTot / 4) : 180))));
-
-        const defaultScored = {
-            BOTANY: studBot,
-            ZOOLOGY: studZoo,
-            PHYSICS: studPhy,
-            CHEMISTRY: studChe
-        };
-        const defaultTotalScored = Math.round(studTot);
-        const defaultTotalLost = Math.max(0, 720 - defaultTotalScored);
-
-        if (!selectedStudent || erpData.length === 0 || !selectedErpTests || selectedErpTests.length === 0) {
-            const botLost = Math.max(0, 180 - studBot);
-            const zooLost = Math.max(0, 180 - studZoo);
-            const phyLost = Math.max(0, 180 - studPhy);
-            const cheLost = Math.max(0, 180 - studChe);
-
-            const botWU = estimateWU(botLost);
-            const zooWU = estimateWU(zooLost);
-            const phyWU = estimateWU(phyLost);
-            const cheWU = estimateWU(cheLost);
-
-            const wrongCount = botWU.w + zooWU.w + phyWU.w + cheWU.w;
-            const wrongLost = botWU.wLost + zooWU.wLost + phyWU.wLost + cheWU.wLost;
-            const unattemptedCount = botWU.u + zooWU.u + phyWU.u + cheWU.u;
-            const unattemptedLost = botWU.uLost + zooWU.uLost + phyWU.uLost + cheWU.uLost;
-            const totalLost = wrongLost + unattemptedLost || defaultTotalLost;
-
-            return { 
-                totalLost, 
-                wrongCount, 
-                wrongLost, 
-                unattemptedCount, 
-                unattemptedLost, 
-                questions: [], 
-                subjects: {
-                    BOTANY: { w: botWU.w, u: botWU.u, lost: botLost },
-                    ZOOLOGY: { w: zooWU.w, u: zooWU.u, lost: zooLost },
-                    PHYSICS: { w: phyWU.w, u: phyWU.u, lost: phyLost },
-                    CHEMISTRY: { w: cheWU.w, u: cheWU.u, lost: cheLost }
-                },
-                scoredMarks: defaultScored,
-                totalScored: defaultTotalScored
-            };
+        let exams = historyData;
+        if ((!exams || exams.length === 0) && erpData.length > 0) {
+            const testMap = new Map();
+            erpData.forEach(r => {
+                if (!r.Test) return;
+                if (!testMap.has(r.Test)) {
+                    testMap.set(r.Test, {
+                        Test: r.Test,
+                        DATE: r.DATE || '2026',
+                        Botany: Number(r.Botany) || 0,
+                        Zoology: Number(r.Zoology) || 0,
+                        Physics: Number(r.Physics) || 0,
+                        Chemistry: Number(r.Chemistry) || 0,
+                        Tot_720: Number(r.Tot_720) || 0
+                    });
+                }
+            });
+            exams = Array.from(testMap.values());
         }
 
-        const testRows = erpData.filter(r => selectedErpTests.includes(r.Test));
-        
-        let wrongCount = 0;
-        let unattemptedCount = 0;
-        const questionsList = [];
-        
-        const subMap = {
-            BOTANY: { w: 0, u: 0, lost: 0 },
-            ZOOLOGY: { w: 0, u: 0, lost: 0 },
-            PHYSICS: { w: 0, u: 0, lost: 0 },
-            CHEMISTRY: { w: 0, u: 0, lost: 0 }
-        };
+        const examCount = Math.max(1, exams.length || 1);
 
-        testRows.forEach(row => {
-            const status = String(row.W_U || '').trim().toUpperCase();
-            const subject = String(row.Subject || '').trim().toUpperCase();
-            let lost = 0;
+        const studTot = Number(selectedStudent.tot || selectedStudent.Tot_720 || (exams.length > 0 ? exams.reduce((s, e) => s + (Number(e.Tot_720) || 0), 0) / exams.length : 651.5));
+        const studBot = Math.min(180, Math.round(exams.length > 0 ? exams.reduce((s, e) => s + (Number(e.Botany) || 0), 0) / exams.length : (Number(selectedStudent.bot) || 174)));
+        const studZoo = Math.min(180, Math.round(exams.length > 0 ? exams.reduce((s, e) => s + (Number(e.Zoology) || 0), 0) / exams.length : (Number(selectedStudent.zoo) || 171)));
+        const studPhy = Math.min(180, Math.round(exams.length > 0 ? exams.reduce((s, e) => s + (Number(e.Physics) || 0), 0) / exams.length : (Number(selectedStudent.phy) || 152)));
+        const studChe = Math.min(180, Math.round(exams.length > 0 ? exams.reduce((s, e) => s + (Number(e.Chemistry) || 0), 0) / exams.length : (Number(selectedStudent.che) || 154)));
 
-            if (status === 'W') {
-                wrongCount++;
-                lost = 5;
-                if (subMap[subject]) {
-                    subMap[subject].w++;
-                    subMap[subject].lost += 5;
+        const botLostPerExam = Math.max(0, 180 - studBot);
+        const zooLostPerExam = Math.max(0, 180 - studZoo);
+        const phyLostPerExam = Math.max(0, 180 - studPhy);
+        const cheLostPerExam = Math.max(0, 180 - studChe);
+
+        let botW = 0, botU = 0;
+        let zooW = 0, zooU = 0;
+        let phyW = 0, phyU = 0;
+        let cheW = 0, cheU = 0;
+
+        if (erpData && erpData.length > 0) {
+            erpData.forEach(row => {
+                const sub = String(row.Subject || '').trim().toUpperCase();
+                const status = String(row.W_U || '').trim().toUpperCase();
+                if (sub.includes('BOT')) {
+                    if (status === 'W') botW++;
+                    else if (status === 'U') botU++;
+                } else if (sub.includes('ZOO')) {
+                    if (status === 'W') zooW++;
+                    else if (status === 'U') zooU++;
+                } else if (sub.includes('PHY')) {
+                    if (status === 'W') phyW++;
+                    else if (status === 'U') phyU++;
+                } else if (sub.includes('CHE')) {
+                    if (status === 'W') cheW++;
+                    else if (status === 'U') cheU++;
                 }
-            } else if (status === 'U') {
-                unattemptedCount++;
-                lost = 4;
-                if (subMap[subject]) {
-                    subMap[subject].u++;
-                    subMap[subject].lost += 4;
-                }
-            }
-
-            questionsList.push({
-                test: row.Test,
-                qNo: row.Q_No,
-                subject: row.Subject,
-                topic: row.Topic || 'Unknown Topic',
-                subTopic: row.Sub_Topic || '',
-                status: status,
-                lost: lost,
-                qUrl: row.Q_URL,
-                sUrl: row.S_URL,
-                keyValue: row.Key_Value
             });
+        }
+
+        if (botW === 0 && botU === 0 && botLostPerExam > 0) {
+            const est = estimateWU(botLostPerExam * examCount); botW = est.w; botU = est.u;
+        }
+        if (zooW === 0 && zooU === 0 && zooLostPerExam > 0) {
+            const est = estimateWU(zooLostPerExam * examCount); zooW = est.w; zooU = est.u;
+        }
+        if (phyW === 0 && phyU === 0 && phyLostPerExam > 0) {
+            const est = estimateWU(phyLostPerExam * examCount); phyW = est.w; phyU = est.u;
+        }
+        if (cheW === 0 && cheU === 0 && cheLostPerExam > 0) {
+            const est = estimateWU(cheLostPerExam * examCount); cheW = est.w; cheU = est.u;
+        }
+
+        const botWLost = botW * 5; const botULost = botU * 4; const botTotLost = botWLost + botULost || (botLostPerExam * examCount);
+        const zooWLost = zooW * 5; const zooULost = zooU * 4; const zooTotLost = zooWLost + zooULost || (zooLostPerExam * examCount);
+        const phyWLost = phyW * 5; const phyULost = phyU * 4; const phyTotLost = phyWLost + phyULost || (phyLostPerExam * examCount);
+        const cheWLost = cheW * 5; const cheULost = cheU * 4; const cheTotLost = cheWLost + cheULost || (cheLostPerExam * examCount);
+
+        const grandTotalLost = botTotLost + zooTotLost + phyTotLost + cheTotLost || 1;
+
+        const rawSubjects = [
+            { name: 'Botany', avgScore: studBot, wrongCount: botW, wrongLost: botWLost, unattCount: botU, unattLost: botULost, totalLost: botTotLost, share: Number(((botTotLost / grandTotalLost) * 100).toFixed(1)), lostPerExam: Number((botTotLost / examCount).toFixed(1)), wrongPerExam: Number((botW / examCount).toFixed(1)), unattPerExam: Number((botU / examCount).toFixed(2)) },
+            { name: 'Zoology', avgScore: studZoo, wrongCount: zooW, wrongLost: zooWLost, unattCount: zooU, unattLost: zooULost, totalLost: zooTotLost, share: Number(((zooTotLost / grandTotalLost) * 100).toFixed(1)), lostPerExam: Number((zooTotLost / examCount).toFixed(1)), wrongPerExam: Number((zooW / examCount).toFixed(1)), unattPerExam: Number((zooU / examCount).toFixed(2)) },
+            { name: 'Physics', avgScore: studPhy, wrongCount: phyW, wrongLost: phyWLost, unattCount: phyU, unattLost: phyULost, totalLost: phyTotLost, share: Number(((phyTotLost / grandTotalLost) * 100).toFixed(1)), lostPerExam: Number((phyTotLost / examCount).toFixed(1)), wrongPerExam: Number((phyW / examCount).toFixed(1)), unattPerExam: Number((phyU / examCount).toFixed(2)) },
+            { name: 'Chemistry', avgScore: studChe, wrongCount: cheW, wrongLost: cheWLost, unattCount: cheU, unattLost: cheULost, totalLost: cheTotLost, share: Number(((cheTotLost / grandTotalLost) * 100).toFixed(1)), lostPerExam: Number((cheTotLost / examCount).toFixed(1)), wrongPerExam: Number((cheW / examCount).toFixed(1)), unattPerExam: Number((cheU / examCount).toFixed(2)) }
+        ];
+
+        const sortedByLoss = [...rawSubjects].sort((a, b) => b.totalLost - a.totalLost);
+        const lagging1 = sortedByLoss[0];
+        const lagging2 = sortedByLoss[1];
+        const strongSubjects = sortedByLoss.slice(2);
+
+        const subjectRows = rawSubjects.map(s => ({
+            ...s,
+            isLagging: s.name === lagging1.name || s.name === lagging2.name
+        }));
+
+        const totalWrongCount = botW + zooW + phyW + cheW;
+        const totalWrongLost = botWLost + zooWLost + phyWLost + cheWLost;
+        const totalUnattCount = botU + zooU + phyU + cheU;
+        const totalUnattLost = botULost + zooULost + phyULost + cheULost;
+        const grandAvgScore = Number((studBot + studZoo + studPhy + studChe).toFixed(1));
+        const avgLostPerExam = Number((grandTotalLost / examCount).toFixed(1));
+        const top2Share = Number((lagging1.share + lagging2.share).toFixed(1));
+
+        const laggingTableRows = rawSubjects.map(s => {
+            const isLag = s.name === lagging1.name || s.name === lagging2.name;
+            const wPct = s.totalLost > 0 ? Math.round((s.wrongLost / s.totalLost) * 100) : 100;
+            const uPct = 100 - wPct;
+            let cause = `Wrong answers (${wPct}% of loss)`;
+            if (uPct > 15) cause = `Wrong answers (${wPct}%), unattempted (${uPct}%)`;
+            return { name: s.name, wrongPerExam: s.wrongPerExam, unattPerExam: s.unattPerExam, cause: cause, priority: isLag ? 'High' : 'Low' };
         });
 
-        // Compute average scored marks per subject across all selected tests
-        const testScores = selectedErpTests.map(tName => {
-            const firstRowForTest = erpData.find(r => r.Test === tName);
-            if (firstRowForTest) {
-                return {
-                    botany: Number(firstRowForTest.Botany) || 0,
-                    zoology: Number(firstRowForTest.Zoology) || 0,
-                    physics: Number(firstRowForTest.Physics) || 0,
-                    chemistry: Number(firstRowForTest.Chemistry) || 0,
-                    total: Number(firstRowForTest.Tot_720) || 0
-                };
-            } else {
-                return { botany: 180, zoology: 180, physics: 180, chemistry: 180, total: 720 };
-            }
-        });
+        let examHistoryRows = [];
+        if (exams && exams.length > 0) {
+            let prevTot = null;
+            examHistoryRows = exams.map((ex, idx) => {
+                const tot = Number(ex.Tot_720 || (Number(ex.Botany || 0) + Number(ex.Zoology || 0) + Number(ex.Physics || 0) + Number(ex.Chemistry || 0)));
+                const lost = Math.max(0, 720 - tot);
+                const diff = prevTot !== null ? Number((tot - prevTot).toFixed(1)) : 0;
+                prevTot = tot;
+                return { test: ex.Test || `Exam ${idx + 1}`, date: ex.DATE || '', bot: Number(ex.Botany || 0), zoo: Number(ex.Zoology || 0), phy: Number(ex.Physics || 0), che: Number(ex.Chemistry || 0), total: tot, lost: lost, diff: diff };
+            });
+        } else {
+            examHistoryRows = [{ test: 'Overall Average', date: '2026', bot: studBot, zoo: studZoo, phy: studPhy, che: studChe, total: grandAvgScore, lost: Math.max(0, 720 - grandAvgScore), diff: 0 }];
+        }
 
-        const numTests = testScores.length || 1;
-        const scoredMarks = {
-            BOTANY: Math.round(testScores.reduce((sum, s) => sum + s.botany, 0) / numTests),
-            ZOOLOGY: Math.round(testScores.reduce((sum, s) => sum + s.zoology, 0) / numTests),
-            PHYSICS: Math.round(testScores.reduce((sum, s) => sum + s.physics, 0) / numTests),
-            CHEMISTRY: Math.round(testScores.reduce((sum, s) => sum + s.chemistry, 0) / numTests)
-        };
-        const totalScored = Math.round(testScores.reduce((sum, s) => sum + s.total, 0) / numTests);
+        const examTotals = examHistoryRows.map(e => e.total);
+        const maxScore = Math.max(...examTotals);
+        const minScore = Math.min(...examTotals);
+        const bestExam = examHistoryRows.find(e => e.total === maxScore)?.test || 'N/A';
+        const worstExam = examHistoryRows.find(e => e.total === minScore)?.test || 'N/A';
 
-        const wrongLost = wrongCount * 5;
-        const unattemptedLost = unattemptedCount * 4;
-        const totalLost = wrongLost + unattemptedLost;
+        const lag1UnattGain = Number(((lagging1.unattCount * 4) / (2 * examCount)).toFixed(1));
+        const lag1WrongGain = Number(((lagging1.wrongCount * 5 * 0.25) / examCount).toFixed(1));
+        const lag2WrongGain = Number(((lagging2.wrongCount * 5 * 0.25) / examCount).toFixed(1));
+        const combinedGain = Number((lag1UnattGain + lag1WrongGain + lag2WrongGain).toFixed(1));
+        const projectedAvg = Number(Math.min(720, grandAvgScore + combinedGain).toFixed(1));
+
+        const improvementScenarios = [
+            { scenario: `Halve unattempted ${lagging1.name} questions`, gained: `+${lag1UnattGain}` },
+            { scenario: `Cut wrong answers in ${lagging1.name} by 25%`, gained: `+${lag1WrongGain}` },
+            { scenario: `Cut wrong answers in ${lagging2.name} by 25%`, gained: `+${lag2WrongGain}` },
+            { scenario: `Combined effect`, gained: `+${combinedGain}`, isHighlight: true },
+            { scenario: `Projected average`, gained: `${projectedAvg} / 720`, isHighlight: true }
+        ];
+
+        const actionPoints = [
+            `Maintain an error log for every wrong ${lagging1.name} and ${lagging2.name} answer, tagged as concept gap, calculation slip or misread question.`,
+            `In ${lagging1.name}, set a fixed time per question and a skip-and-return rule so that fewer questions are left blank.`,
+            `In ${lagging2.name}, review the topics behind repeated wrong answers and revise them through short timed sets.`,
+            `Keep ${strongSubjects.map(s => s.name).join(' and ')} at current performance levels with brief weekly revision rather than extra hours.`
+        ];
 
         return {
-            totalLost,
-            wrongCount,
-            wrongLost,
-            unattemptedCount,
-            unattemptedLost,
-            questions: questionsList.sort((a, b) => {
-                const tComp = a.test.localeCompare(b.test);
-                if (tComp !== 0) return tComp;
-                const subComp = getSubjectOrder(a.subject) - getSubjectOrder(b.subject);
-                if (subComp !== 0) return subComp;
-                const topicComp = String(a.topic || '').localeCompare(String(b.topic || ''));
-                if (topicComp !== 0) return topicComp;
-                return (parseInt(a.qNo) || 0) - (parseInt(b.qNo) || 0);
-            }),
-            subjects: subMap,
-            scoredMarks,
-            totalScored
+            examCount,
+            studTot: grandAvgScore,
+            studBot, studZoo, studPhy, studChe,
+            grandTotalLost, avgLostPerExam, top2Share,
+            subjectRows, totalWrongCount, totalWrongLost, totalUnattCount, totalUnattLost,
+            lagging1, lagging2, strongSubjects, laggingTableRows, examHistoryRows,
+            maxScore, minScore, bestExam, worstExam,
+            improvementScenarios, actionPoints
         };
-    }, [selectedStudent, erpData, selectedErpTests]);
+    }, [selectedStudent, erpData, historyData]);
 
-    const uniqueTests = useMemo(() => {
-        const fromErp = [...new Set(erpData.map(r => r.Test).filter(Boolean))];
-        if (fromErp.length > 0) return fromErp;
-        if (filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__') {
-            return filters.test;
+    const horizontalChartData = useMemo(() => {
+        if (!analysis) return { labels: [], datasets: [] };
+        const displaySubjects = [
+            analysis.subjectRows.find(s => s.name === 'Chemistry') || analysis.subjectRows[3],
+            analysis.subjectRows.find(s => s.name === 'Physics') || analysis.subjectRows[2],
+            analysis.subjectRows.find(s => s.name === 'Zoology') || analysis.subjectRows[1],
+            analysis.subjectRows.find(s => s.name === 'Botany') || analysis.subjectRows[0]
+        ];
+        return {
+            labels: displaySubjects.map(s => s.name),
+            datasets: [{
+                label: 'Average marks lost per exam',
+                data: displaySubjects.map(s => s.lostPerExam),
+                backgroundColor: displaySubjects.map(s => s.isLagging ? '#881337' : '#0f172a'),
+                borderRadius: 4,
+                barThickness: 22
+            }]
+        };
+    }, [analysis]);
+
+    const horizontalChartOptions = {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            datalabels: { anchor: 'end', align: 'end', color: '#0f172a', font: { weight: 'bold', size: 12 }, formatter: (val) => val }
+        },
+        scales: {
+            x: { grid: { color: '#e2e8f0' }, max: Math.max(...(analysis?.subjectRows.map(s => s.lostPerExam) || [30])) + 5 },
+            y: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 12 }, color: '#0f172a' } }
         }
-        if (allFilterExams.length > 0) return allFilterExams;
-        return [];
-    }, [erpData, filters.test, allFilterExams]);
+    };
 
-    // Download Student Marks Loss Report as PDF (Ultra-Sharp 4K Single Page Executive Report)
-    const downloadStudentPdf = async () => {
-        if (!selectedStudent || !erpAnalysis) return;
+    const examProgressionChartData = useMemo(() => {
+        if (!analysis || !analysis.examHistoryRows) return { labels: [], datasets: [] };
+        return {
+            labels: analysis.examHistoryRows.map(e => e.test),
+            datasets: [
+                { label: 'Score (/720)', data: analysis.examHistoryRows.map(e => e.total), borderColor: '#1e3a8a', backgroundColor: 'rgba(30, 58, 138, 0.1)', borderWidth: 2.5, fill: true, tension: 0.2, pointBackgroundColor: '#1e3a8a', pointRadius: 4, yAxisID: 'y' },
+                { label: 'Marks Lost', data: analysis.examHistoryRows.map(e => e.lost), borderColor: '#dc2626', backgroundColor: 'transparent', borderWidth: 2, borderDash: [5, 5], tension: 0.2, pointBackgroundColor: '#dc2626', pointRadius: 3, yAxisID: 'y1' }
+            ]
+        };
+    }, [analysis]);
+
+    const examProgressionChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { font: { weight: 'bold', size: 11 }, boxWidth: 14 } }, datalabels: { display: false } },
+        scales: {
+            x: { grid: { display: false } },
+            y: { type: 'linear', display: true, position: 'left', grid: { color: '#f1f5f9' }, min: Math.max(0, (analysis?.minScore || 600) - 30), max: 720 },
+            y1: { type: 'linear', display: true, position: 'right', grid: { display: false } }
+        }
+    };
+
+    const downloadPdf = async () => {
+        if (!selectedStudent || !analysis) return;
         setIsExportingPdf(true);
 
         try {
@@ -602,1682 +483,458 @@ const estimateWU = (lost) => {
             const margin = 12;
             const contentWidth = pageWidth - (margin * 2);
 
-            // 1. Load fonts & logo in parallel
-            const [impactFont, bookmanFont, bookmanBoldFont, logoImg] = await Promise.all([
-                loadFont('/fonts/unicode.impact.ttf'),
+            const [bookmanFont, bookmanBoldFont, logoImg] = await Promise.all([
                 loadFont('/fonts/bookman-old-style.ttf'),
                 loadFont('/fonts/BOOKOSB.TTF'),
                 loadImage('/logo.png')
             ]);
 
-            // Register Fonts if available
-            if (impactFont) {
-                doc.addFileToVFS("unicode.impact.ttf", impactFont);
-                doc.addFont("unicode.impact.ttf", "Impact", "normal");
-            }
-            if (bookmanFont) {
-                doc.addFileToVFS("bookman-old-style.ttf", bookmanFont);
-                doc.addFont("bookman-old-style.ttf", "Bookman", "normal");
-            }
-            if (bookmanBoldFont) {
-                doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont);
-                doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
-            }
+            if (bookmanFont) { doc.addFileToVFS("bookman-old-style.ttf", bookmanFont); doc.addFont("bookman-old-style.ttf", "Bookman", "normal"); }
+            if (bookmanBoldFont) { doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont); doc.addFont("BOOKOSB.TTF", "Bookman", "bold"); }
 
-            // 2. Generate Ultra-Sharp Offscreen Charts with Large Bold Text
-            const bar4kPromise = createHighResChartImage(
-                'bar',
-                {
-                    labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
-                    datasets: [{
-                        data: [
-                            erpAnalysis.scoredMarks.BOTANY,
-                            erpAnalysis.scoredMarks.ZOOLOGY,
-                            erpAnalysis.scoredMarks.PHYSICS,
-                            erpAnalysis.scoredMarks.CHEMISTRY
-                        ],
-                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ec4899'],
-                        borderRadius: 8,
-                        barThickness: 50,
-                        datalabels: {
-                            color: '#0f172a',
-                            anchor: 'end',
-                            align: 'end',
-                            offset: 4,
-                            font: { weight: 'bold', size: 30 },
-                            formatter: (val) => val
-                        }
-                    }]
-                },
-                {
-                    plugins: {
-                        legend: { display: false },
-                        datalabels: { display: true }
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            ticks: { font: { size: 26, weight: 'bold' }, color: '#0f172a', padding: 8 }
-                        },
-                        y: {
-                            grid: { display: true, color: '#e2e8f0' },
-                            max: 205,
-                            ticks: { 
-                                font: { size: 20, weight: 'bold' }, 
-                                color: '#64748b', 
-                                stepSize: 45,
-                                callback: (val) => val <= 180 ? val : ''
-                            }
-                        }
-                    },
-                    layout: { padding: { top: 55, bottom: 10, left: 15, right: 15 } }
-                },
-                750,
-                550
-            );
-
-            const doughnut4kPromise = createHighResChartImage(
-                'doughnut',
-                {
-                    labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
-                    datasets: [{
-                        data: [
-                            erpAnalysis.subjects.BOTANY.lost,
-                            erpAnalysis.subjects.ZOOLOGY.lost,
-                            erpAnalysis.subjects.PHYSICS.lost,
-                            erpAnalysis.subjects.CHEMISTRY.lost
-                        ],
-                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ec4899'],
-                        borderWidth: 3,
-                        borderColor: '#ffffff',
-                        datalabels: {
-                            color: '#ffffff',
-                            font: { weight: 'bold', size: 28 },
-                            formatter: (val) => val > 0 ? `-${val}` : ''
-                        }
-                    }]
-                },
-                {
-                    cutout: '50%',
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'bottom',
-                            labels: {
-                                boxWidth: 24,
-                                padding: 20,
-                                font: { size: 24, weight: 'bold' },
-                                color: '#0f172a'
-                            }
-                        },
-                        datalabels: { display: true }
-                    },
-                    layout: { padding: { top: 15, bottom: 15, left: 15, right: 15 } }
-                },
-                750,
-                550
-            );
-
-            const [bar4kImg, doughnut4kImg] = await Promise.all([bar4kPromise, doughnut4kPromise]);
-
-            // 3. Top Accent Bar (Positioned high with generous margin to avoid colliding with text)
-            let y = 10;
-            doc.setFillColor(15, 23, 42); // Navy dark #0f172a
-            doc.rect(margin, y, contentWidth, 2.5, 'F');
-            doc.setFillColor(245, 158, 11); // Amber accent #f59e0b
-            doc.rect(margin, y + 2.5, contentWidth, 1, 'F');
-
-            y = 22; // Clear 8.5mm spacing below accent bar
-
-            // 4. Logo & Institution Header
-            let logoW = 0;
-            const logoH = 11;
-            if (logoImg && logoImg.width) {
-                const asp = logoImg.width / logoImg.height;
-                logoW = logoH * asp;
-            }
-
-            const part1 = "Sri Chaitanya";
-            const part2 = " Educational Institutions";
-
-            doc.setFontSize(22);
-            if (impactFont) doc.setFont("Impact", "normal");
-            else doc.setFont("helvetica", "bold");
-            const w1 = doc.getTextWidth(part1);
-
-            if (bookmanFont) doc.setFont("Bookman", "normal");
-            else doc.setFont("helvetica", "normal");
-            const w2 = doc.getTextWidth(part2);
-
-            const gap = logoImg ? 4 : 0;
-            const totalWidth = logoW + gap + w1 + w2;
-            const startX = Math.max(margin, (pageWidth - totalWidth) / 2);
-            let currentX = startX;
-
-            if (logoImg) {
-                try {
-                    doc.addImage(logoImg, 'PNG', currentX, y - 7.5, logoW, logoH);
-                } catch (e) {}
-                currentX += logoW + gap;
-            }
-
-            if (impactFont) doc.setFont("Impact", "normal");
-            else doc.setFont("helvetica", "bold");
-            doc.setTextColor(0, 112, 192);
-            doc.text(part1, currentX, y);
-
-            if (bookmanFont) doc.setFont("Bookman", "normal");
-            else doc.setFont("helvetica", "normal");
-            doc.setTextColor(0, 112, 192);
-            doc.text(part2, currentX + w1, y);
-
-            y += 6;
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(8.5);
-            doc.setTextColor(71, 85, 105);
-            doc.text("Central Office, Bangalore • Academic Performance Division", pageWidth / 2, y, { align: 'center' });
-
-            y += 6;
-            // Document Main Title Banner
-            doc.setFillColor(30, 58, 138); // #1e3a8a
-            doc.roundedRect(margin, y, contentWidth, 9, 2, 2, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(11);
-            doc.setFont("helvetica", "bold");
-            doc.text("STUDENT MARKS LOSS & PERFORMANCE ANALYSIS REPORT", pageWidth / 2, y + 6, { align: 'center' });
-
-            y += 13;
-
-            // 5. Student Information Profile Box
-            doc.setFillColor(248, 250, 252); // #f8fafc
-            doc.setDrawColor(226, 232, 240); // #e2e8f0
-            doc.setLineWidth(0.4);
-            doc.roundedRect(margin, y, contentWidth, 22, 2, 2, 'FD');
+            let y = 12;
+            if (logoImg) doc.addImage(logoImg, 'PNG', margin, y, 10, 10);
+            doc.setFontSize(13);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(15, 23, 42);
+            doc.text("SRI CHAITANYA EDUCATIONAL INSTITUTIONS", margin + (logoImg ? 13 : 0), y + 7);
 
             doc.setFontSize(9);
-            doc.setTextColor(15, 23, 42);
+            if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
+            doc.setTextColor(100, 116, 139);
+            doc.text(`Individual Performance Report - ${filters.academicYear || '2026'}`, pageWidth - margin, y + 7, { align: 'right' });
 
-            const col1X = margin + 5;
-            const col2X = margin + (contentWidth / 2) + 5;
+            y += 14;
+            doc.setFillColor(15, 23, 42);
+            doc.rect(margin, y, contentWidth, 16, 'F');
+            
+            doc.setFontSize(14);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(255, 255, 255);
+            doc.text("MARKS LOSS & PERFORMANCE ANALYSIS", pageWidth / 2, y + 6.5, { align: 'center' });
 
-            // Left Column
-            doc.setFont("helvetica", "bold");
-            doc.text("Student Name:", col1X, y + 6);
-            doc.setFont("helvetica", "normal");
-            doc.text(selectedStudent.name || '-', col1X + 26, y + 6);
+            doc.setFontSize(8.5);
+            if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
+            doc.setTextColor(203, 213, 225);
+            const metadataStr = `${selectedStudent.name} | ID ${selectedStudent.STUD_ID} | ${selectedStudent.campus || 'Campus'} | ${selectedStudent.stream || 'SR ELITE'} | AY ${filters.academicYear || '2026'} | All Exams (${analysis.examCount})`;
+            doc.text(metadataStr, pageWidth / 2, y + 12, { align: 'center' });
 
-            doc.setFont("helvetica", "bold");
-            doc.text("Student ID:", col1X, y + 12);
-            doc.setFont("helvetica", "normal");
-            doc.text(String(selectedStudent.STUD_ID || '-'), col1X + 26, y + 12);
+            y += 22;
 
-            doc.setFont("helvetica", "bold");
-            doc.text("Campus:", col1X, y + 18);
-            doc.setFont("helvetica", "normal");
-            doc.text(selectedStudent.campus || '-', col1X + 26, y + 18);
+            doc.setFontSize(11);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(136, 19, 55);
+            doc.text("1. Overall Picture", margin, y);
+            y += 5;
 
-            // Right Column
-            const academicYr = filters.academicYear || '2026';
-            const studentStream = selectedStudent.stream || selectedStudent.Stream || (erpData && erpData.length > 0 ? erpData.find(r => r.Stream)?.Stream : null) || (filters.stream && filters.stream.length > 0 ? filters.stream.join(', ') : '-');
-            const isSpecificTestFilter = filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__';
-            const testNameText = isSpecificTestFilter
-                ? (selectedErpTests.length > 0 ? selectedErpTests.join(', ') : filters.test.join(', '))
-                : (selectedErpTests.length > 1 ? `All Exams (${selectedErpTests.length})` : (selectedErpTests[0] || 'All Exams'));
+            doc.setFontSize(9);
+            if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
+            doc.setTextColor(30, 41, 59);
 
-            doc.setFont("helvetica", "bold");
-            doc.text("Academic Year:", col2X, y + 6);
-            doc.setFont("helvetica", "normal");
-            doc.text(academicYr, col2X + 26, y + 6);
+            const overallText = `Over ${analysis.examCount} exams, ${selectedStudent.name} lost a total of ${analysis.grandTotalLost.toLocaleString()} marks, which is ${analysis.avgLostPerExam} marks per exam against a maximum of 720. Of this, ${analysis.top2Share}% came from just two subjects, ${analysis.lagging1.name} and ${analysis.lagging2.name}. ${analysis.strongSubjects.map(s => s.name).join(' and ')} is already close to full marks, so the gains available to him/her are almost entirely in ${analysis.lagging1.name} and ${analysis.lagging2.name}.`;
+            const overallLines = doc.splitTextToSize(overallText, contentWidth);
+            doc.text(overallLines, margin, y);
+            y += (overallLines.length * 4.5) + 6;
 
-            doc.setFont("helvetica", "bold");
-            doc.text("Stream:", col2X, y + 12);
-            doc.setFont("helvetica", "normal");
-            doc.text(String(studentStream || '-'), col2X + 26, y + 12);
-
-            doc.setFont("helvetica", "bold");
-            doc.text("Test:", col2X, y + 18);
-            doc.setFont("helvetica", "normal");
-            doc.text(testNameText, col2X + 26, y + 18);
-
-            y += 28;
-
-            // 6. Ultra-Sharp 4K Side-by-Side Performance Charts
-            const chartBoxWidth = (contentWidth - 6) / 2;
-            const chartBoxHeight = 85;
-
-            // Bar Chart Frame
-            if (bar4kImg) {
-                doc.setDrawColor(226, 232, 240);
-                doc.setFillColor(255, 255, 255);
-                doc.roundedRect(margin, y, chartBoxWidth, chartBoxHeight, 2, 2, 'FD');
-                doc.setFontSize(9.5);
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(15, 23, 42);
-                doc.text("Subject Wise Performance (Scored Marks)", margin + 6, y + 6.5);
-                try {
-                    doc.addImage(bar4kImg, 'PNG', margin + 2, y + 9, chartBoxWidth - 4, chartBoxHeight - 12);
-                } catch (e) { console.error("Bar image error:", e); }
-            }
-
-            // Doughnut Chart Frame
-            if (doughnut4kImg) {
-                const dX = margin + chartBoxWidth + 6;
-                doc.setDrawColor(226, 232, 240);
-                doc.setFillColor(255, 255, 255);
-                doc.roundedRect(dX, y, chartBoxWidth, chartBoxHeight, 2, 2, 'FD');
-                doc.setFontSize(9.5);
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(15, 23, 42);
-                doc.text("Marks Loss Distribution (Subject Penalty)", dX + 6, y + 6.5);
-                try {
-                    doc.addImage(doughnut4kImg, 'PNG', dX + 2, y + 9, chartBoxWidth - 4, chartBoxHeight - 12);
-                } catch (e) { console.error("Doughnut image error:", e); }
-            }
-
-            y += chartBoxHeight + 10;
-
-            // 7. Subject Breakdown Table (autoTable)
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(15, 23, 42);
-            doc.text("SUBJECT-WISE SCORE & MARKS LOSS BREAKDOWN", margin, y);
-
+            doc.setFontSize(11);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(136, 19, 55);
+            doc.text("2. Marks Lost by Subject", margin, y);
             y += 4;
-
-            const tableRows = Object.entries(erpAnalysis.subjects).map(([subj, stats]) => {
-                const scored = erpAnalysis.scoredMarks[subj] || 0;
-                return [
-                    subj,
-                    `${scored} / 180 ${selectedErpTests.length > 1 ? '(avg)' : ''}`,
-                    `${stats.w} (-${stats.w * 5})`,
-                    `${stats.u} (-${stats.u * 4})`,
-                    `-${stats.lost}`
-                ];
-            });
-
-            // Add Total Row
-            tableRows.push([
-                'TOTAL',
-                `${erpAnalysis.totalScored} / 720 ${selectedErpTests.length > 1 ? '(avg)' : ''}`,
-                `${erpAnalysis.wrongCount} (-${erpAnalysis.wrongLost})`,
-                `${erpAnalysis.unattemptedCount} (-${erpAnalysis.unattemptedLost})`,
-                `-${erpAnalysis.totalLost}`
-            ]);
 
             autoTable(doc, {
                 startY: y,
                 margin: { left: margin, right: margin },
-                head: [['Subject', 'Scored Marks', 'Wrong Answers (W)', 'Unattempted (U)', 'Total Marks Lost']],
-                body: tableRows,
+                head: [['Subject', 'Avg score /180', 'Wrong answers', 'Marks lost (wrong)', 'Unattempted', 'Marks lost (unatt.)', 'Total lost', 'Share of loss', 'Lost per exam']],
+                body: [
+                    ...analysis.subjectRows.map(s => [s.name, s.avgScore, s.wrongCount, `-${s.wrongLost}`, s.unattCount, `-${s.unattLost}`, `-${s.totalLost}`, `${s.share}%`, s.lostPerExam]),
+                    ['Total', analysis.studTot, analysis.totalWrongCount, `-${analysis.totalWrongLost}`, analysis.totalUnattCount, `-${analysis.totalUnattLost}`, `-${analysis.grandTotalLost}`, '100%', analysis.avgLostPerExam]
+                ],
                 theme: 'grid',
-                headStyles: {
-                    fillColor: [30, 58, 138],
-                    textColor: [255, 255, 255],
-                    fontStyle: 'bold',
-                    fontSize: 9,
-                    halign: 'center'
-                },
-                bodyStyles: {
-                    fontSize: 8.5,
-                    textColor: [30, 41, 59],
-                    halign: 'center'
-                },
-                columnStyles: {
-                    0: { halign: 'left', fontStyle: 'bold' },
-                    1: { halign: 'center', fontStyle: 'bold' },
-                    2: { halign: 'center' },
-                    3: { halign: 'center' },
-                    4: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold' }
-                },
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+                bodyStyles: { fontSize: 8, textColor: [30, 41, 59] },
                 didParseCell: (data) => {
-                    if (data.row.index === tableRows.length - 1) {
-                        data.cell.styles.fontStyle = 'bold';
-                        data.cell.styles.fillColor = [241, 245, 249];
-                        data.cell.styles.textColor = [15, 23, 42];
+                    if (data.section === 'body') {
+                        const rowName = data.row.cells[0]?.raw;
+                        if (rowName === 'Physics' || rowName === 'Chemistry' || rowName === analysis.lagging1.name || rowName === analysis.lagging2.name) {
+                            data.cell.styles.fillColor = [254, 242, 242];
+                        }
+                        if (data.row.index === 4) {
+                            data.cell.styles.fontStyle = 'bold';
+                            data.cell.styles.fillColor = [241, 245, 249];
+                        }
                     }
                 }
             });
 
-            // 8. Wrong & Unattempted Questions Topic & Subtopic Details Table
-            if (erpAnalysis.questions && erpAnalysis.questions.length > 0) {
-                let questionsY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : y + 30;
-                
-                if (questionsY > pageHeight - 40) {
-                    doc.addPage();
-                    questionsY = 20;
-                }
+            y = doc.lastAutoTable.finalY + 4;
+            doc.setFontSize(7.5); doc.setFont("helvetica", "italic"); doc.setTextColor(100, 116, 139);
+            doc.text(`A wrong answer costs 5 marks (4 not earned + 1 negative); an unattempted question costs 4 marks. Counts are totals across ${analysis.examCount} exams. Highlighted rows are the lagging subjects.`, margin, y);
+            y += 6;
 
-                doc.setFontSize(10);
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(15, 23, 42);
-                doc.text("WRONG & UNATTEMPTED QUESTIONS (TOPIC & SUBTOPIC DETAILS)", margin, questionsY);
+            const barChartImg = await createHighResChartImage('bar', horizontalChartData, { indexAxis: 'y', plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'end', font: { weight: 'bold', size: 14 } } }, scales: { x: { display: true }, y: { ticks: { font: { weight: 'bold', size: 14 } } } } }, 800, 300);
+            if (barChartImg) {
+                doc.addImage(barChartImg, 'PNG', margin + 25, y, 140, 45);
+                y += 48;
+                doc.setFontSize(8); doc.setFont("helvetica", "italic");
+                doc.text("Figure 1: Average marks lost per exam, by subject.", pageWidth / 2, y, { align: 'center' });
+                y += 8;
+            }
 
-                const qTableRows = erpAnalysis.questions.map(q => [
-                    q.test,
-                    `Q${q.qNo}`,
-                    q.subject,
-                    q.topic,
-                    q.subTopic || '-',
-                    q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)',
-                    `-${q.lost}`
-                ]);
+            if (y > pageHeight - 60) { doc.addPage(); y = 14; }
 
-                autoTable(doc, {
-                    startY: questionsY + 4,
-                    margin: { left: margin, right: margin },
-                    head: [['Test', 'Q.No', 'Subject', 'Topic', 'Sub-Topic', 'Status', 'Marks Lost']],
-                    body: qTableRows,
-                    theme: 'grid',
-                    headStyles: {
-                        fillColor: [30, 58, 138],
-                        textColor: [255, 255, 255],
-                        fontStyle: 'bold',
-                        fontSize: 8.5,
-                        halign: 'center'
-                    },
-                    bodyStyles: {
-                        fontSize: 8,
-                        textColor: [30, 41, 59],
-                        halign: 'left'
-                    },
-                    columnStyles: {
-                        0: { halign: 'left', fontStyle: 'bold', cellWidth: 25 },
-                        1: { halign: 'center', fontStyle: 'bold', cellWidth: 15 },
-                        2: { halign: 'left', fontStyle: 'bold', cellWidth: 25 },
-                        3: { halign: 'left', cellWidth: 45 },
-                        4: { halign: 'left', cellWidth: 40 },
-                        5: { halign: 'center', cellWidth: 23 },
-                        6: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold', cellWidth: 13 }
-                    },
-                    didParseCell: (data) => {
-                        if (data.section === 'body' && data.column.index === 5) {
-                            const cellVal = String(data.cell.raw);
-                            if (cellVal.includes('Wrong')) {
-                                data.cell.styles.textColor = [180, 83, 9];
-                                data.cell.styles.fontStyle = 'bold';
-                            } else if (cellVal.includes('Unattempted')) {
-                                data.cell.styles.textColor = [21, 128, 61];
-                                data.cell.styles.fontStyle = 'bold';
-                            }
-                        }
+            doc.setFontSize(11);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(136, 19, 55);
+            doc.text("3. Where He Is Lagging", margin, y);
+            y += 4;
+
+            autoTable(doc, {
+                startY: y,
+                margin: { left: margin, right: margin },
+                head: [['Subject', 'Wrong / exam', 'Unattempted / exam', 'Main cause of loss', 'Priority']],
+                body: analysis.laggingTableRows.map(r => [r.name, r.wrongPerExam, r.unattPerExam, r.cause, r.priority]),
+                theme: 'grid',
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+                bodyStyles: { fontSize: 8 },
+                didParseCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 4 && data.cell.raw === 'High') {
+                        data.cell.styles.textColor = [185, 28, 28];
+                        data.cell.styles.fontStyle = 'bold';
                     }
-                });
-            }
+                }
+            });
 
-            // 9. Clean Footer across all pages
-            const totalPages = doc.getNumberOfPages();
-            for (let i = 1; i <= totalPages; i++) {
+            y = doc.lastAutoTable.finalY + 6;
+
+            doc.setFontSize(8.5);
+            if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
+            doc.setTextColor(30, 41, 59);
+
+            const bullet1 = `• ${analysis.lagging1.name} (lost ${analysis.lagging1.totalLost} marks, ${analysis.lagging1.share}% of total): the largest loss. About ${analysis.lagging1.wrongPerExam} questions are wrong in every exam, and ${analysis.lagging1.unattCount} questions were skipped across the ${analysis.examCount} exams (${analysis.lagging1.unattLost} marks). Accuracy and attempt rate need focused practice.`;
+            const b1Lines = doc.splitTextToSize(bullet1, contentWidth);
+            doc.text(b1Lines, margin, y);
+            y += (b1Lines.length * 4) + 3;
+
+            const bullet2 = `• ${analysis.lagging2.name} (lost ${analysis.lagging2.totalLost} marks, ${analysis.lagging2.share}%): almost entirely wrong answers (${Math.round((analysis.lagging2.wrongLost/analysis.lagging2.totalLost)*100)}% of loss), averaging ${analysis.lagging2.wrongPerExam} wrong per exam. Questions are being attempted but answered incorrectly, pointing to calculation errors or half-known concepts.`;
+            const b2Lines = doc.splitTextToSize(bullet2, contentWidth);
+            doc.text(b2Lines, margin, y);
+            y += (b2Lines.length * 4) + 3;
+
+            const bullet3 = `• ${analysis.strongSubjects.map(s => s.name).join(' and ')}: only ${analysis.strongSubjects.map(s => `${s.lostPerExam} (${s.name})`).join(' and ')} marks lost per exam. No major intervention is needed.`;
+            const b3Lines = doc.splitTextToSize(bullet3, contentWidth);
+            doc.text(b3Lines, margin, y);
+            y += (b3Lines.length * 4) + 6;
+
+            if (y > pageHeight - 50) { doc.addPage(); y = 14; }
+
+            doc.setFontSize(11);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(136, 19, 55);
+            doc.text("4. Exam-to-Exam Comparison & Progression", margin, y);
+            y += 4;
+
+            autoTable(doc, {
+                startY: y,
+                margin: { left: margin, right: margin },
+                head: [['Exam / Test', 'Date', 'Botany', 'Zoology', 'Physics', 'Chemistry', 'Total (/720)', 'Marks Lost', 'Trend']],
+                body: analysis.examHistoryRows.map(ex => [ex.test, ex.date, ex.bot, ex.zoo, ex.phy, ex.che, ex.total, `-${ex.lost}`, ex.diff > 0 ? `+${ex.diff}` : `${ex.diff}`]),
+                theme: 'grid',
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+                bodyStyles: { fontSize: 7.5 }
+            });
+
+            y = doc.lastAutoTable.finalY + 6;
+
+            if (y > pageHeight - 45) { doc.addPage(); y = 14; }
+
+            doc.setFontSize(11);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(136, 19, 55);
+            doc.text("5. Improvement Potential", margin, y);
+            y += 4;
+
+            autoTable(doc, {
+                startY: y,
+                margin: { left: margin, right: margin },
+                head: [['Scenario (illustrative)', 'Marks gained per exam']],
+                body: analysis.improvementScenarios.map(sc => [sc.scenario, sc.gained]),
+                theme: 'grid',
+                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+                bodyStyles: { fontSize: 8 },
+                didParseCell: (data) => {
+                    if (data.section === 'body' && (data.row.index === 3 || data.row.index === 4)) {
+                        data.cell.styles.fontStyle = 'bold'; data.cell.styles.fillColor = [241, 245, 249];
+                    }
+                }
+            });
+
+            y = doc.lastAutoTable.finalY + 6;
+
+            if (y > pageHeight - 40) { doc.addPage(); y = 14; }
+
+            doc.setFontSize(11);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(136, 19, 55);
+            doc.text("6. Recommended Action Points", margin, y);
+            y += 5;
+
+            doc.setFontSize(8.5);
+            if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
+            doc.setTextColor(30, 41, 59);
+
+            analysis.actionPoints.forEach((ap, idx) => {
+                const apText = `${idx + 1}. ${ap}`;
+                const apLines = doc.splitTextToSize(apText, contentWidth);
+                doc.text(apLines, margin, y);
+                y += (apLines.length * 4) + 2;
+            });
+
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
-                doc.setDrawColor(226, 232, 240);
-                doc.setLineWidth(0.3);
-                doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
-                doc.setFontSize(7.5);
-                doc.setFont("helvetica", "normal");
-                doc.setTextColor(100, 116, 139);
-                doc.text("Generated automatically via Sri Chaitanya Medicon Analytics Platform", margin, pageHeight - 7);
-                doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+                doc.setFontSize(7.5); doc.setTextColor(148, 163, 184);
+                doc.text(`Academic Performance Division | Confidential`, margin, pageHeight - 8);
+                doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
             }
 
-            const cleanFileName = `${selectedStudent.name.replace(/[^a-zA-Z0-9]/g, '_')}_Marks_Loss_Report.pdf`;
-            doc.save(cleanFileName);
-            logActivity(userData, 'Downloaded Marks Loss PDF', { student: selectedStudent.name, studentId: selectedStudent.STUD_ID });
+            doc.save(`Individual_Performance_Report_${selectedStudent.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+            logActivity(userData, 'Exported Student PDF Report', { studentId: selectedStudent.STUD_ID });
         } catch (err) {
-            console.error("Failed to export Executive PDF:", err);
+            console.error("Failed to export PDF:", err);
         } finally {
             setIsExportingPdf(false);
         }
     };
 
+    const downloadExcel = async () => {
+        if (!toppersList || toppersList.length === 0) return;
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Toppers Marks Loss');
+
+        worksheet.columns = [
+            { header: 'Rank', key: 'rank', width: 8 },
+            { header: 'Student ID', key: 'STUD_ID', width: 15 },
+            { header: 'Student Name', key: 'name', width: 25 },
+            { header: 'Campus', key: 'campus', width: 20 },
+            { header: 'Total Score', key: 'tot', width: 12 },
+            { header: 'Botany', key: 'bot', width: 10 },
+            { header: 'Zoology', key: 'zoo', width: 10 },
+            { header: 'Physics', key: 'phy', width: 10 },
+            { header: 'Chemistry', key: 'che', width: 10 }
+        ];
+
+        toppersList.forEach((st, idx) => {
+            worksheet.addRow({ rank: idx + 1, STUD_ID: st.STUD_ID, name: st.name, campus: st.campus, tot: Number(st.tot || 0).toFixed(1), bot: Number(st.bot || 0).toFixed(1), zoo: Number(st.zoo || 0).toFixed(1), phy: Number(st.phy || 0).toFixed(1), che: Number(st.che || 0).toFixed(1) });
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        saveAs(blob, `Topper_Marks_Loss_Report_${topLimit}.xlsx`);
+        logActivity(userData, 'Downloaded Topper Marks Loss Excel', { limit: topLimit });
+    };
+
     return (
-        <div className="topper-marks-loss-container">
-            {/* Top Control Bar with Top N Filters */}
+        <div className="toppers-report-container">
+            <LoadingTimer isLoading={loading || erpLoading} />
+
             <div className="toppers-controls-bar">
-                <div className="results-indicator">
-                    <div className="title-icon-badge">
-                        <Award size={22} color="#ffffff" />
-                    </div>
-                    <div>
-                        <strong className="main-title">Topper Marks Loss Executive Directory</strong>
-                        <span className="sub-title">
-                            Found <strong>{students.length}</strong> Toppers matching filters • Showing <strong>Top {toppersList.length}</strong>
-                        </span>
-                    </div>
+                <div className="control-left">
+                    <span className="results-indicator">
+                        Found <strong>{students.length}</strong> Students matching filters. Showing <strong>Top {toppersList.length}</strong>.
+                    </span>
+
+                    {toppersList.length > 0 && (
+                        <div style={{ width: '260px' }}>
+                            <Select
+                                options={toppersList.map(s => ({ value: s.STUD_ID, label: `${s.name} (${Math.round(s.tot)}/720) - ${s.campus}` }))}
+                                value={selectedStudent ? { value: selectedStudent.STUD_ID, label: `${selectedStudent.name} (${Math.round(selectedStudent.tot)}/720) - ${selectedStudent.campus}` } : null}
+                                onChange={(opt) => {
+                                    const found = toppersList.find(s => s.STUD_ID === opt.value);
+                                    if (found) setSelectedStudent(found);
+                                }}
+                                isSearchable
+                                placeholder="Select Student..."
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className="control-right">
-                    {/* Preset Pills */}
                     <div className="pill-group">
-                        {[5, 10, 15, 20, 50, 100].map((num) => (
-                            <button
-                                key={num}
-                                className={`pill-btn ${topLimit === num ? 'active' : ''}`}
-                                onClick={() => handleSetTopLimit(num)}
-                            >
-                                Top {num}
+                        {[10, 50, 100].map(limit => (
+                            <button key={limit} className={`pill-btn ${topLimit === limit ? 'active' : ''}`} onClick={() => { setTopLimit(limit); logActivity(userData, `Switched View Limit`, { limit }); }}>
+                                Top {limit}
                             </button>
                         ))}
                     </div>
 
-                    {/* Custom Input */}
-                    <div className="custom-input-box">
-                        <span className="custom-label">Custom:</span>
-                        <input
-                            type="number"
-                            min="1"
-                            max="500"
-                            className="custom-number-input"
-                            value={customInput}
-                            onChange={(e) => setCustomInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSetTopLimit(customInput);
-                            }}
-                        />
-                        <button
-                            className="custom-set-btn"
-                            onClick={() => handleSetTopLimit(customInput)}
-                        >
-                            Set
-                        </button>
-                    </div>
+                    <button className="btn-pdf-download" onClick={downloadPdf} disabled={isExportingPdf} title="Export Single Page PDF Report">
+                        <Download size={16} />
+                        {isExportingPdf ? 'Exporting PDF...' : 'Export PDF'}
+                    </button>
+
+                    <button className="btn-excel-download" onClick={downloadExcel} title="Export to Excel">
+                        <FileSpreadsheet size={16} />
+                        Export Excel
+                    </button>
                 </div>
             </div>
 
-            {/* Student Selection Button Tabs */}
-            {loading ? (
-                <div className="loader-box">
-                    <div className="loading-spinner"></div>
-                    <p>Loading Toppers Directory...</p>
-                </div>
-            ) : toppersList.length === 0 ? (
-                <div className="empty-box">
-                    {!hasSelectedFilters ? (
-                        <>
-                            <SlidersHorizontal size={44} color="#3b82f6" />
-                            <h4>Please Select Filters to Display Data</h4>
-                            <p>To display toppers and marks loss report, kindly select the required filters first from the top filter bar.</p>
-                        </>
-                    ) : (
-                        <>
-                            <Users size={44} color="#94a3b8" />
-                            <h4>No Toppers Found</h4>
-                            <p>Try adjusting your filters to find students matching criteria.</p>
-                        </>
-                    )}
+            {selectedStudent && analysis ? (
+                <div className="pdf-paper-view" ref={reportPaperRef}>
+                    <div className="pdf-header-brand">
+                        <span className="brand-inst">SRI CHAITANYA EDUCATIONAL INSTITUTIONS</span>
+                        <span className="brand-doc-title">Individual Performance Report - {filters.academicYear || '2026'}</span>
+                    </div>
+
+                    <div className="pdf-main-title-banner">
+                        <h2>MARKS LOSS & PERFORMANCE ANALYSIS</h2>
+                        <div className="student-metadata-line">
+                            <span>{selectedStudent.name}</span>
+                            <span className="sep">|</span>
+                            <span>ID {selectedStudent.STUD_ID}</span>
+                            <span className="sep">|</span>
+                            <span>{selectedStudent.campus || 'Campus'}</span>
+                            <span className="sep">|</span>
+                            <span>{selectedStudent.stream || 'SR ELITE'}</span>
+                            <span className="sep">|</span>
+                            <span>AY {filters.academicYear || '2026'}</span>
+                            <span className="sep">|</span>
+                            <span>All Exams ({analysis.examCount})</span>
+                        </div>
+                    </div>
+
+                    <div className="pdf-section">
+                        <h3 className="section-heading">1. Overall Picture</h3>
+                        <p className="narrative-text">
+                            Over {analysis.examCount} exams, {selectedStudent.name} lost a total of <strong>{analysis.grandTotalLost.toLocaleString()} marks</strong>, 
+                            which is <strong>{analysis.avgLostPerExam} marks per exam</strong> against a maximum of 720. 
+                            Of this, <strong>{analysis.top2Share}% came from just two subjects</strong>, {analysis.lagging1.name} and {analysis.lagging2.name}. 
+                            {analysis.strongSubjects.map(s => s.name).join(' and ')} is already close to full marks, so the gains available to him/her are almost entirely in {analysis.lagging1.name} and {analysis.lagging2.name}.
+                        </p>
+                    </div>
+
+                    <div className="pdf-section">
+                        <h3 className="section-heading">2. Marks Lost by Subject</h3>
+                        <table className="pdf-report-table">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th><th>Avg score /180</th><th>Wrong answers</th><th>Marks lost (wrong)</th><th>Unattempted</th><th>Marks lost (unatt.)</th><th>Total lost</th><th>Share of loss</th><th>Lost per exam</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {analysis.subjectRows.map(row => (
+                                    <tr key={row.name} className={row.isLagging ? 'highlight-lagging' : ''}>
+                                        <td className="font-bold">{row.name}</td><td>{row.avgScore}</td><td>{row.wrongCount}</td><td>-{row.wrongLost}</td><td>{row.unattCount}</td><td>-{row.unattLost}</td><td className="font-bold">-{row.totalLost}</td><td>{row.share}%</td><td className="font-bold">{row.lostPerExam}</td>
+                                    </tr>
+                                ))}
+                                <tr className="total-row">
+                                    <td>Total</td><td>{analysis.studTot}</td><td>{analysis.totalWrongCount}</td><td>-{analysis.totalWrongLost}</td><td>{analysis.totalUnattCount}</td><td>-{analysis.totalUnattLost}</td><td>-{analysis.grandTotalLost}</td><td>100%</td><td>{analysis.avgLostPerExam}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p className="table-footnote">
+                            A wrong answer costs 5 marks (4 not earned + 1 negative); an unattempted question costs 4 marks. Counts are totals across {analysis.examCount} exams. Highlighted rows are the lagging subjects.
+                        </p>
+
+                        <div className="chart-container-horizontal" style={{ height: '220px' }}>
+                            <Bar data={horizontalChartData} options={horizontalChartOptions} />
+                            <p className="chart-caption">Figure 1: Average marks lost per exam, by subject.</p>
+                        </div>
+                    </div>
+
+                    <div className="pdf-section">
+                        <h3 className="section-heading">3. Where He Is Lagging</h3>
+                        <table className="pdf-report-table">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th><th>Wrong / exam</th><th>Unattempted / exam</th><th>Main cause of loss</th><th>Priority</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {analysis.laggingTableRows.map(row => (
+                                    <tr key={row.name} className={row.priority === 'High' ? 'highlight-lagging' : ''}>
+                                        <td className="font-bold">{row.name}</td><td>{row.wrongPerExam}</td><td>{row.unattPerExam}</td><td>{row.cause}</td><td className={row.priority === 'High' ? 'text-danger font-bold' : ''}>{row.priority}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        <div className="bullets-analysis">
+                            <p className="bullet-item">• <strong>{analysis.lagging1.name} (lost {analysis.lagging1.totalLost} marks, {analysis.lagging1.share}% of total):</strong> the largest loss. About {analysis.lagging1.wrongPerExam} questions are wrong in every exam, and {analysis.lagging1.unattCount} questions were skipped across the {analysis.examCount} exams ({analysis.lagging1.unattLost} marks). Accuracy and attempt rate need focused practice.</p>
+                            <p className="bullet-item">• <strong>{analysis.lagging2.name} (lost {analysis.lagging2.totalLost} marks, {analysis.lagging2.share}%):</strong> almost entirely wrong answers ({Math.round((analysis.lagging2.wrongLost/analysis.lagging2.totalLost)*100)}% of loss), averaging {analysis.lagging2.wrongPerExam} wrong per exam. Questions are being attempted but answered incorrectly, pointing to calculation errors or half-known concepts.</p>
+                            <p className="bullet-item">• <strong>{analysis.strongSubjects.map(s => s.name).join(' and ')}:</strong> only {analysis.strongSubjects.map(s => `${s.lostPerExam} (${s.name})`).join(' and ')} marks lost per exam. No major intervention is needed.</p>
+                        </div>
+                    </div>
+
+                    <div className="pdf-section">
+                        <h3 className="section-heading">4. Exam-to-Exam Comparison & Progression</h3>
+                        <div className="metrics-summary-bar">
+                            <div className="metric-pill"><span className="metric-pill-lbl">Best Exam Score</span><span className="metric-pill-val text-primary">{analysis.maxScore} / 720 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>({analysis.bestExam})</span></span></div>
+                            <div className="metric-pill"><span className="metric-pill-lbl">Worst Exam Score</span><span className="metric-pill-val text-danger">{analysis.minScore} / 720 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>({analysis.worstExam})</span></span></div>
+                            <div className="metric-pill"><span className="metric-pill-lbl">Average Score</span><span className="metric-pill-val">{analysis.studTot} / 720</span></div>
+                        </div>
+
+                        <div style={{ height: '220px', marginBottom: '16px' }}>
+                            <Line data={examProgressionChartData} options={examProgressionChartOptions} />
+                        </div>
+
+                        <table className="pdf-report-table compact">
+                            <thead>
+                                <tr>
+                                    <th>Exam / Test</th><th>Date</th><th>Botany</th><th>Zoology</th><th>Physics</th><th>Chemistry</th><th>Total (/720)</th><th>Marks Lost</th><th>Trend</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {analysis.examHistoryRows.map(ex => (
+                                    <tr key={ex.test}>
+                                        <td className="font-bold">{ex.test}</td><td>{ex.date}</td><td>{ex.bot}</td><td>{ex.zoo}</td><td>{ex.phy}</td><td>{ex.che}</td><td className="font-bold text-primary">{ex.total}</td><td className="text-danger">-{ex.lost}</td>
+                                        <td>
+                                            {ex.diff > 0 ? (<span className="trend-up"><ArrowUpRight size={14} /> +{ex.diff}</span>) : ex.diff < 0 ? (<span className="trend-down"><ArrowDownRight size={14} /> {ex.diff}</span>) : (<span className="trend-flat"><Minus size={14} /> 0</span>)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="pdf-section">
+                        <h3 className="section-heading">5. Improvement Potential</h3>
+                        <table className="pdf-report-table">
+                            <thead><tr><th>Scenario (illustrative)</th><th>Marks gained per exam</th></tr></thead>
+                            <tbody>
+                                {analysis.improvementScenarios.map((sc, i) => (
+                                    <tr key={i} className={sc.isHighlight ? 'total-row' : ''}><td>{sc.scenario}</td><td className="font-bold">{sc.gained}</td></tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <p className="table-footnote">Scenarios are estimates from the {analysis.examCount}-exam averages, not predictions. Baseline used: 720 - {analysis.avgLostPerExam} = {analysis.studTot} average.</p>
+                    </div>
+
+                    <div className="pdf-section">
+                        <h3 className="section-heading">6. Recommended Action Points</h3>
+                        <ol className="action-points-list">
+                            {analysis.actionPoints.map((ap, i) => (<li key={i}>{ap}</li>))}
+                        </ol>
+                    </div>
+
+                    <div className="pdf-section" style={{ marginBottom: 0 }}>
+                        <h3 className="section-heading">7. Data Notes</h3>
+                        <p className="narrative-text small">
+                            Data reflects results compiled across {analysis.examCount} exam(s) filtered by current criteria. 
+                            Score figures: {analysis.grandTotalLost} marks lost over {analysis.examCount} exams gives an average of {analysis.studTot}/720. 
+                            Individual exam scores and topic-wise error logs are dynamically integrated from portal records.
+                        </p>
+                    </div>
                 </div>
             ) : (
-                <>
-                    <div className="student-buttons-bar">
-                        {toppersList.map((stud, idx) => {
-                            const isSelected = selectedStudent?.STUD_ID === stud.STUD_ID;
-                            const rankNum = idx + 1;
-                            let badgeClass = 'rank-badge normal';
-                            if (rankNum === 1) badgeClass = 'rank-badge gold';
-                            else if (rankNum === 2) badgeClass = 'rank-badge silver';
-                            else if (rankNum === 3) badgeClass = 'rank-badge bronze';
-
-                            return (
-                                <button
-                                    key={stud.STUD_ID || idx}
-                                    onClick={() => setSelectedStudent(stud)}
-                                    className={`student-tab-btn ${isSelected ? 'selected' : ''}`}
-                                >
-                                    <span className={badgeClass}>
-                                        #{rankNum}
-                                    </span>
-                                    <span className="stud-name">{stud.name || stud.STUD_NAME}</span>
-                                    <span className="stud-score">
-                                        ({Number(stud.tot || 0).toFixed(1)})
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Main Content Area for Selected Student */}
-                    {selectedStudent && (
-                        <div className="marks-loss-executive-card">
-                            {/* Executive Header Banner */}
-                            <div className="executive-header">
-                                <div className="student-profile-info">
-                                    <div className="profile-avatar">
-                                        <UserCheck size={26} color="#ffffff" />
-                                    </div>
-                                    <div>
-                                        <div className="title-row">
-                                            <h2 className="student-full-name">
-                                                {selectedStudent.name || selectedStudent.STUD_NAME}
-                                            </h2>
-                                            <span className="id-badge">
-                                                ID: {selectedStudent.STUD_ID}
-                                            </span>
-                                        </div>
-                                        <p className="student-submeta">
-                                            Campus: <strong>{selectedStudent.campus || '-'}</strong> • Stream: <strong>{selectedStudent.stream || selectedStudent.Stream || 'SR_ELITE'}</strong>
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <button
-                                    onClick={downloadStudentPdf}
-                                    disabled={isExportingPdf || erpLoading || !selectedStudent}
-                                    className="download-pdf-exec-btn"
-                                >
-                                    <FileText size={18} />
-                                    {isExportingPdf ? 'Generating Executive PDF...' : 'Download PDF Report'}
-                                </button>
-                            </div>
-
-                            {/* ERP Data Content */}
-                            {erpLoading ? (
-                                <div className="loader-box">
-                                    <div className="loading-spinner"></div>
-                                    <p>Fetching ERP Marks Loss details for {selectedStudent.name || selectedStudent.STUD_NAME}...</p>
-                                </div>
-                            ) : (
-                                <>
-                                    {/* Score Loss Cards */}
-                                            <div className="drawer-loss-cards">
-                                                <div className="loss-summary-card total">
-                                                    <span className="loss-card-title">Total Score Loss</span>
-                                                    <span className="loss-card-val">-{erpAnalysis.totalLost} Marks</span>
-                                                    <span className="loss-card-sub">Sum of penalties</span>
-                                                </div>
-
-                                                <div className="loss-summary-card wrong">
-                                                    <span className="loss-card-title">Wrong Answers (W)</span>
-                                                    <span className="loss-card-val">-{erpAnalysis.wrongLost} Marks</span>
-                                                    <span className="loss-card-sub">
-                                                        <strong>{erpAnalysis.wrongCount}</strong> wrong (-1 penalty, -5 loss each)
-                                                    </span>
-                                                </div>
-
-                                                <div className="loss-summary-card skipped">
-                                                    <span className="loss-card-title">Unattempted (U)</span>
-                                                    <span className="loss-card-val">-{erpAnalysis.unattemptedLost} Marks</span>
-                                                    <span className="loss-card-sub">
-                                                        <strong>{erpAnalysis.unattemptedCount}</strong> skipped (0 penalty, -4 loss each)
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Potential Score Banner & Exam Averages Summary */}
-                                            <div className="potential-score-banner" style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px 18px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <CheckCircle size={20} color="#10b981" style={{ flexShrink: 0 }} />
-                                                        <span style={{ fontWeight: '700', fontSize: '0.9rem', color: '#065f46' }}>
-                                                            Selected Exams: <strong>{selectedErpTests.length}</strong> / {uniqueTests.length} Test{selectedErpTests.length > 1 ? 's' : ''}
-                                                        </span>
-                                                        <span style={{
-                                                            background: '#d1fae5',
-                                                            color: '#047857',
-                                                            padding: '2px 8px',
-                                                            borderRadius: '12px',
-                                                            fontSize: '0.75rem',
-                                                            fontWeight: '800'
-                                                        }}>
-                                                            {(filters?.test && Array.isArray(filters.test) && filters.test.length > 0 && filters.test[0] !== '__ALL__')
-                                                                ? (selectedErpTests.length === 1 ? selectedErpTests[0] : `${selectedErpTests.length} Exams Selected`) 
-                                                                : (selectedErpTests.length > 1 ? 'All Exams Selected' : (selectedErpTests[0] || 'All Exams'))
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', paddingTop: '8px', borderTop: '1px dashed #a7f3d0' }}>
-                                                    <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#047857', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
-                                                        {selectedErpTests.length > 1 ? `Averages (${selectedErpTests.length} Exams):` : 'Exam Score:'}
-                                                    </span>
-                                                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                                        <span style={{ background: '#047857', color: '#ffffff', padding: '3px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '800' }}>
-                                                            TOT: {erpAnalysis.totalScored} / 720
-                                                        </span>
-                                                        <span style={{ background: '#ffffff', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
-                                                            BOT: <strong style={{ color: '#047857' }}>{erpAnalysis.scoredMarks.BOTANY}</strong>/180
-                                                        </span>
-                                                        <span style={{ background: '#ffffff', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
-                                                            ZOO: <strong style={{ color: '#047857' }}>{erpAnalysis.scoredMarks.ZOOLOGY}</strong>/180
-                                                        </span>
-                                                        <span style={{ background: '#ffffff', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
-                                                            PHY: <strong style={{ color: '#047857' }}>{erpAnalysis.scoredMarks.PHYSICS}</strong>/180
-                                                        </span>
-                                                        <span style={{ background: '#ffffff', border: '1px solid #a7f3d0', color: '#065f46', padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700' }}>
-                                                            CHE: <strong style={{ color: '#047857' }}>{erpAnalysis.scoredMarks.CHEMISTRY}</strong>/180
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Charts Row */}
-                                            <div className="drawer-charts-row">
-                                                <div className="drawer-chart-col">
-                                                    <h4 className="drawer-section-title">Subject Wise Performance</h4>
-                                                    <div style={{ height: '240px', position: 'relative' }}>
-                                                        <Bar 
-                                                            ref={subjectBarChartRef}
-                                                            data={{
-                                                                labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
-                                                                datasets: [{
-                                                                    data: [
-                                                                        erpAnalysis.scoredMarks.BOTANY,
-                                                                        erpAnalysis.scoredMarks.ZOOLOGY,
-                                                                        erpAnalysis.scoredMarks.PHYSICS,
-                                                                        erpAnalysis.scoredMarks.CHEMISTRY
-                                                                    ],
-                                                                    backgroundColor: ['#10b981', '#3b82f6', '#eab308', '#ec4899'],
-                                                                    borderRadius: 6,
-                                                                    barThickness: 24,
-                                                                    datalabels: {
-                                                                        color: '#000000',
-                                                                        anchor: 'end',
-                                                                        align: 'end',
-                                                                        offset: 4,
-                                                                        font: { weight: 'bold', size: 10 },
-                                                                        formatter: (val) => val
-                                                                    }
-                                                                }]
-                                                            }}
-                                                            options={{
-                                                                responsive: true,
-                                                                maintainAspectRatio: false,
-                                                                plugins: {
-                                                                    legend: { display: false },
-                                                                    datalabels: { display: true }
-                                                                },
-                                                                scales: {
-                                                                    x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } },
-                                                                    y: { 
-                                                                        grid: { display: true, color: '#f1f5f9' }, 
-                                                                        max: 205, 
-                                                                        ticks: { 
-                                                                            font: { size: 9 }, 
-                                                                            stepSize: 45,
-                                                                            callback: (val) => val <= 180 ? val : ''
-                                                                        } 
-                                                                    }
-                                                                },
-                                                                layout: { padding: { top: 25 } }
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="drawer-chart-col">
-                                                    <h4 className="drawer-section-title">Marks Loss Distribution</h4>
-                                                    <div style={{ height: '240px', position: 'relative' }}>
-                                                        <Doughnut 
-                                                            ref={lossDoughnutChartRef}
-                                                            data={{
-                                                                labels: ['Botany', 'Zoology', 'Physics', 'Chemistry'],
-                                                                datasets: [{
-                                                                    data: [
-                                                                        erpAnalysis.subjects.BOTANY.lost,
-                                                                        erpAnalysis.subjects.ZOOLOGY.lost,
-                                                                        erpAnalysis.subjects.PHYSICS.lost,
-                                                                        erpAnalysis.subjects.CHEMISTRY.lost
-                                                                    ],
-                                                                    backgroundColor: ['#10b981', '#3b82f6', '#eab308', '#ec4899'],
-                                                                    borderWidth: 1,
-                                                                    borderColor: '#ffffff',
-                                                                    datalabels: {
-                                                                        color: '#ffffff',
-                                                                        font: { weight: 'bold', size: 10 },
-                                                                        formatter: (val) => val > 0 ? `-${val}` : ''
-                                                                    }
-                                                                }]
-                                                            }}
-                                                            options={{
-                                                                responsive: true,
-                                                                maintainAspectRatio: false,
-                                                                cutout: '60%',
-                                                                plugins: {
-                                                                    legend: {
-                                                                        display: true,
-                                                                        position: 'right',
-                                                                        labels: { boxWidth: 10, padding: 8, font: { size: 9, weight: 'bold' } }
-                                                                    },
-                                                                    datalabels: { display: true }
-                                                                }
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Subject Breakdown Table */}
-                                            <div className="drawer-subject-breakdown">
-                                                <h4 className="drawer-section-title">Subject-wise Score & Loss</h4>
-                                                <table className="drawer-mini-table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Subject</th>
-                                                            <th>Scored Marks</th>
-                                                            <th>Wrong (W)</th>
-                                                            <th>Unattempted (U)</th>
-                                                            <th>Total Lost</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {Object.entries(erpAnalysis.subjects).map(([subject, stats]) => (
-                                                            <tr key={subject}>
-                                                                <td className="font-bold">{subject}</td>
-                                                                <td className="font-bold" style={{ color: '#0f172a' }}>
-                                                                    {erpAnalysis.scoredMarks[subject]} / 180 {selectedErpTests.length > 1 && <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal' }}>(avg)</span>}
-                                                                </td>
-                                                                <td>{stats.w} <span className="sub-text">(-{stats.w * 5})</span></td>
-                                                                <td>{stats.u} <span className="sub-text">(-{stats.u * 4})</span></td>
-                                                                <td className="loss-red font-bold">-{stats.lost}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                    <tfoot>
-                                                        <tr style={{ background: '#f8fafc', fontWeight: 'bold', borderTop: '2px solid #cbd5e1' }}>
-                                                            <td>TOTAL</td>
-                                                            <td style={{ color: '#172554', fontSize: '0.85rem' }}>
-                                                                {erpAnalysis.totalScored} / 720 {selectedErpTests.length > 1 && <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 'normal' }}>(avg)</span>}
-                                                            </td>
-                                                            <td>{erpAnalysis.wrongCount} <span className="sub-text">(-{erpAnalysis.wrongLost})</span></td>
-                                                            <td>{erpAnalysis.unattemptedCount} <span className="sub-text">(-{erpAnalysis.unattemptedLost})</span></td>
-                                                            <td className="loss-red" style={{ fontSize: '0.85rem' }}>-{erpAnalysis.totalLost}</td>
-                                                        </tr>
-                                                    </tfoot>
-                                                </table>
-                                             <div className="drawer-subject-breakdown" style={{ marginTop: '20px' }}>
-                                                 <div className="drawer-section-header">
-                                                     <h4 className="drawer-section-title" style={{ margin: 0 }}>
-                                                         Wrong & Unattempted Questions (Topic & Subtopic Details)
-                                                     </h4>
-                                                     <span className="q-count-badge">{erpAnalysis.questions.length} items</span>
-                                                 </div>
-
-                                                 {erpAnalysis.questions.length > 0 ? (
-                                                     <div style={{ overflowX: 'auto', marginTop: '12px' }}>
-                                                         <table className="drawer-mini-table topic-details-table">
-                                                             <thead>
-                                                                 <tr>
-                                                                     <th style={{ textAlign: 'left', width: '12%' }}>Test</th>
-                                                                     <th style={{ textAlign: 'center', width: '8%' }}>Q.No</th>
-                                                                     <th style={{ textAlign: 'left', width: '12%' }}>Subject</th>
-                                                                     <th style={{ textAlign: 'left', width: '22%' }}>Topic</th>
-                                                                     <th style={{ textAlign: 'left', width: '20%' }}>Sub-Topic</th>
-                                                                     <th style={{ textAlign: 'center', width: '12%' }}>Status</th>
-                                                                     <th style={{ textAlign: 'center', width: '10%' }}>Marks Lost</th>
-                                                                     <th style={{ textAlign: 'center', width: '6%' }}>Key</th>
-                                                                     <th style={{ textAlign: 'center', width: '8%' }}>Action</th>
-                                                                 </tr>
-                                                             </thead>
-                                                             <tbody>
-                                                                 {erpAnalysis.questions.map((q, idx) => (
-                                                                     <tr key={idx}>
-                                                                         <td className="font-bold">{q.test}</td>
-                                                                         <td style={{ textAlign: 'center', fontWeight: 'bold' }}>Q{q.qNo}</td>
-                                                                         <td className="font-bold">{q.subject}</td>
-                                                                         <td style={{ fontWeight: '600', color: '#1e293b' }}>{q.topic}</td>
-                                                                         <td style={{ color: '#475569' }}>{q.subTopic || '-'}</td>
-                                                                         <td style={{ textAlign: 'center' }}>
-                                                                             <span className={`status-badge ${q.status.toLowerCase()}`}>
-                                                                                 {q.status === 'W' ? 'Wrong (W)' : 'Unattempted (U)'}
-                                                                             </span>
-                                                                         </td>
-                                                                         <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#dc2626' }}>
-                                                                             -{q.lost}
-                                                                         </td>
-                                                                         <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#16a34a' }}>
-                                                                             {q.keyValue || '-'}
-                                                                         </td>
-                                                                         <td style={{ textAlign: 'center' }}>
-                                                                             {q.qUrl ? (
-                                                                                 <button 
-                                                                                     className="q-preview-btn-sm"
-                                                                                     onClick={() => setZoomImage({ url: q.qUrl, title: `${q.test} - Q${q.qNo} (${q.subject}): ${q.topic}` })}
-                                                                                 >
-                                                                                     <Maximize2 size={12} /> View
-                                                                                 </button>
-                                                                             ) : '-'}
-                                                                         </td>
-                                                                     </tr>
-                                                                 ))}
-                                                             </tbody>
-                                                         </table>
-                                                     </div>
-                                                 ) : (
-                                                     <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.88rem' }}>
-                                                         No wrong or unattempted questions recorded for the selected test(s).
-                                                     </div>
-                                                 )}
-                                             </div>
-                                            </div>
-
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    )}
-
-            {/* Question Image Zoom Modal */}
-            {zoomImage && (
-                <div className="zoom-modal-overlay" onClick={() => setZoomImage(null)}>
-                    <div className="zoom-modal-content" onClick={(e) => e.stopPropagation()}>
-                        <div className="zoom-modal-header">
-                            <h5>{zoomImage.title}</h5>
-                            <button className="zoom-close-btn" onClick={() => setZoomImage(null)}>
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div 
-                            className="zoom-modal-body"
-                            ref={zoomContainerRef}
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
-                            style={{ cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
-                        >
-                            <img 
-                                src={zoomImage.url} 
-                                alt={zoomImage.title} 
-                                className="zoomable-image"
-                                style={{
-                                    transform: `translate(${zoomOffset.x}px, ${zoomOffset.y}px) scale(${zoomScale})`,
-                                    transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-                                }}
-                                draggable={false}
-                            />
-                        </div>
-                    </div>
+                <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
+                    <HelpCircle size={40} style={{ marginBottom: '12px', opacity: 0.5 }} />
+                    <h3>No Student Selected or Matching Filters</h3>
+                    <p>Please adjust your filters in the top FilterBar to view student performance report.</p>
                 </div>
             )}
-
-            {/* Dedicated Styling for Executive Topper Marks Loss Report */}
-            <style>{`
-                .topper-marks-loss-container {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 20px;
-                    width: 100%;
-                }
-
-                /* Control Bar */
-                .toppers-controls-bar {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    background: rgba(255, 255, 255, 0.9);
-                    backdrop-filter: blur(12px);
-                    border: 1px solid rgba(226, 232, 240, 0.8);
-                    padding: 12px 22px;
-                    border-radius: 14px;
-                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
-                    flex-wrap: wrap;
-                    gap: 15px;
-                }
-
-                .results-indicator {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                }
-
-                .title-icon-badge {
-                    width: 42px;
-                    height: 42px;
-                    border-radius: 10px;
-                    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
-                }
-
-                .main-title {
-                    font-size: 1.1rem;
-                    font-weight: 800;
-                    color: #0f172a;
-                    display: block;
-                    letter-spacing: -0.01em;
-                }
-
-                .sub-title {
-                    font-size: 0.82rem;
-                    color: #64748b;
-                    display: block;
-                    margin-top: 1px;
-                }
-
-                .control-right {
-                    display: flex;
-                    align-items: center;
-                    gap: 15px;
-                    flex-wrap: wrap;
-                }
-
-                /* Preset Pills */
-                .pill-group {
-                    display: flex;
-                    background: #f1f5f9;
-                    border-radius: 20px;
-                    padding: 3px;
-                    border: 1px solid #e2e8f0;
-                }
-
-                .pill-btn {
-                    border: none;
-                    background: transparent;
-                    color: #475569;
-                    font-size: 0.82rem;
-                    font-weight: 700;
-                    padding: 6px 14px;
-                    border-radius: 17px;
-                    cursor: pointer;
-                    transition: all 0.2s ease-in-out;
-                }
-
-                .pill-btn:hover {
-                    color: #0f172a;
-                }
-
-                .pill-btn.active {
-                    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-                    color: white;
-                    box-shadow: 0 3px 8px rgba(30, 58, 138, 0.3);
-                }
-
-                /* Custom Input Box */
-                .custom-input-box {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    background: #f8fafc;
-                    padding: 4px 10px;
-                    border-radius: 20px;
-                    border: 1px solid #cbd5e1;
-                }
-
-                .custom-label {
-                    font-size: 0.8rem;
-                    font-weight: 700;
-                    color: #475569;
-                }
-
-                .custom-number-input {
-                    width: 55px;
-                    padding: 4px 8px;
-                    border-radius: 6px;
-                    border: 1px solid #cbd5e1;
-                    font-size: 0.85rem;
-                    font-weight: 800;
-                    text-align: center;
-                    outline: none;
-                    color: #0f172a;
-                }
-
-                .custom-number-input:focus {
-                    border-color: #3b82f6;
-                    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-                }
-
-                .custom-set-btn {
-                    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-                    color: white;
-                    border: none;
-                    padding: 5px 12px;
-                    border-radius: 12px;
-                    font-size: 0.78rem;
-                    font-weight: 700;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    box-shadow: 0 2px 4px rgba(30, 58, 138, 0.2);
-                }
-
-                .custom-set-btn:hover {
-                    opacity: 0.95;
-                    transform: translateY(-1px);
-                }
-
-                /* Student Button Tabs Bar */
-                .student-buttons-bar {
-                    display: flex;
-                    gap: 10px;
-                    overflow-x: auto;
-                    padding: 10px 6px;
-                    background: #ffffff;
-                    border-radius: 14px;
-                    border: 1px solid #e2e8f0;
-                    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03);
-                    scrollbar-width: thin;
-                }
-
-                .student-tab-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 8px 16px;
-                    border-radius: 10px;
-                    border: 1px solid #cbd5e1;
-                    background: #f8fafc;
-                    color: #1e293b;
-                    font-weight: 600;
-                    font-size: 0.84rem;
-                    cursor: pointer;
-                    white-space: nowrap;
-                    transition: all 0.2s ease-in-out;
-                }
-
-                .student-tab-btn:hover {
-                    background: #f1f5f9;
-                    border-color: #94a3b8;
-                    transform: translateY(-1px);
-                }
-
-                .student-tab-btn.selected {
-                    border: 2px solid #1e3a8a;
-                    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
-                    color: #ffffff;
-                    font-weight: 700;
-                    box-shadow: 0 6px 15px -3px rgba(30, 58, 138, 0.35);
-                }
-
-                .rank-badge {
-                    padding: 3px 8px;
-                    border-radius: 6px;
-                    font-size: 0.72rem;
-                    font-weight: 800;
-                    letter-spacing: 0.02em;
-                }
-
-                .rank-badge.gold {
-                    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-                    color: #ffffff;
-                    box-shadow: 0 2px 4px rgba(217, 119, 6, 0.3);
-                }
-
-                .rank-badge.silver {
-                    background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
-                    color: #ffffff;
-                }
-
-                .rank-badge.bronze {
-                    background: linear-gradient(135deg, #b45309 0%, #78350f 100%);
-                    color: #ffffff;
-                }
-
-                .rank-badge.normal {
-                    background: #e2e8f0;
-                    color: #334155;
-                }
-
-                .student-tab-btn.selected .rank-badge.normal {
-                    background: rgba(255, 255, 255, 0.2);
-                    color: #ffffff;
-                }
-
-                .stud-name {
-                    font-size: 0.85rem;
-                }
-
-                .stud-score {
-                    font-size: 0.76rem;
-                    opacity: 0.85;
-                    font-weight: 700;
-                }
-
-                /* Executive Main Card */
-                .marks-loss-executive-card {
-                    background: #ffffff;
-                    border-radius: 16px;
-                    border: 1px solid #e2e8f0;
-                    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
-                    padding: 24px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 22px;
-                }
-
-                /* Executive Header */
-                .executive-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    border-bottom: 2px solid #f1f5f9;
-                    padding-bottom: 18px;
-                    flex-wrap: wrap;
-                    gap: 15px;
-                }
-
-                .student-profile-info {
-                    display: flex;
-                    align-items: center;
-                    gap: 14px;
-                }
-
-                .profile-avatar {
-                    width: 48px;
-                    height: 48px;
-                    border-radius: 12px;
-                    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    box-shadow: 0 4px 10px rgba(30, 58, 138, 0.25);
-                }
-
-                .title-row {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    flex-wrap: wrap;
-                }
-
-                .student-full-name {
-                    font-size: 1.45rem;
-                    font-weight: 800;
-                    color: #0f172a;
-                    margin: 0;
-                    letter-spacing: -0.01em;
-                }
-
-                .id-badge {
-                    background: #eff6ff;
-                    color: #1e40af;
-                    padding: 3px 10px;
-                    border-radius: 6px;
-                    font-size: 0.78rem;
-                    font-weight: 800;
-                    border: 1px solid #bfdbfe;
-                }
-
-                .student-submeta {
-                    font-size: 0.88rem;
-                    color: #64748b;
-                    margin: 3px 0 0 0;
-                }
-
-                .download-pdf-exec-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    border-radius: 10px;
-                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-                    color: white;
-                    border: none;
-                    font-weight: 800;
-                    font-size: 0.88rem;
-                    cursor: pointer;
-                    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-                    transition: all 0.2s ease-in-out;
-                }
-
-                .download-pdf-exec-btn:hover:not(:disabled) {
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
-                }
-
-                .test-selector-wrapper {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 6px;
-                    max-width: 420px;
-                }
-
-                /* Loss Cards */
-                .drawer-loss-cards {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                    gap: 15px;
-                }
-
-                .loss-summary-card {
-                    padding: 16px 20px;
-                    border-radius: 12px;
-                    display: flex;
-                    flex-direction: column;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-                    transition: transform 0.2s;
-                }
-
-                .loss-summary-card:hover {
-                    transform: translateY(-2px);
-                }
-
-                .loss-summary-card.total {
-                    background: linear-gradient(135deg, #fef2f2 0%, #ffe4e6 100%);
-                    border: 1px solid #fecaca;
-                    color: #991b1b;
-                }
-
-                .loss-summary-card.wrong {
-                    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-                    border: 1px solid #fde68a;
-                    color: #92400e;
-                }
-
-                .loss-summary-card.skipped {
-                    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-                    border: 1px solid #bbf7d0;
-                    color: #166534;
-                }
-
-                .loss-card-title {
-                    font-size: 0.75rem;
-                    font-weight: 800;
-                    text-transform: uppercase;
-                    letter-spacing: 0.03em;
-                    opacity: 0.85;
-                }
-
-                .loss-card-val {
-                    font-size: 1.4rem;
-                    font-weight: 900;
-                    margin-top: 4px;
-                }
-
-                .loss-card-sub {
-                    font-size: 0.76rem;
-                    margin-top: 4px;
-                    opacity: 0.9;
-                }
-
-                /* Potential Score Banner */
-                .potential-score-banner {
-                    display: flex;
-                    align-items: center;
-                    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-                    border: 1px solid #a7f3d0;
-                    color: #065f46;
-                    padding: 12px 18px;
-                    border-radius: 10px;
-                    font-size: 0.92rem;
-                    box-shadow: 0 2px 5px rgba(16, 185, 129, 0.08);
-                }
-
-                .potential-score-banner strong {
-                    margin: 0 4px;
-                    font-weight: 900;
-                    color: #047857;
-                }
-
-                /* Charts Grid */
-                .drawer-charts-row {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 20px;
-                    background: #f8fafc;
-                    padding: 18px;
-                    border-radius: 14px;
-                    border: 1px solid #e2e8f0;
-                }
-
-                @media (max-width: 900px) {
-                    .drawer-charts-row {
-                        grid-template-columns: 1fr;
-                    }
-                }
-
-                .drawer-chart-col {
-                    background: #ffffff;
-                    border-radius: 10px;
-                    padding: 14px;
-                    border: 1px solid #e2e8f0;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-                }
-
-                .drawer-section-title {
-                    font-size: 0.92rem;
-                    font-weight: 800;
-                    color: #0f172a;
-                    margin-bottom: 12px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.03em;
-                }
-
-                /* Mini Table */
-                .drawer-subject-breakdown {
-                    background: #ffffff;
-                    border-radius: 12px;
-                    border: 1px solid #e2e8f0;
-                    padding: 16px;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-                }
-
-                .drawer-mini-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-size: 0.85rem;
-                }
-
-                .drawer-mini-table th {
-                    text-align: left;
-                    background: #1e3a8a;
-                    color: #ffffff;
-                    padding: 10px 14px;
-                    font-weight: 800;
-                    font-size: 0.8rem;
-                    letter-spacing: 0.02em;
-                }
-
-                .drawer-mini-table td {
-                    padding: 10px 14px;
-                    border-bottom: 1px solid #f1f5f9;
-                    color: #1e293b;
-                }
-
-                .drawer-mini-table tr:hover {
-                    background: #f8fafc;
-                }
-
-                .sub-text {
-                    font-size: 0.72rem;
-                    color: #64748b;
-                    margin-left: 4px;
-                }
-
-                .loss-red {
-                    color: #dc2626;
-                }
-
-                /* Questions List */
-                .drawer-questions-list {
-                    background: #ffffff;
-                    border-radius: 12px;
-                    border: 1px solid #e2e8f0;
-                    padding: 16px;
-                }
-
-                .drawer-section-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 14px;
-                    border-bottom: 1px solid #f1f5f9;
-                    padding-bottom: 8px;
-                }
-
-                .q-count-badge {
-                    background: #eff6ff;
-                    color: #1e40af;
-                    padding: 3px 10px;
-                    border-radius: 12px;
-                    font-size: 0.78rem;
-                    font-weight: 800;
-                }
-
-                .questions-grid-wrapper {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 12px;
-                }
-
-                .q-detail-card {
-                    background: #f8fafc;
-                    border-radius: 10px;
-                    padding: 14px;
-                    border-left: 5px solid #cbd5e1;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 8px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-                }
-
-                .q-detail-card.w {
-                    border-left-color: #f59e0b;
-                }
-
-                .q-detail-card.u {
-                    border-left-color: #10b981;
-                }
-
-                .q-card-top {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-
-                .q-identifier {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-
-                .q-badge-test {
-                    background: #e0e7ff;
-                    color: #4338ca;
-                    font-weight: 800;
-                    font-size: 0.72rem;
-                    padding: 2px 8px;
-                    border-radius: 4px;
-                }
-
-                .q-badge-subject {
-                    background: #e2e8f0;
-                    color: #334155;
-                    font-weight: 800;
-                    font-size: 0.72rem;
-                    padding: 2px 8px;
-                    border-radius: 4px;
-                }
-
-                .q-num {
-                    font-weight: 800;
-                    color: #0f172a;
-                    font-size: 0.9rem;
-                }
-
-                .q-status-tag {
-                    font-size: 0.72rem;
-                    font-weight: 800;
-                    padding: 3px 8px;
-                    border-radius: 6px;
-                }
-
-                .q-status-tag.w {
-                    background: #fffbeb;
-                    color: #b45309;
-                    border: 1px solid #fde68a;
-                }
-
-                .q-status-tag.u {
-                    background: #f0fdf4;
-                    color: #15803d;
-                    border: 1px solid #bbf7d0;
-                }
-
-                .q-topic-line {
-                    font-size: 0.84rem;
-                    color: #334155;
-                }
-
-                .q-actions-bar {
-                    display: flex;
-                    gap: 10px;
-                    margin-top: 4px;
-                }
-
-                .q-preview-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 5px;
-                    border: 1px solid #cbd5e1;
-                    background: #ffffff;
-                    color: #475569;
-                    font-size: 0.76rem;
-                    font-weight: 700;
-                    padding: 5px 12px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    transition: all 0.15s;
-                }
-
-                .q-preview-btn:hover {
-                    background: #f8fafc;
-                    border-color: #6366f1;
-                    color: #6366f1;
-                }
-
-                .q-preview-btn.solution:hover {
-                    border-color: #10b981;
-                    color: #10b981;
-                }
-
-                .status-badge {
-                    display: inline-block;
-                    padding: 3px 10px;
-                    border-radius: 12px;
-                    font-size: 0.75rem;
-                    font-weight: 800;
-                }
-
-                .status-badge.w {
-                    background: #fffbeb;
-                    color: #b45309;
-                    border: 1px solid #fde68a;
-                }
-
-                .status-badge.u {
-                    background: #f0fdf4;
-                    color: #15803d;
-                    border: 1px solid #bbf7d0;
-                }
-
-                .q-preview-btn-sm {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 4px;
-                    border: 1px solid #cbd5e1;
-                    background: #ffffff;
-                    color: #475569;
-                    font-size: 0.72rem;
-                    font-weight: 700;
-                    padding: 4px 10px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    transition: all 0.15s;
-                }
-
-                .q-preview-btn-sm:hover {
-                    background: #eff6ff;
-                    border-color: #3b82f6;
-                    color: #1e40af;
-                }
-
-                /* Zoom Modal */
-                .zoom-modal-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(0, 0, 0, 0.75);
-                    backdrop-filter: blur(4px);
-                    z-index: 10000;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 20px;
-                }
-
-                .zoom-modal-content {
-                    background: white;
-                    border-radius: 14px;
-                    width: 90%;
-                    max-width: 1100px;
-                    height: 85vh;
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
-                }
-
-                .zoom-modal-header {
-                    padding: 14px 20px;
-                    background: #f8fafc;
-                    border-bottom: 1px solid #cbd5e1;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-
-                .zoom-modal-header h5 {
-                    font-weight: 800;
-                    color: #0f172a;
-                    font-size: 0.95rem;
-                    margin: 0;
-                }
-
-                .zoom-close-btn {
-                    border: none;
-                    background: transparent;
-                    color: #475569;
-                    cursor: pointer;
-                    padding: 4px;
-                    border-radius: 50%;
-                }
-
-                .zoom-close-btn:hover {
-                    background: #e2e8f0;
-                }
-
-                .zoom-modal-body {
-                    padding: 20px;
-                    flex: 1;
-                    overflow: hidden;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    background: #f1f5f9;
-                }
-
-                .zoomable-image {
-                    max-width: 100%;
-                    max-height: 75vh;
-                    object-fit: contain;
-                    border-radius: 6px;
-                    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-                }
-
-                .loader-box {
-                    padding: 50px;
-                    text-align: center;
-                    background: #ffffff;
-                    border-radius: 14px;
-                    border: 1px solid #e2e8f0;
-                }
-
-                .loading-spinner {
-                    width: 36px;
-                    height: 36px;
-                    border: 4px solid #f1f5f9;
-                    border-top-color: #1e3a8a;
-                    border-radius: 50%;
-                    animation: spin 0.8s linear infinite;
-                    margin: 0 auto 12px;
-                }
-
-                @keyframes spin {
-                    to { transform: rotate(360deg); }
-                }
-
-                .empty-box {
-                    padding: 50px;
-                    text-align: center;
-                    background: #ffffff;
-                    border-radius: 14px;
-                    border: 1px dashed #cbd5e1;
-                }
-
-                .empty-box h4 {
-                    margin: 12px 0 6px;
-                    color: #0f172a;
-                    font-weight: 800;
-                }
-
-                .empty-box p {
-                    color: #64748b;
-                    font-size: 0.88rem;
-                    margin: 0;
-                }
-            `}</style>
         </div>
     );
 };

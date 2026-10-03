@@ -3252,3 +3252,363 @@ body {
         transform: translateY(0);
     }
 }
+
+/* --- TOPPERS PERFORMANCE & MARKS LOSS SINGLE PAGE PDF STYLES --- */
+.toppers-report-container {
+    padding: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.toppers-controls-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: #ffffff;
+    padding: 14px 20px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    margin-bottom: 24px;
+}
+
+.control-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.results-indicator {
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.control-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.pill-group {
+    display: flex;
+    gap: 6px;
+    background: #f1f5f9;
+    padding: 3px;
+    border-radius: 8px;
+}
+
+.pill-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #64748b;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.pill-btn.active {
+    background: #1e3a8a;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(30, 58, 138, 0.25);
+}
+
+.btn-pdf-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+    color: #ffffff;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+    transition: all 0.2s ease;
+}
+
+.btn-pdf-download:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.3);
+}
+
+.btn-excel-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #10b981;
+    color: #ffffff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-excel-download:hover {
+    background: #059669;
+}
+
+.pdf-paper-view {
+    max-width: 960px;
+    margin: 0 auto;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    padding: 36px 44px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1e293b;
+    line-height: 1.5;
+}
+
+.pdf-header-brand {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    border-bottom: 2.5 solid #0f172a;
+    margin-bottom: 18px;
+}
+
+.pdf-header-brand .brand-inst {
+    font-weight: 900;
+    font-size: 1rem;
+    color: #0f172a;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.pdf-header-brand .brand-doc-title {
+    font-size: 0.85rem;
+    color: #475569;
+    font-weight: 600;
+}
+
+.pdf-main-title-banner {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 16px 20px;
+    border-radius: 6px;
+    margin-bottom: 24px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+}
+
+.pdf-main-title-banner h2 {
+    font-size: 1.35rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    margin: 0 0 6px 0;
+    color: #ffffff;
+}
+
+.student-metadata-line {
+    font-size: 0.83rem;
+    color: #cbd5e1;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-weight: 500;
+}
+
+.student-metadata-line .sep {
+    opacity: 0.4;
+}
+
+.pdf-section {
+    margin-bottom: 28px;
+}
+
+.pdf-section .section-heading {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #881337;
+    margin: 0 0 12px 0;
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid #ffe4e6;
+}
+
+.narrative-text {
+    font-size: 0.92rem;
+    color: #334155;
+    line-height: 1.65;
+    margin: 0;
+}
+
+.narrative-text.small {
+    font-size: 0.82rem;
+    color: #64748b;
+}
+
+.pdf-report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 6px 0;
+    font-size: 0.84rem;
+}
+
+.pdf-report-table.compact {
+    font-size: 0.79rem;
+}
+
+.pdf-report-table th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 9px 12px;
+    border: 1px solid #0f172a;
+}
+
+.pdf-report-table td {
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    color: #1e293b;
+}
+
+.pdf-report-table tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.pdf-report-table tbody tr.highlight-lagging {
+    background: #fef2f2 !important;
+}
+
+.pdf-report-table tbody tr.total-row {
+    background: #f1f5f9;
+    font-weight: 800;
+}
+
+.pdf-report-table tbody tr.total-row td {
+    border-top: 2px solid #0f172a;
+    border-bottom: 2px solid #0f172a;
+}
+
+.table-footnote {
+    font-size: 0.76rem;
+    color: #64748b;
+    font-style: italic;
+    margin: 6px 0 16px 0;
+}
+
+.chart-container-horizontal {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 14px;
+}
+
+.chart-caption {
+    text-align: center;
+    font-size: 0.8rem;
+    color: #64748b;
+    font-style: italic;
+    margin: 10px 0 0 0;
+}
+
+.bullets-analysis {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bullet-item {
+    font-size: 0.9rem;
+    color: #334155;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.action-points-list {
+    margin: 8px 0 0 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.action-points-list li {
+    font-size: 0.9rem;
+    color: #334155;
+    line-height: 1.55;
+}
+
+.trend-up {
+    color: #16a34a;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.trend-down {
+    color: #dc2626;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.trend-flat {
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.font-bold {
+    font-weight: 700;
+}
+
+.text-danger {
+    color: #dc2626;
+}
+
+.text-primary {
+    color: #1e3a8a;
+}
+
+.metrics-summary-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.metric-pill {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 10px 14px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.metric-pill-lbl {
+    font-size: 0.72rem;
+    color: #64748b;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.metric-pill-val {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 2px;
+}
