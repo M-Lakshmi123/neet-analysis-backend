@@ -546,10 +546,18 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
         const laggingTableRows = rawSubjects.map(s => {
             const isLag = s.name === lagging1.name || s.name === lagging2.name;
-            const wPct = s.totalLost > 0 ? Math.round((s.wrongLost / s.totalLost) * 100) : 100;
+            const wPct = s.totalLost > 0 ? Math.round((s.wrongLost / s.totalLost) * 100) : 0;
             const uPct = 100 - wPct;
-            let cause = `Wrong answers (${wPct}% of loss)`;
-            if (uPct > 15) cause = `Wrong answers (${wPct}%), unattempted (${uPct}%)`;
+            let cause = "No marks lost";
+            if (s.totalLost > 0) {
+                if (s.unattCount === 0 || uPct === 0) {
+                    cause = "Incorrect Answers (Calculation / Concept Slips)";
+                } else if (s.wrongCount === 0 || wPct === 0) {
+                    cause = "Skipped Questions (Time Management)";
+                } else {
+                    cause = `Incorrect Answers (${wPct}%) & Skipped (${uPct}%)`;
+                }
+            }
             return { name: s.name, wrongPerExam: s.wrongPerExam, unattPerExam: s.unattPerExam, cause: cause, priority: isLag ? 'High' : 'Low' };
         });
 
@@ -801,7 +809,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             autoTable(doc, {
                 startY: y,
                 margin: { left: margin, right: margin },
-                head: [['Subject', 'Wrong / exam', 'Unattempted / exam', 'Main cause of loss', 'Priority']],
+                head: [['Subject', 'Wrong / Exam', 'Skipped / Exam', 'Primary Reason for Marks Loss', 'Priority']],
                 body: analysis.laggingTableRows.map(r => [r.name, r.wrongPerExam, r.unattPerExam, r.cause, r.priority]),
                 theme: 'grid',
                 headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
@@ -1096,13 +1104,16 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     {/* Section 4: Where He Is Lagging in Simple Words */}
                     <div className="pdf-section">
                         <h3 className="section-heading">4. Where He Is Lagging (Simple Analysis)</h3>
+                        <p className="narrative-text small" style={{ marginBottom: '10px', color: '#475569' }}>
+                            This table identifies why marks were lost in each subject—distinguishing between incorrect attempts (negative marking) and skipped questions (unattempted).
+                        </p>
                         <table className="pdf-report-table">
                             <thead>
                                 <tr>
                                     <th>Subject</th>
                                     <th>Wrong / Exam</th>
-                                    <th>Unattempted / Exam</th>
-                                    <th>Main Cause of Loss</th>
+                                    <th>Skipped / Exam</th>
+                                    <th>Primary Reason for Marks Loss</th>
                                     <th>Priority</th>
                                 </tr>
                             </thead>
@@ -1121,13 +1132,13 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
                         <div className="bullets-analysis">
                             <p className="bullet-item">
-                                • <strong>{analysis.lagging1.name} (lost {analysis.lagging1.totalLost} marks, {analysis.lagging1.share}% of total):</strong> Largest loss. About {analysis.lagging1.wrongPerExam} questions wrong per exam, and {analysis.lagging1.unattCount} skipped across {analysis.examCount} tests ({analysis.lagging1.unattLost} marks). Both accuracy and speed need attention.
+                                • <strong>{analysis.lagging1.name} (lost {analysis.lagging1.totalLost} marks, {analysis.lagging1.share}% of total):</strong> Largest area of loss. Averages {analysis.lagging1.wrongPerExam} wrong answers per exam and {analysis.lagging1.unattCount} skipped across {analysis.examCount} tests ({analysis.lagging1.unattLost} marks lost). Both concept revision and speed practice are needed.
                             </p>
                             <p className="bullet-item">
-                                • <strong>{analysis.lagging2.name} (lost {analysis.lagging2.totalLost} marks, {analysis.lagging2.share}%):</strong> Almost entirely wrong answers ({Math.round((analysis.lagging2.wrongLost/analysis.lagging2.totalLost)*100)}% of loss), averaging {analysis.lagging2.wrongPerExam} wrong per exam. Questions are attempted but marked incorrectly due to concept gaps.
+                                • <strong>{analysis.lagging2.name} (lost {analysis.lagging2.totalLost} marks, {analysis.lagging2.share}%):</strong> Driven primarily by incorrect attempts ({analysis.lagging2.wrongPerExam} wrong per exam). Questions are attempted but answered incorrectly due to calculation slips or option selection errors.
                             </p>
                             <p className="bullet-item">
-                                • <strong>{analysis.strongSubjects.map(s => s.name).join(' and ')}:</strong> Only {analysis.strongSubjects.map(s => `${s.lostPerExam} (${s.name})`).join(' and ')} marks lost per exam. Scores are strong!
+                                • <strong>{analysis.strongSubjects.map(s => s.name).join(' and ')}:</strong> Excellent performance with minimal loss ({analysis.strongSubjects.map(s => `${s.lostPerExam} in ${s.name}`).join(', ')} marks/exam).
                             </p>
                         </div>
                     </div>
