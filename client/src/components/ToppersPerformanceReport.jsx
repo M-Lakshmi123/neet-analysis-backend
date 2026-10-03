@@ -332,7 +332,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         setCurrentIndex(0);
     };
 
-    // Fetch ERP data and History for selected student
+    // Fetch ERP data and History for selected student respecting all active filters
     useEffect(() => {
         if (!selectedStudent || !selectedStudent.STUD_ID) {
             setErpData([]);
@@ -343,20 +343,17 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         const fetchStudentDetails = async () => {
             setErpLoading(true);
             try {
-                const year = filters.academicYear || '2026';
-                let erpUrl = `${API_URL}/api/erp/report?academicYear=${year}&studentSearch=${selectedStudent.STUD_ID}`;
-                if (filters?.testType && Array.isArray(filters.testType) && filters.testType.length > 0) {
-                    filters.testType.forEach(tt => {
-                        if (tt && tt !== '__ALL__') erpUrl += `&testType=${encodeURIComponent(tt)}`;
-                    });
-                }
-                
-                let historyUrl = `${API_URL}/api/history?academicYear=${year}&id=${selectedStudent.STUD_ID}`;
-                if (filters?.testType && Array.isArray(filters.testType) && filters.testType.length > 0) {
-                    filters.testType.forEach(tt => {
-                        if (tt && tt !== '__ALL__') historyUrl += `&testType=${encodeURIComponent(tt)}`;
-                    });
-                }
+                const queryParams = buildQueryParams(filters);
+
+                // Build ERP URL with student ID and all active filters (campus, stream, testType, test, topAll, etc.)
+                const erpParams = new URLSearchParams(queryParams.toString());
+                erpParams.set('studentSearch', selectedStudent.STUD_ID);
+                const erpUrl = `${API_URL}/api/erp/report?${erpParams.toString()}`;
+
+                // Build History URL with student ID and all active filters (campus, stream, testType, test, topAll, etc.)
+                const historyParams = new URLSearchParams(queryParams.toString());
+                historyParams.set('id', selectedStudent.STUD_ID);
+                const historyUrl = `${API_URL}/api/history?${historyParams.toString()}`;
 
                 const [erpRes, historyRes] = await Promise.all([
                     fetch(erpUrl).catch(() => null),
@@ -386,7 +383,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         };
 
         fetchStudentDetails();
-    }, [selectedStudent, filters.academicYear, filters.testType]);
+    }, [selectedStudent, filters]);
 
     // Extract Weak Topics & Subtopics from ERP Data (ERR REPORT ANALYSIS)
     const topicAnalysis = useMemo(() => {
