@@ -218,6 +218,25 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
     const [historyData, setHistoryData] = useState([]);
     const [erpLoading, setErpLoading] = useState(false);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
+    const reportPaperRef = useRef(null);
+
+    // Dropdown open/close state & click outside ref
+    const [menuIsOpen, setMenuIsOpen] = useState(false);
+    const dropdownWrapperRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownWrapperRef.current && !dropdownWrapperRef.current.contains(event.target)) {
+                setMenuIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, []);
 
     // Fetch student cohort based on current global filters
     useEffect(() => {
@@ -913,11 +932,14 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
                     {/* Multi-Select Student Dropdown with Checkboxes */}
                     {dropdownOptions.length > 0 && (
-                        <div style={{ minWidth: '280px' }}>
+                        <div style={{ minWidth: '280px' }} ref={dropdownWrapperRef}>
                             <Select
                                 isMulti
                                 closeMenuOnSelect={false}
                                 hideSelectedOptions={false}
+                                menuIsOpen={menuIsOpen}
+                                onMenuOpen={() => setMenuIsOpen(true)}
+                                onMenuClose={() => setMenuIsOpen(false)}
                                 styles={customSelectStyles}
                                 components={{ Option: CheckboxOption, ValueContainer: MultiValueContainer }}
                                 options={dropdownOptions}
