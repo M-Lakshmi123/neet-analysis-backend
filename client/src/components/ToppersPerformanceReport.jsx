@@ -131,18 +131,45 @@ const estimateWU = (lostTotal) => {
     return { w, wLost, u, uLost };
 };
 
+const customSelectStyles = {
+    option: (provided, state) => ({
+        ...provided,
+        backgroundColor: state.isSelected 
+            ? '#2563eb' 
+            : state.isFocused 
+            ? '#1d4ed8' 
+            : '#ffffff',
+        color: state.isSelected || state.isFocused ? '#ffffff' : '#0f172a',
+        cursor: 'pointer',
+        padding: '8px 12px'
+    }),
+    menu: (provided) => ({
+        ...provided,
+        zIndex: 9999,
+        borderRadius: '8px',
+        overflow: 'hidden',
+        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)'
+    })
+};
+
 // Checkbox Option for Multi-Select Dropdown
 const CheckboxOption = (props) => {
+    const isSelected = props.isSelected;
+    const isFocused = props.isFocused;
+    const textColor = isSelected || isFocused ? '#ffffff' : '#0f172a';
+
     return (
         <components.Option {...props}>
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', width: '100%' }}>
                 <input
                     type="checkbox"
-                    checked={props.isSelected}
-                    onChange={() => null}
-                    style={{ marginRight: '8px', cursor: 'pointer', accentColor: '#1e3a8a' }}
+                    checked={isSelected}
+                    readOnly
+                    style={{ marginRight: '8px', pointerEvents: 'none', accentColor: '#ffffff' }}
                 />
-                <span style={{ fontSize: '0.85rem', color: '#1e293b' }}>{props.label}</span>
+                <span style={{ fontSize: '0.85rem', color: textColor, fontWeight: '700', pointerEvents: 'none' }}>
+                    {props.label}
+                </span>
             </div>
         </components.Option>
     );
@@ -227,17 +254,10 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         return sorted.slice(0, topLimit);
     }, [students, topLimit]);
 
-    // Keep selectedStudentIds synchronized with toppersList
+    // Automatically select all students in the new toppersList when topLimit or toppersList changes
     useEffect(() => {
         if (toppersList.length > 0) {
-            const validIds = toppersList.map(s => s.STUD_ID);
-            if (selectedStudentIds.length === 0) {
-                setSelectedStudentIds(validIds);
-            } else {
-                const filtered = selectedStudentIds.filter(id => validIds.includes(id));
-                if (filtered.length === 0) setSelectedStudentIds(validIds);
-                else setSelectedStudentIds(filtered);
-            }
+            setSelectedStudentIds(toppersList.map(s => s.STUD_ID));
         } else {
             setSelectedStudentIds([]);
         }
@@ -898,6 +918,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                 isMulti
                                 closeMenuOnSelect={false}
                                 hideSelectedOptions={false}
+                                styles={customSelectStyles}
                                 components={{ Option: CheckboxOption, ValueContainer: MultiValueContainer }}
                                 options={dropdownOptions}
                                 value={dropdownOptions.filter(opt => selectedStudentIds.includes(opt.value))}
