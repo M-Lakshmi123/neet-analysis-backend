@@ -700,27 +700,34 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             doc.setTextColor(15, 23, 42);
             doc.text("SRI CHAITANYA EDUCATIONAL INSTITUTIONS", margin + (logoImg ? 13 : 0), y + 7);
 
-            doc.setFontSize(9);
-            if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
-            doc.setTextColor(100, 116, 139);
-            doc.text(`Individual Performance Report - ${filters.academicYear || '2026'}`, pageWidth - margin, y + 7, { align: 'right' });
+            doc.setFontSize(10);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(30, 58, 138); // Deep Royal Navy
+            doc.text("Performance Report", pageWidth - margin, y + 7, { align: 'right' });
 
             y += 14;
-            doc.setFillColor(15, 23, 42);
-            doc.rect(margin, y, contentWidth, 16, 'F');
+            // Rich Royal Navy Blue fill
+            doc.setFillColor(30, 58, 138); // #1e3a8a
+            doc.rect(margin, y, contentWidth, 18, 'F');
             
-            doc.setFontSize(14);
+            // Gold border lines for premium aesthetic
+            doc.setDrawColor(251, 191, 36); // #fbbf24
+            doc.setLineWidth(0.6);
+            doc.line(margin, y, margin + contentWidth, y);
+            doc.line(margin, y + 18, margin + contentWidth, y + 18);
+
+            doc.setFontSize(13.5);
             if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
             doc.setTextColor(255, 255, 255);
-            doc.text("MARKS LOSS & PERFORMANCE ANALYSIS", pageWidth / 2, y + 6.5, { align: 'center' });
+            doc.text("MARKS LOSS & PERFORMANCE ANALYSIS", pageWidth / 2, y + 7, { align: 'center' });
 
-            doc.setFontSize(8.5);
-            if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
-            doc.setTextColor(203, 213, 225);
-            const metadataStr = `${selectedStudent.name} | ID ${selectedStudent.STUD_ID} | ${selectedStudent.campus || 'Campus'} | ${selectedStudent.stream || 'SR ELITE'} | AY ${filters.academicYear || '2026'} | All Exams (${analysis.examCount})`;
-            doc.text(metadataStr, pageWidth / 2, y + 12, { align: 'center' });
+            doc.setFontSize(9);
+            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+            doc.setTextColor(254, 240, 138); // Bright gold/yellow (#fef08a) for crystal clear student info
+            const metadataStr = `${selectedStudent.name}  |  ID ${selectedStudent.STUD_ID}  |  ${selectedStudent.campus || 'Campus'}  |  ${selectedStudent.stream || 'SR ELITE'}  |  AY ${filters.academicYear || '2026'}  |  Exams (${analysis.examCount})`;
+            doc.text(metadataStr, pageWidth / 2, y + 13.5, { align: 'center' });
 
-            y += 22;
+            y += 24;
 
             // 1. Overall Picture
             doc.setFontSize(11);
@@ -873,7 +880,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
             }
 
-            doc.save(`Individual_Performance_Report_${selectedStudent.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+            doc.save(`Performance_Report_${selectedStudent.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
             logActivity(userData, 'Exported Student PDF Report', { studentId: selectedStudent.STUD_ID });
         } catch (err) {
             console.error("Failed to export PDF:", err);
@@ -992,6 +999,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     {/* Hero Student Banner */}
                     <div className="dashboard-hero-banner">
                         <div className="hero-student-info">
+                            <div className="hero-report-tag">PERFORMANCE REPORT</div>
                             <h2>{selectedStudent.name}</h2>
                             <p className="hero-student-sub">
                                 ID {selectedStudent.STUD_ID} • {selectedStudent.campus || 'Campus'} • {selectedStudent.stream || 'SR ELITE'} • AY {filters.academicYear || '2026'} • All Exams ({analysis.examCount})

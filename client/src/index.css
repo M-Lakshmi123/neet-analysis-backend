@@ -3739,7 +3739,7 @@ body {
 }
 
 .dashboard-hero-banner {
-    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
     color: #ffffff;
     border-radius: 10px;
     padding: 20px 24px;
@@ -3749,40 +3749,53 @@ body {
     align-items: center;
     flex-wrap: wrap;
     gap: 16px;
+    border-left: 5px solid #fbbf24;
+    box-shadow: 0 10px 25px -5px rgba(30, 58, 138, 0.25);
+}
+
+.hero-report-tag {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    color: #fbbf24;
+    text-transform: uppercase;
+    margin-bottom: 4px;
 }
 
 .hero-student-info h2 {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
     font-weight: 800;
     margin: 0 0 4px 0;
     color: #ffffff;
 }
 
 .hero-student-sub {
-    font-size: 0.85rem;
-    color: #cbd5e1;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #f8fafc;
     margin: 0;
 }
 
 .hero-score-badge {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 10px 18px;
-    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 12px 20px;
+    border-radius: 10px;
     text-align: right;
 }
 
 .hero-score-val {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     font-weight: 900;
     color: #fbbf24;
     display: block;
 }
 
 .hero-score-lbl {
-    font-size: 0.72rem;
-    color: #e2e8f0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #ffffff;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
