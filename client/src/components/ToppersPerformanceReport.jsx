@@ -789,16 +789,22 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                 doc.text("3. Weakest Topics & Subtopics (ERR Report Analysis)", margin, y);
                 y += 4;
 
+                doc.setFontSize(7.5);
+                if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
+                doc.setTextColor(100, 116, 139);
+                doc.text("Scoring Note: Wrong attempt = 5 marks lost (-1 penalty + 4 unearned) | Skipped = 4 marks lost", margin, y);
+                y += 4;
+
                 autoTable(doc, {
                     startY: y,
                     margin: { left: margin, right: margin },
-                    head: [['Subject', 'Topic Name', 'Subtopic Name', 'Wrong Attempts', 'Marks Lost']],
+                    head: [['Subject', 'Topic Name', 'Subtopic Name', 'Wrong (-5)', 'Skipped (-4)', 'Total Marks Lost']],
                     body: topicAnalysis.topWeakTopics.map(t => [
-                        t.subject, t.topic, t.subTopic, t.wrongCount, `-${t.totalLost}`
+                        t.subject, t.topic, t.subTopic, t.wrongCount, t.unattCount, `-${t.totalLost}`
                     ]),
                     theme: 'grid',
-                    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-                    bodyStyles: { fontSize: 8 }
+                    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+                    bodyStyles: { fontSize: 7.5 }
                 });
 
                 y = doc.lastAutoTable.finalY + 6;
@@ -1076,8 +1082,8 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                     {/* Section 3: Topic & Subtopic Error Analysis (ERR REPORT ANALYSIS) */}
                     <div className="pdf-section">
                         <h3 className="section-heading">3. Top Weak Topics & Subtopics (ERR Report Analysis)</h3>
-                        <p className="narrative-text small" style={{ marginBottom: '10px' }}>
-                            These are the specific topics and subtopics where {selectedStudent.name} made the most wrong attempts across tests:
+                        <p className="narrative-text small" style={{ marginBottom: '10px', color: '#475569' }}>
+                            Topic-level error breakdown from test logs. Each wrong attempt loses 5 marks (-1 penalty + 4 unearned), and each skipped question loses 4 marks:
                         </p>
                         
                         {topicAnalysis.topWeakTopics && topicAnalysis.topWeakTopics.length > 0 ? (
@@ -1094,9 +1100,18 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                                                 </div>
                                                 <span className={`subject-tag ${tagClass}`}>{item.subject}</span>
                                             </div>
-                                            <div className="topic-card-stats">
+                                            <div className="topic-card-stats" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                                                 <span className="stat-badge-lost">-{item.totalLost} Marks Lost</span>
-                                                <span className="stat-badge-wrong">{item.wrongCount} Wrong Attempts</span>
+                                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                    {item.wrongCount > 0 && (
+                                                        <span className="stat-badge-wrong">{item.wrongCount} Wrong (-{item.wrongCount * 5})</span>
+                                                    )}
+                                                    {item.unattCount > 0 && (
+                                                        <span style={{ background: '#fef3c7', color: '#92400e', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                                                            {item.unattCount} Skipped (-{item.unattCount * 4})
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     );
