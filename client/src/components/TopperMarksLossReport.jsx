@@ -21,7 +21,7 @@ import {
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
-import Select from 'react-select';
+import Select, { components } from 'react-select';
 import { 
     Award, 
     Activity, 
@@ -33,13 +33,13 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     Minus,
-    Search,
-    SlidersHorizontal,
-    UserCheck,
-    HelpCircle,
+    ChevronLeft,
+    ChevronRight,
     AlertTriangle,
-    Maximize2,
-    X
+    Target,
+    CheckCircle2,
+    SlidersHorizontal,
+    HelpCircle
 } from 'lucide-react';
 
 ChartJS.register(
@@ -130,20 +130,60 @@ const estimateWU = (lostTotal) => {
     return { w, wLost, u, uLost };
 };
 
+const CheckboxOption = (props) => {
+    return (
+        <components.Option {...props}>
+            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                    type="checkbox"
+                    checked={props.isSelected}
+                    onChange={() => null}
+                    style={{ marginRight: '8px', cursor: 'pointer', accentColor: '#1e3a8a' }}
+                />
+                <span style={{ fontSize: '0.85rem', color: '#1e293b' }}>{props.label}</span>
+            </div>
+        </components.Option>
+    );
+};
+
+const MultiValueContainer = ({ children, ...props }) => {
+    const selected = props.getValue();
+    const totalOptions = props.options.filter(v => v.value !== "SELECT_ALL").length;
+    
+    if (selected.length > 1) {
+        return (
+            <components.ValueContainer {...props}>
+                <div style={{
+                    fontSize: '0.78rem',
+                    fontWeight: '700',
+                    color: '#1e3a8a',
+                    background: '#eff6ff',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    whiteSpace: 'nowrap'
+                }}>
+                    {selected.length === totalOptions ? 'All Students Selected' : `${selected.length} Students Selected`}
+                </div>
+                {children.map(child => child && child.type?.name === 'Input' ? child : null)}
+            </components.ValueContainer>
+        );
+    }
+    return <components.ValueContainer {...props}>{children}</components.ValueContainer>;
+};
+
 const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
     const { userData } = useAuth();
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [topLimit, setTopLimit] = useState(10);
-    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [topLimit, setTopLimit] = useState(5);
+    const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+
     const [erpData, setErpData] = useState([]);
     const [historyData, setHistoryData] = useState([]);
     const [erpLoading, setErpLoading] = useState(false);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
-    const [zoomImage, setZoomImage] = useState(null);
-    const reportPaperRef = useRef(null);
 
-    // Fetch student cohort based on current global filters
     useEffect(() => {
         const controller = new AbortController();
         const fetchData = async () => {
@@ -156,14 +196,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 if (!controller.signal.aborted && data) {
                     const fetchedStudents = data.students || [];
                     setStudents(fetchedStudents);
-                    
-                    if (fetchedStudents.length > 0) {
-                        const sorted = [...fetchedStudents].sort((a, b) => (Number(b.tot) || 0) - (Number(a.tot) || 0));
-                        setSelectedStudent(sorted[0]);
-                        logActivity(userData, 'Loaded Topper Marks Loss Report', { count: fetchedStudents.length });
-                    } else {
-                        setSelectedStudent(null);
-                    }
+                    logActivity(userData, 'Loaded Topper Marks Loss Report', { count: fetchedStudents.length });
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -186,12 +219,63 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
     useEffect(() => {
         if (toppersList.length > 0) {
-            const exists = toppersList.some(s => s.STUD_ID === selectedStudent?.STUD_ID);
-            if (!exists) {
-                setSelectedStudent(toppersList[0]);
+            const validIds = toppersList.map(s => s.STUD_ID);
+            if (selectedStudentIds.length === 0) {
+                setSelectedStudentIds(validIds);
+            } else {
+                const filtered = selectedStudentIds.filter(id => validIds.includes(id));
+                if (filtered.length === 0) setSelectedStudentIds(validIds);
+                else setSelectedStudentIds(filtered);
             }
+        } else {
+            setSelectedStudentIds([]);
         }
+        setCurrentIndex(0);
     }, [toppersList]);
+
+    const activeCohort = useMemo(() => {
+        if (toppersList.length === 0) return [];
+        if (selectedStudentIds.length === 0) return toppersList;
+        const selectedSet = new Set(selectedStudentIds);
+        return toppersList.filter(s => selectedSet.has(s.STUD_ID));
+    }, [toppersList, selectedStudentIds]);
+
+    useEffect(() => {
+        if (activeCohort.length > 0 && currentIndex >= activeCohort.length) {
+            setCurrentIndex(0);
+        }
+    }, [activeCohort, currentIndex]);
+
+    const selectedStudent = useMemo(() => {
+        if (activeCohort.length === 0) return null;
+        return activeCohort[currentIndex] || activeCohort[0];
+    }, [activeCohort, currentIndex]);
+
+    const handlePrevStudent = () => {
+        if (activeCohort.length === 0) return;
+        setCurrentIndex(prev => (prev > 0 ? prev - 1 : activeCohort.length - 1));
+    };
+
+    const handleNextStudent = () => {
+        if (activeCohort.length === 0) return;
+        setCurrentIndex(prev => (prev < activeCohort.length - 1 ? prev + 1 : 0));
+    };
+
+    const dropdownOptions = useMemo(() => {
+        return toppersList.map(s => ({
+            value: s.STUD_ID,
+            label: `${s.name} (${Math.round(s.tot)}/720) - ${s.campus}`
+        }));
+    }, [toppersList]);
+
+    const handleSelectChange = (selectedOptions) => {
+        if (!selectedOptions || selectedOptions.length === 0) {
+            setSelectedStudentIds(toppersList.map(s => s.STUD_ID));
+        } else {
+            setSelectedStudentIds(selectedOptions.map(opt => opt.value));
+        }
+        setCurrentIndex(0);
+    };
 
     useEffect(() => {
         if (!selectedStudent || !selectedStudent.STUD_ID) {
@@ -248,6 +332,41 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
         fetchStudentDetails();
     }, [selectedStudent, filters.academicYear, filters.testType]);
 
+    const topicAnalysis = useMemo(() => {
+        if (!erpData || erpData.length === 0) return { allTopics: [], topWeakTopics: [], bySubject: {} };
+
+        const topicMap = new Map();
+
+        erpData.forEach(row => {
+            const status = String(row.W_U || '').trim().toUpperCase();
+            if (status === 'W' || status === 'U') {
+                const subject = String(row.Subject || 'General').trim();
+                const topic = String(row.Topic || 'General Topic').trim();
+                const subTopic = String(row.Sub_Topic || row.SubTopic || 'General Concept').trim();
+                const key = `${subject}||${topic}||${subTopic}`;
+
+                if (!topicMap.has(key)) {
+                    topicMap.set(key, { subject, topic, subTopic, wrongCount: 0, unattCount: 0, totalLost: 0 });
+                }
+
+                const item = topicMap.get(key);
+                if (status === 'W') { item.wrongCount += 1; item.totalLost += 5; }
+                else { item.unattCount += 1; item.totalLost += 4; }
+            }
+        });
+
+        const allTopics = Array.from(topicMap.values()).sort((a, b) => b.totalLost - a.totalLost);
+
+        const bySubject = {
+            Physics: allTopics.filter(t => t.subject.toUpperCase().includes('PHY')),
+            Chemistry: allTopics.filter(t => t.subject.toUpperCase().includes('CHE')),
+            Botany: allTopics.filter(t => t.subject.toUpperCase().includes('BOT')),
+            Zoology: allTopics.filter(t => t.subject.toUpperCase().includes('ZOO'))
+        };
+
+        return { allTopics, topWeakTopics: allTopics.slice(0, 8), bySubject };
+    }, [erpData]);
+
     const analysis = useMemo(() => {
         if (!selectedStudent) return null;
 
@@ -257,15 +376,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
             erpData.forEach(r => {
                 if (!r.Test) return;
                 if (!testMap.has(r.Test)) {
-                    testMap.set(r.Test, {
-                        Test: r.Test,
-                        DATE: r.DATE || '2026',
-                        Botany: Number(r.Botany) || 0,
-                        Zoology: Number(r.Zoology) || 0,
-                        Physics: Number(r.Physics) || 0,
-                        Chemistry: Number(r.Chemistry) || 0,
-                        Tot_720: Number(r.Tot_720) || 0
-                    });
+                    testMap.set(r.Test, { Test: r.Test, DATE: r.DATE || '2026', Botany: Number(r.Botany) || 0, Zoology: Number(r.Zoology) || 0, Physics: Number(r.Physics) || 0, Chemistry: Number(r.Chemistry) || 0, Tot_720: Number(r.Tot_720) || 0 });
                 }
             });
             exams = Array.from(testMap.values());
@@ -293,34 +404,17 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
             erpData.forEach(row => {
                 const sub = String(row.Subject || '').trim().toUpperCase();
                 const status = String(row.W_U || '').trim().toUpperCase();
-                if (sub.includes('BOT')) {
-                    if (status === 'W') botW++;
-                    else if (status === 'U') botU++;
-                } else if (sub.includes('ZOO')) {
-                    if (status === 'W') zooW++;
-                    else if (status === 'U') zooU++;
-                } else if (sub.includes('PHY')) {
-                    if (status === 'W') phyW++;
-                    else if (status === 'U') phyU++;
-                } else if (sub.includes('CHE')) {
-                    if (status === 'W') cheW++;
-                    else if (status === 'U') cheU++;
-                }
+                if (sub.includes('BOT')) { if (status === 'W') botW++; else if (status === 'U') botU++; }
+                else if (sub.includes('ZOO')) { if (status === 'W') zooW++; else if (status === 'U') zooU++; }
+                else if (sub.includes('PHY')) { if (status === 'W') phyW++; else if (status === 'U') phyU++; }
+                else if (sub.includes('CHE')) { if (status === 'W') cheW++; else if (status === 'U') cheU++; }
             });
         }
 
-        if (botW === 0 && botU === 0 && botLostPerExam > 0) {
-            const est = estimateWU(botLostPerExam * examCount); botW = est.w; botU = est.u;
-        }
-        if (zooW === 0 && zooU === 0 && zooLostPerExam > 0) {
-            const est = estimateWU(zooLostPerExam * examCount); zooW = est.w; zooU = est.u;
-        }
-        if (phyW === 0 && phyU === 0 && phyLostPerExam > 0) {
-            const est = estimateWU(phyLostPerExam * examCount); phyW = est.w; phyU = est.u;
-        }
-        if (cheW === 0 && cheU === 0 && cheLostPerExam > 0) {
-            const est = estimateWU(cheLostPerExam * examCount); cheW = est.w; cheU = est.u;
-        }
+        if (botW === 0 && botU === 0 && botLostPerExam > 0) { const est = estimateWU(botLostPerExam * examCount); botW = est.w; botU = est.u; }
+        if (zooW === 0 && zooU === 0 && zooLostPerExam > 0) { const est = estimateWU(zooLostPerExam * examCount); zooW = est.w; zooU = est.u; }
+        if (phyW === 0 && phyU === 0 && phyLostPerExam > 0) { const est = estimateWU(phyLostPerExam * examCount); phyW = est.w; phyU = est.u; }
+        if (cheW === 0 && cheU === 0 && cheLostPerExam > 0) { const est = estimateWU(cheLostPerExam * examCount); cheW = est.w; cheU = est.u; }
 
         const botWLost = botW * 5; const botULost = botU * 4; const botTotLost = botWLost + botULost || (botLostPerExam * examCount);
         const zooWLost = zooW * 5; const zooULost = zooU * 4; const zooTotLost = zooWLost + zooULost || (zooLostPerExam * examCount);
@@ -342,8 +436,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
         const strongSubjects = sortedByLoss.slice(2);
 
         const subjectRows = rawSubjects.map(s => ({
-            ...s,
-            isLagging: s.name === lagging1.name || s.name === lagging2.name
+            ...s, isLagging: s.name === lagging1.name || s.name === lagging2.name
         }));
 
         const totalWrongCount = botW + zooW + phyW + cheW;
@@ -398,10 +491,10 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
         ];
 
         const actionPoints = [
-            `Maintain an error log for every wrong ${lagging1.name} and ${lagging2.name} answer, tagged as concept gap, calculation slip or misread question.`,
-            `In ${lagging1.name}, set a fixed time per question and a skip-and-return rule so that fewer questions are left blank.`,
-            `In ${lagging2.name}, review the topics behind repeated wrong answers and revise them through short timed sets.`,
-            `Keep ${strongSubjects.map(s => s.name).join(' and ')} at current performance levels with brief weekly revision rather than extra hours.`
+            `Focus on fixing top weak topics in ${lagging1.name} and ${lagging2.name} where negative marks occur repeatedly.`,
+            `In ${lagging1.name}, practice timed sets to avoid leaving questions blank.`,
+            `In ${lagging2.name}, double check calculations before marking answers to stop careless slips.`,
+            `Maintain weekly brief revision for ${strongSubjects.map(s => s.name).join(' and ')} to keep their high scores.`
         ];
 
         return {
@@ -429,7 +522,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
             datasets: [{
                 label: 'Average marks lost per exam',
                 data: displaySubjects.map(s => s.lostPerExam),
-                backgroundColor: displaySubjects.map(s => s.isLagging ? '#881337' : '#0f172a'),
+                backgroundColor: displaySubjects.map(s => s.isLagging ? '#dc2626' : '#1e3a8a'),
                 borderRadius: 4,
                 barThickness: 22
             }]
@@ -440,10 +533,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false },
-            datalabels: { anchor: 'end', align: 'end', color: '#0f172a', font: { weight: 'bold', size: 12 }, formatter: (val) => val }
-        },
+        plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'end', color: '#0f172a', font: { weight: 'bold', size: 12 }, formatter: (val) => val } },
         scales: {
             x: { grid: { color: '#e2e8f0' }, max: Math.max(...(analysis?.subjectRows.map(s => s.lostPerExam) || [30])) + 5 },
             y: { grid: { display: false }, ticks: { font: { weight: 'bold', size: 12 }, color: '#0f172a' } }
@@ -524,14 +614,14 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
             doc.setFontSize(11);
             if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
             doc.setTextColor(136, 19, 55);
-            doc.text("1. Overall Picture", margin, y);
+            doc.text("1. Overall Picture (Simple Summary)", margin, y);
             y += 5;
 
             doc.setFontSize(9);
             if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
             doc.setTextColor(30, 41, 59);
 
-            const overallText = `Over ${analysis.examCount} exams, ${selectedStudent.name} lost a total of ${analysis.grandTotalLost.toLocaleString()} marks, which is ${analysis.avgLostPerExam} marks per exam against a maximum of 720. Of this, ${analysis.top2Share}% came from just two subjects, ${analysis.lagging1.name} and ${analysis.lagging2.name}. ${analysis.strongSubjects.map(s => s.name).join(' and ')} is already close to full marks, so the gains available to him/her are almost entirely in ${analysis.lagging1.name} and ${analysis.lagging2.name}.`;
+            const overallText = `Out of 720 total marks, ${selectedStudent.name} averages ${analysis.studTot} marks and loses ${analysis.avgLostPerExam} marks per exam across ${analysis.examCount} tests. ${analysis.top2Share}% of all lost marks happen in ${analysis.lagging1.name} and ${analysis.lagging2.name}. Botany and Zoology are already strong, so the main opportunity to raise score is in ${analysis.lagging1.name} and ${analysis.lagging2.name}.`;
             const overallLines = doc.splitTextToSize(overallText, contentWidth);
             doc.text(overallLines, margin, y);
             y += (overallLines.length * 4.5) + 6;
@@ -567,26 +657,38 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                 }
             });
 
-            y = doc.lastAutoTable.finalY + 4;
-            doc.setFontSize(7.5); doc.setFont("helvetica", "italic"); doc.setTextColor(100, 116, 139);
-            doc.text(`A wrong answer costs 5 marks (4 not earned + 1 negative); an unattempted question costs 4 marks. Counts are totals across ${analysis.examCount} exams. Highlighted rows are the lagging subjects.`, margin, y);
-            y += 6;
+            y = doc.lastAutoTable.finalY + 6;
 
-            const barChartImg = await createHighResChartImage('bar', horizontalChartData, { indexAxis: 'y', plugins: { legend: { display: false }, datalabels: { anchor: 'end', align: 'end', font: { weight: 'bold', size: 14 } } }, scales: { x: { display: true }, y: { ticks: { font: { weight: 'bold', size: 14 } } } } }, 800, 300);
-            if (barChartImg) {
-                doc.addImage(barChartImg, 'PNG', margin + 25, y, 140, 45);
-                y += 48;
-                doc.setFontSize(8); doc.setFont("helvetica", "italic");
-                doc.text("Figure 1: Average marks lost per exam, by subject.", pageWidth / 2, y, { align: 'center' });
-                y += 8;
+            if (topicAnalysis.allTopics && topicAnalysis.allTopics.length > 0) {
+                if (y > pageHeight - 50) { doc.addPage(); y = 14; }
+
+                doc.setFontSize(11);
+                if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
+                doc.setTextColor(136, 19, 55);
+                doc.text("3. Weakest Topics & Subtopics (ERR Report Analysis)", margin, y);
+                y += 4;
+
+                autoTable(doc, {
+                    startY: y,
+                    margin: { left: margin, right: margin },
+                    head: [['Subject', 'Topic Name', 'Subtopic Name', 'Wrong Attempts', 'Marks Lost']],
+                    body: topicAnalysis.topWeakTopics.map(t => [
+                        t.subject, t.topic, t.subTopic, t.wrongCount, `-${t.totalLost}`
+                    ]),
+                    theme: 'grid',
+                    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+                    bodyStyles: { fontSize: 8 }
+                });
+
+                y = doc.lastAutoTable.finalY + 6;
             }
 
-            if (y > pageHeight - 60) { doc.addPage(); y = 14; }
+            if (y > pageHeight - 50) { doc.addPage(); y = 14; }
 
             doc.setFontSize(11);
             if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
             doc.setTextColor(136, 19, 55);
-            doc.text("3. Where He Is Lagging", margin, y);
+            doc.text("4. Where He Is Lagging (Simple Analysis)", margin, y);
             y += 4;
 
             autoTable(doc, {
@@ -607,31 +709,12 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
             y = doc.lastAutoTable.finalY + 6;
 
-            doc.setFontSize(8.5);
-            if (bookmanFont) doc.setFont("Bookman", "normal"); else doc.setFont("helvetica", "normal");
-            doc.setTextColor(30, 41, 59);
-
-            const bullet1 = `• ${analysis.lagging1.name} (lost ${analysis.lagging1.totalLost} marks, ${analysis.lagging1.share}% of total): the largest loss. About ${analysis.lagging1.wrongPerExam} questions are wrong in every exam, and ${analysis.lagging1.unattCount} questions were skipped across the ${analysis.examCount} exams (${analysis.lagging1.unattLost} marks). Accuracy and attempt rate need focused practice.`;
-            const b1Lines = doc.splitTextToSize(bullet1, contentWidth);
-            doc.text(b1Lines, margin, y);
-            y += (b1Lines.length * 4) + 3;
-
-            const bullet2 = `• ${analysis.lagging2.name} (lost ${analysis.lagging2.totalLost} marks, ${analysis.lagging2.share}%): almost entirely wrong answers (${Math.round((analysis.lagging2.wrongLost/analysis.lagging2.totalLost)*100)}% of loss), averaging ${analysis.lagging2.wrongPerExam} wrong per exam. Questions are being attempted but answered incorrectly, pointing to calculation errors or half-known concepts.`;
-            const b2Lines = doc.splitTextToSize(bullet2, contentWidth);
-            doc.text(b2Lines, margin, y);
-            y += (b2Lines.length * 4) + 3;
-
-            const bullet3 = `• ${analysis.strongSubjects.map(s => s.name).join(' and ')}: only ${analysis.strongSubjects.map(s => `${s.lostPerExam} (${s.name})`).join(' and ')} marks lost per exam. No major intervention is needed.`;
-            const b3Lines = doc.splitTextToSize(bullet3, contentWidth);
-            doc.text(b3Lines, margin, y);
-            y += (b3Lines.length * 4) + 6;
-
             if (y > pageHeight - 50) { doc.addPage(); y = 14; }
 
             doc.setFontSize(11);
             if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
             doc.setTextColor(136, 19, 55);
-            doc.text("4. Exam-to-Exam Comparison & Progression", margin, y);
+            doc.text("5. Exam-to-Exam Progression", margin, y);
             y += 4;
 
             autoTable(doc, {
@@ -646,37 +729,12 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
             y = doc.lastAutoTable.finalY + 6;
 
-            if (y > pageHeight - 45) { doc.addPage(); y = 14; }
-
-            doc.setFontSize(11);
-            if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
-            doc.setTextColor(136, 19, 55);
-            doc.text("5. Improvement Potential", margin, y);
-            y += 4;
-
-            autoTable(doc, {
-                startY: y,
-                margin: { left: margin, right: margin },
-                head: [['Scenario (illustrative)', 'Marks gained per exam']],
-                body: analysis.improvementScenarios.map(sc => [sc.scenario, sc.gained]),
-                theme: 'grid',
-                headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
-                bodyStyles: { fontSize: 8 },
-                didParseCell: (data) => {
-                    if (data.section === 'body' && (data.row.index === 3 || data.row.index === 4)) {
-                        data.cell.styles.fontStyle = 'bold'; data.cell.styles.fillColor = [241, 245, 249];
-                    }
-                }
-            });
-
-            y = doc.lastAutoTable.finalY + 6;
-
             if (y > pageHeight - 40) { doc.addPage(); y = 14; }
 
             doc.setFontSize(11);
             if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
             doc.setTextColor(136, 19, 55);
-            doc.text("6. Recommended Action Points", margin, y);
+            doc.text("6. Simple Action Plan for Student", margin, y);
             y += 5;
 
             doc.setFontSize(8.5);
@@ -744,17 +802,31 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                         Found <strong>{students.length}</strong> Students matching filters. Showing <strong>Top {toppersList.length}</strong>.
                     </span>
 
-                    {toppersList.length > 0 && (
-                        <div style={{ width: '260px' }}>
+                    {activeCohort.length > 0 && (
+                        <div className="student-nav-wrapper">
+                            <button className="nav-arrow-btn" onClick={handlePrevStudent} title="Previous Student">
+                                <ChevronLeft size={18} />
+                            </button>
+                            <span className="nav-counter-badge">
+                                Student {currentIndex + 1} of {activeCohort.length}
+                            </span>
+                            <button className="nav-arrow-btn" onClick={handleNextStudent} title="Next Student">
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
+                    )}
+
+                    {dropdownOptions.length > 0 && (
+                        <div style={{ minWidth: '280px' }}>
                             <Select
-                                options={toppersList.map(s => ({ value: s.STUD_ID, label: `${s.name} (${Math.round(s.tot)}/720) - ${s.campus}` }))}
-                                value={selectedStudent ? { value: selectedStudent.STUD_ID, label: `${selectedStudent.name} (${Math.round(selectedStudent.tot)}/720) - ${selectedStudent.campus}` } : null}
-                                onChange={(opt) => {
-                                    const found = toppersList.find(s => s.STUD_ID === opt.value);
-                                    if (found) setSelectedStudent(found);
-                                }}
-                                isSearchable
-                                placeholder="Select Student..."
+                                isMulti
+                                closeMenuOnSelect={false}
+                                hideSelectedOptions={false}
+                                components={{ Option: CheckboxOption, ValueContainer: MultiValueContainer }}
+                                options={dropdownOptions}
+                                value={dropdownOptions.filter(opt => selectedStudentIds.includes(opt.value))}
+                                onChange={handleSelectChange}
+                                placeholder="Select Students..."
                             />
                         </div>
                     )}
@@ -762,8 +834,15 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
 
                 <div className="control-right">
                     <div className="pill-group">
-                        {[10, 50, 100].map(limit => (
-                            <button key={limit} className={`pill-btn ${topLimit === limit ? 'active' : ''}`} onClick={() => { setTopLimit(limit); logActivity(userData, `Switched View Limit`, { limit }); }}>
+                        {[5, 10, 50, 100].map(limit => (
+                            <button
+                                key={limit}
+                                className={`pill-btn ${topLimit === limit ? 'active' : ''}`}
+                                onClick={() => {
+                                    setTopLimit(limit);
+                                    logActivity(userData, `Switched View Limit`, { limit });
+                                }}
+                            >
                                 Top {limit}
                             </button>
                         ))}
@@ -782,36 +861,26 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
             </div>
 
             {selectedStudent && analysis ? (
-                <div className="pdf-paper-view" ref={reportPaperRef}>
-                    <div className="pdf-header-brand">
-                        <span className="brand-inst">SRI CHAITANYA EDUCATIONAL INSTITUTIONS</span>
-                        <span className="brand-doc-title">Individual Performance Report - {filters.academicYear || '2026'}</span>
-                    </div>
-
-                    <div className="pdf-main-title-banner">
-                        <h2>MARKS LOSS & PERFORMANCE ANALYSIS</h2>
-                        <div className="student-metadata-line">
-                            <span>{selectedStudent.name}</span>
-                            <span className="sep">|</span>
-                            <span>ID {selectedStudent.STUD_ID}</span>
-                            <span className="sep">|</span>
-                            <span>{selectedStudent.campus || 'Campus'}</span>
-                            <span className="sep">|</span>
-                            <span>{selectedStudent.stream || 'SR ELITE'}</span>
-                            <span className="sep">|</span>
-                            <span>AY {filters.academicYear || '2026'}</span>
-                            <span className="sep">|</span>
-                            <span>All Exams ({analysis.examCount})</span>
+                <div className="webpage-dashboard-container">
+                    <div className="dashboard-hero-banner">
+                        <div className="hero-student-info">
+                            <h2>{selectedStudent.name}</h2>
+                            <p className="hero-student-sub">
+                                ID {selectedStudent.STUD_ID} • {selectedStudent.campus || 'Campus'} • {selectedStudent.stream || 'SR ELITE'} • AY {filters.academicYear || '2026'} • All Exams ({analysis.examCount})
+                            </p>
+                        </div>
+                        <div className="hero-score-badge">
+                            <span className="hero-score-val">{analysis.studTot} / 720</span>
+                            <span className="hero-score-lbl">Average Score</span>
                         </div>
                     </div>
 
                     <div className="pdf-section">
-                        <h3 className="section-heading">1. Overall Picture</h3>
+                        <h3 className="section-heading">1. Overall Performance Summary (Simple Explanation)</h3>
                         <p className="narrative-text">
-                            Over {analysis.examCount} exams, {selectedStudent.name} lost a total of <strong>{analysis.grandTotalLost.toLocaleString()} marks</strong>, 
-                            which is <strong>{analysis.avgLostPerExam} marks per exam</strong> against a maximum of 720. 
-                            Of this, <strong>{analysis.top2Share}% came from just two subjects</strong>, {analysis.lagging1.name} and {analysis.lagging2.name}. 
-                            {analysis.strongSubjects.map(s => s.name).join(' and ')} is already close to full marks, so the gains available to him/her are almost entirely in {analysis.lagging1.name} and {analysis.lagging2.name}.
+                            Out of 720 maximum marks, <strong>{selectedStudent.name}</strong> scores an average of <strong>{analysis.studTot} marks</strong> and loses <strong>{analysis.avgLostPerExam} marks per exam</strong> across {analysis.examCount} tests. 
+                            Almost all lost marks (<strong>{analysis.top2Share}%</strong>) happen in <strong>{analysis.lagging1.name}</strong> and <strong>{analysis.lagging2.name}</strong>. 
+                            {analysis.strongSubjects.map(s => s.name).join(' and ')} are already near full marks, so the main opportunity to raise score is in {analysis.lagging1.name} and {analysis.lagging2.name}.
                         </p>
                     </div>
 
@@ -820,7 +889,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                         <table className="pdf-report-table">
                             <thead>
                                 <tr>
-                                    <th>Subject</th><th>Avg score /180</th><th>Wrong answers</th><th>Marks lost (wrong)</th><th>Unattempted</th><th>Marks lost (unatt.)</th><th>Total lost</th><th>Share of loss</th><th>Lost per exam</th>
+                                    <th>Subject</th><th>Avg Score /180</th><th>Wrong Answers</th><th>Marks Lost (Wrong)</th><th>Unattempted</th><th>Marks Lost (Unatt.)</th><th>Total Lost</th><th>Share of Loss</th><th>Lost Per Exam</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -834,9 +903,6 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                                 </tr>
                             </tbody>
                         </table>
-                        <p className="table-footnote">
-                            A wrong answer costs 5 marks (4 not earned + 1 negative); an unattempted question costs 4 marks. Counts are totals across {analysis.examCount} exams. Highlighted rows are the lagging subjects.
-                        </p>
 
                         <div className="chart-container-horizontal" style={{ height: '220px' }}>
                             <Bar data={horizontalChartData} options={horizontalChartOptions} />
@@ -845,11 +911,46 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                     </div>
 
                     <div className="pdf-section">
-                        <h3 className="section-heading">3. Where He Is Lagging</h3>
+                        <h3 className="section-heading">3. Top Weak Topics & Subtopics (ERR Report Analysis)</h3>
+                        <p className="narrative-text small" style={{ marginBottom: '10px' }}>
+                            These are the specific topics and subtopics where {selectedStudent.name} made the most wrong attempts across tests:
+                        </p>
+                        
+                        {topicAnalysis.topWeakTopics && topicAnalysis.topWeakTopics.length > 0 ? (
+                            <div className="topic-error-grid">
+                                {topicAnalysis.topWeakTopics.map((item, idx) => {
+                                    const subLower = item.subject.toLowerCase();
+                                    const tagClass = subLower.includes('phy') ? 'phy' : subLower.includes('che') ? 'che' : subLower.includes('bot') ? 'bot' : 'zoo';
+                                    return (
+                                        <div key={idx} className="topic-error-card">
+                                            <div className="topic-card-header">
+                                                <div>
+                                                    <div className="topic-name">{item.topic}</div>
+                                                    <div className="subtopic-name">{item.subTopic}</div>
+                                                </div>
+                                                <span className={`subject-tag ${tagClass}`}>{item.subject}</span>
+                                            </div>
+                                            <div className="topic-card-stats">
+                                                <span className="stat-badge-lost">-{item.totalLost} Marks Lost</span>
+                                                <span className="stat-badge-wrong">{item.wrongCount} Wrong Attempts</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="narrative-text small" style={{ color: '#64748b', fontStyle: 'italic' }}>
+                                No specific topic-level error logs found for the selected tests. Performance is calculated from subject test scores.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="pdf-section">
+                        <h3 className="section-heading">4. Where He Is Lagging (Simple Analysis)</h3>
                         <table className="pdf-report-table">
                             <thead>
                                 <tr>
-                                    <th>Subject</th><th>Wrong / exam</th><th>Unattempted / exam</th><th>Main cause of loss</th><th>Priority</th>
+                                    <th>Subject</th><th>Wrong / Exam</th><th>Unattempted / Exam</th><th>Main Cause of Loss</th><th>Priority</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -862,14 +963,14 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                         </table>
 
                         <div className="bullets-analysis">
-                            <p className="bullet-item">• <strong>{analysis.lagging1.name} (lost {analysis.lagging1.totalLost} marks, {analysis.lagging1.share}% of total):</strong> the largest loss. About {analysis.lagging1.wrongPerExam} questions are wrong in every exam, and {analysis.lagging1.unattCount} questions were skipped across the {analysis.examCount} exams ({analysis.lagging1.unattLost} marks). Accuracy and attempt rate need focused practice.</p>
-                            <p className="bullet-item">• <strong>{analysis.lagging2.name} (lost {analysis.lagging2.totalLost} marks, {analysis.lagging2.share}%):</strong> almost entirely wrong answers ({Math.round((analysis.lagging2.wrongLost/analysis.lagging2.totalLost)*100)}% of loss), averaging {analysis.lagging2.wrongPerExam} wrong per exam. Questions are being attempted but answered incorrectly, pointing to calculation errors or half-known concepts.</p>
-                            <p className="bullet-item">• <strong>{analysis.strongSubjects.map(s => s.name).join(' and ')}:</strong> only {analysis.strongSubjects.map(s => `${s.lostPerExam} (${s.name})`).join(' and ')} marks lost per exam. No major intervention is needed.</p>
+                            <p className="bullet-item">• <strong>{analysis.lagging1.name} (lost {analysis.lagging1.totalLost} marks, {analysis.lagging1.share}% of total):</strong> Largest loss. About {analysis.lagging1.wrongPerExam} questions wrong per exam, and {analysis.lagging1.unattCount} skipped across {analysis.examCount} tests ({analysis.lagging1.unattLost} marks). Both accuracy and speed need attention.</p>
+                            <p className="bullet-item">• <strong>{analysis.lagging2.name} (lost {analysis.lagging2.totalLost} marks, {analysis.lagging2.share}%):</strong> Almost entirely wrong answers ({Math.round((analysis.lagging2.wrongLost/analysis.lagging2.totalLost)*100)}% of loss), averaging {analysis.lagging2.wrongPerExam} wrong per exam. Questions are attempted but marked incorrectly due to concept gaps.</p>
+                            <p className="bullet-item">• <strong>{analysis.strongSubjects.map(s => s.name).join(' and ')}:</strong> Only {analysis.strongSubjects.map(s => `${s.lostPerExam} (${s.name})`).join(' and ')} marks lost per exam. Scores are strong!</p>
                         </div>
                     </div>
 
                     <div className="pdf-section">
-                        <h3 className="section-heading">4. Exam-to-Exam Comparison & Progression</h3>
+                        <h3 className="section-heading">5. Exam-to-Exam Comparison & Progression</h3>
                         <div className="metrics-summary-bar">
                             <div className="metric-pill"><span className="metric-pill-lbl">Best Exam Score</span><span className="metric-pill-val text-primary">{analysis.maxScore} / 720 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>({analysis.bestExam})</span></span></div>
                             <div className="metric-pill"><span className="metric-pill-lbl">Worst Exam Score</span><span className="metric-pill-val text-danger">{analysis.minScore} / 720 <span style={{ fontSize: '0.75rem', color: '#64748b' }}>({analysis.worstExam})</span></span></div>
@@ -900,7 +1001,7 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                     </div>
 
                     <div className="pdf-section">
-                        <h3 className="section-heading">5. Improvement Potential</h3>
+                        <h3 className="section-heading">6. Score Improvement Targets</h3>
                         <table className="pdf-report-table">
                             <thead><tr><th>Scenario (illustrative)</th><th>Marks gained per exam</th></tr></thead>
                             <tbody>
@@ -909,23 +1010,14 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
                                 ))}
                             </tbody>
                         </table>
-                        <p className="table-footnote">Scenarios are estimates from the {analysis.examCount}-exam averages, not predictions. Baseline used: 720 - {analysis.avgLostPerExam} = {analysis.studTot} average.</p>
+                        <p className="table-footnote">Scenarios are estimates based on average score of {analysis.studTot}/720.</p>
                     </div>
 
                     <div className="pdf-section">
-                        <h3 className="section-heading">6. Recommended Action Points</h3>
+                        <h3 className="section-heading">7. Simple Action Plan for Student</h3>
                         <ol className="action-points-list">
                             {analysis.actionPoints.map((ap, i) => (<li key={i}>{ap}</li>))}
                         </ol>
-                    </div>
-
-                    <div className="pdf-section" style={{ marginBottom: 0 }}>
-                        <h3 className="section-heading">7. Data Notes</h3>
-                        <p className="narrative-text small">
-                            Data reflects results compiled across {analysis.examCount} exam(s) filtered by current criteria. 
-                            Score figures: {analysis.grandTotalLost} marks lost over {analysis.examCount} exams gives an average of {analysis.studTot}/720. 
-                            Individual exam scores and topic-wise error logs are dynamically integrated from portal records.
-                        </p>
                     </div>
                 </div>
             ) : (

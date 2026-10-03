@@ -3612,3 +3612,177 @@ body {
     color: #0f172a;
     margin-top: 2px;
 }
+
+/* --- STUDENT ARROW NAVIGATION BAR & TOPIC ERROR STYLES --- */
+.student-nav-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+}
+
+.nav-arrow-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #1e3a8a;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.nav-arrow-btn:hover:not(:disabled) {
+    background: #1e3a8a;
+    color: #ffffff;
+    border-color: #1e3a8a;
+}
+
+.nav-arrow-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.nav-counter-badge {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #1e293b;
+    white-space: nowrap;
+}
+
+/* Topic Error Cards */
+.topic-error-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+    margin-top: 12px;
+}
+
+.topic-error-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #dc2626;
+    border-radius: 8px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.topic-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.topic-name {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.subtopic-name {
+    font-size: 0.8rem;
+    color: #475569;
+    margin-top: 2px;
+}
+
+.subject-tag {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+}
+
+.subject-tag.phy { background: #fee2e2; color: #991b1b; }
+.subject-tag.che { background: #fef3c7; color: #92400e; }
+.subject-tag.bot { background: #dcfce7; color: #166534; }
+.subject-tag.zoo { background: #dbeafe; color: #1e40af; }
+
+.topic-card-stats {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #e2e8f0;
+    font-size: 0.78rem;
+}
+
+.stat-badge-lost {
+    color: #dc2626;
+    font-weight: 800;
+}
+
+.stat-badge-wrong {
+    color: #475569;
+    font-weight: 600;
+}
+
+/* Webpage Dashboard Cards UI */
+.webpage-dashboard-container {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px 28px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+.dashboard-hero-banner {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.hero-student-info h2 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin: 0 0 4px 0;
+    color: #ffffff;
+}
+
+.hero-student-sub {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    margin: 0;
+}
+
+.hero-score-badge {
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 10px 18px;
+    border-radius: 8px;
+    text-align: right;
+}
+
+.hero-score-val {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #fbbf24;
+    display: block;
+}
+
+.hero-score-lbl {
+    font-size: 0.72rem;
+    color: #e2e8f0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
