@@ -201,6 +201,24 @@ const TopperMarksLossReport = ({ filters, setFilters, setActivePage }) => {
     const subjectBarChartRef = useRef(null);
     const lossDoughnutChartRef = useRef(null);
 
+    const displayStream = useMemo(() => {
+        if (!selectedStudent) return '-';
+        let raw = selectedStudent.stream || selectedStudent.Stream;
+        if (!raw && erpData && erpData.length > 0) {
+            const found = erpData.find(r => r.Stream || r.stream);
+            if (found) raw = found.Stream || found.stream;
+        }
+        if (!raw && filters?.stream && filters.stream.length > 0) {
+            raw = Array.isArray(filters.stream) ? filters.stream.join(', ') : filters.stream;
+        }
+        if (!raw || raw === '-') return '-';
+        const upper = String(raw).toUpperCase();
+        if (upper.includes('JR ELITE')) return 'JR ELITE';
+        if (upper.includes('SR ELITE')) return 'SR ELITE';
+        if (upper.includes('AIIMS')) return 'AIIMS';
+        return raw;
+    }, [selectedStudent, erpData, filters]);
+
     const hasSelectedFilters = useMemo(() => {
         if (!filters) return false;
         const { campus, stream, testType, test, studentSearch } = filters;
@@ -832,7 +850,7 @@ const estimateWU = (lost) => {
             doc.setFont("helvetica", "bold");
             doc.text("Stream:", col2X, y + 12);
             doc.setFont("helvetica", "normal");
-            doc.text(String(studentStream || '-'), col2X + 26, y + 12);
+            doc.text(String(displayStream || '-'), col2X + 26, y + 12);
 
             doc.setFont("helvetica", "bold");
             doc.text("Test:", col2X, y + 18);
@@ -1152,7 +1170,7 @@ const estimateWU = (lost) => {
                                             </span>
                                         </div>
                                         <p className="student-submeta">
-                                            Campus: <strong>{selectedStudent.campus || '-'}</strong> • Stream: <strong>{selectedStudent.stream || selectedStudent.Stream || 'SR_ELITE'}</strong>
+                                            Campus: <strong>{selectedStudent.campus || '-'}</strong> • Stream: <strong>{displayStream}</strong>
                                         </p>
                                     </div>
                                 </div>

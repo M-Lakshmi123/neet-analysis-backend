@@ -1194,6 +1194,7 @@ app.get('/api/analysis-report', async (req, res) => {
         STUD_ID,
             MAX(NAME_OF_THE_STUDENT) as name,
             MAX(CAMPUS_NAME) as campus,
+            MAX(Stream) as stream,
             AVG(CAST(Tot_720 as FLOAT)) as tot,
             AVG(CAST(AIR as FLOAT)) as air,
             AVG(CAST(Botany as FLOAT)) as bot,

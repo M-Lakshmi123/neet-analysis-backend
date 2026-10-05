@@ -304,6 +304,28 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
         return activeCohort[currentIndex] || activeCohort[0];
     }, [activeCohort, currentIndex]);
 
+    // Student stream accurately derived without hardcoding SR ELITE
+    const displayStream = useMemo(() => {
+        let raw = selectedStudent?.stream || selectedStudent?.Stream;
+        if (!raw && historyData && historyData.length > 0) {
+            const found = historyData.find(h => h.Stream || h.stream);
+            if (found) raw = found.Stream || found.stream;
+        }
+        if (!raw && erpData && erpData.length > 0) {
+            const found = erpData.find(e => e.Stream || e.stream);
+            if (found) raw = found.Stream || found.stream;
+        }
+        if (!raw && filters?.stream && filters.stream.length > 0) {
+            raw = Array.isArray(filters.stream) ? filters.stream.join(', ') : filters.stream;
+        }
+        if (!raw) return '';
+        const upper = String(raw).toUpperCase();
+        if (upper.includes('JR ELITE')) return 'JR ELITE';
+        if (upper.includes('SR ELITE')) return 'SR ELITE';
+        if (upper.includes('AIIMS')) return 'AIIMS';
+        return raw;
+    }, [selectedStudent, historyData, erpData, filters]);
+
     // Handlers for Arrow Buttons (< Student X of Y >)
     const handlePrevStudent = () => {
         if (activeCohort.length === 0) return;
@@ -724,7 +746,8 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
             doc.setFontSize(9);
             if (bookmanBoldFont) doc.setFont("Bookman", "bold"); else doc.setFont("helvetica", "bold");
             doc.setTextColor(254, 240, 138); // Bright gold/yellow (#fef08a) for crystal clear student info
-            const metadataStr = `${selectedStudent.name}  |  ID ${selectedStudent.STUD_ID}  |  ${selectedStudent.campus || 'Campus'}  |  ${selectedStudent.stream || 'SR ELITE'}  |  AY ${filters.academicYear || '2026'}  |  Exams (${analysis.examCount})`;
+            const streamPart = displayStream ? `  |  ${displayStream}` : '';
+            const metadataStr = `${selectedStudent.name}  |  ID ${selectedStudent.STUD_ID}  |  ${selectedStudent.campus || 'Campus'}${streamPart}  |  AY ${filters.academicYear || '2026'}  |  Exams (${analysis.examCount})`;
             doc.text(metadataStr, pageWidth / 2, y + 13.5, { align: 'center' });
 
             y += 24;
@@ -1008,7 +1031,7 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
                             <div className="hero-report-tag">PERFORMANCE REPORT</div>
                             <h2>{selectedStudent.name}</h2>
                             <p className="hero-student-sub">
-                                ID {selectedStudent.STUD_ID} • {selectedStudent.campus || 'Campus'} • {selectedStudent.stream || 'SR ELITE'} • AY {filters.academicYear || '2026'} • All Exams ({analysis.examCount})
+                                ID {selectedStudent.STUD_ID} • {selectedStudent.campus || 'Campus'}{displayStream ? ` • ${displayStream}` : ''} • AY {filters.academicYear || '2026'} • All Exams ({analysis.examCount})
                             </p>
                         </div>
                         <div className="hero-score-badge">
