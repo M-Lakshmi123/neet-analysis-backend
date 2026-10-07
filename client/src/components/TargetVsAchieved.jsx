@@ -30,7 +30,7 @@ const TargetVsAchieved = ({ filters }) => {
     const [loading, setLoading] = useState(true);
     const [selectedThreshold, setSelectedThreshold] = useState('>= 550');
 
-    const thresholds = [
+    const thresholds = useMemo(() => [
         { label: '>= 710', key: '>= 710M', statsKey: 'T_710', value: 710 },
         { label: '>= 700', key: '>= 700M', statsKey: 'T_700', value: 700 },
         { label: '>= 685', key: '>= 685M', statsKey: 'T_685', value: 685 },
@@ -41,11 +41,14 @@ const TargetVsAchieved = ({ filters }) => {
         { label: '>= 550', key: '>= 550M', statsKey: 'T_550', value: 550 },
         { label: '>= 530', key: '>= 530M', statsKey: 'T_530', value: 530 },
         { label: '>= 490', key: '>= 490M', statsKey: 'T_490', value: 490 },
+        { label: '>= 480', key: '>= 480M', statsKey: 'T_480', value: 480 },
         { label: '>= 450', key: '>= 450M', statsKey: 'T_450', value: 450 },
         { label: '>= 400', key: '>= 400M', statsKey: 'T_400', value: 400 },
+        { label: '>= 370', key: '>= 370M', statsKey: 'T_370', value: 370 },
+        { label: '>= 350', key: '>= 350M', statsKey: 'T_350', value: 350 },
         { label: '>= 300', key: '>= 300M', statsKey: 'T_300', value: 300 },
         { label: '>= 200', key: '>= 200M', statsKey: 'T_200', value: 200 },
-    ];
+    ], []);
 
     useEffect(() => {
         const fetchTargets = async () => {
@@ -91,7 +94,7 @@ const TargetVsAchieved = ({ filters }) => {
 
         if (!isAllCampus) {
             filtered = filtered.filter(t =>
-                campusFilter.some(c => t.NAME_OF_THE_CAMPUS.trim().toUpperCase() === c.trim().toUpperCase())
+                t.NAME_OF_THE_CAMPUS && campusFilter.some(c => t.NAME_OF_THE_CAMPUS.trim().toUpperCase() === c.trim().toUpperCase())
             );
         }
 
@@ -111,7 +114,10 @@ const TargetVsAchieved = ({ filters }) => {
                         tStreamRaw === sfRaw ||
                         tStreamNorm === sfNorm ||
                         (sfNorm.includes('SR ELITE') && tStreamNorm.includes('SR ELITE')) ||
-                        (sfNorm.includes('SR AIIMS') && tStreamNorm.includes('SR AIIMS'))
+                        (sfNorm.includes('SR AIIMS') && tStreamNorm.includes('SR AIIMS')) ||
+                        (sfNorm.includes('JR ELITE') && tStreamNorm.includes('JR ELITE')) ||
+                        (sfNorm.includes('JR AIIMS') && tStreamNorm.includes('JR AIIMS')) ||
+                        (sfNorm.includes('LTC') && tStreamNorm.includes('LTC'))
                     );
                 });
             });
@@ -119,8 +125,16 @@ const TargetVsAchieved = ({ filters }) => {
 
         const result = {};
         thresholds.forEach(th => {
-            const sum = filtered.reduce((acc, row) => acc + (Number(row[th.key]) || 0), 0);
-            result[th.key] = sum || 0;
+            let hasValidTarget = false;
+            let sum = 0;
+            filtered.forEach(row => {
+                const val = row[th.key];
+                if (val !== null && val !== undefined && val !== '' && !isNaN(Number(val))) {
+                    hasValidTarget = true;
+                    sum += Number(val);
+                }
+            });
+            result[th.key] = hasValidTarget ? sum : '';
         });
         return result;
     }, [allTargets, filters, thresholds]);
@@ -154,7 +168,10 @@ const TargetVsAchieved = ({ filters }) => {
     }, [studentResults, selectedThreshold]);
 
     const selectedThInfo = thresholds.find(t => t.label === selectedThreshold);
-    const targetVal = aggregatedTarget[selectedThInfo?.key] || 0;
+    const hasTargetForSelected = aggregatedTarget[selectedThInfo?.key] !== undefined && 
+                                 aggregatedTarget[selectedThInfo?.key] !== null && 
+                                 aggregatedTarget[selectedThInfo?.key] !== '';
+    const targetVal = hasTargetForSelected ? Number(aggregatedTarget[selectedThInfo?.key]) : 0;
     const achievedVal = achievedCounts[selectedThInfo?.key] || 0;
 
     const chartData = {
@@ -164,12 +181,18 @@ const TargetVsAchieved = ({ filters }) => {
                 data: [targetVal, achievedVal],
                 backgroundColor: [
                     '#003366', // Dark Target Blue
-                    achievedVal >= targetVal ? '#006600' : '#FFC000' // Green or Amber
+                    (!hasTargetForSelected || achievedVal >= targetVal) ? '#006600' : '#FFC000' // Green or Amber
                 ],
                 borderRadius: 12,
                 barThickness: 80,
                 datalabels: {
-                    color: ['white', achievedVal >= targetVal ? 'white' : 'black'],
+                    formatter: (val, ctx) => {
+                        if (ctx.dataIndex === 0 && !hasTargetForSelected) {
+                            return 'No Target';
+                        }
+                        return val;
+                    },
+                    color: ['white', (!hasTargetForSelected || achievedVal >= targetVal) ? 'white' : 'black'],
                     font: { weight: '900', size: 16 },
                     anchor: 'center',
                     align: 'center'
@@ -214,12 +237,16 @@ const TargetVsAchieved = ({ filters }) => {
                     TARGETS GIVEN BY CO_HYD({filters.stream && filters.stream.length > 0 && !filters.stream.includes('__ALL__') ? filters.stream.join(', ') : 'ALL STREAMS'})
                 </div>
                 <div className="glass-grid">
-                    {thresholds.map(th => (
-                        <div key={th.label} className="glass-cell">
-                            <div className="label">{th.label}</div>
-                            <div className="value">{(aggregatedTarget[th.key] !== undefined && aggregatedTarget[th.key] !== null && aggregatedTarget[th.key] !== '') ? aggregatedTarget[th.key] : '--'}</div>
-                        </div>
-                    ))}
+                    {thresholds.map(th => {
+                        const val = aggregatedTarget[th.key];
+                        const displayVal = (val !== undefined && val !== null && val !== '') ? val : '';
+                        return (
+                            <div key={th.label} className="glass-cell">
+                                <div className="label">{th.label}</div>
+                                <div className="value">{displayVal}</div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -227,18 +254,26 @@ const TargetVsAchieved = ({ filters }) => {
                 <div className="glass-header">TOTAL ACHIEVED BY {campusDisplayText}</div>
                 <div className="glass-grid">
                     {thresholds.map(th => {
-                        const target = aggregatedTarget[th.key] || 0;
+                        const target = aggregatedTarget[th.key];
+                        const hasTarget = target !== undefined && target !== null && target !== '';
                         const achieved = (achievedCounts[th.key] !== undefined && achievedCounts[th.key] !== null) ? achievedCounts[th.key] : 0;
-                        const isMatch = achieved >= target;
                         const isSelected = selectedThreshold === th.label;
+                        
+                        let cardStatusClass = 'no-target';
+                        if (hasTarget) {
+                            cardStatusClass = achieved >= Number(target) ? 'match-green' : 'match-red';
+                        } else if (achieved > 0) {
+                            cardStatusClass = 'match-green';
+                        }
+
                         return (
                             <div
                                 key={th.label}
-                                className={`glass-cell interactive ${isMatch ? 'match-green' : 'match-red'} ${isSelected ? 'active-ring' : ''}`}
+                                className={`glass-cell interactive ${cardStatusClass} ${isSelected ? 'active-ring' : ''}`}
                                 onClick={() => setSelectedThreshold(th.label)}
                             >
                                 <div className="label">{th.label}</div>
-                                <div className="value">{achieved !== undefined && achieved !== null ? achieved : '--'}</div>
+                                <div className="value">{achieved}</div>
                             </div>
                         );
                     })}
@@ -320,22 +355,42 @@ const TargetVsAchieved = ({ filters }) => {
                 }
                 .glass-grid {
                     display: grid;
-                    grid-template-columns: repeat(14, 1fr);
+                    grid-template-columns: repeat(17, minmax(0, 1fr));
                 }
                 .glass-cell {
-                    padding: 8px 4px;
+                    padding: 8px 2px;
                     text-align: center;
                     border-right: 1px solid rgba(0,0,102,0.1);
+                    min-width: 0;
                 }
                 .glass-cell:last-child { border: none; }
-                .label { font-size: 0.75rem; font-weight: 900; color: #000066; margin-bottom: 2px; }
-                .value { font-size: 1.15rem; font-weight: 950; color: #000066; }
+                .label {
+                    font-size: 0.72rem;
+                    font-weight: 900;
+                    color: #000066;
+                    margin-bottom: 2px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .value {
+                    font-size: 1.1rem;
+                    font-weight: 950;
+                    color: #000066;
+                    min-height: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
                 
                 .match-green { background: #006600 !important; border: 1px solid rgba(255,255,255,0.1) !important; }
                 .match-green .value, .match-green .label { color: #fff !important; }
                 
                 .match-red { background: #FFC000 !important; border: 1px solid rgba(0,0,0,0.1) !important; }
                 .match-red .value, .match-red .label { color: #000 !important; }
+
+                .no-target { background: rgba(0, 0, 102, 0.04) !important; border: 1px solid rgba(0,0,102,0.08) !important; }
+                .no-target .value, .no-target .label { color: #000066 !important; }
                 
                 .interactive { cursor: pointer; transition: 0.3s; }
                 .interactive:hover { transform: scale(1.02); z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
