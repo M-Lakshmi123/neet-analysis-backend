@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import ExcelJS from 'exceljs';
 import { ChevronLeft, ChevronRight, TrendingUp, Maximize2, X, Edit3 } from 'lucide-react';
 import { logActivity } from '../utils/activityLogger';
 import { useAuth } from './auth/AuthProvider';
@@ -205,6 +206,8 @@ const AverageReport = ({ filters }) => {
     const [includeTopicDetails, setIncludeTopicDetails] = useState(true); // Toggle to include or exclude Topic & Subtopic details
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
+    const [isExcelDownloading, setIsExcelDownloading] = useState(false);
+    const [excelProgress, setExcelProgress] = useState({ current: 0, total: 0 });
     const [modal, setModal] = useState({ isOpen: false, type: 'info', title: '', message: '' });
     const [whatsappNumber, setWhatsappNumber] = useState('');
 
@@ -1159,6 +1162,613 @@ const AverageReport = ({ filters }) => {
         }
     };
 
+    const downloadExcel = async (targetStudentId = null) => {
+        setIsExcelDownloading(true);
+        setExcelProgress({ current: 0, total: 0 });
+        try {
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'Sri Chaitanya';
+            workbook.created = new Date();
+
+            // 1. Group history by student ID
+            const grouped = history.reduce((acc, row) => {
+                const id = row.STUD_ID || 'Unknown';
+                if (!acc[id]) acc[id] = [];
+                acc[id].push(row);
+                return acc;
+            }, {});
+
+            const allStudentIds = Object.keys(grouped);
+            const studentIds = targetStudentId
+                ? allStudentIds.filter(id => String(id) === String(targetStudentId))
+                : allStudentIds;
+
+            if (studentIds.length === 0) return;
+
+            // 2. Fetch Logo
+            let logoId = null;
+            try {
+                const logoRes = await fetch('/logo.png');
+                if (logoRes.ok) {
+                    const logoBlob = await logoRes.blob();
+                    const logoBuffer = await logoBlob.arrayBuffer();
+                    logoId = workbook.addImage({
+                        buffer: logoBuffer,
+                        extension: 'png'
+                    });
+                }
+            } catch (e) {
+                console.warn("[Excel] Logo fetch error:", e);
+            }
+
+            // 3. Batch fetch ERP questions if includeTopicDetails is enabled
+            const erpMap = {};
+            const effectiveCampus = (filters.campus && filters.campus.length > 0) ? filters.campus : (filters._allowedCampuses || []);
+            if (includeTopicDetails) {
+                try {
+                    const erpPayload = {
+                        ...filters,
+                        campus: effectiveCampus,
+                        academicYear: filters.academicYear || '2026'
+                    };
+                    const erpRes = await fetch(`${API_URL}/api/erp/report`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(erpPayload)
+                    });
+                    if (erpRes.ok) {
+                        const erpData = await erpRes.json();
+                        if (Array.isArray(erpData)) {
+                            erpData.forEach(row => {
+                                const sid = String(row.STUD_ID || '').trim();
+                                const sname = String(row.Student_Name || '').trim().toUpperCase();
+                                const status = String(row.W_U || '').trim().toUpperCase();
+                                const qObj = {
+                                    test: row.Test,
+                                    qNo: row.Q_No,
+                                    subject: row.Subject,
+                                    topic: row.Topic || 'Unknown Topic',
+                                    subTopic: row.Sub_Topic || '',
+                                    status: status,
+                                    lost: status === 'W' ? 5 : 4,
+                                    qUrl: row.Q_URL,
+                                    sUrl: row.S_URL,
+                                    keyValue: row.Key_Value
+                                };
+                                if (sid) {
+                                    if (!erpMap[sid]) erpMap[sid] = [];
+                                    erpMap[sid].push(qObj);
+                                }
+                                if (sname) {
+                                    if (!erpMap[sname]) erpMap[sname] = [];
+                                    erpMap[sname].push(qObj);
+                                }
+                            });
+                        }
+                    }
+                } catch (erpErr) {
+                    console.warn("[Excel] Batch ERP fetch failed:", erpErr);
+                }
+            }
+
+            const getTransformedRows = (sRows) => {
+                if (!allExams || allExams.length === 0) {
+                    return (sRows || []).map(r => ({ ...r, isAB: false }));
+                }
+                return allExams.map(exam => {
+                    const examTest = exam.Test?.trim();
+                    const existing = sRows.find(r => r.Test?.trim() === examTest);
+                    if (existing) {
+                        return { ...existing, isAB: false };
+                    } else {
+                        return { Test: exam.Test, DATE: exam.DATE, isAB: true };
+                    }
+                });
+            };
+
+            // 4. Calculate student averages & SORT BY TOP MARKS OF AVERAGE (DESCENDING)
+            const studentSummaries = studentIds.map(id => {
+                const sRows = grouped[id];
+                const sName = sRows[0]?.NAME_OF_THE_STUDENT || id;
+                const campus = sRows[0]?.CAMPUS_NAME || '';
+                const stream = getNormalizedStream(sRows);
+
+                const attemptedRows = sRows.filter(r => !r.isAB);
+                const validRows = attemptedRows.length > 0 ? attemptedRows : sRows;
+                const count = validRows.length;
+                const avgTot = count > 0
+                    ? (validRows.reduce((sum, r) => sum + (Number(r.Tot_720) || 0), 0) / count)
+                    : 0;
+                const avgAIR = count > 0
+                    ? Math.round(validRows.reduce((sum, r) => sum + (Number(r.AIR) || 0), 0) / count)
+                    : 999999;
+
+                return {
+                    id,
+                    name: sName,
+                    campus,
+                    stream,
+                    sRows,
+                    avgTot,
+                    avgAIR
+                };
+            });
+
+            // SORT: Top 1 average marks first, then rank, then name
+            studentSummaries.sort((a, b) => {
+                if (b.avgTot !== a.avgTot) return b.avgTot - a.avgTot;
+                if (a.avgAIR !== b.avgAIR) return a.avgAIR - b.avgAIR;
+                return (a.name || '').localeCompare(b.name || '');
+            });
+
+            const totalStudents = studentSummaries.length;
+            setExcelProgress({ current: 0, total: totalStudents });
+
+            const usedSheetNames = new Set();
+
+            const thinBorder = {
+                top: { style: 'thin', color: { argb: 'FF000000' } },
+                left: { style: 'thin', color: { argb: 'FF000000' } },
+                bottom: { style: 'thin', color: { argb: 'FF000000' } },
+                right: { style: 'thin', color: { argb: 'FF000000' } }
+            };
+
+            const doubleBottomBorder = {
+                top: { style: 'thin', color: { argb: 'FF000000' } },
+                left: { style: 'thin', color: { argb: 'FF000000' } },
+                bottom: { style: 'double', color: { argb: 'FF000000' } },
+                right: { style: 'thin', color: { argb: 'FF000000' } }
+            };
+
+            // 5. Generate one worksheet per student in sorted order
+            for (let idx = 0; idx < studentSummaries.length; idx++) {
+                const student = studentSummaries[idx];
+                setExcelProgress({ current: idx + 1, total: totalStudents });
+                if (idx % 10 === 0) {
+                    await new Promise(r => setTimeout(r, 0));
+                }
+
+                // Sanitize sheet name: max 31 chars, no invalid chars : \ / ? * [ ], unique
+                let baseName = String(student.name || `Student_${student.id || '1'}`)
+                    .replace(/[:\\/?*\[\]]/g, '')
+                    .replace(/^'+|'+$/g, '')
+                    .trim();
+                if (!baseName) baseName = `Student_${student.id || '1'}`;
+                baseName = baseName.slice(0, 31).trim();
+
+                let uniqueSheetName = baseName;
+                let counter = 2;
+                while (usedSheetNames.has(uniqueSheetName.toLowerCase())) {
+                    const suffix = `_${counter}`;
+                    uniqueSheetName = `${baseName.slice(0, 31 - suffix.length).trim()}${suffix}`;
+                    counter++;
+                }
+                usedSheetNames.add(uniqueSheetName.toLowerCase());
+
+                const ws = workbook.addWorksheet(uniqueSheetName);
+                ws.views = [{ showGridLines: true }];
+
+                // Column widths matching progress report
+                ws.getColumn(1).width = 20; // Test Name
+                ws.getColumn(2).width = 14; // Date
+                ws.getColumn(3).width = 13; // Total 720
+                ws.getColumn(4).width = 12; // AIR
+                ws.getColumn(5).width = 11; // Bot 180
+                ws.getColumn(6).width = 11; // Zoo 180
+                ws.getColumn(7).width = 12; // Bio 360
+                ws.getColumn(8).width = 11; // Phy 180
+                ws.getColumn(9).width = 12; // Chem 180
+
+                // Header Banner: Logo & Title
+                if (logoId !== null) {
+                    ws.addImage(logoId, {
+                        tl: { col: 0.15, row: 0.1 },
+                        ext: { width: 55, height: 48 },
+                        editAs: 'oneCell'
+                    });
+                }
+
+                ws.mergeCells('B1:I1');
+                const titleCell = ws.getCell('B1');
+                titleCell.value = {
+                    richText: [
+                        { text: 'Sri Chaitanya ', font: { name: 'Impact', size: 20, bold: true, color: { argb: 'FF0070C0' } } },
+                        { text: 'Educational Institutions., India', font: { name: 'Bookman Old Style', size: 18, bold: true, color: { argb: 'FF003399' } } }
+                    ]
+                };
+                titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+                ws.getRow(1).height = 36;
+
+                // Subtitle
+                ws.mergeCells('A2:I2');
+                const subTitleCell = ws.getCell('A2');
+                subTitleCell.value = 'P R O G R E S S   R E P O R T';
+                subTitleCell.font = { name: 'Bookman Old Style', size: 13, bold: true, color: { argb: 'FF000000' } };
+                subTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+                ws.getRow(2).height = 24;
+
+                // Spacer row 3
+                ws.getRow(3).height = 8;
+
+                // Student Info Box (Rows 4-5)
+                ws.getCell('A4').value = 'Student Name:';
+                ws.getCell('A4').font = { name: 'Bookman Old Style', bold: true, size: 10, color: { argb: 'FF000000' } };
+                ws.getCell('A4').alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                ws.mergeCells('B4:E4');
+                const nameCell = ws.getCell('B4');
+                nameCell.value = student.name;
+                nameCell.font = { name: 'Bookman Old Style', bold: true, size: 11, color: { argb: 'FF003399' } };
+                nameCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+                ws.getCell('F4').value = 'Campus:';
+                ws.getCell('F4').font = { name: 'Bookman Old Style', bold: true, size: 10, color: { argb: 'FF000000' } };
+                ws.getCell('F4').alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                ws.mergeCells('G4:I4');
+                const campusCell = ws.getCell('G4');
+                campusCell.value = student.campus;
+                campusCell.font = { name: 'Bookman Old Style', bold: true, size: 11, color: { argb: 'FF003399' } };
+                campusCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+                ws.getCell('A5').value = 'Student ID:';
+                ws.getCell('A5').font = { name: 'Bookman Old Style', bold: true, size: 10, color: { argb: 'FF000000' } };
+                ws.getCell('A5').alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                ws.mergeCells('B5:E5');
+                const idCell = ws.getCell('B5');
+                idCell.value = String(student.id || '');
+                idCell.font = { name: 'Bookman Old Style', bold: true, size: 11, color: { argb: 'FF003399' } };
+                idCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+                ws.getCell('F5').value = 'Stream:';
+                ws.getCell('F5').font = { name: 'Bookman Old Style', bold: true, size: 10, color: { argb: 'FF000000' } };
+                ws.getCell('F5').alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                ws.mergeCells('G5:I5');
+                const streamCell = ws.getCell('G5');
+                streamCell.value = student.stream;
+                streamCell.font = { name: 'Bookman Old Style', bold: true, size: 11, color: { argb: 'FF003399' } };
+                streamCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+                ws.getRow(4).height = 22;
+                ws.getRow(5).height = 22;
+
+                for (let r = 4; r <= 5; r++) {
+                    for (let c = 1; c <= 9; c++) {
+                        const boxCell = ws.getCell(r, c);
+                        boxCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+                        boxCell.border = {
+                            top: r === 4 ? { style: 'thin', color: { argb: 'FF93C5FD' } } : undefined,
+                            bottom: r === 5 ? { style: 'thin', color: { argb: 'FF93C5FD' } } : undefined,
+                            left: c === 1 ? { style: 'thin', color: { argb: 'FF93C5FD' } } : undefined,
+                            right: c === 9 ? { style: 'thin', color: { argb: 'FF93C5FD' } } : undefined,
+                        };
+                    }
+                }
+
+                // Spacer row 6
+                ws.getRow(6).height = 10;
+
+                // Score Table Header (Row 7)
+                const headers = ['Test Name', 'Date', 'Total\n720', 'AIR', 'Bot\n180', 'Zoo\n180', 'Bio\n360', 'Phy\n180', 'Chem\n180'];
+                headers.forEach((h, i) => {
+                    const cell = ws.getCell(7, i + 1);
+                    cell.value = h;
+                    cell.font = { name: 'Bookman Old Style', bold: true, size: 10.5, color: { argb: 'FFFFFFFF' } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF000000' } };
+                    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                    cell.border = thinBorder;
+                });
+                ws.getRow(7).height = 30;
+
+                // Score Table Data Rows
+                const transformedRows = getTransformedRows(student.sRows);
+                let currentRow = 8;
+
+                transformedRows.forEach(row => {
+                    ws.getCell(currentRow, 1).value = row.Test || '';
+                    ws.getCell(currentRow, 1).font = { name: 'Bookman Old Style', bold: true, size: 10 };
+                    ws.getCell(currentRow, 1).alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                    ws.getCell(currentRow, 1).border = thinBorder;
+
+                    ws.getCell(currentRow, 2).value = formatDate(row.DATE);
+                    ws.getCell(currentRow, 2).font = { name: 'Bookman Old Style', size: 10 };
+                    ws.getCell(currentRow, 2).alignment = { horizontal: 'center', vertical: 'middle' };
+                    ws.getCell(currentRow, 2).border = thinBorder;
+
+                    if (!row.isAB) {
+                        const cTot = ws.getCell(currentRow, 3);
+                        cTot.value = Math.round(row.Tot_720 || 0);
+                        cTot.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } };
+                        cTot.font = { name: 'Bookman Old Style', bold: true, size: 11, color: { argb: 'FF000000' } };
+                        cTot.alignment = { horizontal: 'center', vertical: 'middle' };
+                        cTot.border = thinBorder;
+
+                        const cAir = ws.getCell(currentRow, 4);
+                        cAir.value = Math.round(row.AIR) || '-';
+                        cAir.font = { name: 'Bookman Old Style', size: 10, color: { argb: 'FF78350F' } };
+                        cAir.alignment = { horizontal: 'center', vertical: 'middle' };
+                        cAir.border = thinBorder;
+
+                        const cBot = ws.getCell(currentRow, 5);
+                        cBot.value = Math.round(row.Botany || 0);
+                        cBot.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE9D9' } };
+                        cBot.font = { name: 'Bookman Old Style', size: 10 };
+                        cBot.alignment = { horizontal: 'center', vertical: 'middle' };
+                        cBot.border = thinBorder;
+
+                        const cZoo = ws.getCell(currentRow, 6);
+                        cZoo.value = Math.round(row.Zoology || 0);
+                        cZoo.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDAEEF3' } };
+                        cZoo.font = { name: 'Bookman Old Style', size: 10 };
+                        cZoo.alignment = { horizontal: 'center', vertical: 'middle' };
+                        cZoo.border = thinBorder;
+
+                        const cBio = ws.getCell(currentRow, 7);
+                        cBio.value = Math.round((Number(row.Botany) || 0) + (Number(row.Zoology) || 0));
+                        cBio.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+                        cBio.font = { name: 'Bookman Old Style', bold: true, size: 10 };
+                        cBio.alignment = { horizontal: 'center', vertical: 'middle' };
+                        cBio.border = thinBorder;
+
+                        const cPhy = ws.getCell(currentRow, 8);
+                        cPhy.value = Math.round(row.Physics || 0);
+                        cPhy.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEBF1DE' } };
+                        cPhy.font = { name: 'Bookman Old Style', size: 10 };
+                        cPhy.alignment = { horizontal: 'center', vertical: 'middle' };
+                        cPhy.border = thinBorder;
+
+                        const cChe = ws.getCell(currentRow, 9);
+                        cChe.value = Math.round(row.Chemistry || 0);
+                        cChe.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2DCDB' } };
+                        cChe.font = { name: 'Bookman Old Style', size: 10 };
+                        cChe.alignment = { horizontal: 'center', vertical: 'middle' };
+                        cChe.border = thinBorder;
+                    } else {
+                        for (let c = 3; c <= 9; c++) {
+                            const cell = ws.getCell(currentRow, c);
+                            cell.value = 'AB';
+                            cell.font = { name: 'Bookman Old Style', bold: true, size: 10.5, color: { argb: 'FFFF0000' } };
+                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                            cell.border = thinBorder;
+                        }
+                    }
+
+                    ws.getRow(currentRow).height = 20;
+                    currentRow++;
+                });
+
+                // Average Row
+                const avgRow = currentRow;
+                ws.mergeCells(`A${avgRow}:B${avgRow}`);
+                const avgLabelCell = ws.getCell(`A${avgRow}`);
+                avgLabelCell.value = 'AVERAGE';
+                avgLabelCell.font = { name: 'Bookman Old Style', bold: true, size: 11, color: { argb: 'FF000000' } };
+                avgLabelCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+                const attemptedRows = student.sRows.filter(r => !r.isAB);
+                const validRows = attemptedRows.length > 0 ? attemptedRows : student.sRows;
+                const vCount = validRows.length;
+
+                const cAvgTot = vCount > 0 ? Math.round(validRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / vCount) : 0;
+                const cAvgAir = vCount > 0 ? Math.round(validRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / vCount) : '-';
+                const cAvgBot = vCount > 0 ? Math.round(validRows.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / vCount) : 0;
+                const cAvgZoo = vCount > 0 ? Math.round(validRows.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / vCount) : 0;
+                const cAvgBio = vCount > 0 ? Math.round(validRows.reduce((a, b) => a + (Number(b.Botany) || 0) + (Number(b.Zoology) || 0), 0) / vCount) : 0;
+                const cAvgPhy = vCount > 0 ? Math.round(validRows.reduce((a, b) => a + (Number(b.Physics) || 0), 0) / vCount) : 0;
+                const cAvgChe = vCount > 0 ? Math.round(validRows.reduce((a, b) => a + (Number(b.Chemistry) || 0), 0) / vCount) : 0;
+
+                ws.getCell(avgRow, 3).value = cAvgTot;
+                ws.getCell(avgRow, 4).value = cAvgAir;
+                ws.getCell(avgRow, 5).value = cAvgBot;
+                ws.getCell(avgRow, 6).value = cAvgZoo;
+                ws.getCell(avgRow, 7).value = cAvgBio;
+                ws.getCell(avgRow, 8).value = cAvgPhy;
+                ws.getCell(avgRow, 9).value = cAvgChe;
+
+                for (let c = 1; c <= 9; c++) {
+                    const cell = ws.getCell(avgRow, c);
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDAEEF3' } };
+                    cell.font = { name: 'Bookman Old Style', bold: true, size: 10.5, color: { argb: 'FF000000' } };
+                    if (c > 2) cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    cell.border = doubleBottomBorder;
+                }
+                ws.getRow(avgRow).height = 22;
+                currentRow++;
+
+                // Diagnostics Box (if includeChart)
+                if (includeChart) {
+                    const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
+                    if (analysis) {
+                        currentRow++; // blank row
+                        ws.getRow(currentRow).height = 10;
+                        currentRow++;
+
+                        // Header row
+                        ws.mergeCells(`A${currentRow}:I${currentRow}`);
+                        const diagHeader = ws.getCell(`A${currentRow}`);
+                        diagHeader.value = 'PERFORMANCE DIAGNOSTICS & MARKS LOSS ANALYSIS';
+                        diagHeader.font = { name: 'Bookman Old Style', bold: true, size: 10.5, color: { argb: 'FF1E3A8A' } };
+                        diagHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E7FF' } };
+                        diagHeader.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                        for (let c = 1; c <= 9; c++) ws.getCell(currentRow, c).border = thinBorder;
+                        ws.getRow(currentRow).height = 22;
+                        currentRow++;
+
+                        // Line 1: Lagging Subject
+                        ws.mergeCells(`A${currentRow}:I${currentRow}`);
+                        const diagSubj = ws.getCell(`A${currentRow}`);
+                        diagSubj.value = {
+                            richText: [
+                                { text: 'Primary Lagging Subject: ', font: { name: 'Bookman Old Style', bold: true, size: 10, color: { argb: 'FFDC2626' } } },
+                                { text: `${analysis.laggingSubjectName} (${analysis.laggingAvg}/${analysis.laggingMax})`, font: { name: 'Bookman Old Style', bold: true, size: 10, color: { argb: 'FF003399' } } }
+                            ]
+                        };
+                        diagSubj.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                        diagSubj.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                        for (let c = 1; c <= 9; c++) ws.getCell(currentRow, c).border = thinBorder;
+                        ws.getRow(currentRow).height = 20;
+                        currentRow++;
+
+                        // Line 2: Marks Loss Header
+                        ws.mergeCells(`A${currentRow}:I${currentRow}`);
+                        const diagLossHead = ws.getCell(`A${currentRow}`);
+                        diagLossHead.value = `Marks Loss in ${analysis.laggingSubjectName} across Tests:`;
+                        diagLossHead.font = { name: 'Bookman Old Style', bold: true, size: 9.5, color: { argb: 'FF1E3A8A' } };
+                        diagLossHead.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                        diagLossHead.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                        for (let c = 1; c <= 9; c++) ws.getCell(currentRow, c).border = thinBorder;
+                        ws.getRow(currentRow).height = 18;
+                        currentRow++;
+
+                        // Line 3: Losses breakdown
+                        ws.mergeCells(`A${currentRow}:I${currentRow}`);
+                        const diagLossList = ws.getCell(`A${currentRow}`);
+                        diagLossList.value = {
+                            richText: analysis.testLosses.flatMap((item, lIdx) => [
+                                { text: `${item.testName}: `, font: { name: 'Bookman Old Style', bold: true, size: 9.5, color: { argb: 'FF1E293B' } } },
+                                { text: item.lossText, font: { name: 'Bookman Old Style', bold: true, size: 9.5, color: { argb: 'FFDC2626' } } },
+                                ...(lIdx < analysis.testLosses.length - 1 ? [{ text: '   |   ', font: { name: 'Bookman Old Style', size: 9, color: { argb: 'FF94A3B8' } } }] : [])
+                            ])
+                        };
+                        diagLossList.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+                        diagLossList.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                        for (let c = 1; c <= 9; c++) ws.getCell(currentRow, c).border = thinBorder;
+                        ws.getRow(currentRow).height = 22;
+                        currentRow++;
+                    }
+                }
+
+                // Wrong & Unattempted Questions Table (if includeTopicDetails)
+                if (includeTopicDetails) {
+                    let erpQ = erpMap[student.id] || (student.name ? erpMap[student.name.toUpperCase()] : null);
+                    if (!erpQ && studentSummaries.length <= 15) {
+                        erpQ = await fetchStudentErpQuestionsForPdf(student.id, student.name);
+                    }
+                    erpQ = erpQ || [];
+
+                    if (erpQ.length > 0) {
+                        currentRow++; // blank row
+                        ws.getRow(currentRow).height = 10;
+                        currentRow++;
+
+                        // Section title
+                        ws.mergeCells(`A${currentRow}:I${currentRow}`);
+                        const qTitle = ws.getCell(`A${currentRow}`);
+                        qTitle.value = `WRONG & UNATTEMPTED QUESTIONS (TOPIC & SUBTOPIC DETAILS) — ${erpQ.length} ITEMS`;
+                        qTitle.font = { name: 'Bookman Old Style', bold: true, size: 11, color: { argb: 'FF003399' } };
+                        qTitle.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                        ws.getRow(currentRow).height = 24;
+                        currentRow++;
+
+                        // Header row
+                        ws.getCell(currentRow, 1).value = 'Test';
+                        ws.getCell(currentRow, 2).value = 'Q.No';
+                        ws.getCell(currentRow, 3).value = 'Subject';
+                        ws.mergeCells(`D${currentRow}:E${currentRow}`);
+                        ws.getCell(`D${currentRow}`).value = 'Topic';
+                        ws.mergeCells(`F${currentRow}:G${currentRow}`);
+                        ws.getCell(`F${currentRow}`).value = 'Sub-Topic';
+                        ws.getCell(currentRow, 8).value = 'Status';
+                        ws.getCell(currentRow, 9).value = 'Marks Lost';
+
+                        for (let c = 1; c <= 9; c++) {
+                            const cell = ws.getCell(currentRow, c);
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003399' } };
+                            cell.font = { name: 'Bookman Old Style', bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+                            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                            cell.border = thinBorder;
+                        }
+                        ws.getRow(currentRow).height = 24;
+                        currentRow++;
+
+                        // Question Rows
+                        erpQ.forEach(q => {
+                            ws.getCell(currentRow, 1).value = q.test || '';
+                            ws.getCell(currentRow, 1).font = { name: 'Bookman Old Style', bold: true, size: 9.5 };
+                            ws.getCell(currentRow, 1).alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                            ws.getCell(currentRow, 1).border = thinBorder;
+
+                            ws.getCell(currentRow, 2).value = `Q${q.qNo}`;
+                            ws.getCell(currentRow, 2).font = { name: 'Bookman Old Style', bold: true, size: 9.5 };
+                            ws.getCell(currentRow, 2).alignment = { horizontal: 'center', vertical: 'middle' };
+                            ws.getCell(currentRow, 2).border = thinBorder;
+
+                            ws.getCell(currentRow, 3).value = q.subject || '';
+                            ws.getCell(currentRow, 3).font = { name: 'Bookman Old Style', bold: true, size: 9.5 };
+                            ws.getCell(currentRow, 3).alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+                            ws.getCell(currentRow, 3).border = thinBorder;
+
+                            ws.mergeCells(`D${currentRow}:E${currentRow}`);
+                            const topCell = ws.getCell(`D${currentRow}`);
+                            topCell.value = q.topic || '-';
+                            topCell.font = { name: 'Bookman Old Style', size: 9.5 };
+                            topCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true, indent: 1 };
+                            ws.getCell(currentRow, 4).border = thinBorder;
+                            ws.getCell(currentRow, 5).border = thinBorder;
+
+                            ws.mergeCells(`F${currentRow}:G${currentRow}`);
+                            const subCell = ws.getCell(`F${currentRow}`);
+                            subCell.value = q.subTopic || '-';
+                            subCell.font = { name: 'Bookman Old Style', size: 9.5 };
+                            subCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true, indent: 1 };
+                            ws.getCell(currentRow, 6).border = thinBorder;
+                            ws.getCell(currentRow, 7).border = thinBorder;
+
+                            const isW = q.status === 'W';
+                            const statCell = ws.getCell(currentRow, 8);
+                            statCell.value = isW ? 'Wrong (W)' : 'Unattempted (U)';
+                            statCell.font = { name: 'Bookman Old Style', bold: true, size: 9.5, color: { argb: isW ? 'FFB91C1C' : 'FF15803D' } };
+                            statCell.alignment = { horizontal: 'center', vertical: 'middle' };
+                            statCell.border = thinBorder;
+
+                            const lostCell = ws.getCell(currentRow, 9);
+                            lostCell.value = `-${q.lost}`;
+                            lostCell.font = { name: 'Bookman Old Style', bold: true, size: 10, color: { argb: 'FFDC2626' } };
+                            lostCell.alignment = { horizontal: 'center', vertical: 'middle' };
+                            lostCell.border = thinBorder;
+
+                            ws.getRow(currentRow).height = 20;
+                            currentRow++;
+                        });
+                    }
+                }
+            }
+
+            // 6. Generate buffer & save file
+            const buffer = await workbook.xlsx.writeBuffer();
+            const campusName = studentSummaries[0]?.campus || 'Campus';
+            const sanitizedCampus = String(campusName).replace(/[/\\?%*:|"<>]/g, '_').trim();
+            const dateStr = formatDate(new Date(), 'dd-mmm-yy');
+
+            let fileName;
+            if (studentSummaries.length === 1) {
+                const singleName = String(studentSummaries[0].name).replace(/[/\\?%*:|"<>]/g, '_').trim();
+                fileName = `${singleName}_Progress_Report_${dateStr}.xlsx`;
+            } else {
+                fileName = `${sanitizedCampus}_Progress_Reports_Sorted_${dateStr}.xlsx`;
+            }
+
+            saveAs(new Blob([buffer]), fileName);
+            logActivity(userData, 'Downloaded Progress Excel', {
+                studentCount: studentSummaries.length,
+                campus: campusName,
+                includeChart,
+                includeTopicDetails
+            });
+
+        } catch (err) {
+            console.error("Excel Generation Error:", err);
+            setModal({
+                isOpen: true,
+                type: 'danger',
+                title: 'Excel Export Error',
+                message: `Failed to generate Excel file: ${err.message || 'Unknown error'}`,
+                onClose: () => setModal(prev => ({ ...prev, isOpen: false }))
+            });
+        } finally {
+            setIsExcelDownloading(false);
+            setExcelProgress({ current: 0, total: 0 });
+        }
+    };
+
     const uniqueStudentIds = [...new Set(history.map(h => h.STUD_ID))];
     const uniqueStudents = uniqueStudentIds.length;
 
@@ -1379,16 +1989,16 @@ const AverageReport = ({ filters }) => {
                             />
                             Include Topic & Subtopic Details
                         </label>
-                        <button className="btn-primary" onClick={fetchData} disabled={isDownloading} style={{ backgroundColor: '#6366f1' }}>
+                        <button className="btn-primary" onClick={fetchData} disabled={isDownloading || isExcelDownloading} style={{ backgroundColor: '#6366f1' }}>
                             View Report
                         </button>
                         <button 
                             className="btn-primary" 
                             onClick={() => downloadPDF()} 
-                            disabled={history.length === 0 || isDownloading} 
+                            disabled={history.length === 0 || isDownloading || isExcelDownloading} 
                             style={{ 
                                 backgroundColor: isDownloading ? '#64748b' : '#10b981', 
-                                cursor: isDownloading ? 'wait' : 'pointer',
+                                cursor: (history.length === 0 || isDownloading || isExcelDownloading) ? 'not-allowed' : (isDownloading ? 'wait' : 'pointer'),
                                 minWidth: '160px', 
                                 transition: 'all 0.2s ease' 
                             }}
@@ -1401,6 +2011,25 @@ const AverageReport = ({ filters }) => {
                                 uniqueStudents > 1 ? `Download All (${uniqueStudents})` : 'Download PDF'
                             )}
                         </button>
+                        <button 
+                            className="btn-primary" 
+                            onClick={() => downloadExcel()} 
+                            disabled={history.length === 0 || isDownloading || isExcelDownloading} 
+                            style={{ 
+                                backgroundColor: isExcelDownloading ? '#64748b' : '#059669', 
+                                cursor: (history.length === 0 || isDownloading || isExcelDownloading) ? 'not-allowed' : (isExcelDownloading ? 'wait' : 'pointer'),
+                                minWidth: '160px', 
+                                transition: 'all 0.2s ease' 
+                            }}
+                        >
+                            {isExcelDownloading ? (
+                                excelProgress.total > 1 
+                                    ? `Preparing Excel ${excelProgress.current}/${excelProgress.total}...` 
+                                    : 'Generating Excel...'
+                            ) : (
+                                uniqueStudents > 1 ? `Download Excel (${uniqueStudents})` : 'Download Excel'
+                            )}
+                        </button>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f0fdf4', padding: '4px 8px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
                             <input
@@ -1408,7 +2037,7 @@ const AverageReport = ({ filters }) => {
                                 placeholder="Parent WhatsApp No."
                                 value={whatsappNumber}
                                 onChange={(e) => setWhatsappNumber(e.target.value)}
-                                disabled={history.length === 0 || isDownloading}
+                                disabled={history.length === 0 || isDownloading || isExcelDownloading}
                                 maxLength={13}
                                 style={{
                                     padding: '6px 10px',
@@ -1426,11 +2055,11 @@ const AverageReport = ({ filters }) => {
                                 type="button"
                                 className="btn-whatsapp"
                                 onClick={handleSendWhatsApp}
-                                disabled={history.length === 0 || isDownloading}
+                                disabled={history.length === 0 || isDownloading || isExcelDownloading}
                                 title="Download PDF & Open WhatsApp"
                                 style={{
-                                    cursor: (history.length === 0 || isDownloading) ? 'not-allowed' : 'pointer',
-                                    opacity: (history.length === 0 || isDownloading) ? 0.6 : 1,
+                                    cursor: (history.length === 0 || isDownloading || isExcelDownloading) ? 'not-allowed' : 'pointer',
+                                    opacity: (history.length === 0 || isDownloading || isExcelDownloading) ? 0.6 : 1,
                                     padding: '7px 14px',
                                     display: 'inline-flex',
                                     alignItems: 'center',
