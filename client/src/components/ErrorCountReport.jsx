@@ -291,12 +291,12 @@ const ErrorCountReport = ({ filters }) => {
                 if (lblIdx === 0) {
                     // TOT 720 column header: Dark Blue background, Yellow bold text
                     lblCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF002060' } };
-                    lblCell.font = { bold: true, size: 10, color: { argb: 'FFFFFF00' } };
+                    lblCell.font = { name: 'Arial Black', bold: true, size: 10, color: { argb: 'FFFFFF00' } };
                     lblCell.border = cyanBorder;
                 } else if (lblIdx === 1) {
                     // All India Rank header: Bright Yellow background, Navy bold text
                     lblCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-                    lblCell.font = { bold: true, size: 10, color: { argb: 'FF002060' } };
+                    lblCell.font = { name: 'Arial Black', bold: true, size: 10, color: { argb: 'FF002060' } };
                     lblCell.border = cyanBorder;
                 } else {
                     lblCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: pastel } };
@@ -341,12 +341,12 @@ const ErrorCountReport = ({ filters }) => {
             if (lblIdx === 16) {
                 // Summary TOT 720: Dark Blue background, Yellow bold text
                 lblCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF002060' } };
-                lblCell.font = { bold: true, size: 10, color: { argb: 'FFFFFF00' } };
+                lblCell.font = { name: 'Arial Black', bold: true, size: 10, color: { argb: 'FFFFFF00' } };
                 lblCell.border = cyanBorder;
             } else if (lblIdx === 17) {
                 // Summary All India Rank: Yellow background, Navy bold text
                 lblCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
-                lblCell.font = { bold: true, size: 10, color: { argb: 'FF002060' } };
+                lblCell.font = { name: 'Arial Black', bold: true, size: 10, color: { argb: 'FF002060' } };
                 lblCell.border = cyanBorder;
             } else {
                 lblCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
@@ -422,15 +422,15 @@ const ErrorCountReport = ({ filters }) => {
                     // Individual Exam Columns
                     const relativeIdx = (colIdx - 4) % 18;
                     if (relativeIdx === 0) {
-                        // TOT 720: Blue bold font, cyan border
-                        cell.font = { bold: true, size: 11, color: { argb: 'FF0070C0' } };
+                        // TOT 720: Arial Black, Blue bold font, cyan border
+                        cell.font = { name: 'Arial Black', bold: true, size: 11, color: { argb: 'FF0070C0' } };
                         cell.border = cyanBorder;
                         if (typeof cell.value === 'number') {
                             cell.numFmt = Number.isInteger(cell.value) ? '0' : '0.0';
                         }
                     } else if (relativeIdx === 1) {
-                        // All India Rank: Blue bold italic font, cyan border
-                        cell.font = { bold: true, italic: true, size: 11, color: { argb: 'FF0000FF' } };
+                        // All India Rank: Arial Black, Blue bold italic font, cyan border
+                        cell.font = { name: 'Arial Black', bold: true, italic: true, size: 11, color: { argb: 'FF0000FF' } };
                         cell.border = cyanBorder;
                     } else if ([4, 8, 12, 16].includes(relativeIdx)) {
                         // W count: light pink fill, bold
@@ -449,15 +449,15 @@ const ErrorCountReport = ({ filters }) => {
                     // Summary Section Columns
                     const summaryRelIdx = colIdx - summaryStartCol;
                     if (summaryRelIdx === 16) {
-                        // Summary TOT 720: Blue bold font, cyan border, 1 decimal place
-                        cell.font = { bold: true, size: 11, color: { argb: 'FF0070C0' } };
+                        // Summary TOT 720: Arial Black, Blue bold font, cyan border, 1 decimal place
+                        cell.font = { name: 'Arial Black', bold: true, size: 11, color: { argb: 'FF0070C0' } };
                         cell.border = cyanBorder;
                         if (typeof cell.value === 'number') {
                             cell.numFmt = '0.0';
                         }
                     } else if (summaryRelIdx === 17) {
-                        // Summary All India Rank: Blue bold italic font, cyan border
-                        cell.font = { bold: true, italic: true, size: 11, color: { argb: 'FF0000FF' } };
+                        // Summary All India Rank: Arial Black, Blue bold italic font, cyan border
+                        cell.font = { name: 'Arial Black', bold: true, italic: true, size: 11, color: { argb: 'FF0000FF' } };
                         cell.border = cyanBorder;
                     } else if ([2, 6, 10, 14].includes(summaryRelIdx)) {
                         // Summary W counts
@@ -547,8 +547,8 @@ const ErrorCountReport = ({ filters }) => {
                                     {/* Test columns */}
                                     {data.tests.map((_, i) => (
                                         <React.Fragment key={i}>
-                                            <th style={{ border: '1px solid #00b0f0', backgroundColor: '#002060', color: '#ffff00', fontWeight: 'bold' }}>TOT 720</th>
-                                            <th style={{ border: '1px solid #00b0f0', backgroundColor: '#ffff00', color: '#002060', fontWeight: 'bold' }}>All India Rank</th>
+                                            <th style={{ border: '1px solid #00b0f0', backgroundColor: '#002060', color: '#ffff00', fontWeight: 'bold', fontFamily: '"Arial Black", Gadget, sans-serif' }}>TOT 720</th>
+                                            <th style={{ border: '1px solid #00b0f0', backgroundColor: '#ffff00', color: '#002060', fontWeight: 'bold', fontFamily: '"Arial Black", Gadget, sans-serif' }}>All India Rank</th>
                                             <th style={{ border: '1px solid #ddd' }}>BOT</th>
                                             <th style={{ border: '1px solid #ddd' }}>B_R</th>
                                             <th style={{ border: '1px solid #ddd', color: '#b91c1c' }}>W</th>
@@ -585,8 +585,8 @@ const ErrorCountReport = ({ filters }) => {
                                     <th style={{ border: '1px solid #ddd', backgroundColor: '#fff2cc' }}>C_R</th>
                                     <th style={{ border: '1px solid #ddd', backgroundColor: '#fff2cc', color: '#b91c1c' }}>W</th>
                                     <th style={{ border: '1px solid #ddd', backgroundColor: '#fff2cc', color: '#1d4ed8' }}>U</th>
-                                    <th style={{ border: '1px solid #00b0f0', backgroundColor: '#002060', color: '#ffff00', fontWeight: 'bold' }}>TOT 720</th>
-                                    <th style={{ border: '1px solid #00b0f0', backgroundColor: '#ffff00', color: '#002060', fontWeight: 'bold' }}>All India Rank</th>
+                                    <th style={{ border: '1px solid #00b0f0', backgroundColor: '#002060', color: '#ffff00', fontWeight: 'bold', fontFamily: '"Arial Black", Gadget, sans-serif' }}>TOT 720</th>
+                                    <th style={{ border: '1px solid #00b0f0', backgroundColor: '#ffff00', color: '#002060', fontWeight: 'bold', fontFamily: '"Arial Black", Gadget, sans-serif' }}>All India Rank</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -603,8 +603,8 @@ const ErrorCountReport = ({ filters }) => {
                                                 const t = student.tests?.[test] || {};
                                                 return (
                                                     <React.Fragment key={tIdx}>
-                                                        <td style={{ border: '1px solid #00b0f0', color: '#0070c0', fontWeight: 'bold' }}>{t.tot || '-'}</td>
-                                                        <td style={{ border: '1px solid #00b0f0', color: '#0000ff', fontWeight: 'bold', fontStyle: 'italic' }}>{t.air || '-'}</td>
+                                                        <td style={{ border: '1px solid #00b0f0', color: '#0070c0', fontWeight: 'bold', fontFamily: '"Arial Black", Gadget, sans-serif' }}>{t.tot || '-'}</td>
+                                                        <td style={{ border: '1px solid #00b0f0', color: '#0000ff', fontWeight: 'bold', fontStyle: 'italic', fontFamily: '"Arial Black", Gadget, sans-serif' }}>{t.air || '-'}</td>
                                                         <td style={{ border: '1px solid #eee' }}>{t.bot || '-'}</td>
                                                         <td style={{ border: '1px solid #eee' }}>{t.bot_rank || '-'}</td>
                                                         <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{t.bot_w || 0}</td>
@@ -642,8 +642,8 @@ const ErrorCountReport = ({ filters }) => {
                                             <td style={{ border: '1px solid #eee' }}>{sStats.avgCRank !== '-' ? sStats.avgCRank : '-'}</td>
                                             <td style={{ border: '1px solid #eee', backgroundColor: '#fff5f5', color: '#b91c1c', fontWeight: 'bold' }}>{sStats.che_w || 0}</td>
                                             <td style={{ border: '1px solid #eee', backgroundColor: '#f0f9ff', color: '#1d4ed8', fontWeight: 'bold' }}>{sStats.che_u || 0}</td>
-                                            <td style={{ border: '1px solid #00b0f0', color: '#0070c0', fontWeight: 'bold', backgroundColor: '#f0fdf4' }}>{sStats.avgTot > 0 ? sStats.avgTot.toFixed(1) : '-'}</td>
-                                            <td style={{ border: '1px solid #00b0f0', color: '#0000ff', fontWeight: 'bold', fontStyle: 'italic', backgroundColor: '#fefce8' }}>{sStats.avgAir !== '-' ? sStats.avgAir : '-'}</td>
+                                            <td style={{ border: '1px solid #00b0f0', color: '#0070c0', fontWeight: 'bold', backgroundColor: '#f0fdf4', fontFamily: '"Arial Black", Gadget, sans-serif' }}>{sStats.avgTot > 0 ? sStats.avgTot.toFixed(1) : '-'}</td>
+                                            <td style={{ border: '1px solid #00b0f0', color: '#0000ff', fontWeight: 'bold', fontStyle: 'italic', backgroundColor: '#fefce8', fontFamily: '"Arial Black", Gadget, sans-serif' }}>{sStats.avgAir !== '-' ? sStats.avgAir : '-'}</td>
                                         </tr>
                                     );
                                 })}
