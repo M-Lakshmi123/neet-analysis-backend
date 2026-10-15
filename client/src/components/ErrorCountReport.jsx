@@ -502,7 +502,7 @@ const ErrorCountReport = ({ filters }) => {
         worksheet.getColumn(summaryStartCol + 17).width = 13; // All India Rank
 
         // 7. AutoFilter & Freeze Panes
-        worksheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: totalColsCalc } };
+        worksheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: sortedStudents.length + 4, column: totalColsCalc } };
         worksheet.views = [{ state: 'frozen', xSplit: 3, ySplit: 4 }];
 
         const buffer = await workbook.xlsx.writeBuffer();

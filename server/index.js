@@ -1776,7 +1776,6 @@ app.get('/api/erp/error-count-report', async (req, res) => {
                 FROM ERP_ERROR_COUNTS
                 ${where}
                 ORDER BY Student_Name, Test
-                LIMIT 2000
             `;
             logQuery(countsQuery, req.query);
             const countsRes = await pool.request().query(countsQuery);
@@ -1816,7 +1815,6 @@ app.get('/api/erp/error-count-report', async (req, res) => {
                 ${where}
                 GROUP BY STUD_ID, Test
                 ORDER BY name, Test
-                LIMIT 2000
             `;
             logQuery(fallbackQuery, req.query);
             const fallbackRes = await pool.request().query(fallbackQuery);
