@@ -2033,13 +2033,6 @@ const AverageReport = ({ filters }) => {
         }
     };
 
-    // Calculate dynamic remarks
-    const computedRemarks = useMemo(() => {
-        if (!previewRows || previewRows.length === 0) return '';
-        if (customRemarks[previewStudentId]) return customRemarks[previewStudentId];
-        return generateDynamicRemarks(previewStudentName, transformedPreviewRows, performanceDiagnostics, studentErpQuestions);
-    }, [previewRows, customRemarks, previewStudentId, previewStudentName, transformedPreviewRows, performanceDiagnostics, studentErpQuestions]);
-
     useEffect(() => {
         if (!previewStudentId) {
             setStudentErpQuestions([]);
@@ -2090,6 +2083,13 @@ const AverageReport = ({ filters }) => {
     const performanceDiagnostics = useMemo(() => {
         return analyzeLaggingSubjectAndLosses(transformedPreviewRows);
     }, [transformedPreviewRows]);
+
+    // Calculate dynamic remarks
+    const computedRemarks = useMemo(() => {
+        if (!previewRows || previewRows.length === 0) return '';
+        if (customRemarks[previewStudentId]) return customRemarks[previewStudentId];
+        return generateDynamicRemarks(previewStudentName, transformedPreviewRows, performanceDiagnostics, studentErpQuestions);
+    }, [previewRows, customRemarks, previewStudentId, previewStudentName, transformedPreviewRows, performanceDiagnostics, studentErpQuestions]);
 
     const handleSendWhatsApp = async () => {
         const rawNumber = String(whatsappNumber || '').trim().replace(/\D/g, '');
