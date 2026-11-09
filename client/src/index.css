@@ -4116,20 +4116,20 @@ body {
 
 .rc-test-table td.td-test {
     text-align: left;
-    font-weight: 700;
+    font-weight: 800 !important;
     padding-left: 14px;
 }
 
 .rc-test-table td.td-date {
-    font-weight: 700;
+    font-weight: 800 !important;
 }
 
 .rc-test-table td.td-mark {
-    font-weight: 700;
+    font-weight: 800 !important;
 }
 
 .rc-test-table td.td-total {
-    font-weight: 800;
+    font-weight: 800 !important;
 }
 
 .rc-test-table tr.rc-absent-row td {
