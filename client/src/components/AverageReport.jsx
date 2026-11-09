@@ -314,8 +314,8 @@ const AverageReport = ({ filters }) => {
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
-    const [includeChart, setIncludeChart] = useState(true); // Toggle to include or exclude chart & diagnostics
-    const [includeTopicDetails, setIncludeTopicDetails] = useState(true); // Toggle to include or exclude Topic & Subtopic details
+    const [includeChart, setIncludeChart] = useState(false); // Default unchecked
+    const [includeTopicDetails, setIncludeTopicDetails] = useState(false); // Default unchecked
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
     const [isExcelDownloading, setIsExcelDownloading] = useState(false);
