@@ -137,6 +137,69 @@ const compressImage = (file, maxWidth = 450, maxHeight = 550, quality = 0.85) =>
     });
 };
 
+// Helper to clean and format topic names nicely
+const cleanTopicName = (name) => {
+    if (!name) return '';
+    let str = String(name).trim();
+    if (!str || str === '--' || str.toLowerCase() === 'unknown topic' || str.toLowerCase() === 'none' || str.toLowerCase() === 'n/a') {
+        return '';
+    }
+    // If all uppercase or all lowercase, convert to Title Case
+    if (str === str.toUpperCase() || str === str.toLowerCase()) {
+        const minorWords = new Set(['and', 'or', 'in', 'of', 'the', 'for', 'to', 'a', 'an', 'at', 'by', 'on', 'with']);
+        str = str.toLowerCase().split(' ').map((w, idx) => {
+            if (idx > 0 && minorWords.has(w)) return w;
+            return w.charAt(0).toUpperCase() + w.slice(1);
+        }).join(' ');
+    } else {
+        // Capitalize words with >2 letters if lowercase
+        str = str.split(' ').map((w) => {
+            if (w.length > 2 && w === w.toLowerCase() && !['and', 'or', 'in', 'of', 'the', 'for', 'to', 'a', 'an', 'at', 'by', 'on', 'with'].includes(w)) {
+                return w.charAt(0).toUpperCase() + w.slice(1);
+            }
+            return w;
+        }).join(' ');
+    }
+    return str;
+};
+
+// Helper to extract top 1-2 distinct lagging topics for a subject sorted by marks lost / errors
+const getTopLaggingTopics = (subjectName, questions, limit = 2) => {
+    if (!questions || !Array.isArray(questions) || questions.length === 0) return [];
+    const subUpper = String(subjectName || '').toUpperCase().trim();
+    const subQuestions = questions.filter(q => String(q.subject || '').toUpperCase().trim() === subUpper);
+    if (subQuestions.length === 0) return [];
+
+    const topicMap = {};
+    for (const q of subQuestions) {
+        const cleaned = cleanTopicName(q.topic);
+        if (!cleaned) continue;
+        if (!topicMap[cleaned]) {
+            topicMap[cleaned] = { topic: cleaned, count: 0, lost: 0 };
+        }
+        topicMap[cleaned].count += 1;
+        topicMap[cleaned].lost += (Number(q.lost) || (q.status === 'W' ? 5 : 4));
+    }
+
+    const sorted = Object.values(topicMap).sort((a, b) => b.lost - a.lost || b.count - a.count);
+
+    const selected = [];
+    for (const item of sorted) {
+        const itemLower = item.topic.toLowerCase();
+        // Prevent near-duplicate substrings (e.g. 'Ray Optics' vs 'Ray Optics and Optical Instruments')
+        const isDuplicate = selected.some(s => {
+            const sLower = s.toLowerCase();
+            return sLower === itemLower || 
+                   (sLower.length > 5 && itemLower.length > 5 && (sLower.includes(itemLower) || itemLower.includes(sLower)));
+        });
+        if (!isDuplicate) {
+            selected.push(item.topic);
+            if (selected.length >= limit) break;
+        }
+    }
+    return selected;
+};
+
 const generateDynamicRemarks = (studentName, transformedRows, performanceDiagnostics, erpQuestions = []) => {
     if (!transformedRows || transformedRows.length === 0) {
         return `${studentName} has active enrolment. Test records are being consolidated.`;
@@ -152,6 +215,7 @@ const generateDynamicRemarks = (studentName, transformedRows, performanceDiagnos
     // Find best AIR
     const airs = attended.map(r => Number(r.AIR)).filter(n => !isNaN(n) && n > 0);
     const bestAir = airs.length > 0 ? Math.min(...airs) : null;
+    const airStr = bestAir ? ` and reaching an All India Rank of ${bestAir}` : '';
 
     // Subjects averages
     const avgBot = Math.round(attended.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / count);
@@ -170,33 +234,47 @@ const generateDynamicRemarks = (studentName, transformedRows, performanceDiagnos
 
     const top1 = subjects[0];
     const top2 = subjects[1];
-    const low1 = subjects[3]; // Lagging
-    const low2 = subjects[2]; // Second lowest
+    const low1 = subjects[3]; // Primary lagging subject
+    const low2 = subjects[2]; // Secondary lagging subject
 
-    let tone = "a strong and steady";
-    if (avgTotal >= 650) tone = "an outstanding and highly consistent";
-    else if (avgTotal >= 600) tone = "a strong and steady";
-    else if (avgTotal >= 500) tone = "a good and promising";
-    else if (avgTotal >= 400) tone = "a steady";
-    else tone = "a foundational";
-
-    const airStr = bestAir ? ` and reaching an All India Rank of ${bestAir}` : '';
-
+    // Extract student's ACTUAL highest-error / highest-loss topics from ERP questions
+    const laggingTopics = getTopLaggingTopics(low1.name, erpQuestions, 2);
     let topicHint = '';
-    if (erpQuestions && erpQuestions.length > 0) {
-        const laggingTopics = erpQuestions
-            .filter(q => String(q.subject || '').toUpperCase() === low1.name.toUpperCase())
-            .map(q => q.topic)
-            .filter(Boolean);
-        if (laggingTopics.length > 0) {
-            const uniqueTopics = [...new Set(laggingTopics)];
-            topicHint = `, particularly ${uniqueTopics.slice(0, 2).join(' & ')} topics,`;
-        }
+    if (laggingTopics.length === 2) {
+        topicHint = `, particularly in ${laggingTopics[0]} and ${laggingTopics[1]},`;
+    } else if (laggingTopics.length === 1) {
+        topicHint = `, particularly in ${laggingTopics[0]},`;
+    } else {
+        if (low1.name === 'Physics') topicHint = ', particularly in numerical problem-solving,';
+        else if (low1.name === 'Chemistry') topicHint = ', particularly in organic chemistry and numericals,';
+        else if (low1.name === 'Botany') topicHint = ', particularly in diagram-based questions and fact recall,';
+        else if (low1.name === 'Zoology') topicHint = ', particularly in physiological mechanisms,';
     }
-    if (!topicHint && low1.name === 'Chemistry') topicHint = ', particularly organic topics,';
-    if (!topicHint && low1.name === 'Physics') topicHint = ', particularly numerical problem-solving,';
 
-    return `${studentName} has maintained ${tone} record this year, averaging ${avgTotal} out of 720 across ${count} tests${airStr}. ${top1.name} and ${top2.name} are consistently excellent. ${low1.name}${topicHint} and ${low2.name} deserve extra practice to lift an already impressive score further.`;
+    // Deterministic variant to add natural phrasing diversity
+    const variant = (studentName.length + count) % 2;
+
+    if (avgTotal >= 620) {
+        if (variant === 0) {
+            return `${studentName} has demonstrated exceptional academic consistency, securing an average of ${avgTotal}/720 across ${count} examinations${airStr}. Performance in ${top1.name} and ${top2.name} is outstanding. Focused attention on ${low1.name}${topicHint} will help convert remaining negative marks into rank-defining gains.`;
+        } else {
+            return `${studentName} displays commendable command across test sessions, maintaining a high average of ${avgTotal}/720 over ${count} tests${airStr}. While ${top1.name} and ${top2.name} remain strong pillars, targeted practice in ${low1.name}${topicHint} alongside regular ${low2.name} revision will solidify a top-tier NEET score.`;
+        }
+    } else if (avgTotal >= 500) {
+        if (variant === 0) {
+            return `${studentName} has maintained a steady and promising track record, achieving an average score of ${avgTotal}/720 over ${count} tests${airStr}. ${top1.name} and ${top2.name} show good conceptual grasp. Prioritizing revision in ${low1.name}${topicHint} along with ${low2.name} will significantly boost confidence and total marks.`;
+        } else {
+            return `${studentName} demonstrates earnest effort and solid consistency, averaging ${avgTotal}/720 across ${count} tests${airStr}. Strengths in ${top1.name} and ${top2.name} provide a reliable base. Devoting extra problem-solving time to ${low1.name}${topicHint} will help unlock higher percentile ranks.`;
+        }
+    } else if (avgTotal >= 400) {
+        if (variant === 0) {
+            return `${studentName} has shown steady engagement with an average of ${avgTotal}/720 across ${count} tests${airStr}. Good progress is visible in ${top1.name} and ${top2.name}. Targeted revision of core concepts in ${low1.name}${topicHint} and ${low2.name} is recommended to minimize avoidable errors and steadily improve ranks.`;
+        } else {
+            return `${studentName} shows consistent participation, securing an average of ${avgTotal}/720 across ${count} tests${airStr}. While ${top1.name} reflects positive capability, strengthening fundamental concepts in ${low1.name}${topicHint} and regular ${low2.name} practice will substantially raise overall performance.`;
+        }
+    } else {
+        return `${studentName} has recorded an average of ${avgTotal}/720 across ${count} tests${airStr}. Foundational strength is evident in ${top1.name}. Regular error analysis and structured daily practice in ${low1.name}${topicHint} and ${low2.name} will be vital to build subject confidence and elevate overall performance.`;
+    }
 };
 
 // Canvas Chart Generator with exact 10.3pt PDF Font Size ONLY (46px canvas size) & High-Contrast Dark Slate Navy Labels
@@ -1317,7 +1395,7 @@ const AverageReport = ({ filters }) => {
                 // High Performance: Pre-fetch all ERP questions in a single batch request
                 const erpMap = {};
                 const effectiveCampus = (filters.campus && filters.campus.length > 0) ? filters.campus : (filters._allowedCampuses || []);
-                if (includeTopicDetails) {
+                if (includeTopicDetails || studentIds.length <= 250) {
                     try {
                         const erpPayload = {
                             ...filters,
