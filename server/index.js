@@ -2048,16 +2048,28 @@ app.get('/api/erp/students', async (req, res) => {
 // --- TOP 18 STUDENTS API ---
 app.get('/api/config/top-18', async (req, res) => {
     try {
-        const XLSX = require('xlsx');
-        const configPath = path.join(__dirname, '..', 'Uploader_Config.xlsx');
+        let XLSX;
+        try {
+            XLSX = require('xlsx');
+        } catch (e) {
+            console.warn('[TOP 18 API] xlsx module not available:', e.message);
+            return res.json({ studentIds: [], students: [] });
+        }
+
+        let configPath = path.join(__dirname, '..', 'Uploader_Config.xlsx');
         if (!fs.existsSync(configPath)) {
-            return res.status(404).json({ error: "Uploader_Config.xlsx not found" });
+            configPath = path.join(__dirname, 'Uploader_Config.xlsx');
+        }
+        if (!fs.existsSync(configPath)) {
+            console.warn('[TOP 18 API] Uploader_Config.xlsx not found at', configPath);
+            return res.json({ studentIds: [], students: [] });
         }
 
         const wb = XLSX.readFile(configPath);
         const sheetName = wb.SheetNames.find(s => s.trim().toUpperCase() === 'TOP 18' || s.trim().toUpperCase().includes('TOP 18'));
         if (!sheetName) {
-            return res.status(404).json({ error: "TOP 18 sheet not found in Uploader_Config.xlsx" });
+            console.warn('[TOP 18 API] TOP 18 sheet not found in Uploader_Config.xlsx');
+            return res.json({ studentIds: [], students: [] });
         }
 
         const ws = wb.Sheets[sheetName];
