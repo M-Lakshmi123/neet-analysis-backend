@@ -4120,6 +4120,14 @@ body {
     padding-left: 14px;
 }
 
+.rc-test-table td.td-date {
+    font-weight: 700;
+}
+
+.rc-test-table td.td-mark {
+    font-weight: 700;
+}
+
 .rc-test-table td.td-total {
     font-weight: 800;
 }
