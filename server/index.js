@@ -2147,11 +2147,24 @@ app.get('/api/student-photo/:studentId', async (req, res) => {
             [studentId]
         );
 
-        if (rows.length > 0) {
-            res.json({ success: true, photo: rows[0] });
-        } else {
-            res.json({ success: true, photo: null });
+        let photo = rows.length > 0 ? rows[0] : null;
+
+        // Fallback: If not found by exact ID, search by suffix/prefix matching (e.g. 246555671 matching 6555671)
+        if (!photo && studentId.length >= 6) {
+            const [fallbackRows] = await pool.rawPool.query(
+                `SELECT student_id, photo_data, mime_type, updated_at 
+                 FROM student_photos 
+                 WHERE ? LIKE CONCAT('%', student_id) OR student_id LIKE CONCAT('%', ?) 
+                 ORDER BY LENGTH(student_id) DESC 
+                 LIMIT 1`,
+                [studentId, studentId]
+            );
+            if (fallbackRows.length > 0) {
+                photo = fallbackRows[0];
+            }
         }
+
+        res.json({ success: true, photo });
     } catch (err) {
         console.error('[StudentPhoto GET] ERROR:', err);
         res.status(500).json({ error: 'Failed to retrieve photo', details: err.message });
@@ -2209,6 +2222,18 @@ app.post('/api/student-photos/batch', async (req, res) => {
         rows.forEach(r => {
             photoMap[r.student_id] = r.photo_data;
         });
+
+        // Fallback for any cleanIds not directly matched
+        const missingIds = cleanIds.filter(id => !photoMap[id]);
+        if (missingIds.length > 0) {
+            const [allPhotos] = await pool.rawPool.query('SELECT student_id, photo_data FROM student_photos');
+            missingIds.forEach(mId => {
+                const found = allPhotos.find(p => mId.endsWith(p.student_id) || p.student_id.endsWith(mId));
+                if (found) {
+                    photoMap[mId] = found.photo_data;
+                }
+            });
+        }
 
         res.json({ success: true, photos: photoMap });
     } catch (err) {
