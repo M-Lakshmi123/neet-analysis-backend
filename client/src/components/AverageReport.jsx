@@ -6,7 +6,7 @@ import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import ExcelJS from 'exceljs';
-import { ChevronLeft, ChevronRight, TrendingUp, Maximize2, X, Edit3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingUp, Maximize2, X, Edit3, Camera, Trash2, Upload, Check } from 'lucide-react';
 import { logActivity } from '../utils/activityLogger';
 import { useAuth } from './auth/AuthProvider';
 
@@ -85,6 +85,118 @@ const analyzeLaggingSubjectAndLosses = (transformedRows) => {
         laggingMax: lagging.max,
         testLosses
     };
+};
+
+const getStudentInitials = (name) => {
+    if (!name) return 'SC';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'SC';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const getReportDateStr = () => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+const compressImage = (file, maxWidth = 450, maxHeight = 550, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let { width, height } = img;
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = Math.round((width * maxHeight) / height);
+                        height = maxHeight;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, width, height);
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+};
+
+const generateDynamicRemarks = (studentName, transformedRows, performanceDiagnostics, erpQuestions = []) => {
+    if (!transformedRows || transformedRows.length === 0) {
+        return `${studentName} has active enrolment. Test records are being consolidated.`;
+    }
+    const attended = transformedRows.filter(r => !r.isAB);
+    const count = attended.length;
+    if (count === 0) {
+        return `${studentName} has not attended any examinations recorded in the current period. Consistent attendance is strongly advised.`;
+    }
+
+    const avgTotal = Math.round(attended.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / count);
+
+    // Find best AIR
+    const airs = attended.map(r => Number(r.AIR)).filter(n => !isNaN(n) && n > 0);
+    const bestAir = airs.length > 0 ? Math.min(...airs) : null;
+
+    // Subjects averages
+    const avgBot = Math.round(attended.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / count);
+    const avgZoo = Math.round(attended.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / count);
+    const avgPhy = Math.round(attended.reduce((a, b) => a + (Number(b.Physics) || 0), 0) / count);
+    const avgChem = Math.round(attended.reduce((a, b) => a + (Number(b.Chemistry) || 0), 0) / count);
+
+    const subjects = [
+        { name: 'Botany', avg: avgBot, max: 180, pct: (avgBot / 180) * 100 },
+        { name: 'Zoology', avg: avgZoo, max: 180, pct: (avgZoo / 180) * 100 },
+        { name: 'Physics', avg: avgPhy, max: 180, pct: (avgPhy / 180) * 100 },
+        { name: 'Chemistry', avg: avgChem, max: 180, pct: (avgChem / 180) * 100 }
+    ];
+
+    subjects.sort((a, b) => b.pct - a.pct); // Highest first
+
+    const top1 = subjects[0];
+    const top2 = subjects[1];
+    const low1 = subjects[3]; // Lagging
+    const low2 = subjects[2]; // Second lowest
+
+    let tone = "a strong and steady";
+    if (avgTotal >= 650) tone = "an outstanding and highly consistent";
+    else if (avgTotal >= 600) tone = "a strong and steady";
+    else if (avgTotal >= 500) tone = "a good and promising";
+    else if (avgTotal >= 400) tone = "a steady";
+    else tone = "a foundational";
+
+    const airStr = bestAir ? ` and reaching an All India Rank of ${bestAir}` : '';
+
+    let topicHint = '';
+    if (erpQuestions && erpQuestions.length > 0) {
+        const laggingTopics = erpQuestions
+            .filter(q => String(q.subject || '').toUpperCase() === low1.name.toUpperCase())
+            .map(q => q.topic)
+            .filter(Boolean);
+        if (laggingTopics.length > 0) {
+            const uniqueTopics = [...new Set(laggingTopics)];
+            topicHint = `, particularly ${uniqueTopics.slice(0, 2).join(' & ')} topics,`;
+        }
+    }
+    if (!topicHint && low1.name === 'Chemistry') topicHint = ', particularly organic topics,';
+    if (!topicHint && low1.name === 'Physics') topicHint = ', particularly numerical problem-solving,';
+
+    return `${studentName} has maintained ${tone} record this year, averaging ${avgTotal} out of 720 across ${count} tests${airStr}. ${top1.name} and ${top2.name} are consistently excellent. ${low1.name}${topicHint} and ${low2.name} deserve extra practice to lift an already impressive score further.`;
 };
 
 // Canvas Chart Generator with exact 10.3pt PDF Font Size ONLY (46px canvas size) & High-Contrast Dark Slate Navy Labels
@@ -212,6 +324,16 @@ const AverageReport = ({ filters }) => {
     const [whatsappNumber, setWhatsappNumber] = useState('');
 
     const [studentErpQuestions, setStudentErpQuestions] = useState([]);
+    // Student Photo state (stored directly in TiDB database)
+    const [currentPhoto, setCurrentPhoto] = useState(null);
+    const [photoUploading, setPhotoUploading] = useState(false);
+    const photoInputRef = useRef(null);
+
+    // Custom Remarks state
+    const [customRemarks, setCustomRemarks] = useState({});
+    const [isEditingRemarks, setIsEditingRemarks] = useState(false);
+    const [tempRemarksText, setTempRemarksText] = useState('');
+    const [toastMessage, setToastMessage] = useState(null);
     const [erpLoading, setErpLoading] = useState(false);
     const [zoomImage, setZoomImage] = useState(null);
 
@@ -463,468 +585,453 @@ const AverageReport = ({ filters }) => {
         });
     };
 
-    const generateStudentPDF = (studentData, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformedRows, isChartIncluded, erpQuestions = [], isTopicDetailsIncluded = true) => {
+    const generateStudentPDF = (
+        studentData,
+        logoImg,
+        fonts,
+        studentPhoto,
+        chartImgData,
+        transformedRows,
+        isChartIncluded,
+        erpQuestions = [],
+        isTopicDetailsIncluded = true,
+        customRemarksText = null
+    ) => {
         const doc = new jsPDF('p', 'mm', 'a4');
 
-        if (impactFont) {
-            doc.addFileToVFS("unicode.impact.ttf", impactFont);
-            doc.addFont("unicode.impact.ttf", "Impact", "normal");
+        if (fonts?.oswaldBold) {
+            doc.addFileToVFS("Oswald-Bold.ttf", fonts.oswaldBold);
+            doc.addFont("Oswald-Bold.ttf", "Oswald", "bold");
         }
-        if (bookmanFont) {
-            doc.addFileToVFS("bookman-old-style.ttf", bookmanFont);
-            doc.addFont("bookman-old-style.ttf", "Bookman", "normal");
+        if (fonts?.libreBaskerville) {
+            doc.addFileToVFS("LibreBaskerville-Regular.ttf", fonts.libreBaskerville);
+            doc.addFont("LibreBaskerville-Regular.ttf", "LibreBaskerville", "normal");
         }
-        if (bookmanBoldFont) {
-            doc.addFileToVFS("BOOKOSB.TTF", bookmanBoldFont);
-            doc.addFont("BOOKOSB.TTF", "Bookman", "bold");
+        if (fonts?.cormorantBold) {
+            doc.addFileToVFS("CormorantGaramond-Bold.ttf", fonts.cormorantBold);
+            doc.addFont("CormorantGaramond-Bold.ttf", "CormorantGaramond", "bold");
+        }
+        if (fonts?.cormorantItalic) {
+            doc.addFileToVFS("CormorantGaramond-Italic.ttf", fonts.cormorantItalic);
+            doc.addFont("CormorantGaramond-Italic.ttf", "CormorantGaramond", "italic");
+        }
+        if (fonts?.nunitoRegular) {
+            doc.addFileToVFS("NunitoSans-Regular.ttf", fonts.nunitoRegular);
+            doc.addFont("NunitoSans-Regular.ttf", "NunitoSans", "normal");
+        }
+        if (fonts?.nunitoSemiBold || fonts?.nunitoBold) {
+            doc.addFileToVFS("NunitoSans-SemiBold.ttf", fonts.nunitoSemiBold || fonts.nunitoBold);
+            doc.addFont("NunitoSans-SemiBold.ttf", "NunitoSans", "bold");
         }
 
-        doc.setFillColor(255, 255, 255);
-        doc.rect(0, 0, 210, 297, 'F');
+        const setFontOswald = () => {
+            if (fonts?.oswaldBold) doc.setFont("Oswald", "bold");
+            else doc.setFont("helvetica", "bold");
+        };
+        const setFontLibreBaskerville = () => {
+            if (fonts?.libreBaskerville) doc.setFont("LibreBaskerville", "normal");
+            else doc.setFont("times", "normal");
+        };
+        const setFontCormorantBold = () => {
+            if (fonts?.cormorantBold) doc.setFont("CormorantGaramond", "bold");
+            else doc.setFont("times", "bold");
+        };
+        const setFontCormorantItalic = () => {
+            if (fonts?.cormorantItalic) doc.setFont("CormorantGaramond", "italic");
+            else doc.setFont("times", "italic");
+        };
+        const setFontNunitoRegular = () => {
+            if (fonts?.nunitoRegular) doc.setFont("NunitoSans", "normal");
+            else doc.setFont("helvetica", "normal");
+        };
+        const setFontNunitoBold = () => {
+            if (fonts?.nunitoSemiBold || fonts?.nunitoBold) doc.setFont("NunitoSans", "bold");
+            else doc.setFont("helvetica", "bold");
+        };
 
-        let currentY = 11;
+        const drawPageBorderAndBackground = () => {
+            const pageWidth = 210;
+            const pageHeight = 297;
+            // Warm off-white sheet background: #FFFDF8 -> [255, 253, 248]
+            doc.setFillColor(255, 253, 248);
+            doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-        if (impactFont) {
-            doc.setFont("Impact", "normal");
-        } else {
-            doc.setFont("helvetica", "bold");
-        }
-        doc.setFontSize(22);
-        doc.setTextColor(0, 112, 192);
+            // Outer gold border: #C9962B -> [201, 150, 43], 2px -> 0.7mm
+            doc.setDrawColor(201, 150, 43);
+            doc.setLineWidth(0.7);
+            doc.rect(7.5, 7.5, pageWidth - 15, pageHeight - 15, 'S');
 
+            // Inner thin line: #C9962B, 0.25mm
+            doc.setLineWidth(0.25);
+            doc.rect(9.2, 9.2, pageWidth - 18.4, pageHeight - 18.4, 'S');
+        };
+
+        // Draw frame on page 1
+        drawPageBorderAndBackground();
+
+        const student = studentData[0] || {};
+        const studentName = student.NAME_OF_THE_STUDENT || '';
+        const studentId = String(student.STUD_ID || '');
+        const campus = student.CAMPUS_NAME || '';
+        const stream = getNormalizedStream(studentData);
+
+        // 1. Logo
         if (logoImg) {
-            const aspect = logoImg.width / logoImg.height;
-            let logoH = 20;
-            let logoW = logoH * aspect;
-
+            const logoW = 18;
+            const logoH = 18;
             const logoX = (210 - logoW) / 2;
-            doc.addImage(logoImg, 'PNG', logoX, currentY, logoW, logoH, undefined, 'FAST');
-            currentY += logoH + 6;
-        } else {
-            currentY += 10;
+            doc.addImage(logoImg, 'PNG', logoX, 12, logoW, logoH, undefined, 'FAST');
         }
 
-        const part1 = "Sri Chaitanya";
-        const part2 = " Educational Institutions";
-        doc.setFontSize(26);
+        // 2. Title
+        const titleY = 34.5;
+        setFontOswald();
+        doc.setFontSize(22);
+        doc.setTextColor(10, 79, 196); // #0A4FC4
+        const w1 = doc.getTextWidth("Sri Chaitanya ");
 
-        if (impactFont) doc.setFont("Impact", "normal");
-        else doc.setFont("helvetica", "bold");
-        const w1 = doc.getTextWidth(part1);
+        setFontLibreBaskerville();
+        doc.setFontSize(17); // ~78% of 22
+        doc.setTextColor(26, 99, 200); // #1A63C8
+        const w2 = doc.getTextWidth("Educational Institutions");
 
-        if (bookmanFont) doc.setFont("Bookman", "normal");
-        else doc.setFont("helvetica", "normal");
-        const w2 = doc.getTextWidth(part2);
+        const startX = (210 - (w1 + w2)) / 2;
 
-        const totalWidth = w1 + w2;
-        const startX = (210 - totalWidth) / 2;
+        setFontOswald();
+        doc.setFontSize(22);
+        doc.setTextColor(10, 79, 196);
+        doc.text("Sri Chaitanya ", startX, titleY);
 
-        if (impactFont) doc.setFont("Impact", "normal");
-        else doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 112, 192);
-        doc.text(part1, startX, currentY);
+        setFontLibreBaskerville();
+        doc.setFontSize(17);
+        doc.setTextColor(26, 99, 200);
+        doc.text("Educational Institutions", startX + w1, titleY);
 
-        if (bookmanFont) doc.setFont("Bookman", "normal");
-        else doc.setFont("helvetica", "normal");
-        doc.setTextColor(0, 102, 204);
-        doc.text(part2, startX + w1, currentY);
+        // 3. Ribbon: PROGRESS REPORT CARD
+        const ribbonY = 40;
+        const ribbonW = 86;
+        const ribbonH = 7.2;
+        const ribbonX = (210 - ribbonW) / 2;
 
-        currentY += 8;
+        doc.setFillColor(15, 32, 87); // #0F2057
+        doc.lines(
+            [
+                [ribbonW - 6, 0],
+                [3, ribbonH],
+                [-(ribbonW), 0],
+                [3, -ribbonH]
+            ],
+            ribbonX + 3, ribbonY, [1, 1], 'F', true
+        );
 
-        if (bookmanFont) doc.setFont("Bookman", "bold");
-        else doc.setFont("helvetica", "bolditalic");
-        doc.setFontSize(14);
-        doc.setTextColor(0, 0, 0);
-        const subTitle = "P R O G R E S S   R E P O R T";
-        doc.text(subTitle, 105, currentY, { align: 'center' });
-        currentY += 6;
+        setFontNunitoBold();
+        doc.setFontSize(9.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text("PROGRESS REPORT CARD", 105, ribbonY + 5.1, { align: 'center' });
 
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const contentWidth = 190;
-        const marginX = (pageWidth - contentWidth) / 2;
+        // 4. Student Info Table & Photo Box
+        const infoY = 50.5;
+        const infoX = 14;
+        const infoW = 142;
+        const infoH = 37.2;
+        const rowH = infoH / 6;
 
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.4);
-        doc.line(marginX, currentY, pageWidth - marginX, currentY);
-        currentY += 4;
+        const infoData = [
+            { label: "Type of Report Card", value: "Academic" },
+            { label: "Name of the Student", value: studentName },
+            { label: "Student ID", value: studentId },
+            { label: "Campus and Stream", value: `${campus} · ${stream}` },
+            { label: "Date of Report", value: getReportDateStr() },
+            { label: "Status of the Student", value: "Active" }
+        ];
 
-        // Dynamic Header Box (Student Info) with Uniform Dark Blue Field Values
-        if (studentData.length > 0) {
-            const student = studentData[0];
-            const normalizedStream = getNormalizedStream(studentData);
+        infoData.forEach((row, i) => {
+            const y = infoY + (i * rowH);
+            // Label cell
+            doc.setFillColor(241, 244, 251); // #F1F4FB
+            doc.setDrawColor(207, 214, 232); // #CFD6E8
+            doc.setLineWidth(0.25);
+            doc.rect(infoX, y, 48, rowH, 'FD');
 
-            const col1X = marginX + 6; // 16mm
-            const col2X = marginX + 98; // 108mm
-            const col1ValX = col1X + 33; // 49mm
-            const col2ValX = col2X + 22; // 130mm
+            setFontNunitoBold();
+            doc.setFontSize(8.5);
+            doc.setTextColor(15, 32, 87); // #0F2057
+            doc.text(row.label, infoX + 3, y + 4.3);
 
-            const nameStr = (student.NAME_OF_THE_STUDENT || '').toUpperCase().trim();
-            const campusStr = (student.CAMPUS_NAME || '').toUpperCase().trim();
+            // Value cell
+            doc.setFillColor(255, 253, 248); // #FFFDF8
+            doc.rect(infoX + 48, y, 94, rowH, 'FD');
 
-            if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
+            setFontNunitoBold();
+            doc.setFontSize(8.5);
+            doc.setTextColor(20, 32, 74); // #14204A
+            doc.text(row.value, infoX + 51, y + 4.3);
+        });
 
-            const maxNameWidthOnRow1 = col2X - col1ValX - 4;
-            const nameWidth = doc.getTextWidth(nameStr);
+        // Photo Box on Right
+        const photoX = 160;
+        const photoY = infoY;
+        const photoW = 36;
+        const photoH = infoH;
 
-            let isNameOnNextLine = nameWidth > maxNameWidthOnRow1;
-            let boxHeight = isNameOnNextLine ? 30 : 24;
+        doc.setFillColor(255, 253, 248);
+        doc.setDrawColor(201, 150, 43); // #C9962B
+        doc.setLineWidth(0.9); // 3px
+        doc.rect(photoX, photoY, photoW, photoH, 'FD');
 
-            doc.setFillColor(239, 246, 255);
-            doc.setDrawColor(0, 0, 0);
-            doc.setLineWidth(0.1);
-            doc.roundedRect(marginX, currentY, contentWidth, boxHeight, 1, 1, 'FD');
-
-            const textYStart = currentY + 8;
-
-            // Student Name Label (Black)
-            if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.setTextColor(0, 0, 0);
-            doc.text("Student Name:", col1X, textYStart);
-
-            // Campus Label (Black)
-            doc.text("Campus:", col2X, textYStart);
-
-            // Campus Value (Uniform Dark Blue)
-            if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
-            doc.setTextColor(0, 51, 153);
-            doc.text(campusStr, col2ValX, textYStart);
-
-            let row2Y = textYStart + 9;
-
-            if (isNameOnNextLine) {
-                // Student Name Value on Line 2 (Uniform Dark Blue)
-                if (bookmanFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setFontSize(11);
-                doc.setTextColor(0, 51, 153);
-                doc.text(nameStr, col1X + 4, textYStart + 7);
-
-                row2Y = textYStart + 16;
-            } else {
-                // Student Name Value on Line 1 (Uniform Dark Blue)
-                if (bookmanFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setFontSize(11);
-                doc.setTextColor(0, 51, 153);
-                doc.text(nameStr, col1ValX, textYStart);
+        if (studentPhoto) {
+            try {
+                doc.addImage(studentPhoto, 'JPEG', photoX + 0.6, photoY + 0.6, photoW - 1.2, photoH - 1.2, undefined, 'FAST');
+            } catch (imgErr) {
+                console.warn("Could not render photo in PDF, falling back to initials:", imgErr);
+                setFontCormorantBold();
+                doc.setFontSize(26);
+                doc.setTextColor(15, 32, 87);
+                doc.text(getStudentInitials(studentName), photoX + (photoW / 2), photoY + 18, { align: 'center' });
             }
+        } else {
+            setFontCormorantBold();
+            doc.setFontSize(26);
+            doc.setTextColor(15, 32, 87);
+            doc.text(getStudentInitials(studentName), photoX + (photoW / 2), photoY + 18, { align: 'center' });
 
-            // Student ID Label (Black)
-            if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
-            doc.setFontSize(11);
-            doc.setTextColor(0, 0, 0);
-            doc.text("Student ID:", col1X, row2Y);
-
-            // Student ID Value (Uniform Dark Blue)
-            if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
-            doc.setTextColor(0, 51, 153);
-            doc.text(student.STUD_ID?.toString() || '', col1ValX, row2Y);
-
-            // Stream Label (Black)
-            if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
-            doc.setTextColor(0, 0, 0);
-            doc.text("Stream:", col2X, row2Y);
-
-            // Stream Value (Uniform Dark Blue)
-            if (bookmanFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
-            doc.setTextColor(0, 51, 153);
-            doc.text(normalizedStream, col2ValX, row2Y);
-
-            currentY += boxHeight;
+            setFontNunitoRegular();
+            doc.setFontSize(7);
+            doc.setTextColor(93, 103, 136); // #5D6788
+            doc.text("Student Photo", photoX + (photoW / 2), photoY + 25, { align: 'center' });
         }
 
-        const tableColumn = ["Test Name", "Date", "Total\n720", "AIR", "Bot\n180", "Zoo\n180", "Bio\n360", "Phy\n180", "Chem\n180"];
+        // 5. Section Heading
+        const secHeadingY = 94;
+        setFontCormorantBold();
+        doc.setFontSize(14);
+        doc.setTextColor(15, 32, 87);
+        doc.text("Test-wise record", infoX, secHeadingY);
 
+        // 6. Test-wise Table
         const tableRows = transformedRows.map(row => {
             if (row.isAB) {
                 return [
-                    row.Test,
-                    formatDate(row.DATE),
-                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
-                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
-                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
-                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
-                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
-                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } },
-                    { content: 'AB', styles: { textColor: [255, 0, 0], fontStyle: 'bold' } }
+                    { content: row.Test, styles: { textColor: [198, 45, 71], fontStyle: 'bold' } },
+                    { content: formatDate(row.DATE), styles: { textColor: [198, 45, 71] } },
+                    { content: 'Absent', colSpan: 6, styles: { halign: 'center', textColor: [198, 45, 71], fontStyle: 'bold' } }
                 ];
             }
             return [
-                row.Test,
-                formatDate(row.DATE),
-                Math.round(row.Tot_720 || 0),
-                Math.round(row.AIR) || '-',
-                Math.round(row.Botany || 0),
-                Math.round(row.Zoology || 0),
-                Math.round((Number(row.Botany) || 0) + (Number(row.Zoology) || 0)),
-                Math.round(row.Physics || 0),
-                Math.round(row.Chemistry || 0)
+                { content: row.Test, styles: { fontStyle: 'bold', halign: 'left' } },
+                { content: formatDate(row.DATE), styles: { halign: 'center' } },
+                { content: String(Math.round(row.Tot_720 || 0)), styles: { fontStyle: 'bold', halign: 'center' } },
+                { content: String(Math.round(row.AIR) || '-'), styles: { halign: 'center' } },
+                { content: String(Math.round(row.Botany || 0)), styles: { halign: 'center' } },
+                { content: String(Math.round(row.Zoology || 0)), styles: { halign: 'center' } },
+                { content: String(Math.round(row.Physics || 0)), styles: { halign: 'center' } },
+                { content: String(Math.round(row.Chemistry || 0)), styles: { halign: 'center' } }
             ];
         });
 
-        const attemptedRows = studentData;
-        if (attemptedRows.length > 0) {
-            const avg = (key) => Math.round(attemptedRows.reduce((a, b) => a + (Number(b[key]) || 0), 0) / attemptedRows.length);
-            const avgAIR = Math.round(attemptedRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / attemptedRows.length);
-            const avgBio = Math.round(attemptedRows.reduce((a, b) => a + (Number(b.Botany) || 0) + (Number(b.Zoology) || 0), 0) / attemptedRows.length);
+        const attendedRows = studentData.filter(r => !r.isAB);
+        const count = attendedRows.length;
+        const avg = (key) => count > 0 ? String(Math.round(attendedRows.reduce((a, b) => a + (Number(b[key]) || 0), 0) / count)) : '-';
+        const avgAIR = count > 0 ? String(Math.round(attendedRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / count)) : '-';
 
-            tableRows.push([
-                { content: "AVERAGE", colSpan: 2 },
-                avg('Tot_720'),
-                avgAIR,
-                avg('Botany'),
-                avg('Zoology'),
-                avgBio,
-                avg('Physics'),
-                avg('Chemistry')
-            ]);
-        }
+        // Add Average Row
+        tableRows.push([
+            { content: "Average", colSpan: 2, styles: { fontStyle: 'bold', halign: 'left', fillColor: [241, 244, 251] } },
+            { content: avg('Tot_720'), styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } },
+            { content: avgAIR, styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } },
+            { content: avg('Botany'), styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } },
+            { content: avg('Zoology'), styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } },
+            { content: avg('Physics'), styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } },
+            { content: avg('Chemistry'), styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } }
+        ]);
 
         autoTable(doc, {
-            head: [tableColumn],
+            head: [["Test", "Date", "Total /720", "AIR", "Bot", "Zoo", "Phy", "Chem"]],
             body: tableRows,
-            startY: currentY + 4,
-            theme: 'grid',
+            startY: 97,
+            margin: { left: 14, right: 14, top: 16, bottom: 22 },
+            theme: 'plain',
             headStyles: {
-                fillColor: [0, 0, 0],
+                fillColor: [15, 32, 87], // #0F2057
                 textColor: [255, 255, 255],
-                font: bookmanFont ? "Bookman" : "helvetica",
-                fontStyle: "bold",
+                font: fonts?.nunitoSemiBold || fonts?.nunitoBold ? 'NunitoSans' : 'helvetica',
+                fontStyle: 'bold',
+                fontSize: 8.5,
                 halign: 'center',
                 valign: 'middle',
-                lineWidth: 0.2,
-                fontSize: 11
+                cellPadding: 2,
+                lineColor: [207, 214, 232],
+                lineWidth: 0.2
             },
             styles: {
-                font: bookmanFont ? "Bookman" : "helvetica",
-                fontSize: 11,
-                cellPadding: 1.5,
-                overflow: 'ellipsize',
-                halign: 'center',
+                font: fonts?.nunitoRegular ? 'NunitoSans' : 'helvetica',
+                fontSize: 8,
+                textColor: [20, 32, 74], // #14204A
+                lineColor: [207, 214, 232], // #CFD6E8
+                lineWidth: 0.2,
                 valign: 'middle',
-                lineColor: [0, 0, 0],
-                lineWidth: 0.1,
-                textColor: [0, 0, 0]
+                cellPadding: 1.6
             },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 55, fontSize: 10, fontStyle: 'bold' },
-                1: { cellWidth: 28 },
-                2: { cellWidth: 17, fillColor: [255, 255, 204] },
-                3: { cellWidth: 15 },
-                4: { cellWidth: 15, fillColor: [253, 233, 217] },
-                5: { cellWidth: 15, fillColor: [218, 238, 243] },
-                6: { cellWidth: 15, fillColor: [224, 231, 255] },
-                7: { cellWidth: 15, fillColor: [235, 241, 222] },
-                8: { cellWidth: 15, fillColor: [242, 220, 219] }
+                0: { halign: 'left', cellWidth: 32 },
+                1: { halign: 'center', cellWidth: 26 },
+                2: { halign: 'center', cellWidth: 22 },
+                3: { halign: 'center', cellWidth: 20 },
+                4: { halign: 'center', cellWidth: 20 },
+                5: { halign: 'center', cellWidth: 20 },
+                6: { halign: 'center', cellWidth: 21 },
+                7: { halign: 'center', cellWidth: 21 }
             },
-            margin: { left: marginX, right: marginX, bottom: 15 },
-            didParseCell: (data) => {
+            willDrawPage: () => {
+                drawPageBorderAndBackground();
+            },
+            didDrawCell: (data) => {
                 if (data.row.index === tableRows.length - 1) {
-                    if (bookmanFont) {
-                        data.cell.styles.font = "Bookman";
-                        data.cell.styles.fontStyle = 'bold';
-                    } else {
-                        data.cell.styles.fontStyle = 'bold';
-                    }
-                    data.cell.styles.fillColor = [218, 238, 243];
-                    data.cell.styles.textColor = [0, 0, 0];
+                    // Gold top line on Average row
+                    doc.setDrawColor(201, 150, 43); // #C9962B
+                    doc.setLineWidth(0.6);
+                    doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
                 }
             }
         });
 
-        // Optional Chart & Lagging Subject Diagnostics (only when isChartIncluded is TRUE)
+        let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 4 : 200;
+
+        // Check if remarks and signatures fit on current page, else add new page
+        if (finalY + 55 > 275) {
+            doc.addPage();
+            drawPageBorderAndBackground();
+            finalY = 20;
+        }
+
+        // 7. Table Note
+        setFontNunitoRegular();
+        doc.setFontSize(7.5);
+        doc.setTextColor(93, 103, 136); // #5D6788
+        doc.text("AB means absent. Lower AIR is better.", 14, finalY);
+
+        finalY += 7;
+
+        // 8. Remarks Box
+        const remarksBoxY = finalY;
+        const remarksBoxW = 182;
+        const remarksContent = customRemarksText || generateDynamicRemarks(studentName, transformedRows, analyzeLaggingSubjectAndLosses(transformedRows), erpQuestions);
+
+        setFontCormorantItalic();
+        doc.setFontSize(10.5);
+        const splitRemarks = doc.splitTextToSize("Remarks: " + remarksContent, remarksBoxW - 12);
+        const remarksH = (splitRemarks.length * 5) + 8;
+
+        doc.setFillColor(241, 244, 251); // #F1F4FB
+        doc.setDrawColor(45, 86, 201); // #2D56C9
+        doc.setLineWidth(0.4);
+        doc.roundedRect(14, remarksBoxY, remarksBoxW, remarksH, 2, 2, 'FD');
+
+        doc.setTextColor(20, 32, 74); // #14204A
+        doc.text(splitRemarks, 20, remarksBoxY + 6);
+
+        // 9. Signatures
+        const sigY = 271;
+        doc.setDrawColor(207, 214, 232); // #CFD6E8
+        doc.setLineWidth(0.3);
+        doc.line(22, sigY, 70, sigY);
+        doc.line(82, sigY, 128, sigY);
+        doc.line(140, sigY, 188, sigY);
+
+        setFontNunitoRegular();
+        doc.setFontSize(8.5);
+        doc.setTextColor(93, 103, 136); // #5D6788
+        doc.text("Class Teacher", 46, sigY + 4.5, { align: 'center' });
+        doc.text("Parent / Guardian", 105, sigY + 4.5, { align: 'center' });
+        doc.text("Principal", 164, sigY + 4.5, { align: 'center' });
+
+        // 10. Optional Chart Page
         if (isChartIncluded && chartImgData) {
+            doc.addPage();
+            drawPageBorderAndBackground();
+
+            let chartStartY = 16;
+            setFontOswald();
+            doc.setFontSize(14);
+            doc.setTextColor(10, 79, 196);
+            doc.text("SRI CHAITANYA EDUCATIONAL INSTITUTIONS", 105, chartStartY, { align: 'center' });
+
+            chartStartY += 5;
+            setFontNunitoBold();
+            doc.setFontSize(10);
+            doc.setTextColor(15, 32, 87);
+            doc.text("STUDENT PERFORMANCE REPORT & MARKS LOSS ANALYSIS", 105, chartStartY, { align: 'center' });
+
+            chartStartY += 5;
+            doc.setDrawColor(207, 214, 232);
+            doc.setLineWidth(0.3);
+            doc.line(14, chartStartY, 196, chartStartY);
+
+            chartStartY += 6;
+            doc.addImage(chartImgData, 'PNG', 14, chartStartY, 182, 75);
+
             const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
-            const chartHeight = 75;
-
-            let advisoryHeight = 24;
-            let lossItems = analysis ? analysis.testLosses : [];
-            let lineCount = 1;
-
             if (analysis) {
-                if (bookmanFont) doc.setFont("Bookman", "normal");
-                else doc.setFont("helvetica", "normal");
-                doc.setFontSize(8.5);
-
-                const maxX = marginX + contentWidth - 4;
-                let tempX = marginX + 4;
-
-                lossItems.forEach((item, idx) => {
-                    const str = `${item.testName}: ${item.lossText}${idx < lossItems.length - 1 ? ',  ' : ''}`;
-                    const w = doc.getTextWidth(str);
-                    if (tempX + w > maxX) {
-                        lineCount++;
-                        tempX = marginX + 4 + w;
-                    } else {
-                        tempX += w;
-                    }
-                });
-
-                advisoryHeight = 22 + (lineCount * 5);
-            }
-
-            const totalRequiredHeight = chartHeight + advisoryHeight + 10;
-            const pageHeight = 297;
-            const bottomMargin = 12;
-
-            let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY;
-            let chartStartY = finalY + 6;
-
-            if (chartStartY + totalRequiredHeight > pageHeight - bottomMargin) {
-                doc.addPage();
-                chartStartY = 14;
-
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setFontSize(13);
-                doc.setTextColor(0, 112, 192);
-                doc.text("SRI CHAITANYA EDUCATIONAL INSTITUTIONS", 105, chartStartY, { align: 'center' });
-
-                chartStartY += 5;
-                doc.setFontSize(10.5);
-                doc.setTextColor(0, 0, 0);
-                doc.text("STUDENT PERFORMANCE REPORT & MARKS LOSS ANALYSIS", 105, chartStartY, { align: 'center' });
-
-                chartStartY += 4;
-                doc.setDrawColor(0, 0, 0);
+                const advY = chartStartY + 80;
+                doc.setFillColor(241, 244, 251);
+                doc.setDrawColor(45, 86, 201);
                 doc.setLineWidth(0.3);
-                doc.line(marginX, chartStartY, pageWidth - marginX, chartStartY);
+                doc.roundedRect(14, advY, 182, 35, 2, 2, 'FD');
 
-                chartStartY += 6;
-            } else {
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setFontSize(11);
-                doc.setTextColor(0, 112, 192);
-                doc.text("STUDENT PERFORMANCE TREND CHART", marginX, chartStartY);
-                chartStartY += 4;
-            }
-
-            // Render Crisp High-DPI Chart Image
-            doc.addImage(chartImgData, 'PNG', marginX, chartStartY, contentWidth, chartHeight);
-
-            // Render Diagnostics Box with Colored Highlights for Marks Loss
-            if (analysis) {
-                const advisoryY = chartStartY + chartHeight + 4;
-
-                doc.setFillColor(248, 250, 252);
-                doc.setDrawColor(203, 213, 225);
-                doc.roundedRect(marginX, advisoryY, contentWidth, advisoryHeight, 1, 1, 'FD');
-
-                // Header Bar inside Box
-                doc.setFillColor(224, 231, 255);
-                doc.rect(marginX, advisoryY, contentWidth, 7, 'F');
-                doc.setDrawColor(203, 213, 225);
-                doc.line(marginX, advisoryY + 7, marginX + contentWidth, advisoryY + 7);
-
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
+                setFontNunitoBold();
                 doc.setFontSize(9.5);
-                doc.setTextColor(30, 58, 138);
-                doc.text("PERFORMANCE DIAGNOSTICS & MARKS LOSS ANALYSIS", marginX + 4, advisoryY + 5);
+                doc.setTextColor(15, 32, 87);
+                doc.text("PERFORMANCE DIAGNOSTICS & MARKS LOSS ANALYSIS", 18, advY + 7);
 
-                let textY = advisoryY + 12;
-
-                // Line 1: Primary Lagging Subject Label (Red) & Value (Dark Blue)
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
-                doc.setFontSize(10);
-                doc.setTextColor(185, 28, 28);
-                const labelText = "Primary Lagging Subject: ";
-                doc.text(labelText, marginX + 4, textY);
-
-                const labelWidth = doc.getTextWidth(labelText);
-
-                doc.setTextColor(0, 51, 153); // Uniform Dark Blue for value
-                doc.text(`${analysis.laggingSubjectName} (${analysis.laggingAvg}/${analysis.laggingMax})`, marginX + 4 + labelWidth + 3, textY);
-
-                textY += 6;
-
-                // Line 2: Marks Loss Header
-                if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-                else doc.setFont("helvetica", "bold");
+                setFontNunitoBold();
                 doc.setFontSize(9);
-                doc.setTextColor(30, 58, 138);
-                doc.text(`Marks Loss in ${analysis.laggingSubjectName} across Tests:`, marginX + 4, textY);
+                doc.setTextColor(198, 45, 71);
+                doc.text("Primary Lagging Subject: ", 18, advY + 15);
+                const lw = doc.getTextWidth("Primary Lagging Subject: ");
+                doc.setTextColor(15, 32, 87);
+                doc.text(`${analysis.laggingSubjectName} (${analysis.laggingAvg}/${analysis.laggingMax})`, 18 + lw + 2, advY + 15);
 
-                textY += 5;
+                doc.setTextColor(15, 32, 87);
+                doc.text(`Marks Loss in ${analysis.laggingSubjectName} across Tests:`, 18, advY + 22);
 
-                // Line 3+: Render Test-by-Test Loss with Highlighted RED Loss Numbers
-                let currentX = marginX + 4;
-                const maxX = marginX + contentWidth - 4;
-                doc.setFontSize(8.5);
-
-                lossItems.forEach((item, idx) => {
-                    const testLabel = `${item.testName}: `;
-                    const lossValStr = item.lossText;
-                    const sepStr = (idx < lossItems.length - 1) ? ",  " : "";
-
-                    doc.setFont(bookmanBoldFont ? "Bookman" : "helvetica", "bold");
-                    const testW = doc.getTextWidth(testLabel);
-                    const lossW = doc.getTextWidth(lossValStr);
-                    doc.setFont(bookmanFont ? "Bookman" : "helvetica", "normal");
-                    const sepW = doc.getTextWidth(sepStr);
-
-                    const totalW = testW + lossW + sepW;
-
-                    if (currentX + totalW > maxX) {
-                        textY += 5;
-                        currentX = marginX + 4;
+                let curX = 18;
+                let curY = advY + 28;
+                doc.setFontSize(8);
+                analysis.testLosses.forEach((item, idx) => {
+                    const itemStr = `${item.testName}: ${item.lossText}${idx < analysis.testLosses.length - 1 ? ', ' : ''}`;
+                    const iw = doc.getTextWidth(itemStr);
+                    if (curX + iw > 190) {
+                        curY += 4.5;
+                        curX = 18;
                     }
-
-                    // Test Name in dark slate
-                    doc.setFont(bookmanBoldFont ? "Bookman" : "helvetica", "bold");
-                    doc.setTextColor(30, 41, 59);
-                    doc.text(testLabel, currentX, textY);
-                    currentX += testW;
-
-                    // Loss Value in BOLD RED HIGHLIGHT!
-                    doc.setFont(bookmanBoldFont ? "Bookman" : "helvetica", "bold");
-                    doc.setTextColor(220, 38, 38); // Highlight Red
-                    doc.text(lossValStr, currentX, textY);
-                    currentX += lossW;
-
-                    // Separator
-                    if (sepStr) {
-                        doc.setFont(bookmanFont ? "Bookman" : "helvetica", "normal");
-                        doc.setTextColor(100, 116, 139);
-                        doc.text(sepStr, currentX, textY);
-                        currentX += sepW;
-                    }
+                    doc.setTextColor(198, 45, 71);
+                    doc.text(itemStr, curX, curY);
+                    curX += iw;
                 });
             }
         }
 
-        // Render Wrong & Unattempted Questions (Topic & Subtopic Details) Table in PDF only if topic details exist
+        // 11. Optional Topic Details Pages
         if (isTopicDetailsIncluded && erpQuestions && erpQuestions.length > 0) {
-            let lastY = doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY;
-            if (isChartIncluded && chartImgData) {
-                const analysis = analyzeLaggingSubjectAndLosses(transformedRows);
-                const advisoryHeight = analysis ? 22 + (analysis.testLosses.length * 5) : 0;
-                lastY += 75 + advisoryHeight + 12;
-            } else {
-                lastY += 8;
-            }
+            doc.addPage();
+            drawPageBorderAndBackground();
 
-            if (lastY > 250) {
-                doc.addPage();
-                lastY = 15;
-            }
+            let topY = 16;
+            setFontOswald();
+            doc.setFontSize(14);
+            doc.setTextColor(10, 79, 196);
+            doc.text("SRI CHAITANYA EDUCATIONAL INSTITUTIONS", 105, topY, { align: 'center' });
 
-            if (bookmanBoldFont) doc.setFont("Bookman", "bold");
-            else doc.setFont("helvetica", "bold");
-            doc.setFontSize(10.5);
-            doc.setTextColor(0, 51, 153);
-            doc.text("WRONG & UNATTEMPTED QUESTIONS (TOPIC & SUBTOPIC DETAILS)", marginX, lastY);
+            topY += 5;
+            setFontNunitoBold();
+            doc.setFontSize(10);
+            doc.setTextColor(15, 32, 87);
+            doc.text("WRONG & UNATTEMPTED QUESTIONS (TOPIC & SUBTOPIC DETAILS)", 105, topY, { align: 'center' });
+
+            topY += 5;
+            doc.setDrawColor(207, 214, 232);
+            doc.setLineWidth(0.3);
+            doc.line(14, topY, 196, topY);
 
             const qTableRows = erpQuestions.map(q => [
                 q.test,
@@ -937,47 +1044,49 @@ const AverageReport = ({ filters }) => {
             ]);
 
             autoTable(doc, {
-                startY: lastY + 4,
-                margin: { left: marginX, right: marginX, bottom: 15 },
+                startY: topY + 5,
+                margin: { left: 14, right: 14, top: 16, bottom: 20 },
                 head: [['Test', 'Q.No', 'Subject', 'Topic', 'Sub-Topic', 'Status', 'Marks Lost']],
                 body: qTableRows,
-                theme: 'grid',
+                theme: 'plain',
                 headStyles: {
-                    fillColor: [0, 51, 153],
+                    fillColor: [15, 32, 87],
                     textColor: [255, 255, 255],
-                    font: bookmanFont ? "Bookman" : "helvetica",
+                    font: fonts?.nunitoSemiBold ? 'NunitoSans' : 'helvetica',
                     fontStyle: 'bold',
-                    fontSize: 9,
-                    halign: 'center'
+                    fontSize: 8.5,
+                    halign: 'center',
+                    lineColor: [207, 214, 232],
+                    lineWidth: 0.2
                 },
                 styles: {
-                    font: bookmanFont ? "Bookman" : "helvetica",
-                    fontSize: 8.5,
+                    font: fonts?.nunitoRegular ? 'NunitoSans' : 'helvetica',
+                    fontSize: 8,
                     cellPadding: 1.5,
-                    overflow: 'linebreak',
-                    halign: 'left',
-                    valign: 'middle',
-                    lineColor: [0, 0, 0],
-                    lineWidth: 0.1,
-                    textColor: [0, 0, 0]
+                    lineColor: [207, 214, 232],
+                    lineWidth: 0.2,
+                    textColor: [20, 32, 74]
                 },
                 columnStyles: {
                     0: { halign: 'left', fontStyle: 'bold', cellWidth: 20 },
                     1: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
-                    2: { halign: 'left', fontStyle: 'bold', cellWidth: 24 },
+                    2: { halign: 'left', fontStyle: 'bold', cellWidth: 22 },
                     3: { halign: 'left', cellWidth: 52 },
-                    4: { halign: 'left', cellWidth: 48 },
-                    5: { halign: 'center', cellWidth: 20 },
-                    6: { halign: 'center', textColor: [220, 38, 38], fontStyle: 'bold', cellWidth: 12 }
+                    4: { halign: 'left', cellWidth: 46 },
+                    5: { halign: 'center', cellWidth: 16 },
+                    6: { halign: 'center', textColor: [198, 45, 71], fontStyle: 'bold', cellWidth: 12 }
+                },
+                willDrawPage: () => {
+                    drawPageBorderAndBackground();
                 },
                 didParseCell: (data) => {
                     if (data.section === 'body' && data.column.index === 5) {
                         const cellVal = String(data.cell.raw);
                         if (cellVal.includes('Wrong')) {
-                            data.cell.styles.textColor = [185, 28, 28];
+                            data.cell.styles.textColor = [198, 45, 71];
                             data.cell.styles.fontStyle = 'bold';
                         } else if (cellVal.includes('Unattempted')) {
-                            data.cell.styles.textColor = [21, 128, 61];
+                            data.cell.styles.textColor = [22, 101, 52];
                             data.cell.styles.fontStyle = 'bold';
                         }
                     }
@@ -1002,17 +1111,40 @@ const AverageReport = ({ filters }) => {
                         reader.readAsDataURL(blob);
                     });
                 } catch (err) {
-                    console.error("[PDF] Font loading error:", err);
+                    console.warn("[PDF] Font loading error:", url, err);
                     return null;
                 }
             };
 
-            const [logoImg, impactFont, bookmanFont, bookmanBoldFont] = await Promise.all([
+            const [
+                logoImg,
+                oswaldBold,
+                libreBaskerville,
+                cormorantBold,
+                cormorantItalic,
+                nunitoRegular,
+                nunitoSemiBold,
+                nunitoBold
+            ] = await Promise.all([
                 loadImage('/logo.png'),
-                loadFont('/fonts/unicode.impact.ttf'),
-                loadFont('/fonts/bookman-old-style.ttf'),
-                loadFont('/fonts/BOOKOSB.TTF')
+                loadFont('/fonts/Oswald-Bold.ttf'),
+                loadFont('/fonts/LibreBaskerville-Regular.ttf'),
+                loadFont('/fonts/CormorantGaramond-Bold.ttf'),
+                loadFont('/fonts/CormorantGaramond-Italic.ttf'),
+                loadFont('/fonts/NunitoSans-Regular.ttf'),
+                loadFont('/fonts/NunitoSans-SemiBold.ttf'),
+                loadFont('/fonts/NunitoSans-Bold.ttf')
             ]);
+
+            const fonts = {
+                oswaldBold,
+                libreBaskerville,
+                cormorantBold,
+                cormorantItalic,
+                nunitoRegular,
+                nunitoSemiBold,
+                nunitoBold
+            };
 
             const grouped = history.reduce((acc, row) => {
                 const id = row.STUD_ID || 'Unknown';
@@ -1039,12 +1171,29 @@ const AverageReport = ({ filters }) => {
 
             if (studentIds.length === 1) {
                 setDownloadProgress({ current: 1, total: 1 });
-                const sRows = grouped[studentIds[0]];
+                const sid = studentIds[0];
+                const sRows = grouped[sid];
                 const transformed = getTransformedRows(sRows);
                 const chartImgData = includeChart ? await generateChartImage(transformed) : null;
                 const sName = sRows[0]?.NAME_OF_THE_STUDENT || '';
-                const erpQ = await fetchStudentErpQuestionsForPdf(studentIds[0], sName);
-                const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ, includeTopicDetails);
+                const erpQ = await fetchStudentErpQuestionsForPdf(sid, sName);
+
+                // Fetch student photo from TiDB if not already loaded in currentPhoto
+                let studentPhoto = (sid.toString() === previewStudentId?.toString()) ? currentPhoto : null;
+                if (!studentPhoto) {
+                    try {
+                        const pRes = await fetch(`${API_URL}/api/student-photo/${encodeURIComponent(sid)}?academicYear=${filters.academicYear || '2026'}`);
+                        if (pRes.ok) {
+                            const pData = await pRes.json();
+                            studentPhoto = pData.photo?.photo_data || null;
+                        }
+                    } catch (photoErr) {
+                        console.warn("Could not load photo for student in PDF:", photoErr);
+                    }
+                }
+
+                const studentRem = customRemarks[sid] || null;
+                const doc = generateStudentPDF(sRows, logoImg, fonts, studentPhoto, chartImgData, transformed, includeChart, erpQ, includeTopicDetails, studentRem);
                 const sanitizedName = String(sName || 'Report').replace(/[/\\?%*:|"<>]/g, '_').trim();
                 doc.save(`${sanitizedName}_Progress_Report.pdf`);
                 logActivity(userData, 'Downloaded Progress PDF', { student: sName, includeChart, includeTopicDetails });
@@ -1054,7 +1203,26 @@ const AverageReport = ({ filters }) => {
                 const total = studentIds.length;
                 setDownloadProgress({ current: 0, total });
 
-                // High Performance: Pre-fetch all ERP questions in a single batch request to avoid hundreds of sequential HTTP calls
+                // Pre-fetch all student photos in batch from TiDB!
+                let photosMap = {};
+                try {
+                    const batchRes = await fetch(`${API_URL}/api/student-photos/batch`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            studentIds: studentIds,
+                            academicYear: filters.academicYear || '2026'
+                        })
+                    });
+                    if (batchRes.ok) {
+                        const batchData = await batchRes.json();
+                        photosMap = batchData.photos || {};
+                    }
+                } catch (batchErr) {
+                    console.warn("[Bulk PDF] Batch photos fetch failed:", batchErr);
+                }
+
+                // High Performance: Pre-fetch all ERP questions in a single batch request
                 const erpMap = {};
                 const effectiveCampus = (filters.campus && filters.campus.length > 0) ? filters.campus : (filters._allowedCampuses || []);
                 if (includeTopicDetails) {
@@ -1108,7 +1276,6 @@ const AverageReport = ({ filters }) => {
                 for (const id of studentIds) {
                     count++;
                     setDownloadProgress({ current: count, total });
-                    // Yield control to UI thread so react updates button state and browser stays responsive
                     await new Promise((resolve) => setTimeout(resolve, count % 10 === 0 ? 20 : 0));
 
                     try {
@@ -1121,14 +1288,16 @@ const AverageReport = ({ filters }) => {
                         const transformed = getTransformedRows(sRows);
                         const chartImgData = includeChart ? await generateChartImage(transformed) : null;
 
-                        // Use pre-fetched batch ERP map if available, otherwise fallback
                         let erpQ = erpMap[id] || (sName ? erpMap[sName.toUpperCase()] : null);
                         if (!erpQ && includeTopicDetails && studentIds.length <= 25) {
                             erpQ = await fetchStudentErpQuestionsForPdf(id, sName);
                         }
                         erpQ = erpQ || [];
 
-                        const doc = generateStudentPDF(sRows, logoImg, impactFont, bookmanFont, bookmanBoldFont, chartImgData, transformed, includeChart, erpQ, includeTopicDetails);
+                        const studentPhoto = photosMap[id] || null;
+                        const studentRem = customRemarks[id] || null;
+
+                        const doc = generateStudentPDF(sRows, logoImg, fonts, studentPhoto, chartImgData, transformed, includeChart, erpQ, includeTopicDetails, studentRem);
                         const pdfArrayBuffer = doc.output('arraybuffer');
                         zip.file(fileName, pdfArrayBuffer);
                     } catch (singleStudentErr) {
@@ -1162,7 +1331,7 @@ const AverageReport = ({ filters }) => {
         }
     };
 
-    const downloadExcel = async (targetStudentId = null) => {
+        const downloadExcel = async (targetStudentId = null) => {
         setIsExcelDownloading(true);
         setExcelProgress({ current: 0, total: 0 });
         try {
@@ -1780,6 +1949,97 @@ const AverageReport = ({ filters }) => {
 
     const previewStudentName = previewRows[0]?.NAME_OF_THE_STUDENT || '';
 
+    // Fetch Student Photo from TiDB whenever active student changes
+    useEffect(() => {
+        if (!previewStudentId) {
+            setCurrentPhoto(null);
+            return;
+        }
+
+        let isMounted = true;
+        const fetchPhoto = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/student-photo/${encodeURIComponent(previewStudentId)}?academicYear=${filters.academicYear || '2026'}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (isMounted) {
+                        setCurrentPhoto(data.photo ? data.photo.photo_data : null);
+                    }
+                }
+            } catch (err) {
+                console.warn("Failed to load student photo:", err);
+            }
+        };
+
+        fetchPhoto();
+        return () => { isMounted = false; };
+    }, [previewStudentId, filters.academicYear]);
+
+    // Handle interactive photo upload directly to TiDB database
+    const handlePhotoUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file || !previewStudentId) return;
+
+        setPhotoUploading(true);
+        try {
+            // Compress image to optimized JPEG (~50-100KB)
+            const compressedBase64 = await compressImage(file, 450, 550, 0.85);
+
+            const res = await fetch(`${API_URL}/api/student-photo`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    studentId: previewStudentId,
+                    photoData: compressedBase64,
+                    mimeType: 'image/jpeg',
+                    academicYear: filters.academicYear || '2026'
+                })
+            });
+
+            if (!res.ok) throw new Error('Failed to save student photo in database');
+
+            setCurrentPhoto(compressedBase64);
+            logActivity(userData, 'Uploaded Student Photo', { studentId: previewStudentId });
+        } catch (err) {
+            console.error("Photo upload error:", err);
+            setModal({
+                isOpen: true,
+                type: 'danger',
+                title: 'Upload Error',
+                message: 'Failed to upload photo to TiDB: ' + err.message,
+                onClose: () => setModal(p => ({ ...p, isOpen: false }))
+            });
+        } finally {
+            setPhotoUploading(false);
+            if (photoInputRef.current) photoInputRef.current.value = '';
+        }
+    };
+
+    const handleDeletePhoto = async (e) => {
+        e.stopPropagation();
+        if (!previewStudentId) return;
+        if (!window.confirm("Remove this student's photo from database?")) return;
+
+        try {
+            const res = await fetch(`${API_URL}/api/student-photo/${encodeURIComponent(previewStudentId)}?academicYear=${filters.academicYear || '2026'}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                setCurrentPhoto(null);
+                logActivity(userData, 'Deleted Student Photo', { studentId: previewStudentId });
+            }
+        } catch (err) {
+            console.error("Failed to delete photo:", err);
+        }
+    };
+
+    // Calculate dynamic remarks
+    const computedRemarks = useMemo(() => {
+        if (!previewRows || previewRows.length === 0) return '';
+        if (customRemarks[previewStudentId]) return customRemarks[previewStudentId];
+        return generateDynamicRemarks(previewStudentName, transformedPreviewRows, performanceDiagnostics, studentErpQuestions);
+    }, [previewRows, customRemarks, previewStudentId, previewStudentName, transformedPreviewRows, performanceDiagnostics, studentErpQuestions]);
+
     useEffect(() => {
         if (!previewStudentId) {
             setStudentErpQuestions([]);
@@ -2091,89 +2351,250 @@ const AverageReport = ({ filters }) => {
                 ) : (
                     <>
                         {previewRows.length > 0 && (
-                            <div className="table-container">
-                                <table className="analysis-table merit-style" style={{ fontFamily: 'Bookman, serif', fontSize: '12px' }}>
-                                    <thead style={{ fontWeight: 'bold' }}>
-                                        <tr className="grouped-header">
-                                            <th colSpan={3} className="header-group-blue" style={{ fontSize: '12px' }}>
-                                                <div className="header-label" style={{ fontSize: '0.75rem' }}>CAMPUS</div>
-                                                <div className="header-value" style={{ fontSize: '1rem' }}>{previewRows[0].CAMPUS_NAME}</div>
-                                            </th>
-                                            <th colSpan={1} className="header-group-blue" style={{ fontSize: '12px' }}>
-                                                <div className="header-label" style={{ fontSize: '0.75rem' }}>STUD ID</div>
-                                                <div className="header-value" style={{ fontSize: '1rem' }}>{previewRows[0].STUD_ID}</div>
-                                            </th>
-                                            <th colSpan={2} className="header-group-blue" style={{ fontSize: '12px' }}>
-                                                <div className="header-label" style={{ fontSize: '0.75rem' }}>STREAM</div>
-                                                <div className="header-value" style={{ fontSize: '1rem' }}>{getNormalizedStream(previewRows)}</div>
-                                            </th>
-                                            <th colSpan={3} className="header-group-blue" style={{ fontSize: '12px' }}>
-                                                <div className="header-label" style={{ fontSize: '0.75rem' }}>NAME OF THE STUDENT</div>
-                                                <div className="header-value" style={{ fontSize: '1rem' }}>
-                                                    {previewRows[0].NAME_OF_THE_STUDENT}
+                            <div className="report-card-wrapper">
+                                <div className="report-card-sheet">
+                                    {/* Header */}
+                                    <div className="rc-header">
+                                        <img src="/logo.png" alt="Sri Chaitanya Logo" className="rc-logo" />
+                                        <div className="rc-title">
+                                            <span className="rc-title-primary">Sri Chaitanya</span>
+                                            <span className="rc-title-secondary">Educational Institutions</span>
+                                        </div>
+                                        <div className="rc-ribbon-container">
+                                            <div className="rc-ribbon">PROGRESS REPORT CARD</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Student Info & Photo Section */}
+                                    <div className="rc-student-section">
+                                        <table className="rc-info-table">
+                                            <tbody>
+                                                <tr>
+                                                    <td className="rc-info-label">Type of Report Card</td>
+                                                    <td className="rc-info-value">Academic</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="rc-info-label">Name of the Student</td>
+                                                    <td className="rc-info-value">{previewRows[0]?.NAME_OF_THE_STUDENT || '-'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="rc-info-label">Student ID</td>
+                                                    <td className="rc-info-value">{previewRows[0]?.STUD_ID || '-'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="rc-info-label">Campus and Stream</td>
+                                                    <td className="rc-info-value">
+                                                        {previewRows[0]?.CAMPUS_NAME || '-'} · {getNormalizedStream(previewRows)}
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="rc-info-label">Date of Report</td>
+                                                    <td className="rc-info-value">{getReportDateStr()}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="rc-info-label">Status of the Student</td>
+                                                    <td className="rc-info-value">Active</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+
+                                        {/* Photo Box */}
+                                        <div 
+                                            className="rc-photo-box" 
+                                            onClick={() => photoInputRef.current?.click()}
+                                            title={currentPhoto ? "Click to change photo" : "Click to upload student photo (saved directly to TiDB)"}
+                                        >
+                                            <input 
+                                                type="file" 
+                                                ref={photoInputRef} 
+                                                onChange={handlePhotoUpload} 
+                                                accept="image/*" 
+                                                style={{ display: 'none' }} 
+                                            />
+
+                                            {photoUploading ? (
+                                                <div className="rc-photo-placeholder">
+                                                    <span style={{ fontSize: '11px', color: '#5D6788' }}>Saving to TiDB...</span>
                                                 </div>
-                                            </th>
-                                        </tr>
-                                        <tr className="table-main-header">
-                                            <th className="w-test">Test Name</th>
-                                            <th className="w-date">Date</th>
-                                            <th className="w-total col-yellow">Total<br />720</th>
-                                            <th className="w-air">AIR</th>
-                                            <th className="w-sub col-orange">Bot<br />180</th>
-                                            <th className="w-sub col-blue-light">Zoo<br />180</th>
-                                            <th className="w-sub col-blue-med">Bio<br />360</th>
-                                            <th className="w-sub col-green-pale">Phy<br />180</th>
-                                            <th className="w-sub col-pink-pale">Chem<br />180</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {allExams.map((exam, idx) => {
-                                            const examTest = exam.Test?.trim();
-                                            const row = previewRows.find(r => r.Test?.trim() === examTest);
-                                            if (row) {
-                                                return (
-                                                    <tr key={idx}>
-                                                        <td>{row.Test}</td>
-                                                        <td>{formatDate(row.DATE)}</td>
-                                                        <td className="col-yellow font-bold">{Math.round(row.Tot_720 || 0)}</td>
-                                                        <td className="text-brown">{Math.round(row.AIR) || '-'}</td>
-                                                        <td className="col-orange">{Math.round(row.Botany || 0)}</td>
-                                                        <td className="col-blue-light">{Math.round(row.Zoology || 0)}</td>
-                                                        <td className="col-blue-med font-bold">{Math.round((Number(row.Botany || 0) + Number(row.Zoology || 0)))}</td>
-                                                        <td className="col-green-pale">{Math.round(row.Physics || 0)}</td>
-                                                        <td className="col-pink-pale">{Math.round(row.Chemistry || 0)}</td>
+                                            ) : currentPhoto ? (
+                                                <>
+                                                    <img src={currentPhoto} alt="Student" className="rc-photo-img" />
+                                                    <div className="rc-photo-overlay">
+                                                        <span style={{ fontSize: '10px', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Camera size={12} /> Change
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleDeletePhoto}
+                                                            style={{
+                                                                background: '#ef4444',
+                                                                color: '#ffffff',
+                                                                border: 'none',
+                                                                borderRadius: '4px',
+                                                                padding: '2px 6px',
+                                                                fontSize: '10px',
+                                                                cursor: 'pointer',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '3px'
+                                                            }}
+                                                        >
+                                                            <Trash2 size={10} /> Delete
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="rc-photo-placeholder">
+                                                    <div className="rc-photo-initials">
+                                                        {getStudentInitials(previewRows[0]?.NAME_OF_THE_STUDENT)}
+                                                    </div>
+                                                    <div className="rc-photo-add-text">
+                                                        <Camera size={12} /> Click to add photo
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Section Heading */}
+                                    <h3 className="rc-section-heading">Test-wise record</h3>
+
+                                    {/* Test-wise Table */}
+                                    <div style={{ overflowX: 'auto' }}>
+                                        <table className="rc-test-table">
+                                            <thead>
+                                                <tr>
+                                                    <th className="th-test">Test</th>
+                                                    <th>Date</th>
+                                                    <th>Total /720</th>
+                                                    <th>AIR</th>
+                                                    <th>Bot</th>
+                                                    <th>Zoo</th>
+                                                    <th>Phy</th>
+                                                    <th>Chem</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {allExams.map((exam, idx) => {
+                                                    const examTest = exam.Test?.trim();
+                                                    const row = previewRows.find(r => r.Test?.trim() === examTest);
+                                                    if (row) {
+                                                        return (
+                                                            <tr key={idx}>
+                                                                <td className="td-test">{row.Test}</td>
+                                                                <td>{formatDate(row.DATE)}</td>
+                                                                <td className="td-total">{Math.round(row.Tot_720 || 0)}</td>
+                                                                <td>{Math.round(row.AIR) || '-'}</td>
+                                                                <td>{Math.round(row.Botany || 0)}</td>
+                                                                <td>{Math.round(row.Zoology || 0)}</td>
+                                                                <td>{Math.round(row.Physics || 0)}</td>
+                                                                <td>{Math.round(row.Chemistry || 0)}</td>
+                                                            </tr>
+                                                        );
+                                                    } else {
+                                                        return (
+                                                            <tr key={idx} className="rc-absent-row">
+                                                                <td className="td-test">{exam.Test}</td>
+                                                                <td>{formatDate(exam.DATE)}</td>
+                                                                <td colSpan={6} className="td-absent">Absent</td>
+                                                            </tr>
+                                                        );
+                                                    }
+                                                })}
+
+                                                {/* Average Row */}
+                                                {previewRows.length > 0 && (
+                                                    <tr className="rc-avg-row">
+                                                        <td className="td-avg-label" colSpan={2}>Average</td>
+                                                        <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / previewRows.length)}</td>
+                                                        <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / previewRows.length)}</td>
+                                                        <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / previewRows.length)}</td>
+                                                        <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / previewRows.length)}</td>
+                                                        <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.Physics) || 0), 0) / previewRows.length)}</td>
+                                                        <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.Chemistry) || 0), 0) / previewRows.length)}</td>
                                                     </tr>
-                                                );
-                                            } else {
-                                                return (
-                                                    <tr key={idx}>
-                                                        <td>{exam.Test}</td>
-                                                        <td>{formatDate(exam.DATE)}</td>
-                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
-                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
-                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
-                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
-                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
-                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
-                                                        <td className="text-red font-bold" style={{ color: 'red', fontWeight: 'bold' }}>AB</td>
-                                                    </tr>
-                                                );
-                                            }
-                                        })}
-                                        {previewRows.length > 0 && (
-                                            <tr className="total-row">
-                                                <td colSpan={2} className="text-right">AVERAGES</td>
-                                                <td className="col-yellow">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / previewRows.length)}</td>
-                                                <td>{Math.round(previewRows.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / previewRows.length)}</td>
-                                                <td className="col-orange">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / previewRows.length)}</td>
-                                                <td className="col-blue-light">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Zoology) || 0), 0) / previewRows.length)}</td>
-                                                <td className="col-blue-med">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Botany || 0) + Number(b.Zoology || 0)), 0) / previewRows.length)}</td>
-                                                <td className="col-green-pale">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Physics) || 0), 0) / previewRows.length)}</td>
-                                                <td className="col-pink-pale">{Math.round(previewRows.reduce((a, b) => a + (Number(b.Chemistry) || 0), 0) / previewRows.length)}</td>
-                                            </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Table Note */}
+                                    <div className="rc-table-note">
+                                        AB means absent. Lower AIR is better.
+                                    </div>
+
+                                    {/* Remarks Box */}
+                                    <div className="rc-remarks-box">
+                                        {isEditingRemarks ? (
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                    <span className="rc-remarks-title">Edit Remarks:</span>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setCustomRemarks(prev => ({ ...prev, [previewStudentId]: tempRemarksText }));
+                                                                setIsEditingRemarks(false);
+                                                            }}
+                                                            style={{ background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 10px', fontSize: '12px', cursor: 'pointer' }}
+                                                        >
+                                                            Save
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsEditingRemarks(false)}
+                                                            style={{ background: '#e2e8f0', color: '#334155', border: 'none', borderRadius: '4px', padding: '3px 10px', fontSize: '12px', cursor: 'pointer' }}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <textarea
+                                                    value={tempRemarksText}
+                                                    onChange={(e) => setTempRemarksText(e.target.value)}
+                                                    rows={3}
+                                                    style={{ width: '100%', fontFamily: 'inherit', fontSize: '16px', padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                    <div>
+                                                        <span className="rc-remarks-title">Remarks:</span>
+                                                        <span>{computedRemarks}</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setTempRemarksText(computedRemarks);
+                                                            setIsEditingRemarks(true);
+                                                        }}
+                                                        title="Customize Remarks"
+                                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.6, padding: '2px 4px' }}
+                                                    >
+                                                        <Edit3 size={14} color="#2D56C9" />
+                                                    </button>
+                                                </div>
+                                            </div>
                                         )}
-                                    </tbody>
-                                </table>
+                                    </div>
+
+                                    {/* Signatures */}
+                                    <div className="rc-signatures">
+                                        <div className="rc-sig-col">
+                                            <div className="rc-sig-line"></div>
+                                            <div className="rc-sig-label">Class Teacher</div>
+                                        </div>
+                                        <div className="rc-sig-col">
+                                            <div className="rc-sig-line"></div>
+                                            <div className="rc-sig-label">Parent / Guardian</div>
+                                        </div>
+                                        <div className="rc-sig-col">
+                                            <div className="rc-sig-line"></div>
+                                            <div className="rc-sig-label">Principal</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
 

@@ -2122,6 +2122,105 @@ app.get('/api/config/top-18', async (req, res) => {
     }
 });
 
+// --- STUDENT PHOTO APIS (TiDB Database) ---
+app.get('/api/student-photo/:studentId', async (req, res) => {
+    try {
+        const studentId = String(req.params.studentId || '').trim();
+        const year = req.query.academicYear || '2026';
+        if (!studentId) return res.status(400).json({ error: 'studentId is required' });
+
+        const pool = await connectToDb(year);
+        const [rows] = await pool.rawPool.query(
+            'SELECT student_id, photo_data, mime_type, updated_at FROM student_photos WHERE student_id = ? LIMIT 1',
+            [studentId]
+        );
+
+        if (rows.length > 0) {
+            res.json({ success: true, photo: rows[0] });
+        } else {
+            res.json({ success: true, photo: null });
+        }
+    } catch (err) {
+        console.error('[StudentPhoto GET] ERROR:', err);
+        res.status(500).json({ error: 'Failed to retrieve photo', details: err.message });
+    }
+});
+
+app.post('/api/student-photo', async (req, res) => {
+    try {
+        const { studentId, photoData, mimeType, academicYear } = req.body;
+        const cleanId = String(studentId || '').trim();
+        const year = academicYear || '2026';
+
+        if (!cleanId || !photoData) {
+            return res.status(400).json({ error: 'studentId and photoData are required' });
+        }
+
+        const pool = await connectToDb(year);
+        const mime = mimeType || 'image/jpeg';
+
+        await pool.rawPool.query(
+            `INSERT INTO student_photos (student_id, photo_data, mime_type) 
+             VALUES (?, ?, ?) 
+             ON DUPLICATE KEY UPDATE photo_data = VALUES(photo_data), mime_type = VALUES(mime_type), updated_at = CURRENT_TIMESTAMP`,
+            [cleanId, photoData, mime]
+        );
+
+        res.json({ success: true, message: 'Photo saved successfully in TiDB', studentId: cleanId });
+    } catch (err) {
+        console.error('[StudentPhoto POST] ERROR:', err);
+        res.status(500).json({ error: 'Failed to save photo in TiDB', details: err.message });
+    }
+});
+
+app.post('/api/student-photos/batch', async (req, res) => {
+    try {
+        const { studentIds, academicYear } = req.body;
+        const year = academicYear || '2026';
+
+        if (!Array.isArray(studentIds) || studentIds.length === 0) {
+            return res.json({ success: true, photos: {} });
+        }
+
+        const cleanIds = [...new Set(studentIds.map(id => String(id).trim()).filter(Boolean))];
+        if (cleanIds.length === 0) {
+            return res.json({ success: true, photos: {} });
+        }
+
+        const pool = await connectToDb(year);
+        const [rows] = await pool.rawPool.query(
+            'SELECT student_id, photo_data, mime_type FROM student_photos WHERE student_id IN (?)',
+            [cleanIds]
+        );
+
+        const photoMap = {};
+        rows.forEach(r => {
+            photoMap[r.student_id] = r.photo_data;
+        });
+
+        res.json({ success: true, photos: photoMap });
+    } catch (err) {
+        console.error('[StudentPhotos Batch] ERROR:', err);
+        res.status(500).json({ error: 'Failed to retrieve batch photos', details: err.message });
+    }
+});
+
+app.delete('/api/student-photo/:studentId', async (req, res) => {
+    try {
+        const studentId = String(req.params.studentId || '').trim();
+        const year = req.query.academicYear || req.body?.academicYear || '2026';
+        if (!studentId) return res.status(400).json({ error: 'studentId is required' });
+
+        const pool = await connectToDb(year);
+        await pool.rawPool.query('DELETE FROM student_photos WHERE student_id = ?', [studentId]);
+
+        res.json({ success: true, message: 'Photo deleted successfully' });
+    } catch (err) {
+        console.error('[StudentPhoto DELETE] ERROR:', err);
+        res.status(500).json({ error: 'Failed to delete photo', details: err.message });
+    }
+});
+
 // SERVE REACT APP FOR ANY OTHER ROUTE
 // app.get('*', (req, res) => {
 //     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
