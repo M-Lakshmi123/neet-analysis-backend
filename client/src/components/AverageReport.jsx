@@ -149,10 +149,10 @@ const generateDynamicRemarks = (studentName, transformedRows, performanceDiagnos
 
     const avgTotal = Math.round(attended.reduce((a, b) => a + (Number(b.Tot_720) || 0), 0) / count);
 
-    // Find best AIR
-    const airs = attended.map(r => Number(r.AIR)).filter(n => !isNaN(n) && n > 0);
-    const bestAir = airs.length > 0 ? Math.min(...airs) : null;
-    const airStr = bestAir ? ` and reaching an All India Rank of ${bestAir}` : '';
+    // Calculate overall average AIR across attended tests (matching the Average row)
+    const validAirs = attended.map(r => Number(r.AIR)).filter(n => !isNaN(n) && n > 0);
+    const avgAir = validAirs.length > 0 ? Math.round(attended.reduce((a, b) => a + (Number(b.AIR) || 0), 0) / count) : null;
+    const airStr = avgAir ? ` and an average All India Rank of ${avgAir}` : '';
 
     // Subjects averages
     const avgBot = Math.round(attended.reduce((a, b) => a + (Number(b.Botany) || 0), 0) / count);
