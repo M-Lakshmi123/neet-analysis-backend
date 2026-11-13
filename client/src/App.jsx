@@ -17,6 +17,7 @@ import AverageCountReport from './components/AverageCountReport';
 import ErrorReport from './components/ErrorReport';
 import ErrorTop100 from './components/ErrorTop100';
 import ErrorCountReport from './components/ErrorCountReport';
+import InternalErrorAnalysis from './components/InternalErrorAnalysis';
 import TargetVsAchieved from './components/TargetVsAchieved';
 import StudentPerformance from './components/StudentPerformance';
 import LoginPage from './components/auth/LoginPage';
@@ -311,6 +312,7 @@ const Dashboard = () => {
                 'errors': 'Error Report',
                 'error_top': 'Error Top 100%',
                 'error_count': 'Error Count Report',
+                'internal_error_analysis': 'Internal Error Analysis',
                 'student_performance': 'Student Performance',
                 'target_vs_achieved': 'Target Vs Achieved',
                 'approvals': 'User Approvals',
@@ -380,6 +382,15 @@ const Dashboard = () => {
                         <ErrorCountReport filters={globalFilters} />
                     </div>
                 );
+            case 'internal_error_analysis':
+                return (
+                    <div className="report-sections">
+                        <InternalErrorAnalysis
+                            academicYear={academicYear}
+                            restrictedCampus={userAllowedCampuses}
+                        />
+                    </div>
+                );
             case 'target_vs_achieved':
                 return (
                     <div className="report-sections">
@@ -432,7 +443,8 @@ const Dashboard = () => {
                                             activePage === 'errors' ? 'Error Report' :
                                                 activePage === 'error_top' ? 'Error Top 100%' :
                                                     activePage === 'error_count' ? 'Error Count Report' :
-                                                        activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
+                                                        activePage === 'internal_error_analysis' ? 'Internal Error Analysis' :
+                                                            activePage === 'target_vs_achieved' ? 'Target Vs Achieved' :
                                                             activePage === 'student_performance' ? 'Student Performance' :
                                                                 activePage === 'approvals' ? 'User Approvals' :
                                                                     activePage === 'file_management' ? 'Schedules & Timetable & Files' : 'Activity Logs'

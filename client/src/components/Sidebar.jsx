@@ -6,7 +6,8 @@ import {
     Users,
     Activity,
     FileWarning,
-    FileText
+    FileText,
+    FileSpreadsheet
 } from 'lucide-react';
 
 const Sidebar = ({ activePage, setActivePage }) => {
@@ -25,6 +26,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
         { id: 'target_vs_achieved', label: 'Target Vs Achieved', icon: <ClipboardList size={18} /> },
         { id: 'average_count', label: 'Average Count Report', icon: <ClipboardList size={18} /> },
         { id: 'error_count', label: 'Error Count Report', icon: <ClipboardList size={18} /> },
+        { id: 'internal_error_analysis', label: 'Internal Error Analysis', icon: <FileSpreadsheet size={18} /> },
         { id: 'student_performance', label: 'Student Performance', icon: <Activity size={18} /> }
     ];
 

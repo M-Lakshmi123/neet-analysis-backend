@@ -2258,6 +2258,107 @@ app.delete('/api/student-photo/:studentId', async (req, res) => {
     }
 });
 
+// ==========================================
+// INTERNAL ERROR ANALYSIS - STUDENT LOOKUP & EXCEL SAVE
+// ==========================================
+app.post('/api/internal-error/lookup-students', async (req, res) => {
+    try {
+        const { studentIds, academicYear, campus, stream, test } = req.body;
+        const year = academicYear || '2026';
+
+        if (!Array.isArray(studentIds) || studentIds.length === 0) {
+            return res.json({ success: true, students: {} });
+        }
+
+        const cleanIds = [...new Set(studentIds.map(id => String(id).trim()).filter(Boolean))];
+        if (cleanIds.length === 0) {
+            return res.json({ success: true, students: {} });
+        }
+
+        const pool = await connectToDb(year);
+        const studentMap = {};
+
+        // Query ERP_ERROR_COUNTS and MEDICAL_RESULT
+        const [erpRows] = await pool.rawPool.query(`
+            SELECT STUD_ID, Student_Name, Branch as Campus, Stream, Custom_Heading
+            FROM ERP_ERROR_COUNTS
+            WHERE STUD_ID IN (?) 
+               OR SUBSTRING(STUD_ID, -7) IN (?)
+               OR SUBSTRING(STUD_ID, -6) IN (?)
+        `, [cleanIds, cleanIds, cleanIds]).catch(e => {
+            console.warn('[InternalError] ERP query error:', e.message);
+            return [[]];
+        });
+
+        const [medRows] = await pool.rawPool.query(`
+            SELECT STUD_ID, NAME_OF_THE_STUDENT as Student_Name, CAMPUS_NAME as Campus, Stream, Custom_Heading
+            FROM MEDICAL_RESULT
+            WHERE STUD_ID IN (?) 
+               OR SUBSTRING(STUD_ID, -7) IN (?)
+               OR SUBSTRING(STUD_ID, -6) IN (?)
+        `, [cleanIds, cleanIds, cleanIds]).catch(e => {
+            console.warn('[InternalError] Med query error:', e.message);
+            return [[]];
+        });
+
+        const allCandidates = [...(erpRows || []), ...(medRows || [])];
+
+        cleanIds.forEach(roll => {
+            let matching = allCandidates.filter(c => c.STUD_ID === roll || (c.STUD_ID && c.STUD_ID.endsWith(roll)));
+            if (matching.length === 0) {
+                matching = allCandidates.filter(c => c.STUD_ID && roll.endsWith(c.STUD_ID));
+            }
+
+            if (matching.length > 0) {
+                let chosen = matching[0];
+                if (campus) {
+                    const campusMatch = matching.find(c => 
+                        c.Campus && c.Campus.trim().toUpperCase() === campus.trim().toUpperCase()
+                    );
+                    if (campusMatch) chosen = campusMatch;
+                }
+                studentMap[roll] = {
+                    name: chosen.Student_Name || '',
+                    section: chosen.Custom_Heading || chosen.Stream || chosen.Campus || '',
+                    campus: chosen.Campus || '',
+                    stream: chosen.Stream || ''
+                };
+            }
+        });
+
+        res.json({ success: true, students: studentMap });
+    } catch (err) {
+        console.error('[InternalError Lookup] ERROR:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Endpoint to save generated excel directly into the 'Internal Error Extraction' directory
+app.post('/api/internal-error/save-excel', async (req, res) => {
+    try {
+        const { filename, fileBase64 } = req.body;
+        if (!filename || !fileBase64) {
+            return res.status(400).json({ success: false, error: 'filename and fileBase64 are required' });
+        }
+
+        const safeFilename = path.basename(filename);
+        const targetDir = path.join(__dirname, '..', 'Internal Error Extraction');
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        const targetPath = path.join(targetDir, safeFilename);
+        const buffer = Buffer.from(fileBase64, 'base64');
+        fs.writeFileSync(targetPath, buffer);
+
+        console.log(`[InternalError] Saved file successfully to ${targetPath}`);
+        res.json({ success: true, path: targetPath, filename: safeFilename });
+    } catch (err) {
+        console.error('[InternalError Save] ERROR:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // SERVE REACT APP FOR ANY OTHER ROUTE
 // app.get('*', (req, res) => {
 //     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
