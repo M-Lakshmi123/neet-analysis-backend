@@ -232,22 +232,13 @@ const InternalErrorAnalysis = ({ academicYear = '2026', restrictedCampus = [] })
     };
 
     // Quick range presets
-    const applyPreset = (presetType) => {
-        if (presetType === 'standard') {
-            setRanges({
-                botany: { start: 1, end: 45 },
-                zoology: { start: 46, end: 90 },
-                physics: { start: 91, end: 135 },
-                chemistry: { start: 136, end: 180 }
-            });
-        } else if (presetType === 'physics_46') {
-            setRanges({
-                botany: { start: 1, end: 45 },
-                zoology: { start: 46, end: 90 },
-                physics: { start: 91, end: 136 },
-                chemistry: { start: 137, end: 180 }
-            });
-        }
+    const applyPreset = (presetType = 'standard') => {
+        setRanges({
+            botany: { start: 1, end: 45 },
+            zoology: { start: 46, end: 90 },
+            physics: { start: 91, end: 135 },
+            chemistry: { start: 136, end: 180 }
+        });
     };
 
     // Generate Analysis Logic
@@ -987,38 +978,26 @@ const InternalErrorAnalysis = ({ academicYear = '2026', restrictedCampus = [] })
                             <Sliders size={18} color="#0284c7" />
                             3. Question Pattern Entry
                         </h3>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                            <button
-                                type="button"
-                                onClick={() => applyPreset('standard')}
-                                style={{
-                                    fontSize: '11px',
-                                    padding: '3px 8px',
-                                    borderRadius: '4px',
-                                    border: '1px solid #cbd5e1',
-                                    background: '#f8fafc',
-                                    cursor: 'pointer'
-                                }}
-                                title="Default 45 Qs each"
-                            >
-                                45 Qs Each
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => applyPreset('physics_46')}
-                                style={{
-                                    fontSize: '11px',
-                                    padding: '3px 8px',
-                                    borderRadius: '4px',
-                                    border: '1px solid #cbd5e1',
-                                    background: '#f8fafc',
-                                    cursor: 'pointer'
-                                }}
-                                title="Physics 46 Qs, Chem 44 Qs"
-                            >
-                                Phy 46 Qs
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            onClick={() => applyPreset('standard')}
+                            style={{
+                                fontSize: '11px',
+                                padding: '4px 10px',
+                                borderRadius: '4px',
+                                border: '1px solid #cbd5e1',
+                                background: '#f8fafc',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                color: '#475569'
+                            }}
+                            title="Reset all 4 subjects to standard 45 questions each"
+                        >
+                            <RefreshCw size={12} />
+                            Reset (45 Qs Each)
+                        </button>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
