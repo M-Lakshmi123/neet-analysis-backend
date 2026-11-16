@@ -80,6 +80,10 @@ const STREAM_OPTIONS = [
     { value: 'JR AIIMS', label: 'JR AIIMS' },
     { value: 'LTC', label: 'LTC' },
     // Engineering Streams
+    { value: 'JR SUPER60', label: 'JR.SUPER60 (Engineering)' },
+    { value: 'SR SUPER60', label: 'SR.SUPER60 (Engineering)' },
+    { value: 'STERLING', label: 'STERLING (Engineering)' },
+    { value: 'JEE-MAIN', label: 'JEE-MAIN (Engineering)' },
     { value: 'SR IPL', label: 'SR IPL (Engineering)' },
     { value: 'JR IPL', label: 'JR IPL (Engineering)' },
     { value: 'SR CHAINA', label: 'SR CHAINA (Engineering)' },
@@ -187,9 +191,25 @@ const InternalErrorAnalysis = ({ academicYear = '2026', restrictedCampus = [] })
                     return;
                 }
 
-                // Check row 0 for test title or metadata
-                const titleCandidate = rows[0][0] || '';
-                const headerRow = rows[1];
+                // Detect header row dynamically (some CSVs have title on row 0, others start directly with Roll Number on row 0)
+                let headerRowIndex = 0;
+                for (let i = 0; i < Math.min(rows.length, 10); i++) {
+                    const row = rows[i];
+                    if (!row || row.length === 0) continue;
+                    const firstCell = (row[0] || '').toLowerCase().trim();
+                    const hasRoll = firstCell.includes('roll') || firstCell.includes('stud') || firstCell.includes('adm');
+                    const hasQ1 = row.some(c => {
+                        const v = (c || '').toUpperCase().trim();
+                        return v === 'Q1' || v === 'Q01' || v === 'Q 1';
+                    });
+                    const hasSeries = row.some(c => (c || '').toLowerCase().trim() === 'series');
+                    if (hasRoll || hasQ1 || hasSeries) {
+                        headerRowIndex = i;
+                        break;
+                    }
+                }
+
+                const headerRow = rows[headerRowIndex];
 
                 // Check how many questions are present
                 let qCount = 0;
@@ -200,19 +220,37 @@ const InternalErrorAnalysis = ({ academicYear = '2026', restrictedCampus = [] })
                 }
                 if (qCount === 0) qCount = Math.max(0, headerRow.length - 2);
 
-                const studentCount = rows.length - 2;
+                // Filter student rows starting strictly after headerRowIndex
+                const studentRows = rows.slice(headerRowIndex + 1).filter(r => {
+                    if (!r || r.length < 2) return false;
+                    const roll = (r[0] || '').trim();
+                    if (!roll) return false;
+                    const lower = roll.toLowerCase();
+                    return !lower.includes('total') && !lower.includes('average') && !lower.includes('roll') && !lower.includes('series');
+                });
+
+                const studentCount = studentRows.length;
+
+                // Title candidate: from row 0 if header is at row > 0, otherwise from file name
+                let titleCandidate = '';
+                if (headerRowIndex > 0 && rows[0] && rows[0][0]) {
+                    titleCandidate = rows[0][0];
+                } else {
+                    titleCandidate = file.name.replace(/\.csv$/i, '').replace(/_rpt.*$/i, '').replace(/_/g, ' ').trim();
+                }
 
                 setParsedRows(rows);
                 setCsvHeaders(headerRow);
                 setDetectedInfo({
+                    headerRowIndex,
                     totalStudents: studentCount,
                     totalQuestions: qCount,
                     rawTitle: titleCandidate
                 });
 
-                // Auto-detect exam type from title or question count
-                const upperTitle = titleCandidate.toUpperCase();
-                const isEngTitle = upperTitle.includes('JEE') || upperTitle.includes('ENG') || upperTitle.includes('MATH') || upperTitle.includes('IPL') || upperTitle.includes('CHAINA') || qCount <= 90;
+                // Auto-detect exam type from title, file name, or question count
+                const searchStr = (titleCandidate + ' ' + file.name).toUpperCase();
+                const isEngTitle = searchStr.includes('JEE') || searchStr.includes('ENG') || searchStr.includes('MATH') || searchStr.includes('IPL') || searchStr.includes('CHAINA') || searchStr.includes('SUPER60') || searchStr.includes('STERLING') || qCount <= 90;
 
                 if (isEngTitle) {
                     setExamMode('engineering');
@@ -245,16 +283,17 @@ const InternalErrorAnalysis = ({ academicYear = '2026', restrictedCampus = [] })
                     });
                 }
 
-                // Auto-fill Test Name if currently empty and available in row 0
+                // Auto-fill Test Name if available
                 if (titleCandidate) {
                     const cleanTitle = titleCandidate.split('\n')[0].trim();
-                    if (cleanTitle && !testName) {
+                    if (cleanTitle) {
                         setTestName(cleanTitle);
                     }
 
                     // Also try detecting stream
                     for (const opt of STREAM_OPTIONS) {
-                        if (cleanTitle.toUpperCase().includes(opt.value.toUpperCase())) {
+                        const optKey = opt.value.toUpperCase().replace(/[()._-]/g, ' ').trim();
+                        if (searchStr.includes(opt.value.toUpperCase()) || (optKey.length > 3 && searchStr.includes(optKey))) {
                             setSelectedStream(opt);
                             break;
                         }
@@ -361,7 +400,7 @@ const InternalErrorAnalysis = ({ academicYear = '2026', restrictedCampus = [] })
 
     // Generate Analysis Logic
     const handleGenerate = async () => {
-        if (!parsedRows || parsedRows.length < 3) {
+        if (!parsedRows || parsedRows.length < 2) {
             setStatusMessage({ type: 'error', text: 'Please upload a CSV file with student responses first.' });
             return;
         }
@@ -370,7 +409,42 @@ const InternalErrorAnalysis = ({ academicYear = '2026', restrictedCampus = [] })
         setStatusMessage({ type: 'info', text: 'Analyzing student responses and querying student master details...' });
 
         try {
-            const studentRows = parsedRows.slice(2);
+            // Determine header row index dynamically
+            let headerRowIndex = detectedInfo?.headerRowIndex ?? -1;
+            if (headerRowIndex < 0) {
+                for (let i = 0; i < Math.min(parsedRows.length, 10); i++) {
+                    const row = parsedRows[i];
+                    if (!row || row.length === 0) continue;
+                    const firstCell = (row[0] || '').toLowerCase().trim();
+                    const hasRoll = firstCell.includes('roll') || firstCell.includes('stud') || firstCell.includes('adm');
+                    const hasQ1 = row.some(c => {
+                        const v = (c || '').toUpperCase().trim();
+                        return v === 'Q1' || v === 'Q01' || v === 'Q 1';
+                    });
+                    const hasSeries = row.some(c => (c || '').toLowerCase().trim() === 'series');
+                    if (hasRoll || hasQ1 || hasSeries) {
+                        headerRowIndex = i;
+                        break;
+                    }
+                }
+                if (headerRowIndex < 0) headerRowIndex = 0;
+            }
+
+            // Extract student rows starting strictly after header row
+            const studentRows = parsedRows.slice(headerRowIndex + 1).filter(r => {
+                if (!r || r.length < 2) return false;
+                const roll = (r[0] || '').trim();
+                if (!roll) return false;
+                const lower = roll.toLowerCase();
+                return !lower.includes('total') && !lower.includes('average') && !lower.includes('roll') && !lower.includes('series');
+            });
+
+            if (studentRows.length === 0) {
+                setStatusMessage({ type: 'error', text: 'No student records found in the CSV file.' });
+                setIsProcessing(false);
+                return;
+            }
+
             const rollNumbers = studentRows.map(r => r[0]?.trim()).filter(Boolean);
 
             // Step 1: Lookup student names & sections from DB
