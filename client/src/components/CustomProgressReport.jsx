@@ -19,8 +19,6 @@ import {
     Search,
     Plus,
     Trash2,
-    Edit3,
-    Save,
     Check,
     FileText,
     Award,
@@ -56,6 +54,26 @@ const STREAM_PRESETS = {
         defaultSubjectMax: { MATHS: 100, PHYSICS: 100, CHEMISTRY: 100 },
         defaultMaxTotal: 300
     },
+    KCET_MED: {
+        id: 'KCET_MED',
+        label: 'KCET Medical (PCB)',
+        icon: '🧬',
+        description: 'Karnataka CET Medical / Agri stream (Physics, Chemistry, Biology)',
+        defaultSubjects: ['PHYSICS', 'CHEMISTRY', 'BIOLOGY'],
+        availableSubjects: ['PHYSICS', 'CHEMISTRY', 'BIOLOGY', 'MATHS'],
+        defaultSubjectMax: { PHYSICS: 60, CHEMISTRY: 60, BIOLOGY: 60, MATHS: 60 },
+        defaultMaxTotal: 180
+    },
+    KCET_ENGG: {
+        id: 'KCET_ENGG',
+        label: 'KCET Engg (PCM)',
+        icon: '📐',
+        description: 'Karnataka CET Engineering stream (Physics, Chemistry, Maths)',
+        defaultSubjects: ['PHYSICS', 'CHEMISTRY', 'MATHS'],
+        availableSubjects: ['PHYSICS', 'CHEMISTRY', 'MATHS', 'BIOLOGY'],
+        defaultSubjectMax: { PHYSICS: 60, CHEMISTRY: 60, MATHS: 60, BIOLOGY: 60 },
+        defaultMaxTotal: 180
+    },
     CBSE: {
         id: 'CBSE',
         label: 'CBSE Board',
@@ -78,62 +96,6 @@ const STREAM_PRESETS = {
     }
 };
 
-const generateDynamicRemarks = (studentName, streamTests, attendance, streamMaxTotals) => {
-    const remarks = [];
-
-    // Competitive Exam Performance
-    if (streamTests.MEDICAL && streamTests.MEDICAL.length > 0) {
-        const attended = streamTests.MEDICAL.filter(t => !t.isAB);
-        if (attended.length > 0) {
-            const avg = Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / attended.length);
-            const maxTot = streamMaxTotals?.MEDICAL || 720;
-            remarks.push(`${studentName} achieved an average of ${avg}/${maxTot} marks across ${attended.length} NEET Medical test${attended.length > 1 ? 's' : ''}.`);
-        }
-    } else if (streamTests.ENGG && streamTests.ENGG.length > 0) {
-        const attended = streamTests.ENGG.filter(t => !t.isAB);
-        if (attended.length > 0) {
-            const avg = Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / attended.length);
-            const maxTot = streamMaxTotals?.ENGG || 300;
-            remarks.push(`${studentName} scored an average of ${avg}/${maxTot} marks in JEE Engineering tests.`);
-        }
-    }
-
-    // Board Exam Performance
-    if (streamTests.CBSE && streamTests.CBSE.length > 0) {
-        const attended = streamTests.CBSE.filter(t => !t.isAB);
-        if (attended.length > 0) {
-            const avg = Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / attended.length);
-            const maxTot = streamMaxTotals?.CBSE || 500;
-            remarks.push(`In CBSE Board assessments, maintained an aggregate average of ${avg}/${maxTot} marks.`);
-        }
-    } else if (streamTests.PU && streamTests.PU.length > 0) {
-        const attended = streamTests.PU.filter(t => !t.isAB);
-        if (attended.length > 0) {
-            const avg = Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / attended.length);
-            const maxTot = streamMaxTotals?.PU || 600;
-            remarks.push(`In PU Board assessments, recorded an aggregate average of ${avg}/${maxTot} marks.`);
-        }
-    }
-
-    // Attendance Performance
-    if (attendance && Number(attendance.workingDays) > 0) {
-        const w = Number(attendance.workingDays);
-        const p = Number(attendance.present);
-        const pct = ((p / w) * 100).toFixed(1);
-        if (pct >= 90) {
-            remarks.push(`Exemplary attendance record (${pct}% present across ${w} working days).`);
-        } else if (pct >= 75) {
-            remarks.push(`Good attendance (${pct}% present out of ${w} working days).`);
-        } else {
-            remarks.push(`Attendance is currently ${pct}%; regular classroom presence is strongly encouraged.`);
-        }
-    } else {
-        remarks.push(`Consistent revision and targeted question practice will ensure continued academic excellence.`);
-    }
-
-    return remarks.join(' ');
-};
-
 const CustomProgressReport = () => {
     const { userData } = useAuth();
 
@@ -146,6 +108,8 @@ const CustomProgressReport = () => {
     const [streamSubjects, setStreamSubjects] = useState({
         MEDICAL: [...STREAM_PRESETS.MEDICAL.defaultSubjects],
         ENGG: [...STREAM_PRESETS.ENGG.defaultSubjects],
+        KCET_MED: [...STREAM_PRESETS.KCET_MED.defaultSubjects],
+        KCET_ENGG: [...STREAM_PRESETS.KCET_ENGG.defaultSubjects],
         CBSE: [...STREAM_PRESETS.CBSE.defaultSubjects],
         PU: [...STREAM_PRESETS.PU.defaultSubjects]
     });
@@ -154,6 +118,8 @@ const CustomProgressReport = () => {
     const [streamMaxMarks, setStreamMaxMarks] = useState({
         MEDICAL: { ...STREAM_PRESETS.MEDICAL.defaultSubjectMax },
         ENGG: { ...STREAM_PRESETS.ENGG.defaultSubjectMax },
+        KCET_MED: { ...STREAM_PRESETS.KCET_MED.defaultSubjectMax },
+        KCET_ENGG: { ...STREAM_PRESETS.KCET_ENGG.defaultSubjectMax },
         CBSE: { ...STREAM_PRESETS.CBSE.defaultSubjectMax },
         PU: { ...STREAM_PRESETS.PU.defaultSubjectMax }
     });
@@ -162,6 +128,8 @@ const CustomProgressReport = () => {
     const [customAddedSubjects, setCustomAddedSubjects] = useState({
         MEDICAL: [],
         ENGG: [],
+        KCET_MED: [],
+        KCET_ENGG: [],
         CBSE: [],
         PU: []
     });
@@ -179,11 +147,6 @@ const CustomProgressReport = () => {
     const [students, setStudents] = useState([]);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
     const [studentSearch, setStudentSearch] = useState('');
-
-    // Editing Custom Remarks per student
-    const [customRemarks, setCustomRemarks] = useState({});
-    const [editingRemarks, setEditingRemarks] = useState(false);
-    const [tempRemarkText, setTempRemarkText] = useState('');
 
     // Download States
     const [isDownloading, setIsDownloading] = useState(false);
@@ -276,11 +239,11 @@ const CustomProgressReport = () => {
             ...prev,
             [activeConfigTab]: {
                 ...(prev[activeConfigTab] || {}),
-                [trimmed]: 100
+                [trimmed]: activeConfigTab.startsWith('KCET') ? 60 : 100
             }
         }));
         setNewSubjectInput('');
-        setStatusMessage({ type: 'success', text: `Added custom subject "${trimmed}" with Max Marks 100.` });
+        setStatusMessage({ type: 'success', text: `Added custom subject "${trimmed}".` });
     };
 
     // Select All / Reset Defaults for active stream tab
@@ -324,8 +287,9 @@ const CustomProgressReport = () => {
                 { header: 'STUDENT ID', key: 'STUD_ID', width: 16 },
                 { header: 'NAME OF THE STUDENT', key: 'NAME_OF_THE_STUDENT', width: 26 },
                 { header: 'CAMPUS NAME', key: 'CAMPUS_NAME', width: 22 },
-                { header: 'STREAM NAME', key: 'STREAM_NAME', width: 20 },
-                { header: 'EXAM TYPE', key: 'EXAM_TYPE', width: 16 },
+                { header: 'SECTION', key: 'SECTION', width: 14 },
+                { header: 'STREAM NAME', key: 'STREAM_NAME', width: 22 },
+                { header: 'EXAM TYPE', key: 'EXAM_TYPE', width: 18 },
                 { header: 'TEST NAME', key: 'TEST_NAME', width: 22 },
                 { header: 'DATE', key: 'DATE', width: 14 }
             ];
@@ -384,7 +348,7 @@ const CustomProgressReport = () => {
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
                 cell.border = {
                     top: { style: 'thin', color: { argb: 'FFC9962B' } },
-                    bottom: { style: 'thin', color: { argb: 'FFC9962B' } },
+                    bottom: { style: 'medium', color: { argb: 'FFC9962B' } },
                     left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                     right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
                 };
@@ -395,6 +359,7 @@ const CustomProgressReport = () => {
                 STUD_ID: 'MAX MARKS',
                 NAME_OF_THE_STUDENT: 'Out of Marks Reference',
                 CAMPUS_NAME: '-',
+                SECTION: '-',
                 STREAM_NAME: '-',
                 EXAM_TYPE: '-',
                 TEST_NAME: 'Max Marks',
@@ -403,7 +368,7 @@ const CustomProgressReport = () => {
 
             let sumOfTotals = 0;
             subjectCols.forEach(sc => {
-                const maxVal = streamMaxMarks[sc.streamKey]?.[sc.subName] ?? 100;
+                const maxVal = streamMaxMarks[sc.streamKey]?.[sc.subName] ?? (sc.streamKey.startsWith('KCET') ? 60 : 100);
                 maxRowObj[sc.key] = maxVal;
                 sumOfTotals += Number(maxVal) || 0;
             });
@@ -443,13 +408,22 @@ const CustomProgressReport = () => {
             const sampleRows = [];
             selectedStreams.forEach((streamKey, sIdx) => {
                 const isFirst = sIdx === 0;
+                let sampleTestName = 'Unit Test - 1';
+                if (streamKey === 'MEDICAL') sampleTestName = 'Grand Test - 1 (NEET)';
+                else if (streamKey === 'ENGG') sampleTestName = 'Mains Mock Test (JEE)';
+                else if (streamKey === 'KCET_MED') sampleTestName = 'KCET Mock (PCB)';
+                else if (streamKey === 'KCET_ENGG') sampleTestName = 'KCET Mock (PCM)';
+                else if (streamKey === 'CBSE') sampleTestName = 'Mid-Term Board Exam';
+                else if (streamKey === 'PU') sampleTestName = 'Preparatory Exam';
+
                 const rowObj = {
                     STUD_ID: 'SC1001',
                     NAME_OF_THE_STUDENT: 'Aarav Patel',
                     CAMPUS_NAME: 'Indiranagar Campus',
+                    SECTION: 'Section A',
                     STREAM_NAME: streamLabels,
                     EXAM_TYPE: streamKey,
-                    TEST_NAME: streamKey === 'MEDICAL' ? 'Grand Test - 1' : streamKey === 'CBSE' ? 'Mid-Term Board' : 'Unit Test - 1',
+                    TEST_NAME: sampleTestName,
                     DATE: isFirst ? '2026-03-01' : '2026-03-12'
                 };
 
@@ -457,7 +431,7 @@ const CustomProgressReport = () => {
                 const subs = streamSubjects[streamKey] || [];
                 subs.forEach((sub, subIdx) => {
                     const colKey = selectedStreams.length > 1 ? `[${streamKey}] ${sub}` : sub;
-                    const maxVal = Number(streamMaxMarks[streamKey]?.[sub]) || 100;
+                    const maxVal = Number(streamMaxMarks[streamKey]?.[sub]) || (streamKey.startsWith('KCET') ? 60 : 100);
                     const mark = Math.round(maxVal * 0.85) - (subIdx * 2);
                     rowObj[colKey] = mark;
                     sum += mark;
@@ -468,6 +442,49 @@ const CustomProgressReport = () => {
                     rowObj.WORKING_DAYS = 180;
                     rowObj.ATT_ABSENT = 6;
                     rowObj.ATT_PRESENT = 170;
+                    rowObj.ATT_SICK = 4;
+                    rowObj.ATT_TOTAL = 180;
+                }
+                sampleRows.push(rowObj);
+            });
+
+            // Student 2 Sample
+            selectedStreams.forEach((streamKey, sIdx) => {
+                const isFirst = sIdx === 0;
+                let sampleTestName = 'Unit Test - 1';
+                if (streamKey === 'MEDICAL') sampleTestName = 'Grand Test - 1 (NEET)';
+                else if (streamKey === 'ENGG') sampleTestName = 'Mains Mock Test (JEE)';
+                else if (streamKey === 'KCET_MED') sampleTestName = 'KCET Mock (PCB)';
+                else if (streamKey === 'KCET_ENGG') sampleTestName = 'KCET Mock (PCM)';
+                else if (streamKey === 'CBSE') sampleTestName = 'Mid-Term Board Exam';
+                else if (streamKey === 'PU') sampleTestName = 'Preparatory Exam';
+
+                const rowObj = {
+                    STUD_ID: 'SC1002',
+                    NAME_OF_THE_STUDENT: 'Diya Sharma',
+                    CAMPUS_NAME: 'Koramangala Campus',
+                    SECTION: 'Section B',
+                    STREAM_NAME: streamLabels,
+                    EXAM_TYPE: streamKey,
+                    TEST_NAME: sampleTestName,
+                    DATE: isFirst ? '2026-03-01' : '2026-03-12'
+                };
+
+                let sum = 0;
+                const subs = streamSubjects[streamKey] || [];
+                subs.forEach((sub, subIdx) => {
+                    const colKey = selectedStreams.length > 1 ? `[${streamKey}] ${sub}` : sub;
+                    const maxVal = Number(streamMaxMarks[streamKey]?.[sub]) || (streamKey.startsWith('KCET') ? 60 : 100);
+                    const mark = Math.round(maxVal * 0.90) - (subIdx * 2);
+                    rowObj[colKey] = mark;
+                    sum += mark;
+                });
+                rowObj.TOTAL_MARKS = sum;
+
+                if (includeAttendance) {
+                    rowObj.WORKING_DAYS = 180;
+                    rowObj.ATT_ABSENT = 4;
+                    rowObj.ATT_PRESENT = 172;
                     rowObj.ATT_SICK = 4;
                     rowObj.ATT_TOTAL = 180;
                 }
@@ -507,9 +524,11 @@ const CustomProgressReport = () => {
 
             const instructions = [
                 ['Selected Streams', streamLabels],
+                ['KCET Support', 'KCET Medical (PCB) has Physics (60), Chemistry (60), Biology (60) = Total 180. KCET Engg (PCM) has Physics (60), Chemistry (60), Maths (60) = Total 180.'],
                 ['Out of / Max Marks', 'Row 2 indicates the Out of Marks (Max Marks) for each subject and total. You can adjust them directly.'],
                 ['Attendance Enabled', includeAttendance ? 'Yes (Working Days, Absent, Present, Sick, Total)' : 'No'],
                 ['STUDENT ID', 'Mandatory unique ID. Multiple rows with the same ID will be grouped together.'],
+                ['SECTION', 'Enter the student section or division (e.g. "Section A", "NEET-1", "PU-B").'],
                 ['EXAM TYPE', `Specify which stream this test belongs to (${selectedStreams.join(', ')}).`],
                 ['Subject Marks', 'Enter student marks for each test. If absent, enter "AB" or "Absent".'],
                 ['Attendance Section', 'Enter TOTAL NO.OF WORKING DAYS, ABSENT, PRESENT, SICK, and TOTAL.']
@@ -594,6 +613,7 @@ const CustomProgressReport = () => {
             let idCol = -1;
             let nameCol = -1;
             let campusCol = -1;
+            let sectionCol = -1;
             let streamCol = -1;
             let examTypeCol = -1;
             let testCol = -1;
@@ -618,6 +638,8 @@ const CustomProgressReport = () => {
                     if (nameCol === -1) nameCol = colIdx;
                 } else if (h.includes('CAMPUS') || h.includes('BRANCH')) {
                     if (campusCol === -1) campusCol = colIdx;
+                } else if (h.includes('SECTION') || h === 'SEC' || h.includes('CLASS & SEC') || h.includes('BATCH')) {
+                    if (sectionCol === -1) sectionCol = colIdx;
                 } else if (h.includes('EXAM TYPE') || h.includes('STREAM TYPE') || h.includes('CATEGORY')) {
                     if (examTypeCol === -1) examTypeCol = colIdx;
                 } else if (h.includes('STREAM')) {
@@ -656,7 +678,6 @@ const CustomProgressReport = () => {
             const isRow2MaxMarks = r2Label.includes('MAX') || r2Label.includes('OUT OF') || r2Label.includes('TOTAL');
 
             if (isRow2MaxMarks) {
-                // Extract Max Marks from Row 2!
                 const extractedMax = {};
                 subjectCols.forEach(sc => {
                     const rawVal = getCellValue(secondRow.getCell(sc.col));
@@ -679,11 +700,12 @@ const CustomProgressReport = () => {
             const rawStudentRows = [];
             worksheet.eachRow((row, rowNumber) => {
                 if (rowNumber <= headerRowIndex) return;
-                if (rowNumber === headerRowIndex + 1 && isRow2MaxMarks) return; // skip max marks reference row
+                if (rowNumber === headerRowIndex + 1 && isRow2MaxMarks) return;
 
                 const studId = idCol !== -1 ? String(getCellValue(row.getCell(idCol)) || '').trim() : '';
                 const studName = nameCol !== -1 ? String(getCellValue(row.getCell(nameCol)) || '').trim() : '';
                 const campus = campusCol !== -1 ? String(getCellValue(row.getCell(campusCol)) || '').trim() : 'Campus';
+                const section = sectionCol !== -1 ? String(getCellValue(row.getCell(sectionCol)) || '').trim() : '';
                 const stream = streamCol !== -1 ? String(getCellValue(row.getCell(streamCol)) || '').trim() : selectedStreams.map(k => STREAM_PRESETS[k].label).join(' & ');
                 let examType = examTypeCol !== -1 ? String(getCellValue(row.getCell(examTypeCol)) || '').trim().toUpperCase() : '';
                 const test = testCol !== -1 ? String(getCellValue(row.getCell(testCol)) || '').trim() : `Test ${rowNumber - headerRowIndex}`;
@@ -725,10 +747,16 @@ const CustomProgressReport = () => {
                     finalTotal = Number(totalMarksVal);
                 }
 
+                // Match Exam Type
                 if (!examType) {
                     examType = detectedStreamFromCols || selectedStreams[0];
                 }
-                if (examType.includes('MED') || examType.includes('NEET')) examType = 'MEDICAL';
+
+                if (examType.includes('KCET')) {
+                    if (examType.includes('MED') || examType.includes('PCB') || examType.includes('BIO')) examType = 'KCET_MED';
+                    else if (examType.includes('ENG') || examType.includes('PCM') || examType.includes('MAT')) examType = 'KCET_ENGG';
+                    else examType = selectedStreams.includes('KCET_MED') ? 'KCET_MED' : 'KCET_ENGG';
+                } else if (examType.includes('MED') || examType.includes('NEET')) examType = 'MEDICAL';
                 else if (examType.includes('ENG') || examType.includes('JEE')) examType = 'ENGG';
                 else if (examType.includes('CBSE')) examType = 'CBSE';
                 else if (examType.includes('PU')) examType = 'PU';
@@ -743,6 +771,7 @@ const CustomProgressReport = () => {
                     studId: studId || studName,
                     studName: studName || studId,
                     campus,
+                    section,
                     stream,
                     examType,
                     testName: test || 'Exam',
@@ -772,10 +801,14 @@ const CustomProgressReport = () => {
                         id: row.studId,
                         name: row.studName,
                         campus: row.campus,
+                        section: row.section || '',
                         stream: row.stream,
                         streamTests: {},
                         attendance: null
                     };
+                }
+                if (!grouped[sid].section && row.section) {
+                    grouped[sid].section = row.section;
                 }
                 const st = row.examType || selectedStreams[0];
                 if (!grouped[sid].streamTests[st]) {
@@ -874,32 +907,6 @@ const CustomProgressReport = () => {
     };
     const handleNext = () => {
         setCurrentStudentIndex(prev => (prev < filteredStudents.length - 1 ? prev + 1 : 0));
-    };
-
-    // Remarks management
-    const streamTotalsMap = useMemo(() => {
-        const res = {};
-        selectedStreams.forEach(k => {
-            res[k] = getStreamTotalMax(k);
-        });
-        return res;
-    }, [selectedStreams, streamSubjects, streamMaxMarks]);
-
-    const currentRemark = useMemo(() => {
-        if (!activeStudent) return '';
-        if (customRemarks[activeStudent.id]) {
-            return customRemarks[activeStudent.id];
-        }
-        return generateDynamicRemarks(activeStudent.name, activeStudent.streamTests, activeStudent.attendance, streamTotalsMap);
-    }, [activeStudent, customRemarks, streamTotalsMap]);
-
-    const handleSaveRemark = () => {
-        if (!activeStudent) return;
-        setCustomRemarks(prev => ({
-            ...prev,
-            [activeStudent.id]: tempRemarkText
-        }));
-        setEditingRemarks(false);
     };
 
     // -------------------------------------------------------------
@@ -1067,8 +1074,7 @@ const CustomProgressReport = () => {
         const infoY = 49.5;
         const infoX = 14;
         const infoW = 182;
-        const infoH = 28;
-        const rowH = infoH / 4;
+        const infoH = 30;
         const labelW = 50;
         const valueW = infoW - labelW;
 
@@ -1076,8 +1082,11 @@ const CustomProgressReport = () => {
             { label: "Type of Report Card", value: "Academic", isBold: false },
             { label: "Name of the Student", value: student.name, isBold: true },
             { label: "Student ID", value: String(student.id || ''), isBold: true },
+            { label: "Section", value: String(student.section || '-'), isBold: false },
             { label: "Campus and Stream", value: `${student.campus || 'Campus'} · ${student.stream || 'Stream'}`, isBold: false }
         ];
+
+        const rowH = infoH / infoData.length;
 
         infoData.forEach((row, i) => {
             const y = infoY + (i * rowH);
@@ -1089,7 +1098,7 @@ const CustomProgressReport = () => {
             setFontNunitoBold();
             doc.setFontSize(8.5);
             doc.setTextColor(15, 32, 87);
-            doc.text(row.label, infoX + 4, y + 4.8);
+            doc.text(row.label, infoX + 4, y + (rowH * 0.68));
 
             doc.setFillColor(255, 253, 248);
             doc.rect(infoX + labelW, y, valueW, rowH, 'FD');
@@ -1098,13 +1107,13 @@ const CustomProgressReport = () => {
             else setFontNunitoRegular();
             doc.setFontSize(8.5);
             doc.setTextColor(20, 32, 74);
-            doc.text(row.value, infoX + labelW + 4, y + 4.8);
+            doc.text(String(row.value), infoX + labelW + 4, y + (rowH * 0.68));
         });
 
-        let currentY = infoY + infoH + 7;
+        let currentY = infoY + infoH + 6;
 
         // 5. Render Tables for Each Active Stream (2-Tier Header matching Image 2!)
-        const streamOrder = ['MEDICAL', 'ENGG', 'CBSE', 'PU'];
+        const streamOrder = ['MEDICAL', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU'];
         const activeStreamKeys = streamOrder.filter(k => student.streamTests[k] && student.streamTests[k].length > 0);
         const streamsToRender = activeStreamKeys.length > 0 ? activeStreamKeys : selectedStreams;
 
@@ -1137,7 +1146,7 @@ const CustomProgressReport = () => {
             const headRow2 = [
                 { content: String(totalMaxVal), styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.5, textColor: [252, 211, 77] } },
                 ...subs.map(sub => ({
-                    content: String(streamMaxMarks[stKey]?.[sub] ?? 100),
+                    content: String(streamMaxMarks[stKey]?.[sub] ?? (stKey.startsWith('KCET') ? 60 : 100)),
                     styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.5, textColor: [252, 211, 77] }
                 }))
             ];
@@ -1283,28 +1292,7 @@ const CustomProgressReport = () => {
             currentY = doc.lastAutoTable.finalY + 6;
         }
 
-        // 7. Remarks Box
-        if (currentY + 40 > 265) {
-            doc.addPage();
-            drawBorderAndBackground();
-            currentY = 22;
-        }
-
-        const remarksContent = customRemarks[student.id] || generateDynamicRemarks(student.name, student.streamTests, student.attendance, streamTotalsMap);
-        setFontCormorantItalic();
-        doc.setFontSize(9.5);
-        const splitRemarks = doc.splitTextToSize("Remarks: " + remarksContent, infoW - 12);
-        const remarksH = Math.max(14, (splitRemarks.length * 4.6) + 5);
-
-        doc.setFillColor(241, 244, 251);
-        doc.setDrawColor(45, 86, 201);
-        doc.setLineWidth(0.4);
-        doc.roundedRect(14, currentY, infoW, remarksH, 2, 2, 'FD');
-
-        doc.setTextColor(20, 32, 74);
-        doc.text(splitRemarks, 20, currentY + 5);
-
-        // 8. Signatures Footer
+        // 7. Signatures Footer
         const sigY = 271;
         doc.setDrawColor(207, 214, 232);
         doc.setLineWidth(0.3);
@@ -1450,11 +1438,11 @@ const CustomProgressReport = () => {
                             textTransform: 'uppercase',
                             letterSpacing: '0.8px'
                         }}>
-                            Configurable Out of Marks
+                            NEET · JEE · KCET · CBSE · PU
                         </span>
                     </div>
                     <p style={{ margin: 0, fontSize: '14px', color: '#E2E8F0', maxWidth: '780px', lineHeight: '1.5' }}>
-                        Generate combined progress reports with custom out-of-marks (e.g. Botany 180, Physics 60, etc.) displayed directly in the table header under each subject.
+                        Generate combined progress reports with KCET support (Medical PCB: Physics, Chemistry, Biology; Engg PCM: Physics, Chemistry, Maths), custom out-of-marks, and attendance records.
                     </p>
                 </div>
 
@@ -1501,7 +1489,7 @@ const CustomProgressReport = () => {
                         gap: '8px'
                     }}>
                         <Sparkles size={18} color="#C9962B" />
-                        How to Configure Out-Of-Marks & Generate Progress Reports
+                        How to Generate Multi-Stream & Attendance Progress Reports (Step-by-Step)
                     </h3>
                     <div style={{
                         display: 'grid',
@@ -1511,38 +1499,38 @@ const CustomProgressReport = () => {
                         {[
                             {
                                 num: '1',
-                                title: 'Multi-Select Stream(s) & Attendance',
-                                desc: 'Select one or more streams (e.g. Medical + CBSE or Medical + PU). Toggle Attendance Record.'
+                                title: 'Select Stream(s) including KCET',
+                                desc: 'Choose between Medical (NEET), Engineering (JEE), KCET Medical (PCB), KCET Engg (PCM), CBSE, or PU.'
                             },
                             {
                                 num: '2',
                                 title: 'Configure Subjects & Out-Of-Marks',
-                                desc: 'Enter the exact Max Marks (e.g. 180, 100, 60) for each subject in the input boxes. Total auto-updates.'
+                                desc: 'KCET defaults to 60 marks per subject (180 total). Easily adjust any subject max marks.'
                             },
                             {
                                 num: '3',
-                                title: 'Download Pre-filled Template',
-                                desc: 'Click "Download Template" to get the formatted .xlsx with Row 2 showing your exact out-of-marks reference.'
+                                title: 'Download Multi-Stream Template',
+                                desc: 'Click "Download Template" to get the formatted .xlsx with pre-configured exam types, columns, and attendance.'
                             },
                             {
                                 num: '4',
                                 title: 'Fill Student Marks & Attendance',
-                                desc: 'Enter student marks for each test. Values will be evaluated against your defined out-of-marks.'
+                                desc: 'Enter student marks for competitive and board exams, section, plus attendance (Working Days, Absent, Present, Sick, Total).'
                             },
                             {
                                 num: '5',
                                 title: 'Upload Completed Excel File',
-                                desc: 'Upload the sheet. The system detects marks and extracts or applies your custom out-of-marks.'
+                                desc: 'Upload the sheet. The parser segregates competitive tests, board tests, and attendance automatically.'
                             },
                             {
                                 num: '6',
                                 title: 'Review 2-Tier Header Webview',
-                                desc: 'The table header displays subject names on Row 1 and out-of-marks on Row 2 directly underneath.'
+                                desc: 'Test tables stack in order with subject names and out-of-marks in header; attendance table at the end.'
                             },
                             {
                                 num: '7',
                                 title: 'Download Combined or Individual PDFs',
-                                desc: 'Download a Single Combined PDF for all students, an Individual PDFs ZIP bundle, or single student PDF.'
+                                desc: 'Generate a Single Combined PDF for all students, an Individual PDFs ZIP bundle, or single student PDF.'
                             }
                         ].map(step => (
                             <div key={step.num} style={{
@@ -1601,7 +1589,7 @@ const CustomProgressReport = () => {
                 </div>
             )}
 
-            {/* Top Control Grid: 1. Multi-Stream & Attendance | 2. Subject Checkboxes + Out of Marks | 3. Template & Upload */}
+            {/* Top Control Grid: 1. Stream Selection | 2. Subjects & Out-of-Marks | 3. Template & Upload */}
             <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
@@ -1626,7 +1614,8 @@ const CustomProgressReport = () => {
                         </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
+                    {/* 6 Stream Cards */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '14px' }}>
                         {Object.values(STREAM_PRESETS).map(st => {
                             const isSelected = selectedStreams.includes(st.id);
                             return (
@@ -1638,7 +1627,7 @@ const CustomProgressReport = () => {
                                         background: isSelected ? '#EFF6FF' : '#F8FAFC',
                                         border: `2px solid ${isSelected ? '#0A4FC4' : '#E2E8F0'}`,
                                         borderRadius: '8px',
-                                        padding: '10px 12px',
+                                        padding: '9px 11px',
                                         textAlign: 'left',
                                         cursor: 'pointer',
                                         transition: 'all 0.15s ease',
@@ -1663,7 +1652,7 @@ const CustomProgressReport = () => {
                                             {isSelected && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
                                         </div>
                                     </div>
-                                    <span style={{ fontSize: '13px', fontWeight: '700', color: isSelected ? '#0A4FC4' : '#1E293B' }}>
+                                    <span style={{ fontSize: '12.5px', fontWeight: '700', color: isSelected ? '#0A4FC4' : '#1E293B', lineHeight: '1.3' }}>
                                         {st.label}
                                     </span>
                                 </button>
@@ -1737,10 +1726,10 @@ const CustomProgressReport = () => {
                             <button
                                 type="button"
                                 onClick={() => handleSetAllMaxMarks(activeConfigTab, 60)}
-                                title="Set all checked subjects to 60 (Unit test style)"
-                                style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', padding: '2px 6px', fontSize: '10.5px', fontWeight: '700', color: '#0F2057', cursor: 'pointer' }}
+                                title="Set all checked subjects to 60 (KCET standard)"
+                                style={{ background: '#EFF6FF', border: '1px solid #93C5FD', borderRadius: '4px', padding: '2px 6px', fontSize: '10.5px', fontWeight: '700', color: '#1D4ED8', cursor: 'pointer' }}
                             >
-                                /60
+                                /60 (KCET)
                             </button>
                             <button
                                 type="button"
@@ -1784,7 +1773,8 @@ const CustomProgressReport = () => {
                                             cursor: 'pointer',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '5px'
+                                            gap: '5px',
+                                            whiteSpace: 'nowrap'
                                         }}
                                     >
                                         <span>{STREAM_PRESETS[k].icon}</span>
@@ -1798,7 +1788,7 @@ const CustomProgressReport = () => {
                         </div>
                     )}
 
-                    {/* Subject Checkbox Grid with Out Of Marks Input in Every Card */}
+                    {/* Subject Checkbox Grid with Out Of Marks Input */}
                     <div style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
@@ -1813,7 +1803,7 @@ const CustomProgressReport = () => {
                             ...(customAddedSubjects[activeConfigTab] || [])
                         ].map(sub => {
                             const isChecked = (streamSubjects[activeConfigTab] || []).includes(sub);
-                            const maxVal = streamMaxMarks[activeConfigTab]?.[sub] ?? 100;
+                            const maxVal = streamMaxMarks[activeConfigTab]?.[sub] ?? (activeConfigTab.startsWith('KCET') ? 60 : 100);
 
                             return (
                                 <div
@@ -2019,7 +2009,7 @@ const CustomProgressReport = () => {
                         No Custom Progress Data Uploaded Yet
                     </h3>
                     <p style={{ fontSize: '14px', color: '#64748B', maxWidth: '520px', margin: '0 auto 20px auto', lineHeight: '1.5' }}>
-                        Configure the out-of-marks for your stream, download the Excel template, fill in marks and attendance, then upload above.
+                        Configure streams (including KCET Medical & Engineering), out-of-marks, download the Excel template, and upload your file.
                     </p>
                     <button
                         type="button"
@@ -2223,7 +2213,7 @@ const CustomProgressReport = () => {
                         </div>
                     )}
 
-                    {/* Webview Progress Report Sheet (With 2-Tier Header Matching Image 2) */}
+                    {/* Webview Progress Report Sheet */}
                     {activeStudent && (
                         <div className="report-card-wrapper" style={{ display: 'flex', justifyContent: 'center', margin: '20px 0 40px 0' }}>
                             <div className="report-card-sheet" style={{
@@ -2251,7 +2241,7 @@ const CustomProgressReport = () => {
                                     </div>
                                 </div>
 
-                                {/* Student Info Section (Full Width, Photo/Initials Box Completely Removed) */}
+                                {/* Student Info Section (Full Width, No Photo) */}
                                 <div style={{ marginTop: '24px' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <tbody>
@@ -2281,6 +2271,14 @@ const CustomProgressReport = () => {
                                             </tr>
                                             <tr>
                                                 <td style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
+                                                    Section
+                                                </td>
+                                                <td style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 600, fontSize: '13.5px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
+                                                    {activeStudent.section || '-'}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
                                                     Campus and Stream
                                                 </td>
                                                 <td style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 700, fontSize: '13.5px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
@@ -2291,8 +2289,8 @@ const CustomProgressReport = () => {
                                     </table>
                                 </div>
 
-                                {/* Dynamic Tables for Each Selected Stream (2-Tier Header with Out-of-Marks matching Image 2!) */}
-                                {['MEDICAL', 'ENGG', 'CBSE', 'PU']
+                                {/* Dynamic Tables for Each Selected Stream (2-Tier Header with Out-of-Marks) */}
+                                {['MEDICAL', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU']
                                     .filter(stKey => (activeStudent.streamTests[stKey] && activeStudent.streamTests[stKey].length > 0) || selectedStreams.includes(stKey))
                                     .map(stKey => {
                                         const tests = activeStudent.streamTests[stKey] || [];
@@ -2319,7 +2317,7 @@ const CustomProgressReport = () => {
 
                                                 <div style={{ overflowX: 'auto' }}>
                                                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
-                                                        {/* 2-TIER TABLE HEADER (Matching Image 2: Subject on Top, Out Of Marks Underneath) */}
+                                                        {/* 2-TIER TABLE HEADER */}
                                                         <thead>
                                                             <tr style={{ background: '#0F2057', color: '#ffffff' }}>
                                                                 <th rowSpan={2} style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle' }}>Test</th>
@@ -2338,7 +2336,7 @@ const CustomProgressReport = () => {
                                                                 </th>
                                                                 {subs.map(sub => (
                                                                     <th key={sub} style={{ padding: '4px 10px', border: '1px solid #CFD6E8', fontSize: '12px', fontWeight: '800' }}>
-                                                                        {streamMaxMarks[stKey]?.[sub] ?? 100}
+                                                                        {streamMaxMarks[stKey]?.[sub] ?? (stKey.startsWith('KCET') ? 60 : 100)}
                                                                     </th>
                                                                 ))}
                                                             </tr>
@@ -2436,115 +2434,12 @@ const CustomProgressReport = () => {
                                     </div>
                                 )}
 
-                                {/* Remarks Box */}
-                                <div style={{
-                                    background: '#F1F4FB',
-                                    border: '1px solid #2D56C9',
-                                    borderRadius: '6px',
-                                    padding: '12px 18px',
-                                    marginTop: '28px',
-                                    marginBottom: '32px',
-                                    position: 'relative'
-                                }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#0F2057', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                                            Remarks
-                                        </span>
-                                        {!editingRemarks ? (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setTempRemarkText(currentRemark);
-                                                    setEditingRemarks(true);
-                                                }}
-                                                style={{
-                                                    background: 'transparent',
-                                                    border: 'none',
-                                                    color: '#2D56C9',
-                                                    fontSize: '11px',
-                                                    fontWeight: '600',
-                                                    cursor: 'pointer',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px'
-                                                }}
-                                            >
-                                                <Edit3 size={12} /> Edit
-                                            </button>
-                                        ) : (
-                                            <div style={{ display: 'flex', gap: '8px' }}>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleSaveRemark}
-                                                    style={{
-                                                        background: '#0F2057',
-                                                        color: '#fff',
-                                                        border: 'none',
-                                                        borderRadius: '4px',
-                                                        padding: '2px 8px',
-                                                        fontSize: '11px',
-                                                        fontWeight: '600',
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '4px'
-                                                    }}
-                                                >
-                                                    <Save size={11} /> Save
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setEditingRemarks(false)}
-                                                    style={{
-                                                        background: 'transparent',
-                                                        border: 'none',
-                                                        color: '#64748B',
-                                                        fontSize: '11px',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {editingRemarks ? (
-                                        <textarea
-                                            value={tempRemarkText}
-                                            onChange={(e) => setTempRemarkText(e.target.value)}
-                                            rows={3}
-                                            style={{
-                                                width: '100%',
-                                                padding: '8px',
-                                                borderRadius: '4px',
-                                                border: '1px solid #CBD5E1',
-                                                fontSize: '13px',
-                                                fontFamily: "'Nunito Sans', sans-serif",
-                                                outline: 'none',
-                                                boxSizing: 'border-box'
-                                            }}
-                                        />
-                                    ) : (
-                                        <p style={{
-                                            margin: 0,
-                                            fontSize: '13.5px',
-                                            fontStyle: 'italic',
-                                            color: '#14204A',
-                                            lineHeight: '1.5',
-                                            fontFamily: "'Cormorant Garamond', Georgia, serif"
-                                        }}>
-                                            {currentRemark}
-                                        </p>
-                                    )}
-                                </div>
-
                                 {/* Signatures Footer */}
                                 <div style={{
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     paddingTop: '36px',
-                                    marginTop: '20px'
+                                    marginTop: '28px'
                                 }}>
                                     {[
                                         'Class Teacher',
