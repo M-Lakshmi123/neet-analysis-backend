@@ -1723,17 +1723,6 @@ const CustomProgressReport = () => {
                                 <BookOpen size={18} color="#0A4FC4" />
                                 2. Subjects & Out-of-Marks
                             </h3>
-                            <span style={{
-                                background: '#FEF3C7',
-                                color: '#92400E',
-                                fontSize: '11px',
-                                fontWeight: '800',
-                                padding: '2px 8px',
-                                borderRadius: '6px',
-                                border: '1px solid #FCD34D'
-                            }}>
-                                Total: {getStreamTotalMax(activeConfigTab)}
-                            </span>
                         </div>
 
                         {/* Quick Preset Buttons */}
@@ -1794,9 +1783,6 @@ const CustomProgressReport = () => {
                                     >
                                         <span>{STREAM_PRESETS[k].icon}</span>
                                         <span>{STREAM_PRESETS[k].label}</span>
-                                        <span style={{ background: isCurrent ? '#C9962B' : '#E2E8F0', color: isCurrent ? '#0F2057' : '#475569', fontSize: '10px', padding: '1px 5px', borderRadius: '8px' }}>
-                                            {getStreamTotalMax(k)}m
-                                        </span>
                                     </button>
                                 );
                             })}
