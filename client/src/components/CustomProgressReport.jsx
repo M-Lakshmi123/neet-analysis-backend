@@ -26,14 +26,12 @@ import {
     Award,
     Layers,
     HelpCircle,
-    ArrowRight,
     Printer,
     Archive,
     Sparkles,
-    UserCheck,
     Calendar,
-    Building2,
-    BookOpen
+    BookOpen,
+    Hash
 } from 'lucide-react';
 
 // Stream Definitions & Subject Presets
@@ -42,93 +40,133 @@ const STREAM_PRESETS = {
         id: 'MEDICAL',
         label: 'Medical (NEET)',
         icon: '🩺',
-        description: 'NEET Medical streams (Botany, Zoology, Physics, Chemistry)',
-        subjects: ['BOTANY', 'ZOOLOGY', 'PHYSICS', 'CHEMISTRY'],
+        description: 'NEET Medical stream (Botany, Zoology, Physics, Chemistry)',
         defaultSubjects: ['BOTANY', 'ZOOLOGY', 'PHYSICS', 'CHEMISTRY'],
+        availableSubjects: ['BOTANY', 'ZOOLOGY', 'PHYSICS', 'CHEMISTRY'],
+        defaultSubjectMax: { BOTANY: 180, ZOOLOGY: 180, PHYSICS: 180, CHEMISTRY: 180 },
         defaultMaxTotal: 720
     },
     ENGG: {
         id: 'ENGG',
         label: 'Engineering (JEE)',
         icon: '⚙️',
-        description: 'JEE Engineering streams (Maths, Physics, Chemistry)',
-        subjects: ['MATHS', 'PHYSICS', 'CHEMISTRY'],
+        description: 'JEE Engineering stream (Maths, Physics, Chemistry)',
         defaultSubjects: ['MATHS', 'PHYSICS', 'CHEMISTRY'],
+        availableSubjects: ['MATHS', 'PHYSICS', 'CHEMISTRY'],
+        defaultSubjectMax: { MATHS: 100, PHYSICS: 100, CHEMISTRY: 100 },
         defaultMaxTotal: 300
     },
     CBSE: {
         id: 'CBSE',
         label: 'CBSE Board',
         icon: '🎓',
-        description: 'CBSE Class XI & XII Board streams (PCMB / PCMC / Commerce / Arts)',
-        subjects: ['PHYSICS', 'CHEMISTRY', 'MATHS', 'ENGLISH', 'BIOLOGY', 'IP', 'PE'],
+        description: 'CBSE Class XI & XII Board stream (PCMB / PCMC)',
         defaultSubjects: ['PHYSICS', 'CHEMISTRY', 'MATHS', 'ENGLISH', 'BIOLOGY'],
+        availableSubjects: ['PHYSICS', 'CHEMISTRY', 'MATHS', 'ENGLISH', 'BIOLOGY', 'IP', 'PE'],
+        defaultSubjectMax: { PHYSICS: 100, CHEMISTRY: 100, MATHS: 100, ENGLISH: 100, BIOLOGY: 100, IP: 100, PE: 100 },
         defaultMaxTotal: 500
     },
     PU: {
         id: 'PU',
         label: 'PU Board',
         icon: '🏛️',
-        description: 'Karnataka Pre-University Board streams (PCMB, PCMC, etc.)',
-        subjects: ['MATHS', 'PHYSICS', 'CHEMISTRY', 'BIOLOGY', 'COMPUTER SCIENCE', 'ENGLISH', 'KANNADA', 'SANSKRIT', 'HINDI'],
+        description: 'Karnataka Pre-University Board stream (PCMB, PCMC, etc.)',
         defaultSubjects: ['MATHS', 'PHYSICS', 'CHEMISTRY', 'BIOLOGY', 'ENGLISH', 'KANNADA'],
+        availableSubjects: ['MATHS', 'PHYSICS', 'CHEMISTRY', 'BIOLOGY', 'COMPUTER SCIENCE', 'ENGLISH', 'KANNADA', 'SANSKRIT', 'HINDI'],
+        defaultSubjectMax: { MATHS: 100, PHYSICS: 100, CHEMISTRY: 100, BIOLOGY: 100, 'COMPUTER SCIENCE': 100, ENGLISH: 100, KANNADA: 100, SANSKRIT: 100, HINDI: 100 },
         defaultMaxTotal: 600
     }
 };
 
-const getStudentInitials = (name) => {
-    if (!name) return 'SC';
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return 'SC';
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-};
+const generateDynamicRemarks = (studentName, streamTests, attendance, streamMaxTotals) => {
+    const remarks = [];
 
-const generateDynamicRemarks = (studentName, tests, subjects) => {
-    if (!tests || tests.length === 0) {
-        return `${studentName} has active enrolment. Test records are being consolidated.`;
+    // Competitive Exam Performance
+    if (streamTests.MEDICAL && streamTests.MEDICAL.length > 0) {
+        const attended = streamTests.MEDICAL.filter(t => !t.isAB);
+        if (attended.length > 0) {
+            const avg = Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / attended.length);
+            const maxTot = streamMaxTotals?.MEDICAL || 720;
+            remarks.push(`${studentName} achieved an average of ${avg}/${maxTot} marks across ${attended.length} NEET Medical test${attended.length > 1 ? 's' : ''}.`);
+        }
+    } else if (streamTests.ENGG && streamTests.ENGG.length > 0) {
+        const attended = streamTests.ENGG.filter(t => !t.isAB);
+        if (attended.length > 0) {
+            const avg = Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / attended.length);
+            const maxTot = streamMaxTotals?.ENGG || 300;
+            remarks.push(`${studentName} scored an average of ${avg}/${maxTot} marks in JEE Engineering tests.`);
+        }
     }
-    const attended = tests.filter(t => !t.isAB);
-    if (attended.length === 0) {
-        return `${studentName} was marked absent for the scheduled test(s). Regular attendance is strongly advised.`;
+
+    // Board Exam Performance
+    if (streamTests.CBSE && streamTests.CBSE.length > 0) {
+        const attended = streamTests.CBSE.filter(t => !t.isAB);
+        if (attended.length > 0) {
+            const avg = Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / attended.length);
+            const maxTot = streamMaxTotals?.CBSE || 500;
+            remarks.push(`In CBSE Board assessments, maintained an aggregate average of ${avg}/${maxTot} marks.`);
+        }
+    } else if (streamTests.PU && streamTests.PU.length > 0) {
+        const attended = streamTests.PU.filter(t => !t.isAB);
+        if (attended.length > 0) {
+            const avg = Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / attended.length);
+            const maxTot = streamMaxTotals?.PU || 600;
+            remarks.push(`In PU Board assessments, recorded an aggregate average of ${avg}/${maxTot} marks.`);
+        }
     }
-    const avgTotal = Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / attended.length);
 
-    // Calculate subject averages
-    const subAvgs = subjects.map(sub => {
-        const marksList = attended
-            .map(t => t.marks && t.marks[sub])
-            .filter(m => m !== undefined && m !== null && m !== '' && !isNaN(Number(m)))
-            .map(Number);
-        if (marksList.length === 0) return null;
-        const avg = Math.round(marksList.reduce((a, b) => a + b, 0) / marksList.length);
-        return { subject: sub, avg };
-    }).filter(Boolean);
-
-    subAvgs.sort((a, b) => b.avg - a.avg);
-    const topSub = subAvgs[0];
-    const lagSub = subAvgs[subAvgs.length - 1];
-
-    let remark = `${studentName} has achieved an average score of ${avgTotal} marks across ${attended.length} test${attended.length > 1 ? 's' : ''}. `;
-    if (topSub && topSub.avg > 0) {
-        remark += `Demonstrated strong conceptual grasp in ${topSub.subject} (Avg: ${topSub.avg}). `;
-    }
-    if (lagSub && lagSub.subject !== topSub?.subject) {
-        remark += `Focused revision and timed question practice in ${lagSub.subject} (Avg: ${lagSub.avg}) will elevate the aggregate rank.`;
+    // Attendance Performance
+    if (attendance && Number(attendance.workingDays) > 0) {
+        const w = Number(attendance.workingDays);
+        const p = Number(attendance.present);
+        const pct = ((p / w) * 100).toFixed(1);
+        if (pct >= 90) {
+            remarks.push(`Exemplary attendance record (${pct}% present across ${w} working days).`);
+        } else if (pct >= 75) {
+            remarks.push(`Good attendance (${pct}% present out of ${w} working days).`);
+        } else {
+            remarks.push(`Attendance is currently ${pct}%; regular classroom presence is strongly encouraged.`);
+        }
     } else {
-        remark += `Consistent effort and rigorous practice will maintain top performance.`;
+        remarks.push(`Consistent revision and targeted question practice will ensure continued academic excellence.`);
     }
-    return remark;
+
+    return remarks.join(' ');
 };
 
 const CustomProgressReport = () => {
     const { userData } = useAuth();
 
-    // Stream & Subject Config States
-    const [selectedStream, setSelectedStream] = useState('MEDICAL');
-    const [availableSubjects, setAvailableSubjects] = useState(STREAM_PRESETS.MEDICAL.subjects);
-    const [selectedSubjects, setSelectedSubjects] = useState(STREAM_PRESETS.MEDICAL.defaultSubjects);
-    const [newSubjectName, setNewSubjectName] = useState('');
+    // Multi-Stream & Attendance Selection
+    const [selectedStreams, setSelectedStreams] = useState(['MEDICAL', 'CBSE']);
+    const [includeAttendance, setIncludeAttendance] = useState(true);
+    const [activeConfigTab, setActiveConfigTab] = useState('MEDICAL');
+
+    // Per-stream subjects map
+    const [streamSubjects, setStreamSubjects] = useState({
+        MEDICAL: [...STREAM_PRESETS.MEDICAL.defaultSubjects],
+        ENGG: [...STREAM_PRESETS.ENGG.defaultSubjects],
+        CBSE: [...STREAM_PRESETS.CBSE.defaultSubjects],
+        PU: [...STREAM_PRESETS.PU.defaultSubjects]
+    });
+
+    // Per-stream Out of Marks (Max Marks) map
+    const [streamMaxMarks, setStreamMaxMarks] = useState({
+        MEDICAL: { ...STREAM_PRESETS.MEDICAL.defaultSubjectMax },
+        ENGG: { ...STREAM_PRESETS.ENGG.defaultSubjectMax },
+        CBSE: { ...STREAM_PRESETS.CBSE.defaultSubjectMax },
+        PU: { ...STREAM_PRESETS.PU.defaultSubjectMax }
+    });
+
+    // Custom added subjects map
+    const [customAddedSubjects, setCustomAddedSubjects] = useState({
+        MEDICAL: [],
+        ENGG: [],
+        CBSE: [],
+        PU: []
+    });
+
+    const [newSubjectInput, setNewSubjectInput] = useState('');
     const [showInstructions, setShowInstructions] = useState(true);
 
     // Upload & Parsed Data States
@@ -138,7 +176,6 @@ const CustomProgressReport = () => {
     const [statusMessage, setStatusMessage] = useState(null);
 
     // Students Data Array
-    // Each student: { id, name, campus, stream, tests: [{ testName, date, total, marks: { SUB: val }, isAB }], avgTotal, subjectAverages: { SUB: val } }
     const [students, setStudents] = useState([]);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
     const [studentSearch, setStudentSearch] = useState('');
@@ -154,56 +191,120 @@ const CustomProgressReport = () => {
 
     const fileInputRef = useRef(null);
 
-    // On Stream Change
-    const handleStreamChange = (streamKey) => {
-        setSelectedStream(streamKey);
-        const preset = STREAM_PRESETS[streamKey];
-        setAvailableSubjects(preset.subjects);
-        setSelectedSubjects(preset.defaultSubjects);
-        setStatusMessage({
-            type: 'info',
-            text: `Switched stream to ${preset.label}. Subjects updated to default stream template.`
+    // Compute Total Max Marks for a Stream
+    const getStreamTotalMax = (streamKey) => {
+        const subs = streamSubjects[streamKey] || [];
+        const maxMap = streamMaxMarks[streamKey] || {};
+        return subs.reduce((sum, s) => sum + (Number(maxMap[s]) || 0), 0);
+    };
+
+    // Toggle Stream Selection (Multi-Select)
+    const handleToggleStream = (streamKey) => {
+        setSelectedStreams(prev => {
+            if (prev.includes(streamKey)) {
+                if (prev.length <= 1) {
+                    setStatusMessage({ type: 'error', text: 'At least one stream must be selected!' });
+                    return prev;
+                }
+                const updated = prev.filter(k => k !== streamKey);
+                if (activeConfigTab === streamKey) {
+                    setActiveConfigTab(updated[0]);
+                }
+                return updated;
+            } else {
+                const updated = [...prev, streamKey];
+                setActiveConfigTab(streamKey);
+                return updated;
+            }
         });
     };
 
-    // Toggle Subject Checkbox
-    const toggleSubject = (sub) => {
-        if (selectedSubjects.includes(sub)) {
-            if (selectedSubjects.length <= 1) {
-                setStatusMessage({ type: 'error', text: 'At least one subject must be selected!' });
-                return;
+    // Toggle Subject Checkbox for currently active stream tab
+    const handleToggleSubject = (streamKey, sub) => {
+        setStreamSubjects(prev => {
+            const currentList = prev[streamKey] || [];
+            if (currentList.includes(sub)) {
+                if (currentList.length <= 1) {
+                    setStatusMessage({ type: 'error', text: 'At least one subject must remain selected for this stream!' });
+                    return prev;
+                }
+                return { ...prev, [streamKey]: currentList.filter(s => s !== sub) };
+            } else {
+                return { ...prev, [streamKey]: [...currentList, sub] };
             }
-            setSelectedSubjects(prev => prev.filter(s => s !== sub));
-        } else {
-            setSelectedSubjects(prev => [...prev, sub]);
-        }
+        });
     };
 
-    // Add Custom Subject
+    // Change Max Marks for a subject
+    const handleMaxMarkChange = (streamKey, subject, value) => {
+        const num = value === '' ? '' : Math.max(0, Number(value));
+        setStreamMaxMarks(prev => ({
+            ...prev,
+            [streamKey]: {
+                ...(prev[streamKey] || {}),
+                [subject]: num
+            }
+        }));
+    };
+
+    // Quick presets for Max Marks
+    const handleSetAllMaxMarks = (streamKey, val) => {
+        const subs = streamSubjects[streamKey] || [];
+        const updated = {};
+        subs.forEach(s => { updated[s] = val; });
+        setStreamMaxMarks(prev => ({
+            ...prev,
+            [streamKey]: { ...(prev[streamKey] || {}), ...updated }
+        }));
+        setStatusMessage({ type: 'info', text: `Set out of marks for all ${subs.length} subjects to ${val} in ${STREAM_PRESETS[streamKey].label}.` });
+    };
+
+    // Add Custom Subject to active stream
     const handleAddCustomSubject = (e) => {
         e.preventDefault();
-        const trimmed = newSubjectName.trim().toUpperCase();
+        const trimmed = newSubjectInput.trim().toUpperCase();
         if (!trimmed) return;
-        if (!availableSubjects.includes(trimmed)) {
-            setAvailableSubjects(prev => [...prev, trimmed]);
-        }
-        if (!selectedSubjects.includes(trimmed)) {
-            setSelectedSubjects(prev => [...prev, trimmed]);
-        }
-        setNewSubjectName('');
-        setStatusMessage({ type: 'success', text: `Added custom subject "${trimmed}".` });
+        setCustomAddedSubjects(prev => ({
+            ...prev,
+            [activeConfigTab]: [...new Set([...(prev[activeConfigTab] || []), trimmed])]
+        }));
+        setStreamSubjects(prev => ({
+            ...prev,
+            [activeConfigTab]: [...new Set([...(prev[activeConfigTab] || []), trimmed])]
+        }));
+        setStreamMaxMarks(prev => ({
+            ...prev,
+            [activeConfigTab]: {
+                ...(prev[activeConfigTab] || {}),
+                [trimmed]: 100
+            }
+        }));
+        setNewSubjectInput('');
+        setStatusMessage({ type: 'success', text: `Added custom subject "${trimmed}" with Max Marks 100.` });
     };
 
-    // Select All / Clear All Subjects
-    const handleSelectAllSubjects = () => {
-        setSelectedSubjects([...availableSubjects]);
+    // Select All / Reset Defaults for active stream tab
+    const handleSelectAllForTab = () => {
+        const fullAvailable = [
+            ...STREAM_PRESETS[activeConfigTab].availableSubjects,
+            ...(customAddedSubjects[activeConfigTab] || [])
+        ];
+        setStreamSubjects(prev => ({ ...prev, [activeConfigTab]: fullAvailable }));
     };
-    const handleResetSubjects = () => {
-        setSelectedSubjects(STREAM_PRESETS[selectedStream].defaultSubjects);
+
+    const handleResetDefaultsForTab = () => {
+        setStreamSubjects(prev => ({
+            ...prev,
+            [activeConfigTab]: [...STREAM_PRESETS[activeConfigTab].defaultSubjects]
+        }));
+        setStreamMaxMarks(prev => ({
+            ...prev,
+            [activeConfigTab]: { ...STREAM_PRESETS[activeConfigTab].defaultSubjectMax }
+        }));
     };
 
     // -------------------------------------------------------------
-    // 1. DYNAMIC EXCEL TEMPLATE GENERATION
+    // 1. DYNAMIC EXCEL TEMPLATE GENERATION (With Out Of / Max Marks)
     // -------------------------------------------------------------
     const handleDownloadTemplate = async () => {
         try {
@@ -211,129 +312,176 @@ const CustomProgressReport = () => {
             workbook.creator = 'Sri Chaitanya Educational Institutions';
             workbook.created = new Date();
 
-            const streamConfig = STREAM_PRESETS[selectedStream];
-            const sheet = workbook.addWorksheet('Custom_Progress_Template', {
+            const streamLabels = selectedStreams.map(k => STREAM_PRESETS[k].label).join(' & ');
+
+            // Main Unified Sheet
+            const mainSheet = workbook.addWorksheet('Custom_Progress_Template', {
                 views: [{ showGridLines: true }]
             });
 
-            // Column Definitions
-            const baseColumns = [
-                { header: 'STUDENT ID', key: 'STUD_ID', width: 18 },
+            // Base Columns
+            const baseCols = [
+                { header: 'STUDENT ID', key: 'STUD_ID', width: 16 },
                 { header: 'NAME OF THE STUDENT', key: 'NAME_OF_THE_STUDENT', width: 26 },
                 { header: 'CAMPUS NAME', key: 'CAMPUS_NAME', width: 22 },
                 { header: 'STREAM NAME', key: 'STREAM_NAME', width: 20 },
+                { header: 'EXAM TYPE', key: 'EXAM_TYPE', width: 16 },
                 { header: 'TEST NAME', key: 'TEST_NAME', width: 22 },
                 { header: 'DATE', key: 'DATE', width: 14 }
             ];
 
-            const subjectColumns = selectedSubjects.map(sub => ({
-                header: sub,
-                key: sub,
-                width: 16
-            }));
+            // Build dynamic subject columns for selected streams
+            const subjectCols = [];
+            selectedStreams.forEach(streamKey => {
+                const subs = streamSubjects[streamKey] || [];
+                subs.forEach(sub => {
+                    const colKey = selectedStreams.length > 1 ? `[${streamKey}] ${sub}` : sub;
+                    if (!subjectCols.some(c => c.key === colKey)) {
+                        subjectCols.push({
+                            header: colKey,
+                            key: colKey,
+                            width: 16,
+                            streamKey,
+                            subName: sub
+                        });
+                    }
+                });
+            });
 
-            const totalColumn = {
-                header: 'TOTAL MARKS',
-                key: 'TOTAL_MARKS',
-                width: 18
-            };
+            const totalCol = { header: 'TOTAL MARKS', key: 'TOTAL_MARKS', width: 16 };
 
-            sheet.columns = [...baseColumns, ...subjectColumns, totalColumn];
+            // Attendance Columns (exact match to Image 2)
+            const attendanceCols = includeAttendance ? [
+                { header: 'TOTAL NO.OF WORKING DAYS', key: 'WORKING_DAYS', width: 25 },
+                { header: 'ABSENT', key: 'ATT_ABSENT', width: 14 },
+                { header: 'PRESENT', key: 'ATT_PRESENT', width: 14 },
+                { header: 'SICK', key: 'ATT_SICK', width: 14 },
+                { header: 'TOTAL', key: 'ATT_TOTAL', width: 14 }
+            ] : [];
+
+            mainSheet.columns = [...baseCols, ...subjectCols, totalCol, ...attendanceCols];
 
             // Style Header Row (Row 1)
-            const headerRow = sheet.getRow(1);
+            const headerRow = mainSheet.getRow(1);
             headerRow.height = 30;
-            headerRow.eachCell((cell) => {
+            headerRow.eachCell((cell, colNum) => {
+                const totalColIndex = baseCols.length + subjectCols.length + 1;
+                const isAttendance = includeAttendance && colNum > totalColIndex;
+
                 cell.fill = {
                     type: 'pattern',
                     pattern: 'solid',
-                    fgColor: { argb: 'FF0F2057' } // Deep Royal Navy
+                    fgColor: {
+                        argb: colNum === totalColIndex ? 'FFC9962B' : isAttendance ? 'FF1E3A8A' : 'FF0F2057'
+                    }
                 };
                 cell.font = {
                     name: 'Segoe UI',
-                    size: 11,
+                    size: 10.5,
                     bold: true,
-                    color: { argb: 'FFFFFFFF' }
+                    color: { argb: colNum === totalColIndex ? 'FF0F2057' : 'FFFFFFFF' }
                 };
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
                 cell.border = {
                     top: { style: 'thin', color: { argb: 'FFC9962B' } },
+                    bottom: { style: 'thin', color: { argb: 'FFC9962B' } },
+                    left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                    right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+                };
+            });
+
+            // Row 2: OUT OF / MAX MARKS ROW (Exactly as shown in Image 2!)
+            const maxRowObj = {
+                STUD_ID: 'MAX MARKS',
+                NAME_OF_THE_STUDENT: 'Out of Marks Reference',
+                CAMPUS_NAME: '-',
+                STREAM_NAME: '-',
+                EXAM_TYPE: '-',
+                TEST_NAME: 'Max Marks',
+                DATE: '-'
+            };
+
+            let sumOfTotals = 0;
+            subjectCols.forEach(sc => {
+                const maxVal = streamMaxMarks[sc.streamKey]?.[sc.subName] ?? 100;
+                maxRowObj[sc.key] = maxVal;
+                sumOfTotals += Number(maxVal) || 0;
+            });
+            maxRowObj.TOTAL_MARKS = selectedStreams.length === 1 ? getStreamTotalMax(selectedStreams[0]) : sumOfTotals;
+
+            if (includeAttendance) {
+                maxRowObj.WORKING_DAYS = 'Max Working Days';
+                maxRowObj.ATT_ABSENT = '-';
+                maxRowObj.ATT_PRESENT = '-';
+                maxRowObj.ATT_SICK = '-';
+                maxRowObj.ATT_TOTAL = '-';
+            }
+
+            const maxRow = mainSheet.addRow(maxRowObj);
+            maxRow.height = 24;
+            maxRow.eachCell((cell, colNum) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFF1F4FB' }
+                };
+                cell.font = {
+                    name: 'Segoe UI',
+                    size: 10,
+                    bold: true,
+                    color: { argb: 'FF0F2057' }
+                };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.border = {
                     bottom: { style: 'medium', color: { argb: 'FFC9962B' } },
                     left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
                     right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
                 };
             });
 
-            // Highlight TOTAL MARKS header cell with Gold accent
-            const totalCell = headerRow.getCell(baseColumns.length + subjectColumns.length + 1);
-            if (totalCell) {
-                totalCell.fill = {
-                    type: 'pattern',
-                    pattern: 'solid',
-                    fgColor: { argb: 'FFC9962B' } // Gold
-                };
-                totalCell.font = {
-                    name: 'Segoe UI',
-                    size: 11,
-                    bold: true,
-                    color: { argb: 'FF0F2057' }
-                };
-            }
-
-            // 3 Realistic Sample Rows to demonstrate format
-            const sampleStudents = [
-                {
-                    id: 'SC1001',
-                    name: 'Aarav Patel',
-                    campus: 'Indiranagar Campus',
-                    stream: streamConfig.label,
-                    test: 'Unit Test - 1',
-                    date: '2026-03-01'
-                },
-                {
-                    id: 'SC1001',
-                    name: 'Aarav Patel',
-                    campus: 'Indiranagar Campus',
-                    stream: streamConfig.label,
-                    test: 'Grand Test - 1',
-                    date: '2026-03-15'
-                },
-                {
-                    id: 'SC1002',
-                    name: 'Diya Sharma',
-                    campus: 'Koramangala Campus',
-                    stream: streamConfig.label,
-                    test: 'Unit Test - 1',
-                    date: '2026-03-01'
-                }
-            ];
-
-            sampleStudents.forEach((stud, idx) => {
-                const rowData = {
-                    STUD_ID: stud.id,
-                    NAME_OF_THE_STUDENT: stud.name,
-                    CAMPUS_NAME: stud.campus,
-                    STREAM_NAME: stud.stream,
-                    TEST_NAME: stud.test,
-                    DATE: stud.date
+            // Sample Rows for demonstration
+            const sampleRows = [];
+            selectedStreams.forEach((streamKey, sIdx) => {
+                const isFirst = sIdx === 0;
+                const rowObj = {
+                    STUD_ID: 'SC1001',
+                    NAME_OF_THE_STUDENT: 'Aarav Patel',
+                    CAMPUS_NAME: 'Indiranagar Campus',
+                    STREAM_NAME: streamLabels,
+                    EXAM_TYPE: streamKey,
+                    TEST_NAME: streamKey === 'MEDICAL' ? 'Grand Test - 1' : streamKey === 'CBSE' ? 'Mid-Term Board' : 'Unit Test - 1',
+                    DATE: isFirst ? '2026-03-01' : '2026-03-12'
                 };
 
-                // Add sample marks for each subject
                 let sum = 0;
-                selectedSubjects.forEach((sub, sIdx) => {
-                    const mark = idx === 1 ? 88 + (sIdx * 2) : 80 + (sIdx * 3);
-                    rowData[sub] = mark;
+                const subs = streamSubjects[streamKey] || [];
+                subs.forEach((sub, subIdx) => {
+                    const colKey = selectedStreams.length > 1 ? `[${streamKey}] ${sub}` : sub;
+                    const maxVal = Number(streamMaxMarks[streamKey]?.[sub]) || 100;
+                    const mark = Math.round(maxVal * 0.85) - (subIdx * 2);
+                    rowObj[colKey] = mark;
                     sum += mark;
                 });
-                rowData.TOTAL_MARKS = sum;
+                rowObj.TOTAL_MARKS = sum;
 
-                const addedRow = sheet.addRow(rowData);
-                addedRow.height = 22;
-                addedRow.eachCell((cell, colNumber) => {
+                if (includeAttendance) {
+                    rowObj.WORKING_DAYS = 180;
+                    rowObj.ATT_ABSENT = 6;
+                    rowObj.ATT_PRESENT = 170;
+                    rowObj.ATT_SICK = 4;
+                    rowObj.ATT_TOTAL = 180;
+                }
+                sampleRows.push(rowObj);
+            });
+
+            sampleRows.forEach(sRow => {
+                const added = mainSheet.addRow(sRow);
+                added.height = 22;
+                added.eachCell((cell, colNum) => {
                     cell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF1E293B' } };
                     cell.alignment = {
                         vertical: 'middle',
-                        horizontal: colNumber <= 2 ? 'left' : 'center'
+                        horizontal: colNum <= 2 ? 'left' : 'center'
                     };
                     cell.border = {
                         top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
@@ -344,30 +492,27 @@ const CustomProgressReport = () => {
                 });
             });
 
-            // Add Helpful Instructions Sheet
+            // Instructions Sheet
             const infoSheet = workbook.addWorksheet('Instructions');
             infoSheet.columns = [
-                { header: 'Step / Column', width: 24 },
-                { header: 'Guideline & Description', width: 75 }
+                { header: 'Section / Column', width: 26 },
+                { header: 'Description & Input Guidelines', width: 75 }
             ];
             const infoHeaders = infoSheet.getRow(1);
             infoHeaders.height = 26;
             infoHeaders.eachCell(c => {
-                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+                c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F2057' } };
                 c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-                c.alignment = { vertical: 'middle', horizontal: 'left' };
             });
 
             const instructions = [
-                ['Stream Configured', `${streamConfig.label} with ${selectedSubjects.length} subjects: ${selectedSubjects.join(', ')}`],
-                ['STUDENT ID', 'Mandatory. Unique ID or Roll No. Multiple rows with the same ID will be grouped as test history for that student.'],
-                ['NAME OF THE STUDENT', 'Mandatory. Full name of the student as it should appear on the Progress Report Card.'],
-                ['CAMPUS NAME', 'Branch / Campus name (e.g., Indiranagar, Electronic City, Whitefield).'],
-                ['STREAM NAME', `Academic Stream (e.g., ${streamConfig.label}, PCMB, PCMC).`],
-                ['TEST NAME', 'Name of exam (e.g., Unit Test - 1, Term Exam, Mock Test 01).'],
-                ['DATE', 'Date of exam in DD/MM/YYYY or YYYY-MM-DD format.'],
-                ['Subject Columns', 'Enter numeric marks scored in each subject. Enter "AB" or "Absent" if the student was absent.'],
-                ['TOTAL MARKS', 'Sum of all subject marks. If left blank, the system will automatically calculate the total sum of subject marks!']
+                ['Selected Streams', streamLabels],
+                ['Out of / Max Marks', 'Row 2 indicates the Out of Marks (Max Marks) for each subject and total. You can adjust them directly.'],
+                ['Attendance Enabled', includeAttendance ? 'Yes (Working Days, Absent, Present, Sick, Total)' : 'No'],
+                ['STUDENT ID', 'Mandatory unique ID. Multiple rows with the same ID will be grouped together.'],
+                ['EXAM TYPE', `Specify which stream this test belongs to (${selectedStreams.join(', ')}).`],
+                ['Subject Marks', 'Enter student marks for each test. If absent, enter "AB" or "Absent".'],
+                ['Attendance Section', 'Enter TOTAL NO.OF WORKING DAYS, ABSENT, PRESENT, SICK, and TOTAL.']
             ];
 
             instructions.forEach(inst => {
@@ -376,17 +521,17 @@ const CustomProgressReport = () => {
                 r.alignment = { vertical: 'middle' };
             });
 
-            // Generate buffer & trigger download
+            // Write and Save
             const buffer = await workbook.xlsx.writeBuffer();
             const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            const fileName = `${selectedStream}_Progress_Report_Template.xlsx`;
+            const fileName = `${selectedStreams.join('_')}_Progress_Report_Template.xlsx`;
             saveAs(blob, fileName);
 
             setStatusMessage({
                 type: 'success',
-                text: `Downloaded "${fileName}" successfully! Fill student marks in this template and upload below.`
+                text: `Downloaded template "${fileName}" with out-of-marks configured!`
             });
-            logActivity(userData, 'Downloaded Custom Progress Template', { stream: selectedStream, subjects: selectedSubjects });
+            logActivity(userData, 'Downloaded Multi-Stream Progress Template', { streams: selectedStreams, attendance: includeAttendance });
         } catch (err) {
             console.error('Error generating template:', err);
             setStatusMessage({ type: 'error', text: `Failed to create Excel template: ${err.message}` });
@@ -394,7 +539,7 @@ const CustomProgressReport = () => {
     };
 
     // -------------------------------------------------------------
-    // 2. FILE UPLOAD & PARSER
+    // 2. PARSE EXCEL FILE (Multi-Stream & Attendance Handler)
     // -------------------------------------------------------------
     const getCellValue = (cell) => {
         if (!cell || cell.value === null || cell.value === undefined) return '';
@@ -418,14 +563,12 @@ const CustomProgressReport = () => {
             const workbook = new ExcelJS.Workbook();
             await workbook.xlsx.load(arrayBuffer);
 
-            // Use first sheet with data
             const worksheet = workbook.worksheets.find(ws => ws.name !== 'Instructions') || workbook.worksheets[0];
             if (!worksheet) throw new Error('No valid worksheet found in the Excel file.');
 
             let headerRowIndex = 1;
             let headerValues = [];
 
-            // Scan first 5 rows to locate header row
             for (let r = 1; r <= 5; r++) {
                 const row = worksheet.getRow(r);
                 const values = [];
@@ -433,7 +576,7 @@ const CustomProgressReport = () => {
                     values[colNumber] = String(getCellValue(cell) || '').trim();
                 });
                 const normStr = values.join(' ').toUpperCase();
-                if (normStr.includes('STUD') || normStr.includes('NAME') || normStr.includes('MARKS')) {
+                if (normStr.includes('STUD') || normStr.includes('NAME') || normStr.includes('MARKS') || normStr.includes('ATTENDANCE')) {
                     headerRowIndex = r;
                     headerValues = values;
                     break;
@@ -452,10 +595,18 @@ const CustomProgressReport = () => {
             let nameCol = -1;
             let campusCol = -1;
             let streamCol = -1;
+            let examTypeCol = -1;
             let testCol = -1;
             let dateCol = -1;
             let totalCol = -1;
-            const subjectCols = {};
+
+            let workingDaysCol = -1;
+            let absentCol = -1;
+            let presentCol = -1;
+            let sickCol = -1;
+            let attTotalCol = -1;
+
+            const subjectCols = [];
 
             headerValues.forEach((rawHeader, colIdx) => {
                 if (!rawHeader) return;
@@ -463,138 +614,220 @@ const CustomProgressReport = () => {
 
                 if (h.includes('STUDENT ID') || h === 'STUD_ID' || h === 'STUDENTID' || h === 'ID' || h === 'ROLL NO') {
                     if (idCol === -1) idCol = colIdx;
-                } else if (h.includes('NAME') || h === 'STUDENT NAME') {
+                } else if (h.includes('NAME OF THE STUDENT') || h === 'STUDENT NAME' || h === 'NAME') {
                     if (nameCol === -1) nameCol = colIdx;
                 } else if (h.includes('CAMPUS') || h.includes('BRANCH')) {
                     if (campusCol === -1) campusCol = colIdx;
+                } else if (h.includes('EXAM TYPE') || h.includes('STREAM TYPE') || h.includes('CATEGORY')) {
+                    if (examTypeCol === -1) examTypeCol = colIdx;
                 } else if (h.includes('STREAM')) {
                     if (streamCol === -1) streamCol = colIdx;
                 } else if (h.includes('TEST') || h.includes('EXAM')) {
                     if (testCol === -1) testCol = colIdx;
                 } else if (h.includes('DATE')) {
                     if (dateCol === -1) dateCol = colIdx;
-                } else if (h.includes('TOTAL') || h.includes('TOT_')) {
+                } else if (h.includes('TOTAL NO.OF WORKING DAYS') || h.includes('WORKING DAYS')) {
+                    workingDaysCol = colIdx;
+                } else if (h === 'ABSENT' || h.includes('DAYS ABSENT')) {
+                    absentCol = colIdx;
+                } else if (h === 'PRESENT' || h.includes('DAYS PRESENT')) {
+                    presentCol = colIdx;
+                } else if (h === 'SICK' || h.includes('SICK LEAVE')) {
+                    sickCol = colIdx;
+                } else if (h === 'TOTAL' && colIdx > (workingDaysCol !== -1 ? workingDaysCol : 10)) {
+                    attTotalCol = colIdx;
+                } else if (h.includes('TOTAL MARKS') || h === 'TOTAL' || h === 'TOT') {
                     if (totalCol === -1) totalCol = colIdx;
                 } else {
-                    // Check if matches any selected or available subjects, or custom column
-                    subjectCols[h] = colIdx;
+                    let streamTag = null;
+                    let cleanSub = h;
+                    const match = h.match(/^\[(.*?)\]\s*(.*)$/);
+                    if (match) {
+                        streamTag = match[1].trim();
+                        cleanSub = match[2].trim();
+                    }
+                    subjectCols.push({ col: colIdx, originalName: h, cleanName: cleanSub, streamTag });
                 }
             });
 
-            // Determine active subjects from upload header or fallback to current selected
-            const detectedSubjects = Object.keys(subjectCols);
-            const activeSubList = detectedSubjects.length > 0 ? detectedSubjects : selectedSubjects;
-            if (detectedSubjects.length > 0) {
-                setSelectedSubjects(detectedSubjects);
+            // Check if row directly below header is a Max Marks row
+            const secondRow = worksheet.getRow(headerRowIndex + 1);
+            const r2Label = String(getCellValue(secondRow.getCell(idCol !== -1 ? idCol : 1)) || '').toUpperCase();
+            const isRow2MaxMarks = r2Label.includes('MAX') || r2Label.includes('OUT OF') || r2Label.includes('TOTAL');
+
+            if (isRow2MaxMarks) {
+                // Extract Max Marks from Row 2!
+                const extractedMax = {};
+                subjectCols.forEach(sc => {
+                    const rawVal = getCellValue(secondRow.getCell(sc.col));
+                    if (rawVal && !isNaN(Number(rawVal))) {
+                        const targetStream = sc.streamTag || selectedStreams[0];
+                        if (!extractedMax[targetStream]) extractedMax[targetStream] = {};
+                        extractedMax[targetStream][sc.cleanName] = Number(rawVal);
+                    }
+                });
+
+                setStreamMaxMarks(prev => {
+                    const merged = { ...prev };
+                    Object.keys(extractedMax).forEach(st => {
+                        merged[st] = { ...(merged[st] || {}), ...extractedMax[st] };
+                    });
+                    return merged;
+                });
             }
 
             const rawStudentRows = [];
             worksheet.eachRow((row, rowNumber) => {
-                if (rowNumber <= headerRowIndex) return; // skip header
+                if (rowNumber <= headerRowIndex) return;
+                if (rowNumber === headerRowIndex + 1 && isRow2MaxMarks) return; // skip max marks reference row
 
                 const studId = idCol !== -1 ? String(getCellValue(row.getCell(idCol)) || '').trim() : '';
                 const studName = nameCol !== -1 ? String(getCellValue(row.getCell(nameCol)) || '').trim() : '';
                 const campus = campusCol !== -1 ? String(getCellValue(row.getCell(campusCol)) || '').trim() : 'Campus';
-                const stream = streamCol !== -1 ? String(getCellValue(row.getCell(streamCol)) || '').trim() : STREAM_PRESETS[selectedStream].label;
+                const stream = streamCol !== -1 ? String(getCellValue(row.getCell(streamCol)) || '').trim() : selectedStreams.map(k => STREAM_PRESETS[k].label).join(' & ');
+                let examType = examTypeCol !== -1 ? String(getCellValue(row.getCell(examTypeCol)) || '').trim().toUpperCase() : '';
                 const test = testCol !== -1 ? String(getCellValue(row.getCell(testCol)) || '').trim() : `Test ${rowNumber - headerRowIndex}`;
                 let dateVal = dateCol !== -1 ? getCellValue(row.getCell(dateCol)) : '';
                 if (dateVal instanceof Date) {
                     dateVal = dateVal.toISOString().split('T')[0];
                 }
 
-                // If completely empty row, skip
                 if (!studId && !studName) return;
 
-                // Read subjects marks
                 const marksObj = {};
                 let numericSum = 0;
                 let isAbsentRow = false;
+                let detectedStreamFromCols = null;
 
-                activeSubList.forEach(sub => {
-                    const col = subjectCols[sub];
-                    if (col !== undefined) {
-                        const rawVal = getCellValue(row.getCell(col));
-                        const strVal = String(rawVal || '').trim().toUpperCase();
-                        if (strVal === 'AB' || strVal === 'ABSENT' || strVal === 'A') {
-                            marksObj[sub] = 'AB';
-                            isAbsentRow = true;
-                        } else if (strVal !== '' && !isNaN(Number(strVal))) {
-                            const num = Number(strVal);
-                            marksObj[sub] = num;
-                            numericSum += num;
+                subjectCols.forEach(sc => {
+                    const rawVal = getCellValue(row.getCell(sc.col));
+                    const strVal = String(rawVal || '').trim().toUpperCase();
+                    if (strVal === 'AB' || strVal === 'ABSENT' || strVal === 'A') {
+                        marksObj[sc.cleanName] = 'AB';
+                        isAbsentRow = true;
+                    } else if (strVal !== '' && !isNaN(Number(strVal))) {
+                        const num = Number(strVal);
+                        marksObj[sc.cleanName] = num;
+                        numericSum += num;
+                        if (sc.streamTag) {
+                            detectedStreamFromCols = sc.streamTag;
                         } else {
-                            marksObj[sub] = strVal || 0;
+                            if (['BOTANY', 'ZOOLOGY'].includes(sc.cleanName)) detectedStreamFromCols = 'MEDICAL';
+                            else if (['COMPUTER SCIENCE', 'KANNADA', 'SANSKRIT', 'HINDI'].includes(sc.cleanName)) detectedStreamFromCols = 'PU';
+                            else if (['IP', 'PE'].includes(sc.cleanName)) detectedStreamFromCols = 'CBSE';
                         }
-                    } else {
-                        marksObj[sub] = 0;
                     }
                 });
 
-                // Total Marks
                 let totalMarksVal = totalCol !== -1 ? getCellValue(row.getCell(totalCol)) : null;
                 let finalTotal = numericSum;
                 if (totalMarksVal !== null && totalMarksVal !== '' && !isNaN(Number(totalMarksVal))) {
                     finalTotal = Number(totalMarksVal);
                 }
 
+                if (!examType) {
+                    examType = detectedStreamFromCols || selectedStreams[0];
+                }
+                if (examType.includes('MED') || examType.includes('NEET')) examType = 'MEDICAL';
+                else if (examType.includes('ENG') || examType.includes('JEE')) examType = 'ENGG';
+                else if (examType.includes('CBSE')) examType = 'CBSE';
+                else if (examType.includes('PU')) examType = 'PU';
+
+                const wDays = workingDaysCol !== -1 ? Number(getCellValue(row.getCell(workingDaysCol))) || 0 : 0;
+                const abDays = absentCol !== -1 ? Number(getCellValue(row.getCell(absentCol))) || 0 : 0;
+                const prDays = presentCol !== -1 ? Number(getCellValue(row.getCell(presentCol))) || 0 : 0;
+                const skDays = sickCol !== -1 ? Number(getCellValue(row.getCell(sickCol))) || 0 : 0;
+                const totAtt = attTotalCol !== -1 ? Number(getCellValue(row.getCell(attTotalCol))) || (prDays + abDays + skDays) : (prDays + abDays + skDays);
+
                 rawStudentRows.push({
                     studId: studId || studName,
-                    studName: studName || studId || 'Student',
+                    studName: studName || studId,
                     campus,
                     stream,
+                    examType,
                     testName: test || 'Exam',
                     date: dateVal,
                     total: isAbsentRow ? 0 : finalTotal,
                     marks: marksObj,
-                    isAB: isAbsentRow
+                    isAB: isAbsentRow,
+                    attendance: wDays > 0 ? {
+                        workingDays: wDays,
+                        absent: abDays,
+                        present: prDays,
+                        sick: skDays,
+                        total: totAtt || wDays
+                    } : null
                 });
             });
 
             if (rawStudentRows.length === 0) {
-                throw new Error('No valid student mark records found. Please ensure the template has student rows.');
+                throw new Error('No valid student rows found in the uploaded file.');
             }
 
-            // Group by Student ID
             const grouped = {};
             rawStudentRows.forEach(row => {
-                const key = row.studId;
-                if (!grouped[key]) {
-                    grouped[key] = {
+                const sid = row.studId;
+                if (!grouped[sid]) {
+                    grouped[sid] = {
                         id: row.studId,
                         name: row.studName,
                         campus: row.campus,
                         stream: row.stream,
-                        tests: []
+                        streamTests: {},
+                        attendance: null
                     };
                 }
-                grouped[key].tests.push({
+                const st = row.examType || selectedStreams[0];
+                if (!grouped[sid].streamTests[st]) {
+                    grouped[sid].streamTests[st] = [];
+                }
+                grouped[sid].streamTests[st].push({
                     testName: row.testName,
                     date: row.date,
                     total: row.total,
                     marks: row.marks,
                     isAB: row.isAB
                 });
+
+                if (row.attendance) {
+                    grouped[sid].attendance = row.attendance;
+                }
             });
 
-            // Compute Averages for each student
-            const studentList = Object.values(grouped).map(st => {
-                const attended = st.tests.filter(t => !t.isAB);
-                const count = attended.length;
-                const avgTotal = count > 0 ? Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / count) : 0;
+            const studentList = Object.values(grouped).map(stud => {
+                const streamAverages = {};
+                Object.keys(stud.streamTests).forEach(stKey => {
+                    const tests = stud.streamTests[stKey] || [];
+                    const attended = tests.filter(t => !t.isAB);
+                    const count = attended.length;
+                    const avgTot = count > 0 ? Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / count) : 0;
 
-                const subjectAverages = {};
-                activeSubList.forEach(sub => {
-                    const validMarks = attended
-                        .map(t => t.marks[sub])
-                        .filter(m => m !== undefined && m !== null && m !== 'AB' && !isNaN(Number(m)))
-                        .map(Number);
-                    subjectAverages[sub] = validMarks.length > 0 ? Math.round(validMarks.reduce((a, b) => a + b, 0) / validMarks.length) : '-';
+                    const activeSubs = streamSubjects[stKey] || STREAM_PRESETS[stKey]?.defaultSubjects || [];
+                    const subjectAverages = {};
+                    activeSubs.forEach(sub => {
+                        const validMarks = attended
+                            .map(t => t.marks[sub])
+                            .filter(m => m !== undefined && m !== null && m !== 'AB' && !isNaN(Number(m)))
+                            .map(Number);
+                        subjectAverages[sub] = validMarks.length > 0 ? Math.round(validMarks.reduce((a, b) => a + b, 0) / validMarks.length) : '-';
+                    });
+
+                    streamAverages[stKey] = {
+                        avgTotal: avgTot,
+                        subjectAverages
+                    };
                 });
 
+                let attObj = stud.attendance;
+                if (attObj && attObj.workingDays > 0) {
+                    const pct = ((attObj.present / attObj.workingDays) * 100).toFixed(1);
+                    attObj.percentage = `${pct}%`;
+                }
+
                 return {
-                    ...st,
-                    avgTotal,
-                    subjectAverages
+                    ...stud,
+                    streamAverages,
+                    attendance: attObj
                 };
             });
 
@@ -602,15 +835,12 @@ const CustomProgressReport = () => {
             setCurrentStudentIndex(0);
             setStatusMessage({
                 type: 'success',
-                text: `Successfully parsed ${studentList.length} student(s) with ${rawStudentRows.length} exam records across ${activeSubList.length} subjects!`
+                text: `Parsed ${studentList.length} student(s) with ${rawStudentRows.length} total test records across selected streams!`
             });
-            logActivity(userData, 'Uploaded Custom Progress Excel', { studentsCount: studentList.length, subjects: activeSubList });
+            logActivity(userData, 'Uploaded Multi-Stream Progress Excel', { studentsCount: studentList.length });
         } catch (err) {
             console.error('File parsing error:', err);
-            setStatusMessage({
-                type: 'error',
-                text: `Failed to parse Excel file: ${err.message}`
-            });
+            setStatusMessage({ type: 'error', text: `Failed to parse Excel file: ${err.message}` });
         } finally {
             setIsParsing(false);
         }
@@ -647,13 +877,21 @@ const CustomProgressReport = () => {
     };
 
     // Remarks management
+    const streamTotalsMap = useMemo(() => {
+        const res = {};
+        selectedStreams.forEach(k => {
+            res[k] = getStreamTotalMax(k);
+        });
+        return res;
+    }, [selectedStreams, streamSubjects, streamMaxMarks]);
+
     const currentRemark = useMemo(() => {
         if (!activeStudent) return '';
         if (customRemarks[activeStudent.id]) {
             return customRemarks[activeStudent.id];
         }
-        return generateDynamicRemarks(activeStudent.name, activeStudent.tests, selectedSubjects);
-    }, [activeStudent, customRemarks, selectedSubjects]);
+        return generateDynamicRemarks(activeStudent.name, activeStudent.streamTests, activeStudent.attendance, streamTotalsMap);
+    }, [activeStudent, customRemarks, streamTotalsMap]);
 
     const handleSaveRemark = () => {
         if (!activeStudent) return;
@@ -665,7 +903,7 @@ const CustomProgressReport = () => {
     };
 
     // -------------------------------------------------------------
-    // 4. HIGH-FIDELITY PDF GENERATION (Matching Sri Chaitanya Format)
+    // 4. HIGH-FIDELITY PDF GENERATION (2-Tier Header with Out Of Marks)
     // -------------------------------------------------------------
     const loadFont = async (url) => {
         try {
@@ -692,8 +930,7 @@ const CustomProgressReport = () => {
         });
     };
 
-    const renderStudentPDFPage = (doc, student, logoImg, fonts, subjects) => {
-        // Embed Fonts if available
+    const renderStudentPDFPage = (doc, student, logoImg, fonts) => {
         if (fonts?.oswaldBold) {
             try {
                 doc.addFileToVFS("Oswald-Bold.ttf", fonts.oswaldBold);
@@ -759,16 +996,13 @@ const CustomProgressReport = () => {
         const drawBorderAndBackground = () => {
             const pageWidth = 210;
             const pageHeight = 297;
-            // Warm off-white background: #FFFDF8
             doc.setFillColor(255, 253, 248);
             doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
-            // Outer gold border: #C9962B (0.7mm)
             doc.setDrawColor(201, 150, 43);
             doc.setLineWidth(0.7);
             doc.rect(7.5, 7.5, pageWidth - 15, pageHeight - 15, 'S');
 
-            // Inner thin line: #C9962B (0.25mm)
             doc.setLineWidth(0.25);
             doc.rect(9.2, 9.2, pageWidth - 18.4, pageHeight - 18.4, 'S');
         };
@@ -783,16 +1017,16 @@ const CustomProgressReport = () => {
             doc.addImage(logoImg, 'PNG', logoX, 12, logoW, logoH, undefined, 'FAST');
         }
 
-        // 2. Title: "Sri Chaitanya Educational Institutions"
+        // 2. Title
         const titleY = 34.5;
         setFontOswald();
         doc.setFontSize(22);
-        doc.setTextColor(10, 79, 196); // #0A4FC4
+        doc.setTextColor(10, 79, 196);
         const w1 = doc.getTextWidth("Sri Chaitanya ");
 
         setFontLibreBaskerville();
         doc.setFontSize(17);
-        doc.setTextColor(26, 99, 200); // #1A63C8
+        doc.setTextColor(26, 99, 200);
         const w2 = doc.getTextWidth("Educational Institutions");
 
         const startX = (210 - (w1 + w2)) / 2;
@@ -813,7 +1047,7 @@ const CustomProgressReport = () => {
         const ribbonH = 7.2;
         const ribbonX = (210 - ribbonW) / 2;
 
-        doc.setFillColor(15, 32, 87); // #0F2057
+        doc.setFillColor(15, 32, 87);
         doc.lines(
             [
                 [ribbonW - 6, 0],
@@ -829,12 +1063,14 @@ const CustomProgressReport = () => {
         doc.setTextColor(255, 255, 255);
         doc.text("PROGRESS REPORT CARD", 105, ribbonY + 5.1, { align: 'center' });
 
-        // 4. Student Info Table & Initials Monogram Box
+        // 4. Student Info Table (Full Width - Photo/Initials Box Completely Removed)
         const infoY = 49.5;
         const infoX = 14;
-        const infoW = 142;
-        const infoH = 29.6;
+        const infoW = 182;
+        const infoH = 28;
         const rowH = infoH / 4;
+        const labelW = 50;
+        const valueW = infoW - labelW;
 
         const infoData = [
             { label: "Type of Report Card", value: "Academic", isBold: false },
@@ -845,169 +1081,230 @@ const CustomProgressReport = () => {
 
         infoData.forEach((row, i) => {
             const y = infoY + (i * rowH);
-            // Label cell
-            doc.setFillColor(241, 244, 251); // #F1F4FB
-            doc.setDrawColor(207, 214, 232); // #CFD6E8
+            doc.setFillColor(241, 244, 251);
+            doc.setDrawColor(207, 214, 232);
             doc.setLineWidth(0.25);
-            doc.rect(infoX, y, 48, rowH, 'FD');
+            doc.rect(infoX, y, labelW, rowH, 'FD');
 
             setFontNunitoBold();
             doc.setFontSize(8.5);
-            doc.setTextColor(15, 32, 87); // #0F2057
-            doc.text(row.label, infoX + 3, y + 4.8);
+            doc.setTextColor(15, 32, 87);
+            doc.text(row.label, infoX + 4, y + 4.8);
 
-            // Value cell
-            doc.setFillColor(255, 253, 248); // #FFFDF8
-            doc.rect(infoX + 48, y, 94, rowH, 'FD');
+            doc.setFillColor(255, 253, 248);
+            doc.rect(infoX + labelW, y, valueW, rowH, 'FD');
 
             if (row.isBold) setFontNunitoBold();
             else setFontNunitoRegular();
             doc.setFontSize(8.5);
-            doc.setTextColor(20, 32, 74); // #14204A
-            doc.text(row.value, infoX + 51, y + 4.8);
+            doc.setTextColor(20, 32, 74);
+            doc.text(row.value, infoX + labelW + 4, y + 4.8);
         });
 
-        // Photo / Monogram Box on Right (No photo needed for manual report)
-        const photoX = 160;
-        const photoY = infoY;
-        const photoW = 36;
-        const photoH = infoH;
+        let currentY = infoY + infoH + 7;
 
-        doc.setFillColor(255, 253, 248);
-        doc.setDrawColor(201, 150, 43); // #C9962B
-        doc.setLineWidth(0.9);
-        doc.rect(photoX, photoY, photoW, photoH, 'FD');
+        // 5. Render Tables for Each Active Stream (2-Tier Header matching Image 2!)
+        const streamOrder = ['MEDICAL', 'ENGG', 'CBSE', 'PU'];
+        const activeStreamKeys = streamOrder.filter(k => student.streamTests[k] && student.streamTests[k].length > 0);
+        const streamsToRender = activeStreamKeys.length > 0 ? activeStreamKeys : selectedStreams;
 
-        // Initials Avatar Monogram
-        setFontCormorantBold();
-        doc.setFontSize(22);
-        doc.setTextColor(15, 32, 87);
-        doc.text(getStudentInitials(student.name), photoX + (photoW / 2), photoY + 16, { align: 'center' });
+        streamsToRender.forEach(stKey => {
+            const tests = student.streamTests[stKey] || [];
+            const subs = streamSubjects[stKey] || STREAM_PRESETS[stKey]?.defaultSubjects || [];
+            const stLabel = STREAM_PRESETS[stKey]?.label || stKey;
+            const totalMaxVal = getStreamTotalMax(stKey);
 
-        setFontNunitoRegular();
-        doc.setFontSize(7);
-        doc.setTextColor(93, 103, 136); // #5D6788
-        doc.text("Student", photoX + (photoW / 2), photoY + 23, { align: 'center' });
-
-        // 5. Section Heading
-        const secHeadingY = 85.5;
-        setFontCormorantBold();
-        doc.setFontSize(14);
-        doc.setTextColor(15, 32, 87);
-        doc.text("Test-wise record", infoX, secHeadingY);
-
-        // 6. Test-wise Table
-        const headCols = ["Test", "Date", "Total Marks", ...subjects];
-        const tableRows = (student.tests || []).map(t => {
-            if (t.isAB) {
-                return [
-                    { content: t.testName, styles: { textColor: [198, 45, 71], fontStyle: 'bold', halign: 'left' } },
-                    { content: formatDate(t.date), styles: { textColor: [198, 45, 71], fontStyle: 'bold', halign: 'center' } },
-                    { content: 'Absent', colSpan: subjects.length + 1, styles: { halign: 'center', textColor: [198, 45, 71], fontStyle: 'bold' } }
-                ];
+            if (currentY + 45 > 265) {
+                doc.addPage();
+                drawBorderAndBackground();
+                currentY = 22;
             }
-            return [
-                { content: t.testName, styles: { fontStyle: 'bold', halign: 'left' } },
-                { content: formatDate(t.date), styles: { fontStyle: 'bold', halign: 'center' } },
-                { content: String(Math.round(t.total || 0)), styles: { fontStyle: 'bold', halign: 'center' } },
-                ...subjects.map(sub => ({
-                    content: String(t.marks && t.marks[sub] !== undefined && t.marks[sub] !== null ? Math.round(t.marks[sub]) : '-'),
-                    styles: { fontStyle: 'bold', halign: 'center' }
+
+            setFontCormorantBold();
+            doc.setFontSize(13);
+            doc.setTextColor(15, 32, 87);
+            doc.text(`${stLabel} - Test-wise record`, infoX, currentY);
+            currentY += 4;
+
+            // 2-TIER TABLE HEADER (Subject Names on Row 1, Out Of Marks on Row 2 as in Image 2!)
+            const headRow1 = [
+                { content: "Test", rowSpan: 2, styles: { valign: 'middle', halign: 'left' } },
+                { content: "Date", rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
+                { content: "Total", styles: { halign: 'center' } },
+                ...subs.map(sub => ({ content: sub, styles: { halign: 'center' } }))
+            ];
+
+            const headRow2 = [
+                { content: String(totalMaxVal), styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.5, textColor: [252, 211, 77] } },
+                ...subs.map(sub => ({
+                    content: String(streamMaxMarks[stKey]?.[sub] ?? 100),
+                    styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.5, textColor: [252, 211, 77] }
                 }))
             ];
-        });
 
-        // Average Row
-        tableRows.push([
-            { content: "Average", colSpan: 2, styles: { fontStyle: 'bold', halign: 'left', fillColor: [241, 244, 251] } },
-            { content: String(student.avgTotal || '-'), styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } },
-            ...subjects.map(sub => ({
-                content: String(student.subjectAverages && student.subjectAverages[sub] !== undefined ? student.subjectAverages[sub] : '-'),
-                styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] }
-            }))
-        ]);
-
-        // Proportional column widths calculation
-        const totalAvailWidth = 182; // 210 - 28 margin
-        const fixedWidth = 32 + 24 + 22; // Test (32), Date (24), Total (22) = 78mm
-        const remainingWidth = totalAvailWidth - fixedWidth;
-        const subWidth = Math.max(12, Math.floor(remainingWidth / subjects.length));
-
-        const columnStyles = {
-            0: { halign: 'left', fontStyle: 'bold', cellWidth: 32 },
-            1: { halign: 'center', fontStyle: 'bold', cellWidth: 24 },
-            2: { halign: 'center', fontStyle: 'bold', cellWidth: 22 }
-        };
-        subjects.forEach((_, idx) => {
-            columnStyles[3 + idx] = { halign: 'center', fontStyle: 'bold', cellWidth: subWidth };
-        });
-
-        const tableFontSize = subjects.length <= 5 ? 8.5 : subjects.length <= 8 ? 8 : 7.2;
-
-        autoTable(doc, {
-            head: [headCols],
-            body: tableRows,
-            startY: 88.5,
-            margin: { left: 14, right: 14, top: 16, bottom: 22 },
-            theme: 'plain',
-            headStyles: {
-                fillColor: [15, 32, 87], // #0F2057
-                textColor: [255, 255, 255],
-                font: 'NunitoSans',
-                fontStyle: 'bold',
-                fontSize: tableFontSize,
-                halign: 'center',
-                valign: 'middle',
-                cellPadding: 2,
-                lineColor: [207, 214, 232],
-                lineWidth: 0.2
-            },
-            styles: {
-                font: 'NunitoSans',
-                fontSize: tableFontSize,
-                textColor: [20, 32, 74],
-                lineColor: [207, 214, 232],
-                lineWidth: 0.2,
-                valign: 'middle',
-                cellPadding: 1.6
-            },
-            columnStyles,
-            didDrawCell: (data) => {
-                if (data.row.index === tableRows.length - 1) {
-                    // Gold top line on Average row
-                    doc.setDrawColor(201, 150, 43); // #C9962B
-                    doc.setLineWidth(0.6);
-                    doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+            const tableRows = tests.map(t => {
+                if (t.isAB) {
+                    return [
+                        { content: t.testName, styles: { textColor: [198, 45, 71], fontStyle: 'bold', halign: 'left' } },
+                        { content: formatDate(t.date), styles: { textColor: [198, 45, 71], fontStyle: 'bold', halign: 'center' } },
+                        { content: 'Absent', colSpan: subs.length + 1, styles: { halign: 'center', textColor: [198, 45, 71], fontStyle: 'bold' } }
+                    ];
                 }
-            }
+                return [
+                    { content: t.testName, styles: { fontStyle: 'bold', halign: 'left' } },
+                    { content: formatDate(t.date), styles: { fontStyle: 'bold', halign: 'center' } },
+                    { content: String(Math.round(t.total || 0)), styles: { fontStyle: 'bold', halign: 'center' } },
+                    ...subs.map(sub => ({
+                        content: String(t.marks && t.marks[sub] !== undefined && t.marks[sub] !== null ? Math.round(t.marks[sub]) : '-'),
+                        styles: { fontStyle: 'bold', halign: 'center' }
+                    }))
+                ];
+            });
+
+            // Average Row
+            const avgData = student.streamAverages?.[stKey];
+            tableRows.push([
+                { content: "Average", colSpan: 2, styles: { fontStyle: 'bold', halign: 'left', fillColor: [241, 244, 251] } },
+                { content: String(avgData?.avgTotal || '-'), styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } },
+                ...subs.map(sub => ({
+                    content: String(avgData?.subjectAverages?.[sub] !== undefined ? avgData.subjectAverages[sub] : '-'),
+                    styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] }
+                }))
+            ]);
+
+            const fixedWidth = 32 + 24 + 22; // 78mm
+            const remainingW = infoW - fixedWidth;
+            const subWidth = Math.max(12, Math.floor(remainingW / subs.length));
+
+            const columnStyles = {
+                0: { halign: 'left', fontStyle: 'bold', cellWidth: 32 },
+                1: { halign: 'center', fontStyle: 'bold', cellWidth: 24 },
+                2: { halign: 'center', fontStyle: 'bold', cellWidth: 22 }
+            };
+            subs.forEach((_, idx) => {
+                columnStyles[3 + idx] = { halign: 'center', fontStyle: 'bold', cellWidth: subWidth };
+            });
+
+            const tableFontSize = subs.length <= 5 ? 8.5 : subs.length <= 8 ? 7.8 : 7.2;
+
+            autoTable(doc, {
+                head: [headRow1, headRow2],
+                body: tableRows,
+                startY: currentY,
+                margin: { left: 14, right: 14 },
+                theme: 'plain',
+                headStyles: {
+                    fillColor: [15, 32, 87],
+                    textColor: [255, 255, 255],
+                    font: 'NunitoSans',
+                    fontStyle: 'bold',
+                    fontSize: tableFontSize,
+                    halign: 'center',
+                    valign: 'middle',
+                    cellPadding: 1.6,
+                    lineColor: [207, 214, 232],
+                    lineWidth: 0.2
+                },
+                styles: {
+                    font: 'NunitoSans',
+                    fontSize: tableFontSize,
+                    textColor: [20, 32, 74],
+                    lineColor: [207, 214, 232],
+                    lineWidth: 0.2,
+                    valign: 'middle',
+                    cellPadding: 1.5
+                },
+                columnStyles,
+                didDrawCell: (data) => {
+                    if (data.row.index === tableRows.length - 1) {
+                        doc.setDrawColor(201, 150, 43);
+                        doc.setLineWidth(0.6);
+                        doc.line(data.cell.x, data.cell.y, data.cell.x + data.cell.width, data.cell.y);
+                    }
+                }
+            });
+
+            currentY = doc.lastAutoTable.finalY + 6;
         });
 
-        let finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : 140;
-        if (finalY + 45 > 270) {
-            doc.addPage();
-            drawBorderAndBackground();
-            finalY = 24;
+        // 6. Attendance Table (Matching Image 2)
+        if (student.attendance || includeAttendance) {
+            const att = student.attendance || { workingDays: '-', absent: '0', present: '-', sick: '0', total: '-' };
+
+            if (currentY + 30 > 265) {
+                doc.addPage();
+                drawBorderAndBackground();
+                currentY = 22;
+            }
+
+            setFontCormorantBold();
+            doc.setFontSize(13);
+            doc.setTextColor(15, 32, 87);
+            doc.text("Attendance Record", infoX, currentY);
+            currentY += 4;
+
+            autoTable(doc, {
+                head: [["TOTAL NO.OF WORKING DAYS", "ABSENT", "PRESENT", "SICK", "TOTAL"]],
+                body: [[
+                    String(att.workingDays || '-'),
+                    String(att.absent || '0'),
+                    String(att.present || '-'),
+                    String(att.sick || '0'),
+                    String(att.total || '-')
+                ]],
+                startY: currentY,
+                margin: { left: 14, right: 14 },
+                theme: 'plain',
+                headStyles: {
+                    fillColor: [15, 32, 87],
+                    textColor: [255, 255, 255],
+                    font: 'NunitoSans',
+                    fontStyle: 'bold',
+                    fontSize: 8,
+                    halign: 'center',
+                    valign: 'middle',
+                    cellPadding: 2,
+                    lineColor: [207, 214, 232],
+                    lineWidth: 0.2
+                },
+                styles: {
+                    font: 'NunitoSans',
+                    fontSize: 8.5,
+                    fontStyle: 'bold',
+                    textColor: [20, 32, 74],
+                    lineColor: [207, 214, 232],
+                    lineWidth: 0.2,
+                    valign: 'middle',
+                    halign: 'center',
+                    cellPadding: 1.8
+                }
+            });
+
+            currentY = doc.lastAutoTable.finalY + 6;
         }
 
-        // Remarks Box
-        const remarksBoxY = finalY;
-        const remarksBoxW = 182;
-        const remarksContent = customRemarks[student.id] || generateDynamicRemarks(student.name, student.tests, subjects);
+        // 7. Remarks Box
+        if (currentY + 40 > 265) {
+            doc.addPage();
+            drawBorderAndBackground();
+            currentY = 22;
+        }
 
+        const remarksContent = customRemarks[student.id] || generateDynamicRemarks(student.name, student.streamTests, student.attendance, streamTotalsMap);
         setFontCormorantItalic();
-        doc.setFontSize(10);
-        const splitRemarks = doc.splitTextToSize("Remarks: " + remarksContent, remarksBoxW - 12);
-        const remarksH = Math.max(16, (splitRemarks.length * 4.8) + 6);
+        doc.setFontSize(9.5);
+        const splitRemarks = doc.splitTextToSize("Remarks: " + remarksContent, infoW - 12);
+        const remarksH = Math.max(14, (splitRemarks.length * 4.6) + 5);
 
-        doc.setFillColor(241, 244, 251); // #F1F4FB
-        doc.setDrawColor(45, 86, 201); // #2D56C9
+        doc.setFillColor(241, 244, 251);
+        doc.setDrawColor(45, 86, 201);
         doc.setLineWidth(0.4);
-        doc.roundedRect(14, remarksBoxY, remarksBoxW, remarksH, 2, 2, 'FD');
+        doc.roundedRect(14, currentY, infoW, remarksH, 2, 2, 'FD');
 
         doc.setTextColor(20, 32, 74);
-        doc.text(splitRemarks, 20, remarksBoxY + 5.5);
+        doc.text(splitRemarks, 20, currentY + 5);
 
-        // Signatures (Fixed at bottom of page)
+        // 8. Signatures Footer
         const sigY = 271;
         doc.setDrawColor(207, 214, 232);
         doc.setLineWidth(0.3);
@@ -1024,7 +1321,7 @@ const CustomProgressReport = () => {
     };
 
     // -------------------------------------------------------------
-    // 5. DOWNLOAD PDF HANDLERS (Combined vs Individual ZIP vs Current)
+    // 5. DOWNLOAD PDF HANDLERS
     // -------------------------------------------------------------
     const handleDownloadPDF = async (mode = 'combined') => {
         if (!students || students.length === 0) {
@@ -1033,10 +1330,9 @@ const CustomProgressReport = () => {
         }
 
         setIsDownloading(true);
-        setDownloadProgress({ current: 0, total: students.length, status: 'Initializing PDF fonts and assets...' });
+        setDownloadProgress({ current: 0, total: students.length, status: 'Initializing PDF assets...' });
 
         try {
-            // Load fonts and logo in parallel
             const [
                 logoImg,
                 oswaldBold,
@@ -1065,17 +1361,15 @@ const CustomProgressReport = () => {
             };
 
             if (mode === 'current') {
-                // Download Current Student PDF only
                 setDownloadProgress({ current: 1, total: 1, status: `Generating PDF for ${activeStudent.name}...` });
                 const doc = new jsPDF('p', 'mm', 'a4');
-                renderStudentPDFPage(doc, activeStudent, logoImg, fonts, selectedSubjects);
+                renderStudentPDFPage(doc, activeStudent, logoImg, fonts);
                 const safeName = (activeStudent.name || 'Student').replace(/[/\\?%*:|"<>]/g, '_').trim();
                 const fileName = `${safeName}_${activeStudent.id}_Progress_Report.pdf`;
                 doc.save(fileName);
                 setStatusMessage({ type: 'success', text: `Downloaded "${fileName}"!` });
                 logActivity(userData, 'Downloaded Single Custom Progress PDF', { student: activeStudent.name });
             } else if (mode === 'combined') {
-                // Download Single Multi-Page PDF with ALL Students
                 const total = students.length;
                 const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -1083,17 +1377,15 @@ const CustomProgressReport = () => {
                     const st = students[i];
                     setDownloadProgress({ current: i + 1, total, status: `Appending student ${i + 1} of ${total}: ${st.name}` });
                     if (i > 0) doc.addPage();
-                    renderStudentPDFPage(doc, st, logoImg, fonts, selectedSubjects);
-                    // Yield brief control so UI updates
+                    renderStudentPDFPage(doc, st, logoImg, fonts);
                     if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
                 }
 
-                const fileName = `${selectedStream}_Progress_Reports_All_Students.pdf`;
+                const fileName = `${selectedStreams.join('_')}_Progress_Reports_All_Students.pdf`;
                 doc.save(fileName);
                 setStatusMessage({ type: 'success', text: `Downloaded combined PDF "${fileName}" for all ${total} students!` });
-                logActivity(userData, 'Downloaded Combined Custom Progress PDF', { totalStudents: total, stream: selectedStream });
+                logActivity(userData, 'Downloaded Combined Custom Progress PDF', { totalStudents: total, streams: selectedStreams });
             } else if (mode === 'zip') {
-                // Download Individual PDFs inside a ZIP archive
                 const zip = new JSZip();
                 const total = students.length;
 
@@ -1101,7 +1393,7 @@ const CustomProgressReport = () => {
                     const st = students[i];
                     setDownloadProgress({ current: i + 1, total, status: `Generating file ${i + 1} of ${total}: ${st.name}` });
                     const doc = new jsPDF('p', 'mm', 'a4');
-                    renderStudentPDFPage(doc, st, logoImg, fonts, selectedSubjects);
+                    renderStudentPDFPage(doc, st, logoImg, fonts);
 
                     const pdfBuffer = doc.output('arraybuffer');
                     const safeName = (st.name || 'Student').replace(/[/\\?%*:|"<>]/g, '_').trim();
@@ -1113,10 +1405,10 @@ const CustomProgressReport = () => {
 
                 setDownloadProgress({ current: total, total, status: 'Compressing ZIP archive...' });
                 const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 2 } });
-                const zipFileName = `${selectedStream}_Individual_Progress_Reports.zip`;
+                const zipFileName = `${selectedStreams.join('_')}_Individual_Progress_Reports.zip`;
                 saveAs(zipBlob, zipFileName);
                 setStatusMessage({ type: 'success', text: `Downloaded individual PDFs in "${zipFileName}" (${total} files)!` });
-                logActivity(userData, 'Downloaded Custom Progress ZIP', { totalStudents: total, stream: selectedStream });
+                logActivity(userData, 'Downloaded Custom Progress ZIP', { totalStudents: total, streams: selectedStreams });
             }
         } catch (err) {
             console.error('PDF Generation Error:', err);
@@ -1158,11 +1450,11 @@ const CustomProgressReport = () => {
                             textTransform: 'uppercase',
                             letterSpacing: '0.8px'
                         }}>
-                            Manual Upload System
+                            Configurable Out of Marks
                         </span>
                     </div>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#E2E8F0', maxWidth: '750px', lineHeight: '1.5' }}>
-                        Generate official Sri Chaitanya progress report cards by selecting custom streams, configuring subjects, downloading dynamic Excel templates, and generating individual or single combined PDFs.
+                    <p style={{ margin: 0, fontSize: '14px', color: '#E2E8F0', maxWidth: '780px', lineHeight: '1.5' }}>
+                        Generate combined progress reports with custom out-of-marks (e.g. Botany 180, Physics 60, etc.) displayed directly in the table header under each subject.
                     </p>
                 </div>
 
@@ -1209,7 +1501,7 @@ const CustomProgressReport = () => {
                         gap: '8px'
                     }}>
                         <Sparkles size={18} color="#C9962B" />
-                        How to Generate Custom Progress Reports (Step-by-Step)
+                        How to Configure Out-Of-Marks & Generate Progress Reports
                     </h3>
                     <div style={{
                         display: 'grid',
@@ -1219,38 +1511,38 @@ const CustomProgressReport = () => {
                         {[
                             {
                                 num: '1',
-                                title: 'Select Academic Stream',
-                                desc: 'Choose between Medical (NEET), Engineering (JEE), CBSE Board, or PU Board.'
+                                title: 'Multi-Select Stream(s) & Attendance',
+                                desc: 'Select one or more streams (e.g. Medical + CBSE or Medical + PU). Toggle Attendance Record.'
                             },
                             {
                                 num: '2',
-                                title: 'Configure & Customize Subjects',
-                                desc: 'Check or uncheck the subjects for your batch/campus, or type to add custom subjects.'
+                                title: 'Configure Subjects & Out-Of-Marks',
+                                desc: 'Enter the exact Max Marks (e.g. 180, 100, 60) for each subject in the input boxes. Total auto-updates.'
                             },
                             {
                                 num: '3',
-                                title: 'Download Excel Template',
-                                desc: 'Click "Download Excel Template" to get the pre-formatted .xlsx file with your selected columns.'
+                                title: 'Download Pre-filled Template',
+                                desc: 'Click "Download Template" to get the formatted .xlsx with Row 2 showing your exact out-of-marks reference.'
                             },
                             {
                                 num: '4',
-                                title: 'Fill Student Marks & Details',
-                                desc: 'Enter Student ID, Name, Campus, Stream, Test, Date, subject marks and Total Marks in Excel.'
+                                title: 'Fill Student Marks & Attendance',
+                                desc: 'Enter student marks for each test. Values will be evaluated against your defined out-of-marks.'
                             },
                             {
                                 num: '5',
-                                title: 'Upload Filled Excel Sheet',
-                                desc: 'Drag & drop or browse your filled file. The system parses multi-test records and computes averages.'
+                                title: 'Upload Completed Excel File',
+                                desc: 'Upload the sheet. The system detects marks and extracts or applies your custom out-of-marks.'
                             },
                             {
                                 num: '6',
-                                title: 'Review & Verify Webview',
-                                desc: 'Preview the student progress report card in Sri Chaitanya royal format (no photo required, initials monogram shown).'
+                                title: 'Review 2-Tier Header Webview',
+                                desc: 'The table header displays subject names on Row 1 and out-of-marks on Row 2 directly underneath.'
                             },
                             {
                                 num: '7',
                                 title: 'Download Combined or Individual PDFs',
-                                desc: 'Choose to download a Single Combined PDF for all students, an Individual PDFs ZIP bundle, or single student PDF.'
+                                desc: 'Download a Single Combined PDF for all students, an Individual PDFs ZIP bundle, or single student PDF.'
                             }
                         ].map(step => (
                             <div key={step.num} style={{
@@ -1290,7 +1582,7 @@ const CustomProgressReport = () => {
                 </div>
             )}
 
-            {/* Notification / Status Alert */}
+            {/* Notification Alert */}
             {statusMessage && (
                 <div style={{
                     padding: '12px 18px',
@@ -1309,14 +1601,14 @@ const CustomProgressReport = () => {
                 </div>
             )}
 
-            {/* Control Grid: 1. Stream Selection | 2. Subject Checkboxes | 3. Template & Upload */}
+            {/* Top Control Grid: 1. Multi-Stream & Attendance | 2. Subject Checkboxes + Out of Marks | 3. Template & Upload */}
             <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
                 gap: '20px',
                 marginBottom: '26px'
             }}>
-                {/* Panel 1: Stream Filter Selection */}
+                {/* Panel 1: Multi-Stream & Attendance Selector */}
                 <div style={{
                     background: '#FFFFFF',
                     border: '1px solid #E2E8F0',
@@ -1324,41 +1616,54 @@ const CustomProgressReport = () => {
                     padding: '18px 20px',
                     boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)'
                 }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F2057', marginTop: 0, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Layers size={18} color="#0A4FC4" />
-                        1. Select Stream
-                    </h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                        <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F2057', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Layers size={18} color="#0A4FC4" />
+                            1. Select Stream(s) (Multi-Select)
+                        </h3>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#0A4FC4', background: '#EFF6FF', padding: '2px 8px', borderRadius: '6px' }}>
+                            {selectedStreams.length} Selected
+                        </span>
+                    </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' }}>
                         {Object.values(STREAM_PRESETS).map(st => {
-                            const isSelected = selectedStream === st.id;
+                            const isSelected = selectedStreams.includes(st.id);
                             return (
                                 <button
                                     key={st.id}
                                     type="button"
-                                    onClick={() => handleStreamChange(st.id)}
+                                    onClick={() => handleToggleStream(st.id)}
                                     style={{
                                         background: isSelected ? '#EFF6FF' : '#F8FAFC',
                                         border: `2px solid ${isSelected ? '#0A4FC4' : '#E2E8F0'}`,
                                         borderRadius: '8px',
-                                        padding: '12px 14px',
+                                        padding: '10px 12px',
                                         textAlign: 'left',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
+                                        transition: 'all 0.15s ease',
                                         display: 'flex',
                                         flexDirection: 'column',
-                                        gap: '4px'
+                                        gap: '3px',
+                                        position: 'relative'
                                     }}
                                 >
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <span style={{ fontSize: '18px' }}>{st.icon}</span>
-                                        {isSelected && (
-                                            <span style={{ background: '#0A4FC4', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px' }}>
-                                                ✓
-                                            </span>
-                                        )}
+                                        <span style={{ fontSize: '16px' }}>{st.icon}</span>
+                                        <div style={{
+                                            width: '18px',
+                                            height: '18px',
+                                            borderRadius: '4px',
+                                            border: `1.5px solid ${isSelected ? '#0A4FC4' : '#CBD5E1'}`,
+                                            background: isSelected ? '#0A4FC4' : '#FFFFFF',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}>
+                                            {isSelected && <Check size={13} color="#FFFFFF" strokeWidth={3} />}
+                                        </div>
                                     </div>
-                                    <span style={{ fontSize: '14px', fontWeight: '700', color: isSelected ? '#0A4FC4' : '#1E293B' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: '700', color: isSelected ? '#0A4FC4' : '#1E293B' }}>
                                         {st.label}
                                     </span>
                                 </button>
@@ -1366,12 +1671,41 @@ const CustomProgressReport = () => {
                         })}
                     </div>
 
-                    <div style={{ background: '#F1F4FB', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', color: '#475569' }}>
-                        <strong style={{ color: '#0F2057' }}>Active Stream:</strong> {STREAM_PRESETS[selectedStream].description}
-                    </div>
+                    {/* Attendance Toggle Card */}
+                    <label
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 14px',
+                            borderRadius: '8px',
+                            background: includeAttendance ? '#F0FDF4' : '#F8FAFC',
+                            border: `2px solid ${includeAttendance ? '#16A34A' : '#E2E8F0'}`,
+                            cursor: 'pointer',
+                            userSelect: 'none'
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '18px' }}>📅</span>
+                            <div>
+                                <strong style={{ fontSize: '13px', color: includeAttendance ? '#15803D' : '#1E293B', display: 'block' }}>
+                                    Include Attendance Table
+                                </strong>
+                                <span style={{ fontSize: '11px', color: '#64748B' }}>
+                                    Working Days, Absent, Present, Sick & Total
+                                </span>
+                            </div>
+                        </div>
+                        <input
+                            type="checkbox"
+                            checked={includeAttendance}
+                            onChange={(e) => setIncludeAttendance(e.target.checked)}
+                            style={{ width: '16px', height: '16px', accentColor: '#16A34A', cursor: 'pointer' }}
+                        />
+                    </label>
                 </div>
 
-                {/* Panel 2: Subject Checkboxes */}
+                {/* Panel 2: Subject Checkboxes + Out of Marks Input */}
                 <div style={{
                     background: '#FFFFFF',
                     border: '1px solid #E2E8F0',
@@ -1379,125 +1713,216 @@ const CustomProgressReport = () => {
                     padding: '18px 20px',
                     boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)'
                 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F2057', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <BookOpen size={18} color="#0A4FC4" />
-                            2. Configure Subjects ({selectedSubjects.length} selected)
-                        </h3>
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F2057', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <BookOpen size={18} color="#0A4FC4" />
+                                2. Subjects & Out-of-Marks
+                            </h3>
+                            <span style={{
+                                background: '#FEF3C7',
+                                color: '#92400E',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                padding: '2px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid #FCD34D'
+                            }}>
+                                Total: {getStreamTotalMax(activeConfigTab)}
+                            </span>
+                        </div>
+
+                        {/* Quick Preset Buttons */}
+                        <div style={{ display: 'flex', gap: '4px' }}>
                             <button
                                 type="button"
-                                onClick={handleSelectAllSubjects}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#0A4FC4',
-                                    fontSize: '11px',
-                                    fontWeight: '700',
-                                    cursor: 'pointer',
-                                    textDecoration: 'underline'
-                                }}
+                                onClick={() => handleSetAllMaxMarks(activeConfigTab, 60)}
+                                title="Set all checked subjects to 60 (Unit test style)"
+                                style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', padding: '2px 6px', fontSize: '10.5px', fontWeight: '700', color: '#0F2057', cursor: 'pointer' }}
                             >
-                                Select All
+                                /60
                             </button>
-                            <span style={{ color: '#cbd5e1' }}>|</span>
                             <button
                                 type="button"
-                                onClick={handleResetSubjects}
+                                onClick={() => handleSetAllMaxMarks(activeConfigTab, 100)}
+                                title="Set all checked subjects to 100"
+                                style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', padding: '2px 6px', fontSize: '10.5px', fontWeight: '700', color: '#0F2057', cursor: 'pointer' }}
+                            >
+                                /100
+                            </button>
+                            {activeConfigTab === 'MEDICAL' && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSetAllMaxMarks(activeConfigTab, 180)}
+                                    title="Set all subjects to 180 (NEET full mark)"
+                                    style={{ background: '#EFF6FF', border: '1px solid #93C5FD', borderRadius: '4px', padding: '2px 6px', fontSize: '10.5px', fontWeight: '700', color: '#1D4ED8', cursor: 'pointer' }}
+                                >
+                                    /180
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Stream Tabs if multiple streams selected */}
+                    {selectedStreams.length > 1 && (
+                        <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', borderBottom: '1px solid #E2E8F0', paddingBottom: '6px', overflowX: 'auto' }}>
+                            {selectedStreams.map(k => {
+                                const isCurrent = activeConfigTab === k;
+                                return (
+                                    <button
+                                        key={k}
+                                        type="button"
+                                        onClick={() => setActiveConfigTab(k)}
+                                        style={{
+                                            background: isCurrent ? '#0F2057' : '#F1F5F9',
+                                            color: isCurrent ? '#FFFFFF' : '#334155',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            padding: '4px 9px',
+                                            fontSize: '11px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px'
+                                        }}
+                                    >
+                                        <span>{STREAM_PRESETS[k].icon}</span>
+                                        <span>{STREAM_PRESETS[k].label}</span>
+                                        <span style={{ background: isCurrent ? '#C9962B' : '#E2E8F0', color: isCurrent ? '#0F2057' : '#475569', fontSize: '10px', padding: '1px 5px', borderRadius: '8px' }}>
+                                            {getStreamTotalMax(k)}m
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Subject Checkbox Grid with Out Of Marks Input in Every Card */}
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                        gap: '8px',
+                        maxHeight: '135px',
+                        overflowY: 'auto',
+                        padding: '4px',
+                        marginBottom: '10px'
+                    }}>
+                        {[
+                            ...STREAM_PRESETS[activeConfigTab].availableSubjects,
+                            ...(customAddedSubjects[activeConfigTab] || [])
+                        ].map(sub => {
+                            const isChecked = (streamSubjects[activeConfigTab] || []).includes(sub);
+                            const maxVal = streamMaxMarks[activeConfigTab]?.[sub] ?? 100;
+
+                            return (
+                                <div
+                                    key={sub}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '6px',
+                                        padding: '5px 8px',
+                                        borderRadius: '6px',
+                                        background: isChecked ? '#EFF6FF' : '#F8FAFC',
+                                        border: `1px solid ${isChecked ? '#93C5FD' : '#E2E8F0'}`,
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => handleToggleSubject(activeConfigTab, sub)}
+                                            style={{ accentColor: '#0A4FC4', cursor: 'pointer', width: '13px', height: '13px', flexShrink: 0 }}
+                                        />
+                                        <span style={{ fontSize: '11.5px', fontWeight: isChecked ? '700' : '500', color: isChecked ? '#1D4ED8' : '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {sub}
+                                        </span>
+                                    </label>
+
+                                    {/* Out of Marks Input */}
+                                    {isChecked && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                                            <span style={{ fontSize: '10.5px', color: '#64748B', fontWeight: '600' }}>/</span>
+                                            <input
+                                                type="number"
+                                                title={`Out of marks for ${sub}`}
+                                                value={maxVal}
+                                                onChange={(e) => handleMaxMarkChange(activeConfigTab, sub, e.target.value)}
+                                                style={{
+                                                    width: '44px',
+                                                    padding: '2px 3px',
+                                                    fontSize: '11px',
+                                                    fontWeight: '700',
+                                                    textAlign: 'center',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid #93C5FD',
+                                                    background: '#FFFFFF',
+                                                    color: '#0F2057',
+                                                    outline: 'none'
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Controls Footer */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                        <form onSubmit={handleAddCustomSubject} style={{ display: 'flex', gap: '6px', flex: 1 }}>
+                            <input
+                                type="text"
+                                placeholder={`+ Add subject to ${STREAM_PRESETS[activeConfigTab].label}...`}
+                                value={newSubjectInput}
+                                onChange={(e) => setNewSubjectInput(e.target.value)}
                                 style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#64748b',
+                                    flex: 1,
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #CBD5E1',
+                                    fontSize: '11.5px',
+                                    outline: 'none'
+                                }}
+                            />
+                            <button
+                                type="submit"
+                                style={{
+                                    background: '#F1F5F9',
+                                    border: '1px solid #CBD5E1',
+                                    color: '#1E293B',
+                                    padding: '5px 10px',
+                                    borderRadius: '6px',
                                     fontSize: '11px',
                                     fontWeight: '600',
                                     cursor: 'pointer'
                                 }}
                             >
-                                Reset Defaults
+                                <Plus size={13} />
+                            </button>
+                        </form>
+
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                                type="button"
+                                onClick={handleSelectAllForTab}
+                                style={{ background: 'transparent', border: 'none', color: '#0A4FC4', fontSize: '11px', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                                All
+                            </button>
+                            <span style={{ color: '#cbd5e1' }}>|</span>
+                            <button
+                                type="button"
+                                onClick={handleResetDefaultsForTab}
+                                style={{ background: 'transparent', border: 'none', color: '#64748b', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+                            >
+                                Reset
                             </button>
                         </div>
                     </div>
-
-                    {/* Subject Checkbox Grid */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
-                        gap: '8px',
-                        maxHeight: '140px',
-                        overflowY: 'auto',
-                        padding: '4px',
-                        marginBottom: '12px'
-                    }}>
-                        {availableSubjects.map(sub => {
-                            const isChecked = selectedSubjects.includes(sub);
-                            return (
-                                <label
-                                    key={sub}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px',
-                                        padding: '7px 10px',
-                                        borderRadius: '6px',
-                                        background: isChecked ? '#EFF6FF' : '#F8FAFC',
-                                        border: `1px solid ${isChecked ? '#93C5FD' : '#E2E8F0'}`,
-                                        cursor: 'pointer',
-                                        fontSize: '12px',
-                                        fontWeight: isChecked ? '700' : '500',
-                                        color: isChecked ? '#1D4ED8' : '#334155',
-                                        userSelect: 'none',
-                                        transition: 'all 0.15s ease'
-                                    }}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={isChecked}
-                                        onChange={() => toggleSubject(sub)}
-                                        style={{ accentColor: '#0A4FC4', cursor: 'pointer', width: '14px', height: '14px' }}
-                                    />
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {sub}
-                                    </span>
-                                </label>
-                            );
-                        })}
-                    </div>
-
-                    {/* Add Custom Subject Form */}
-                    <form onSubmit={handleAddCustomSubject} style={{ display: 'flex', gap: '8px' }}>
-                        <input
-                            type="text"
-                            placeholder="+ Add custom subject..."
-                            value={newSubjectName}
-                            onChange={(e) => setNewSubjectName(e.target.value)}
-                            style={{
-                                flex: 1,
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                border: '1px solid #CBD5E1',
-                                fontSize: '12px',
-                                outline: 'none'
-                            }}
-                        />
-                        <button
-                            type="submit"
-                            style={{
-                                background: '#F1F5F9',
-                                border: '1px solid #CBD5E1',
-                                color: '#1E293B',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                            }}
-                        >
-                            <Plus size={14} /> Add
-                        </button>
-                    </form>
                 </div>
 
                 {/* Panel 3: Template Download & Excel Upload */}
@@ -1514,7 +1939,7 @@ const CustomProgressReport = () => {
                     <div>
                         <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0F2057', marginTop: 0, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <FileSpreadsheet size={18} color="#0A4FC4" />
-                            3. Download Template & Upload Data
+                            3. Download Template & Upload
                         </h3>
 
                         {/* Download Template Button */}
@@ -1536,12 +1961,11 @@ const CustomProgressReport = () => {
                                 justifyContent: 'center',
                                 gap: '8px',
                                 marginBottom: '14px',
-                                boxShadow: '0 2px 6px rgba(15, 32, 87, 0.2)',
-                                transition: 'all 0.2s ease'
+                                boxShadow: '0 2px 6px rgba(15, 32, 87, 0.2)'
                             }}
                         >
                             <Download size={16} color="#C9962B" />
-                            Download {STREAM_PRESETS[selectedStream].label} Template (.xlsx)
+                            Download {selectedStreams.map(k => STREAM_PRESETS[k].label).join(' & ')} Template (.xlsx)
                         </button>
                     </div>
 
@@ -1574,13 +1998,13 @@ const CustomProgressReport = () => {
                             {uploadedFileName ? `Loaded: ${uploadedFileName}` : 'Click to Upload or Drag & Drop File'}
                         </span>
                         <span style={{ fontSize: '11px', color: '#94A3B8' }}>
-                            Supports .xlsx, .xls, or .csv template
+                            Reads marks, attendance, and out-of-marks references
                         </span>
                     </div>
                 </div>
             </div>
 
-            {/* If no students loaded yet, show helpful empty state */}
+            {/* Empty State */}
             {students.length === 0 ? (
                 <div style={{
                     background: '#FFFFFF',
@@ -1595,7 +2019,7 @@ const CustomProgressReport = () => {
                         No Custom Progress Data Uploaded Yet
                     </h3>
                     <p style={{ fontSize: '14px', color: '#64748B', maxWidth: '520px', margin: '0 auto 20px auto', lineHeight: '1.5' }}>
-                        Download the {STREAM_PRESETS[selectedStream].label} Excel template above, enter student marks and records, then upload the file to generate Webview and PDF progress report cards.
+                        Configure the out-of-marks for your stream, download the Excel template, fill in marks and attendance, then upload above.
                     </p>
                     <button
                         type="button"
@@ -1620,7 +2044,7 @@ const CustomProgressReport = () => {
                 </div>
             ) : (
                 <>
-                    {/* Action Toolbar: Navigation + PDF Export Options */}
+                    {/* Action Toolbar */}
                     <div style={{
                         background: '#FFFFFF',
                         border: '1px solid #E2E8F0',
@@ -1701,9 +2125,8 @@ const CustomProgressReport = () => {
                             </div>
                         </div>
 
-                        {/* PDF Download Options Buttons */}
+                        {/* PDF Download Options */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            {/* Option 1: Combined Single PDF */}
                             <button
                                 type="button"
                                 onClick={() => handleDownloadPDF('combined')}
@@ -1728,7 +2151,6 @@ const CustomProgressReport = () => {
                                 Download All (Single Combined PDF)
                             </button>
 
-                            {/* Option 2: Individual PDFs in ZIP */}
                             <button
                                 type="button"
                                 onClick={() => handleDownloadPDF('zip')}
@@ -1753,7 +2175,6 @@ const CustomProgressReport = () => {
                                 Download All (Individual PDFs - ZIP)
                             </button>
 
-                            {/* Option 3: Current Student PDF */}
                             <button
                                 type="button"
                                 onClick={() => handleDownloadPDF('current')}
@@ -1778,7 +2199,7 @@ const CustomProgressReport = () => {
                         </div>
                     </div>
 
-                    {/* Progress Bar when generating bulk PDF */}
+                    {/* Progress Bar */}
                     {isDownloading && (
                         <div style={{
                             background: '#EFF6FF',
@@ -1802,7 +2223,7 @@ const CustomProgressReport = () => {
                         </div>
                     )}
 
-                    {/* Webview Progress Report Sheet (Matching Sri Chaitanya Official Format) */}
+                    {/* Webview Progress Report Sheet (With 2-Tier Header Matching Image 2) */}
                     {activeStudent && (
                         <div className="report-card-wrapper" style={{ display: 'flex', justifyContent: 'center', margin: '20px 0 40px 0' }}>
                             <div className="report-card-sheet" style={{
@@ -1830,147 +2251,199 @@ const CustomProgressReport = () => {
                                     </div>
                                 </div>
 
-                                {/* Student Info & Monogram Avatar Section */}
-                                <div className="rc-student-section" style={{ display: 'flex', gap: '20px', marginTop: '24px', alignItems: 'stretch' }}>
-                                    <table className="rc-info-table" style={{ flex: 1, borderCollapse: 'collapse', width: '100%' }}>
+                                {/* Student Info Section (Full Width, Photo/Initials Box Completely Removed) */}
+                                <div style={{ marginTop: '24px' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <tbody>
                                             <tr>
-                                                <td className="rc-info-label" style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '8px 14px', width: '38%', border: '1px solid #CFD6E8' }}>
+                                                <td style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '9px 16px', width: '25%', border: '1px solid #CFD6E8' }}>
                                                     Type of Report Card
                                                 </td>
-                                                <td className="rc-info-value" style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 700, fontSize: '13.5px', padding: '8px 14px', border: '1px solid #CFD6E8' }}>
+                                                <td style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 700, fontSize: '13.5px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
                                                     Academic
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td className="rc-info-label" style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '8px 14px', border: '1px solid #CFD6E8' }}>
+                                                <td style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
                                                     Name of the Student
                                                 </td>
-                                                <td className="rc-info-value" style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 700, fontSize: '13.5px', padding: '8px 14px', border: '1px solid #CFD6E8' }}>
+                                                <td style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 700, fontSize: '13.5px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
                                                     {activeStudent.name || '-'}
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td className="rc-info-label" style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '8px 14px', border: '1px solid #CFD6E8' }}>
+                                                <td style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
                                                     Student ID
                                                 </td>
-                                                <td className="rc-info-value" style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 700, fontSize: '13.5px', padding: '8px 14px', border: '1px solid #CFD6E8' }}>
+                                                <td style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 700, fontSize: '13.5px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
                                                     {activeStudent.id || '-'}
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td className="rc-info-label" style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '8px 14px', border: '1px solid #CFD6E8' }}>
+                                                <td style={{ backgroundColor: '#F1F4FB', color: '#0F2057', fontWeight: 700, fontSize: '13px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
                                                     Campus and Stream
                                                 </td>
-                                                <td className="rc-info-value" style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 700, fontSize: '13.5px', padding: '8px 14px', border: '1px solid #CFD6E8' }}>
-                                                    {activeStudent.campus || '-'} · {activeStudent.stream || STREAM_PRESETS[selectedStream].label}
+                                                <td style={{ backgroundColor: '#FFFDF8', color: '#14204A', fontWeight: 700, fontSize: '13.5px', padding: '9px 16px', border: '1px solid #CFD6E8' }}>
+                                                    {activeStudent.campus || '-'} · {activeStudent.stream || '-'}
                                                 </td>
                                             </tr>
                                         </tbody>
                                     </table>
+                                </div>
 
-                                    {/* Monogram Box (No photo required as requested) */}
-                                    <div className="rc-photo-box" style={{
-                                        width: '125px',
-                                        minWidth: '125px',
-                                        border: '3px solid #C9962B',
-                                        backgroundColor: '#FFFDF8',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        position: 'relative',
-                                        borderRadius: '2px'
-                                    }}>
-                                        <div style={{
-                                            fontFamily: "'Cormorant Garamond', Georgia, serif",
-                                            fontWeight: '700',
-                                            fontSize: '32px',
-                                            color: '#0F2057',
-                                            letterSpacing: '1px'
-                                        }}>
-                                            {getStudentInitials(activeStudent.name)}
+                                {/* Dynamic Tables for Each Selected Stream (2-Tier Header with Out-of-Marks matching Image 2!) */}
+                                {['MEDICAL', 'ENGG', 'CBSE', 'PU']
+                                    .filter(stKey => (activeStudent.streamTests[stKey] && activeStudent.streamTests[stKey].length > 0) || selectedStreams.includes(stKey))
+                                    .map(stKey => {
+                                        const tests = activeStudent.streamTests[stKey] || [];
+                                        const subs = streamSubjects[stKey] || STREAM_PRESETS[stKey]?.defaultSubjects || [];
+                                        const avgData = activeStudent.streamAverages?.[stKey];
+                                        const stLabel = STREAM_PRESETS[stKey]?.label || stKey;
+                                        const totalMaxVal = getStreamTotalMax(stKey);
+
+                                        return (
+                                            <div key={stKey} style={{ marginTop: '26px' }}>
+                                                <h3 style={{
+                                                    fontFamily: "'Cormorant Garamond', serif",
+                                                    fontSize: '20px',
+                                                    fontWeight: '700',
+                                                    color: '#0F2057',
+                                                    margin: '0 0 10px 0',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
+                                                }}>
+                                                    <span>{STREAM_PRESETS[stKey]?.icon}</span>
+                                                    <span>{stLabel} - Test-wise record</span>
+                                                </h3>
+
+                                                <div style={{ overflowX: 'auto' }}>
+                                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
+                                                        {/* 2-TIER TABLE HEADER (Matching Image 2: Subject on Top, Out Of Marks Underneath) */}
+                                                        <thead>
+                                                            <tr style={{ background: '#0F2057', color: '#ffffff' }}>
+                                                                <th rowSpan={2} style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle' }}>Test</th>
+                                                                <th rowSpan={2} style={{ padding: '8px 10px', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle' }}>Date</th>
+                                                                <th style={{ padding: '6px 10px', border: '1px solid #CFD6E8', fontSize: '13px' }}>Total Marks</th>
+                                                                {subs.map(sub => (
+                                                                    <th key={sub} style={{ padding: '6px 10px', border: '1px solid #CFD6E8', fontSize: '13px' }}>
+                                                                        {sub}
+                                                                    </th>
+                                                                ))}
+                                                            </tr>
+                                                            {/* Second Tier Header: OUT OF / MAX MARKS */}
+                                                            <tr style={{ background: '#172B6B', color: '#FCD34D' }}>
+                                                                <th style={{ padding: '4px 10px', border: '1px solid #CFD6E8', fontSize: '12px', fontWeight: '800' }}>
+                                                                    {totalMaxVal}
+                                                                </th>
+                                                                {subs.map(sub => (
+                                                                    <th key={sub} style={{ padding: '4px 10px', border: '1px solid #CFD6E8', fontSize: '12px', fontWeight: '800' }}>
+                                                                        {streamMaxMarks[stKey]?.[sub] ?? 100}
+                                                                    </th>
+                                                                ))}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {tests.length === 0 ? (
+                                                                <tr>
+                                                                    <td colSpan={subs.length + 3} style={{ padding: '12px', color: '#64748B', fontStyle: 'italic', border: '1px solid #CFD6E8' }}>
+                                                                        No exam records uploaded for this stream.
+                                                                    </td>
+                                                                </tr>
+                                                            ) : (
+                                                                tests.map((t, idx) => {
+                                                                    if (t.isAB) {
+                                                                        return (
+                                                                            <tr key={idx} style={{ background: '#FFF5F5', color: '#C62D47' }}>
+                                                                                <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', border: '1px solid #CFD6E8' }}>{t.testName}</td>
+                                                                                <td style={{ padding: '8px 10px', fontWeight: '700', border: '1px solid #CFD6E8' }}>{formatDate(t.date)}</td>
+                                                                                <td colSpan={subs.length + 1} style={{ padding: '8px 10px', fontWeight: '700', textAlign: 'center', border: '1px solid #CFD6E8' }}>
+                                                                                    Absent
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    }
+                                                                    return (
+                                                                        <tr key={idx} style={{ borderBottom: '1px solid #CFD6E8' }}>
+                                                                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#14204A', border: '1px solid #CFD6E8' }}>{t.testName}</td>
+                                                                            <td style={{ padding: '8px 10px', fontWeight: '600', color: '#14204A', border: '1px solid #CFD6E8' }}>{formatDate(t.date)}</td>
+                                                                            <td style={{ padding: '8px 10px', fontWeight: '800', color: '#0F2057', border: '1px solid #CFD6E8' }}>{Math.round(t.total || 0)}</td>
+                                                                            {subs.map(sub => (
+                                                                                <td key={sub} style={{ padding: '8px 10px', fontWeight: '700', color: '#14204A', border: '1px solid #CFD6E8' }}>
+                                                                                    {t.marks && t.marks[sub] !== undefined && t.marks[sub] !== null ? Math.round(t.marks[sub]) : '-'}
+                                                                                </td>
+                                                                            ))}
+                                                                        </tr>
+                                                                    );
+                                                                })
+                                                            )}
+
+                                                            {/* Average Row */}
+                                                            {tests.length > 0 && (
+                                                                <tr style={{ background: '#F1F4FB', borderTop: '2px solid #C9962B', fontWeight: '800', color: '#0F2057' }}>
+                                                                    <td colSpan={2} style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8' }}>Average</td>
+                                                                    <td style={{ padding: '8px 10px', border: '1px solid #CFD6E8' }}>{avgData?.avgTotal || '-'}</td>
+                                                                    {subs.map(sub => (
+                                                                        <td key={sub} style={{ padding: '8px 10px', border: '1px solid #CFD6E8' }}>
+                                                                            {avgData?.subjectAverages?.[sub] !== undefined ? avgData.subjectAverages[sub] : '-'}
+                                                                        </td>
+                                                                    ))}
+                                                                </tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                {/* Attendance Table (Matching Image 2) */}
+                                {(activeStudent.attendance || includeAttendance) && (
+                                    <div style={{ marginTop: '26px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                            <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '20px', fontWeight: '700', color: '#0F2057', margin: 0 }}>
+                                                Attendance Record
+                                            </h3>
+                                            {activeStudent.attendance?.percentage && (
+                                                <span style={{ background: '#DCFCE7', color: '#15803D', fontWeight: '800', fontSize: '12px', padding: '3px 10px', borderRadius: '12px', border: '1px solid #86EFAC' }}>
+                                                    {activeStudent.attendance.percentage} Attendance
+                                                </span>
+                                            )}
                                         </div>
-                                        <span style={{ fontSize: '11px', color: '#5D6788', fontWeight: '600', marginTop: '2px' }}>
-                                            Student
-                                        </span>
-                                    </div>
-                                </div>
 
-                                {/* Section Heading */}
-                                <h3 className="rc-section-heading" style={{
-                                    fontFamily: "'Cormorant Garamond', serif",
-                                    fontSize: '20px',
-                                    fontWeight: '700',
-                                    color: '#0F2057',
-                                    margin: '28px 0 12px 0'
-                                }}>
-                                    Test-wise record
-                                </h3>
-
-                                {/* Dynamic Test-wise Table */}
-                                <div style={{ overflowX: 'auto', marginBottom: '24px' }}>
-                                    <table className="rc-test-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
-                                        <thead>
-                                            <tr style={{ background: '#0F2057', color: '#ffffff' }}>
-                                                <th style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8', fontSize: '13px' }}>Test</th>
-                                                <th style={{ padding: '8px 10px', border: '1px solid #CFD6E8', fontSize: '13px' }}>Date</th>
-                                                <th style={{ padding: '8px 10px', border: '1px solid #CFD6E8', fontSize: '13px' }}>Total Marks</th>
-                                                {selectedSubjects.map(sub => (
-                                                    <th key={sub} style={{ padding: '8px 10px', border: '1px solid #CFD6E8', fontSize: '13px' }}>
-                                                        {sub}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {(activeStudent.tests || []).map((t, idx) => {
-                                                if (t.isAB) {
-                                                    return (
-                                                        <tr key={idx} style={{ background: '#FFF5F5', color: '#C62D47' }}>
-                                                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', border: '1px solid #CFD6E8' }}>{t.testName}</td>
-                                                            <td style={{ padding: '8px 10px', fontWeight: '700', border: '1px solid #CFD6E8' }}>{formatDate(t.date)}</td>
-                                                            <td colSpan={selectedSubjects.length + 1} style={{ padding: '8px 10px', fontWeight: '700', textAlign: 'center', border: '1px solid #CFD6E8' }}>
-                                                                Absent
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                }
-                                                return (
-                                                    <tr key={idx} style={{ borderBottom: '1px solid #CFD6E8' }}>
-                                                        <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#14204A', border: '1px solid #CFD6E8' }}>{t.testName}</td>
-                                                        <td style={{ padding: '8px 10px', fontWeight: '600', color: '#14204A', border: '1px solid #CFD6E8' }}>{formatDate(t.date)}</td>
-                                                        <td style={{ padding: '8px 10px', fontWeight: '800', color: '#0F2057', border: '1px solid #CFD6E8' }}>{Math.round(t.total || 0)}</td>
-                                                        {selectedSubjects.map(sub => (
-                                                            <td key={sub} style={{ padding: '8px 10px', fontWeight: '700', color: '#14204A', border: '1px solid #CFD6E8' }}>
-                                                                {t.marks && t.marks[sub] !== undefined && t.marks[sub] !== null ? Math.round(t.marks[sub]) : '-'}
-                                                            </td>
-                                                        ))}
-                                                    </tr>
-                                                );
-                                            })}
-
-                                            {/* Average Row */}
-                                            <tr style={{ background: '#F1F4FB', borderTop: '2px solid #C9962B', fontWeight: '800', color: '#0F2057' }}>
-                                                <td colSpan={2} style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8' }}>Average</td>
-                                                <td style={{ padding: '8px 10px', border: '1px solid #CFD6E8' }}>{activeStudent.avgTotal || '-'}</td>
-                                                {selectedSubjects.map(sub => (
-                                                    <td key={sub} style={{ padding: '8px 10px', border: '1px solid #CFD6E8' }}>
-                                                        {activeStudent.subjectAverages && activeStudent.subjectAverages[sub] !== undefined ? activeStudent.subjectAverages[sub] : '-'}
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
+                                            <thead>
+                                                <tr style={{ background: '#0F2057', color: '#ffffff' }}>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>TOTAL NO.OF WORKING DAYS</th>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>ABSENT</th>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>PRESENT</th>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>SICK</th>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>TOTAL</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style={{ background: '#FFFDF8', fontWeight: '700', color: '#14204A' }}>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px' }}>{activeStudent.attendance?.workingDays || '-'}</td>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', color: (activeStudent.attendance?.absent > 0) ? '#C62D47' : '#14204A' }}>
+                                                        {activeStudent.attendance?.absent || '0'}
                                                     </td>
-                                                ))}
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', color: '#0F2057' }}>{activeStudent.attendance?.present || '-'}</td>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px' }}>{activeStudent.attendance?.sick || '0'}</td>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', fontWeight: '800' }}>{activeStudent.attendance?.total || '-'}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
 
-                                {/* Dynamic Remarks Box */}
+                                {/* Remarks Box */}
                                 <div style={{
                                     background: '#F1F4FB',
                                     border: '1px solid #2D56C9',
                                     borderRadius: '6px',
                                     padding: '12px 18px',
-                                    marginBottom: '34px',
+                                    marginTop: '28px',
+                                    marginBottom: '32px',
                                     position: 'relative'
                                 }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
@@ -2071,8 +2544,7 @@ const CustomProgressReport = () => {
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     paddingTop: '36px',
-                                    marginTop: '20px',
-                                    borderTop: 'none'
+                                    marginTop: '20px'
                                 }}>
                                     {[
                                         'Class Teacher',
