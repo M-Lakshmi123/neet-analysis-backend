@@ -12,6 +12,7 @@ import ToppersPerformanceReport from './components/ToppersPerformanceReport';
 import TopperMarksLossReport from './components/TopperMarksLossReport';
 import TestWiseImprovements from './components/TestWiseImprovements';
 import AverageReport from './components/AverageReport';
+import CustomProgressReport from './components/CustomProgressReport';
 import AverageMarksReport from './components/AverageMarksReport';
 import AverageCountReport from './components/AverageCountReport';
 import ErrorReport from './components/ErrorReport';
@@ -309,6 +310,7 @@ const Dashboard = () => {
                 'averages': 'Average Marks Report',
                 'average_count': 'Average Count Report',
                 'progress': 'Progress Report',
+                'custom_progress': 'Custom Progress Report',
                 'errors': 'Error Report',
                 'error_top': 'Error Top 100%',
                 'error_count': 'Error Count Report',
@@ -370,6 +372,12 @@ const Dashboard = () => {
                 return (
                     <div className="report-sections">
                         <AverageReport filters={globalFilters} />
+                    </div>
+                );
+            case 'custom_progress':
+                return (
+                    <div className="report-sections">
+                        <CustomProgressReport />
                     </div>
                 );
             case 'errors':
@@ -440,7 +448,8 @@ const Dashboard = () => {
                                 activePage === 'averages' ? 'Average Marks Report' :
                                     activePage === 'average_count' ? 'Average Count Report' :
                                         activePage === 'progress' ? 'Progress Report' :
-                                            activePage === 'errors' ? 'Error Report' :
+                                            activePage === 'custom_progress' ? 'Custom Progress Report' :
+                                                activePage === 'errors' ? 'Error Report' :
                                                 activePage === 'error_top' ? 'Error Top 100%' :
                                                     activePage === 'error_count' ? 'Error Count Report' :
                                                         activePage === 'internal_error_analysis' ? 'Internal Error Analysis' :

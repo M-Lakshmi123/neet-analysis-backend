@@ -21,6 +21,7 @@ const Sidebar = ({ activePage, setActivePage }) => {
         { id: 'topper_marks_loss', label: 'Topper Marks Loss', icon: <FileText size={18} /> },
         { id: 'test_improvements', label: 'Test Wise Improvements', icon: <Activity size={18} /> },
         { id: 'progress', label: 'Progress Report', icon: <Users size={18} /> },
+        { id: 'custom_progress', label: 'Custom Progress Report', icon: <FileSpreadsheet size={18} /> },
         { id: 'averages', label: 'Average Marks Report', icon: <ClipboardList size={18} /> },
         { id: 'errors', label: 'Error Report', icon: <FileWarning size={18} /> },
         { id: 'target_vs_achieved', label: 'Target Vs Achieved', icon: <ClipboardList size={18} /> },
