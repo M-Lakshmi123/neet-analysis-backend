@@ -312,8 +312,6 @@ const CustomProgressReport = () => {
                 });
             });
 
-            const totalCol = { header: 'TOTAL MARKS', key: 'TOTAL_MARKS', width: 16 };
-
             // Attendance Columns (exact match to Image 2)
             const attendanceCols = includeAttendance ? [
                 { header: 'TOTAL NO.OF WORKING DAYS', key: 'WORKING_DAYS', width: 25 },
@@ -323,27 +321,26 @@ const CustomProgressReport = () => {
                 { header: 'TOTAL', key: 'ATT_TOTAL', width: 14 }
             ] : [];
 
-            mainSheet.columns = [...baseCols, ...subjectCols, totalCol, ...attendanceCols];
+            mainSheet.columns = [...baseCols, ...subjectCols, ...attendanceCols];
 
             // Style Header Row (Row 1)
             const headerRow = mainSheet.getRow(1);
             headerRow.height = 30;
             headerRow.eachCell((cell, colNum) => {
-                const totalColIndex = baseCols.length + subjectCols.length + 1;
-                const isAttendance = includeAttendance && colNum > totalColIndex;
+                const isAttendance = includeAttendance && colNum > (baseCols.length + subjectCols.length);
 
                 cell.fill = {
                     type: 'pattern',
                     pattern: 'solid',
                     fgColor: {
-                        argb: colNum === totalColIndex ? 'FFC9962B' : isAttendance ? 'FF1E3A8A' : 'FF0F2057'
+                        argb: isAttendance ? 'FF1E3A8A' : 'FF0F2057'
                     }
                 };
                 cell.font = {
                     name: 'Segoe UI',
                     size: 10.5,
                     bold: true,
-                    color: { argb: colNum === totalColIndex ? 'FF0F2057' : 'FFFFFFFF' }
+                    color: { argb: 'FFFFFFFF' }
                 };
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
                 cell.border = {
@@ -366,13 +363,10 @@ const CustomProgressReport = () => {
                 DATE: '-'
             };
 
-            let sumOfTotals = 0;
             subjectCols.forEach(sc => {
                 const maxVal = streamMaxMarks[sc.streamKey]?.[sc.subName] ?? (sc.streamKey.startsWith('KCET') ? 60 : 100);
                 maxRowObj[sc.key] = maxVal;
-                sumOfTotals += Number(maxVal) || 0;
             });
-            maxRowObj.TOTAL_MARKS = selectedStreams.length === 1 ? getStreamTotalMax(selectedStreams[0]) : sumOfTotals;
 
             if (includeAttendance) {
                 maxRowObj.WORKING_DAYS = 'Max Working Days';
@@ -427,16 +421,13 @@ const CustomProgressReport = () => {
                     DATE: isFirst ? '2026-03-01' : '2026-03-12'
                 };
 
-                let sum = 0;
                 const subs = streamSubjects[streamKey] || [];
                 subs.forEach((sub, subIdx) => {
                     const colKey = selectedStreams.length > 1 ? `[${streamKey}] ${sub}` : sub;
                     const maxVal = Number(streamMaxMarks[streamKey]?.[sub]) || (streamKey.startsWith('KCET') ? 60 : 100);
                     const mark = Math.round(maxVal * 0.85) - (subIdx * 2);
                     rowObj[colKey] = mark;
-                    sum += mark;
                 });
-                rowObj.TOTAL_MARKS = sum;
 
                 if (includeAttendance) {
                     rowObj.WORKING_DAYS = 180;
@@ -470,16 +461,13 @@ const CustomProgressReport = () => {
                     DATE: isFirst ? '2026-03-01' : '2026-03-12'
                 };
 
-                let sum = 0;
                 const subs = streamSubjects[streamKey] || [];
                 subs.forEach((sub, subIdx) => {
                     const colKey = selectedStreams.length > 1 ? `[${streamKey}] ${sub}` : sub;
                     const maxVal = Number(streamMaxMarks[streamKey]?.[sub]) || (streamKey.startsWith('KCET') ? 60 : 100);
                     const mark = Math.round(maxVal * 0.90) - (subIdx * 2);
                     rowObj[colKey] = mark;
-                    sum += mark;
                 });
-                rowObj.TOTAL_MARKS = sum;
 
                 if (includeAttendance) {
                     rowObj.WORKING_DAYS = 180;
@@ -525,7 +513,8 @@ const CustomProgressReport = () => {
             const instructions = [
                 ['Selected Streams', streamLabels],
                 ['KCET Support', 'KCET Medical (PCB) has Physics (60), Chemistry (60), Biology (60) = Total 180. KCET Engg (PCM) has Physics (60), Chemistry (60), Maths (60) = Total 180.'],
-                ['Out of / Max Marks', 'Row 2 indicates the Out of Marks (Max Marks) for each subject and total. You can adjust them directly.'],
+                ['Out of / Max Marks', 'Row 2 indicates the Out of Marks (Max Marks) for each subject. You can adjust them directly.'],
+                ['Auto Total Calculation', 'NO NEED TO ENTER TOTAL MARKS! The system automatically calculates total marks for each exam and stream (NEET, CBSE, KCET, PU, JEE) from the subject marks and adds it into the progress report.'],
                 ['Attendance Enabled', includeAttendance ? 'Yes (Working Days, Absent, Present, Sick, Total)' : 'No'],
                 ['STUDENT ID', 'Mandatory unique ID. Multiple rows with the same ID will be grouped together.'],
                 ['SECTION', 'Enter the student section or division (e.g. "Section A", "NEET-1", "PU-B").'],
@@ -707,7 +696,6 @@ const CustomProgressReport = () => {
                 const campus = campusCol !== -1 ? String(getCellValue(row.getCell(campusCol)) || '').trim() : 'Campus';
                 const section = sectionCol !== -1 ? String(getCellValue(row.getCell(sectionCol)) || '').trim() : '';
                 const stream = streamCol !== -1 ? String(getCellValue(row.getCell(streamCol)) || '').trim() : selectedStreams.map(k => STREAM_PRESETS[k].label).join(' & ');
-                let examType = examTypeCol !== -1 ? String(getCellValue(row.getCell(examTypeCol)) || '').trim().toUpperCase() : '';
                 const test = testCol !== -1 ? String(getCellValue(row.getCell(testCol)) || '').trim() : `Test ${rowNumber - headerRowIndex}`;
                 let dateVal = dateCol !== -1 ? getCellValue(row.getCell(dateCol)) : '';
                 if (dateVal instanceof Date) {
@@ -716,42 +704,32 @@ const CustomProgressReport = () => {
 
                 if (!studId && !studName) return;
 
-                const marksObj = {};
-                let numericSum = 0;
-                let isAbsentRow = false;
-                let detectedStreamFromCols = null;
+                // 1. Determine Exam Type for this row
+                let examType = examTypeCol !== -1 ? String(getCellValue(row.getCell(examTypeCol)) || '').trim().toUpperCase() : '';
 
-                subjectCols.forEach(sc => {
-                    const rawVal = getCellValue(row.getCell(sc.col));
-                    const strVal = String(rawVal || '').trim().toUpperCase();
-                    if (strVal === 'AB' || strVal === 'ABSENT' || strVal === 'A') {
-                        marksObj[sc.cleanName] = 'AB';
-                        isAbsentRow = true;
-                    } else if (strVal !== '' && !isNaN(Number(strVal))) {
-                        const num = Number(strVal);
-                        marksObj[sc.cleanName] = num;
-                        numericSum += num;
-                        if (sc.streamTag) {
-                            detectedStreamFromCols = sc.streamTag;
-                        } else {
-                            if (['BOTANY', 'ZOOLOGY'].includes(sc.cleanName)) detectedStreamFromCols = 'MEDICAL';
-                            else if (['COMPUTER SCIENCE', 'KANNADA', 'SANSKRIT', 'HINDI'].includes(sc.cleanName)) detectedStreamFromCols = 'PU';
-                            else if (['IP', 'PE'].includes(sc.cleanName)) detectedStreamFromCols = 'CBSE';
+                if (!examType) {
+                    for (const sc of subjectCols) {
+                        const rawVal = getCellValue(row.getCell(sc.col));
+                        const strVal = String(rawVal || '').trim().toUpperCase();
+                        if (strVal !== '') {
+                            if (sc.streamTag) {
+                                examType = sc.streamTag;
+                                break;
+                            } else if (['BOTANY', 'ZOOLOGY'].includes(sc.cleanName)) {
+                                examType = 'MEDICAL';
+                                break;
+                            } else if (['COMPUTER SCIENCE', 'KANNADA', 'SANSKRIT', 'HINDI'].includes(sc.cleanName)) {
+                                examType = 'PU';
+                                break;
+                            } else if (['IP', 'PE'].includes(sc.cleanName)) {
+                                examType = 'CBSE';
+                                break;
+                            }
                         }
                     }
-                });
-
-                let totalMarksVal = totalCol !== -1 ? getCellValue(row.getCell(totalCol)) : null;
-                let finalTotal = numericSum;
-                if (totalMarksVal !== null && totalMarksVal !== '' && !isNaN(Number(totalMarksVal))) {
-                    finalTotal = Number(totalMarksVal);
                 }
 
-                // Match Exam Type
-                if (!examType) {
-                    examType = detectedStreamFromCols || selectedStreams[0];
-                }
-
+                // Canonical examType mapping
                 if (examType.includes('KCET')) {
                     if (examType.includes('MED') || examType.includes('PCB') || examType.includes('BIO')) examType = 'KCET_MED';
                     else if (examType.includes('ENG') || examType.includes('PCM') || examType.includes('MAT')) examType = 'KCET_ENGG';
@@ -760,6 +738,43 @@ const CustomProgressReport = () => {
                 else if (examType.includes('ENG') || examType.includes('JEE')) examType = 'ENGG';
                 else if (examType.includes('CBSE')) examType = 'CBSE';
                 else if (examType.includes('PU')) examType = 'PU';
+                else examType = selectedStreams[0];
+
+                // 2. Extract Marks and Automatically Calculate Total for this Stream's Test
+                const marksObj = {};
+                let numericSum = 0;
+                let hasMarks = false;
+                let isAllAbsent = true;
+
+                subjectCols.forEach(sc => {
+                    // When multi-stream columns are present (tagged [STREAM]), only process columns matching this row's examType
+                    if (sc.streamTag && sc.streamTag !== examType) {
+                        return;
+                    }
+
+                    const rawVal = getCellValue(row.getCell(sc.col));
+                    const strVal = String(rawVal || '').trim().toUpperCase();
+
+                    if (strVal === 'AB' || strVal === 'ABSENT' || strVal === 'A') {
+                        marksObj[sc.cleanName] = 'AB';
+                        hasMarks = true;
+                    } else if (strVal !== '' && !isNaN(Number(strVal))) {
+                        const num = Number(strVal);
+                        marksObj[sc.cleanName] = num;
+                        numericSum += num;
+                        hasMarks = true;
+                        isAllAbsent = false;
+                    }
+                });
+
+                const isAbsentRow = hasMarks && isAllAbsent;
+
+                // Total is automatically computed from individual subject marks!
+                let totalMarksVal = totalCol !== -1 ? getCellValue(row.getCell(totalCol)) : null;
+                let finalTotal = numericSum;
+                if (numericSum === 0 && !isAbsentRow && totalMarksVal !== null && totalMarksVal !== '' && !isNaN(Number(totalMarksVal))) {
+                    finalTotal = Number(totalMarksVal);
+                }
 
                 const wDays = workingDaysCol !== -1 ? Number(getCellValue(row.getCell(workingDaysCol))) || 0 : 0;
                 const abDays = absentCol !== -1 ? Number(getCellValue(row.getCell(absentCol))) || 0 : 0;
@@ -1510,12 +1525,12 @@ const CustomProgressReport = () => {
                             {
                                 num: '3',
                                 title: 'Download Multi-Stream Template',
-                                desc: 'Click "Download Template" to get the formatted .xlsx with pre-configured exam types, columns, and attendance.'
+                                desc: 'Click "Download Template" to get the formatted .xlsx with pre-configured subject columns and attendance (no manual total marks column needed!).'
                             },
                             {
                                 num: '4',
-                                title: 'Fill Student Marks & Attendance',
-                                desc: 'Enter student marks for competitive and board exams, section, plus attendance (Working Days, Absent, Present, Sick, Total).'
+                                title: 'Fill Marks (Auto-Total Calculation)',
+                                desc: 'Enter student details, section, and individual subject marks. Total marks for each exam and stream are automatically calculated by the system!'
                             },
                             {
                                 num: '5',
