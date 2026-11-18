@@ -79,10 +79,10 @@ const STREAM_PRESETS = {
         label: 'CBSE Board',
         icon: '🎓',
         description: 'CBSE Class XI & XII Board stream (PCMB / PCMC)',
-        defaultSubjects: ['PHYSICS', 'CHEMISTRY', 'MATHS', 'ENGLISH', 'BIOLOGY'],
+        defaultSubjects: ['PHYSICS', 'CHEMISTRY', 'MATHS', 'ENGLISH', 'BIOLOGY', 'IP', 'PE'],
         availableSubjects: ['PHYSICS', 'CHEMISTRY', 'MATHS', 'ENGLISH', 'BIOLOGY', 'IP', 'PE'],
         defaultSubjectMax: { PHYSICS: 100, CHEMISTRY: 100, MATHS: 100, ENGLISH: 100, BIOLOGY: 100, IP: 100, PE: 100 },
-        defaultMaxTotal: 500
+        defaultMaxTotal: 700
     },
     PU: {
         id: 'PU',
@@ -223,10 +223,14 @@ const CustomProgressReport = () => {
     const fileInputRef = useRef(null);
 
     // Compute Total Max Marks for a Stream
-    const getStreamTotalMax = (streamKey) => {
-        const subs = streamSubjects[streamKey] || [];
+    const getStreamTotalMax = (streamKey, subsList) => {
+        const subs = subsList || streamSubjects[streamKey] || STREAM_PRESETS[streamKey]?.defaultSubjects || [];
         const maxMap = streamMaxMarks[streamKey] || {};
-        return subs.reduce((sum, s) => sum + (Number(maxMap[s]) || 0), 0);
+        return subs.reduce((sum, s) => {
+            const defaultM = streamKey?.startsWith('KCET') ? 60 : 100;
+            const val = maxMap[s] !== undefined && maxMap[s] !== null ? Number(maxMap[s]) : defaultM;
+            return sum + (isNaN(val) ? defaultM : val);
+        }, 0);
     };
 
     // Toggle Stream Selection (Multi-Select)
@@ -729,6 +733,50 @@ const CustomProgressReport = () => {
                 }
             });
 
+            // Dynamically detect subjects and streams directly from the uploaded Excel file headers!
+            const detectedStreamSubjects = {};
+            const detectedStreams = new Set();
+
+            subjectCols.forEach(sc => {
+                let st = sc.streamTag;
+                if (!st) {
+                    if (['BOTANY', 'ZOOLOGY'].includes(sc.cleanName)) st = 'MEDICAL';
+                    else if (['COMPUTER SCIENCE', 'KANNADA', 'SANSKRIT', 'HINDI'].includes(sc.cleanName)) st = 'PU';
+                    else if (['IP', 'PE'].includes(sc.cleanName)) st = 'CBSE';
+                    else st = selectedStreams[0] || 'MEDICAL';
+                }
+                detectedStreams.add(st);
+                if (!detectedStreamSubjects[st]) detectedStreamSubjects[st] = [];
+                if (!detectedStreamSubjects[st].includes(sc.cleanName)) {
+                    detectedStreamSubjects[st].push(sc.cleanName);
+                }
+            });
+
+            if (Object.keys(detectedStreamSubjects).length > 0) {
+                setStreamSubjects(prev => {
+                    const merged = { ...prev };
+                    Object.keys(detectedStreamSubjects).forEach(st => {
+                        const fileSubs = detectedStreamSubjects[st];
+                        if (fileSubs && fileSubs.length > 0) {
+                            merged[st] = fileSubs;
+                        }
+                    });
+                    return merged;
+                });
+            }
+
+            if (detectedStreams.size > 0) {
+                setSelectedStreams(prev => {
+                    const merged = [...prev];
+                    detectedStreams.forEach(st => {
+                        if (STREAM_PRESETS[st] && !merged.includes(st)) {
+                            merged.push(st);
+                        }
+                    });
+                    return merged;
+                });
+            }
+
             // Check if row directly below header is a Max Marks row
             const secondRow = worksheet.getRow(headerRowIndex + 1);
             const r2Label = String(getCellValue(secondRow.getCell(idCol !== -1 ? idCol : 1)) || '').toUpperCase();
@@ -739,7 +787,13 @@ const CustomProgressReport = () => {
                 subjectCols.forEach(sc => {
                     const rawVal = getCellValue(secondRow.getCell(sc.col));
                     if (rawVal && !isNaN(Number(rawVal))) {
-                        const targetStream = sc.streamTag || selectedStreams[0];
+                        let targetStream = sc.streamTag;
+                        if (!targetStream) {
+                            if (['BOTANY', 'ZOOLOGY'].includes(sc.cleanName)) targetStream = 'MEDICAL';
+                            else if (['COMPUTER SCIENCE', 'KANNADA', 'SANSKRIT', 'HINDI'].includes(sc.cleanName)) targetStream = 'PU';
+                            else if (['IP', 'PE'].includes(sc.cleanName)) targetStream = 'CBSE';
+                            else targetStream = selectedStreams[0] || 'MEDICAL';
+                        }
                         if (!extractedMax[targetStream]) extractedMax[targetStream] = {};
                         extractedMax[targetStream][sc.cleanName] = Number(rawVal);
                     }
@@ -944,7 +998,14 @@ const CustomProgressReport = () => {
                     const count = attended.length;
                     const avgTot = count > 0 ? Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / count) : '-';
 
-                    const activeSubs = streamSubjects[stKey] || STREAM_PRESETS[stKey]?.defaultSubjects || [];
+                    // Collect ALL active subjects from detected subjects, streamSubjects, defaultSubjects, AND test marks!
+                    const activeSubs = [...new Set([
+                        ...(detectedStreamSubjects[stKey] || []),
+                        ...(streamSubjects[stKey] || []),
+                        ...(STREAM_PRESETS[stKey]?.defaultSubjects || []),
+                        ...tests.flatMap(t => Object.keys(t.marks || {}))
+                    ])].filter(Boolean);
+
                     const subjectAverages = {};
                     activeSubs.forEach(sub => {
                         const validMarks = attended
@@ -956,7 +1017,8 @@ const CustomProgressReport = () => {
 
                     streamAverages[stKey] = {
                         avgTotal: avgTot,
-                        subjectAverages
+                        subjectAverages,
+                        subjects: activeSubs
                     };
                 });
 
@@ -1228,9 +1290,15 @@ const CustomProgressReport = () => {
 
         streamsToRender.forEach(stKey => {
             const tests = student.streamTests[stKey] || [];
-            const subs = streamSubjects[stKey] || STREAM_PRESETS[stKey]?.defaultSubjects || [];
+            // Dynamically determine all active subjects: configured, defaults, or from test marks!
+            const subs = [...new Set([
+                ...(student.streamAverages?.[stKey]?.subjects || []),
+                ...(streamSubjects[stKey] || []),
+                ...(STREAM_PRESETS[stKey]?.defaultSubjects || []),
+                ...tests.flatMap(t => Object.keys(t.marks || {}))
+            ])].filter(Boolean);
             const stLabel = STREAM_PRESETS[stKey]?.label || stKey;
-            const totalMaxVal = getStreamTotalMax(stKey);
+            const totalMaxVal = getStreamTotalMax(stKey, subs);
 
             if (currentY + 45 > 265) {
                 doc.addPage();
@@ -1246,26 +1314,26 @@ const CustomProgressReport = () => {
 
             // Sizing columns dynamically to prevent subject header wrapping
             const numSubs = subs.length;
-            const testW = numSubs <= 4 ? 28 : numSubs <= 6 ? 25 : 23;
-            const dateW = numSubs <= 4 ? 20 : numSubs <= 6 ? 17 : 16;
-            const totalW = numSubs <= 4 ? 18 : numSubs <= 6 ? 15 : 14;
+            const testW = numSubs <= 4 ? 28 : numSubs <= 6 ? 24 : numSubs <= 8 ? 22 : 20;
+            const dateW = numSubs <= 4 ? 20 : numSubs <= 6 ? 17 : numSubs <= 8 ? 15 : 14;
+            const totalW = numSubs <= 4 ? 18 : numSubs <= 6 ? 15 : numSubs <= 8 ? 14 : 13;
             const fixedW = testW + dateW + totalW;
             const remainingW = infoW - fixedW;
 
             // Subject length-based weights for intelligent proportional width allocation
             const getSubWeight = (sub) => {
                 const len = (sub || '').length;
-                if (len <= 2) return 2.4; // e.g. IP, PE
-                if (len <= 4) return 3.4; // e.g. PHY, MAT
-                if (len <= 5) return 4.5; // e.g. MATHS
-                if (len <= 7) return 6.0; // e.g. PHYSICS, ENGLISH, BIOLOGY
-                if (len <= 9) return 7.5; // e.g. CHEMISTRY
-                if (len <= 12) return 9.0;
-                return 11.0; // e.g. COMPUTER SCIENCE
+                if (len <= 2) return 2.2; // e.g. IP, PE
+                if (len <= 4) return 3.2; // e.g. PHY, MAT
+                if (len <= 5) return 4.2; // e.g. MATHS
+                if (len <= 7) return 5.8; // e.g. PHYSICS, ENGLISH, BIOLOGY
+                if (len <= 9) return 7.2; // e.g. CHEMISTRY
+                if (len <= 12) return 8.5;
+                return 10.5; // e.g. COMPUTER SCIENCE
             };
 
             const weights = subs.map(getSubWeight);
-            const minColW = numSubs <= 6 ? 12 : 10;
+            const minColW = numSubs <= 6 ? 12 : numSubs <= 8 ? 9.5 : 8.5;
             const shortIndices = [];
             let shortWidthSum = 0;
             subs.forEach((s, i) => {
@@ -1293,7 +1361,7 @@ const CustomProgressReport = () => {
                 return rounded;
             });
 
-            const tableFontSize = numSubs <= 4 ? 8.5 : numSubs <= 6 ? 7.6 : 7.0;
+            const tableFontSize = numSubs <= 4 ? 8.5 : numSubs <= 6 ? 7.6 : numSubs <= 8 ? 6.8 : 6.2;
 
             // 2-TIER TABLE HEADER (Subject Names on Row 1, Out Of Marks on Row 2)
             const headRow1 = [
@@ -2466,10 +2534,15 @@ const CustomProgressReport = () => {
                                     .filter(stKey => (activeStudent.streamTests[stKey] && activeStudent.streamTests[stKey].length > 0) || selectedStreams.includes(stKey))
                                     .map(stKey => {
                                         const tests = activeStudent.streamTests[stKey] || [];
-                                        const subs = streamSubjects[stKey] || STREAM_PRESETS[stKey]?.defaultSubjects || [];
+                                        const subs = [...new Set([
+                                            ...(activeStudent.streamAverages?.[stKey]?.subjects || []),
+                                            ...(streamSubjects[stKey] || []),
+                                            ...(STREAM_PRESETS[stKey]?.defaultSubjects || []),
+                                            ...tests.flatMap(t => Object.keys(t.marks || {}))
+                                        ])].filter(Boolean);
                                         const avgData = activeStudent.streamAverages?.[stKey];
                                         const stLabel = STREAM_PRESETS[stKey]?.label || stKey;
-                                        const totalMaxVal = getStreamTotalMax(stKey);
+                                        const totalMaxVal = getStreamTotalMax(stKey, subs);
 
                                         return (
                                             <div key={stKey} style={{ marginTop: '26px' }}>
@@ -2488,18 +2561,18 @@ const CustomProgressReport = () => {
                                                 </h3>
 
                                                 <div style={{ overflowX: 'auto' }}>
-                                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
+                                                    <table style={{ width: '100%', minWidth: subs.length > 6 ? '780px' : '650px', borderCollapse: 'collapse', textAlign: 'center' }}>
                                                         {/* 2-TIER TABLE HEADER */}
                                                         <thead>
                                                             <tr style={{ background: '#0F2057', color: '#ffffff' }}>
-                                                                <th rowSpan={2} style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Test</th>
-                                                                <th rowSpan={2} style={{ padding: '8px 10px', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Date</th>
-                                                                <th style={{ padding: '6px 10px', border: '1px solid #CFD6E8', fontSize: '13px', whiteSpace: 'nowrap' }}>Total Marks</th>
+                                                                <th rowSpan={2} style={{ padding: '8px 10px', textAlign: 'left', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Test</th>
+                                                                <th rowSpan={2} style={{ padding: '8px 8px', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Date</th>
+                                                                <th style={{ padding: '6px 8px', border: '1px solid #CFD6E8', fontSize: '13px', whiteSpace: 'nowrap' }}>Total Marks</th>
                                                                 {subs.map(sub => (
                                                                     <th key={sub} style={{
                                                                         padding: '6px 8px',
                                                                         border: '1px solid #CFD6E8',
-                                                                        fontSize: subs.length > 6 ? '11.5px' : subs.length > 4 ? '12px' : '13px',
+                                                                        fontSize: subs.length > 7 ? '11px' : subs.length > 5 ? '12px' : '13px',
                                                                         whiteSpace: 'nowrap',
                                                                         letterSpacing: '0.2px'
                                                                     }}>
