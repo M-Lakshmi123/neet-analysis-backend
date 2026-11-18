@@ -96,6 +96,74 @@ const STREAM_PRESETS = {
     }
 };
 
+// =============================================================
+// HELPER FUNCTIONS FOR MARKS & ATTENDANCE RENDERING
+// =============================================================
+
+// Helper to detect if a mark represents absence / remark
+const isAbsentMark = (val) => {
+    if (val === undefined || val === null || val === '') return false;
+    if (typeof val === 'number') return isNaN(val);
+    const str = String(val).trim();
+    if (str === '' || str === '-') return false;
+    const num = Number(str);
+    return isNaN(num) || isNaN(parseFloat(str));
+};
+
+// Formatter to render subject mark safely: keeps exact given string if absent/text ('AB', 'A', 'Abset', 'Absent', etc.), rounds numbers, returns '-' if empty. Never returns 'NaN'.
+const formatMarkDisplay = (mark) => {
+    if (mark === undefined || mark === null || mark === '') return '-';
+    if (typeof mark === 'number') {
+        return isNaN(mark) ? '-' : String(Math.round(mark));
+    }
+    const str = String(mark).trim();
+    if (str === '' || str === '-') return '-';
+    const num = Number(str);
+    if (!isNaN(num) && !isNaN(parseFloat(str))) {
+        return String(Math.round(num));
+    }
+    return str;
+};
+
+// Formatter to render test total marks safely
+const formatTotalDisplay = (total) => {
+    if (total === undefined || total === null || total === '') return '-';
+    if (typeof total === 'number') {
+        return isNaN(total) ? '-' : String(Math.round(total));
+    }
+    const str = String(total).trim();
+    if (str === '' || str === '-') return '-';
+    const num = Number(str);
+    if (!isNaN(num) && !isNaN(parseFloat(str))) {
+        return String(Math.round(num));
+    }
+    return str;
+};
+
+// Helper to determine if a student has meaningful attendance data entered
+const hasAttendanceData = (student) => {
+    if (!student || !student.attendance) return false;
+    const att = student.attendance;
+    const w = att.workingDays;
+    const p = att.present;
+    const a = att.absent;
+    const t = att.total;
+
+    const nw = Number(w);
+    const np = Number(p);
+    const nt = Number(t);
+    const na = Number(a);
+    if (!isNaN(nw) && nw > 0) return true;
+    if (!isNaN(np) && np > 0) return true;
+    if (!isNaN(nt) && nt > 0) return true;
+    if (!isNaN(na) && na > 0) return true;
+
+    const isMeaningful = (v) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim() !== '-' && String(v).trim() !== '0';
+    if (isMeaningful(w) || isMeaningful(p) || isMeaningful(t)) return true;
+
+    return false;
+};
+
 const CustomProgressReport = () => {
     const { userData } = useAuth();
 
@@ -753,17 +821,21 @@ const CustomProgressReport = () => {
                     }
 
                     const rawVal = getCellValue(row.getCell(sc.col));
-                    const strVal = String(rawVal || '').trim().toUpperCase();
+                    const strVal = rawVal !== undefined && rawVal !== null ? String(rawVal).trim() : '';
 
-                    if (strVal === 'AB' || strVal === 'ABSENT' || strVal === 'A') {
-                        marksObj[sc.cleanName] = 'AB';
-                        hasMarks = true;
-                    } else if (strVal !== '' && !isNaN(Number(strVal))) {
+                    if (strVal !== '') {
                         const num = Number(strVal);
-                        marksObj[sc.cleanName] = num;
-                        numericSum += num;
-                        hasMarks = true;
-                        isAllAbsent = false;
+                        if (!isNaN(num) && !isNaN(parseFloat(strVal))) {
+                            marksObj[sc.cleanName] = num;
+                            numericSum += num;
+                            hasMarks = true;
+                            isAllAbsent = false;
+                        } else {
+                            // Non-numeric mark ('AB', 'A', 'Absent', 'Abset', etc.)
+                            // Store exactly as entered by user
+                            marksObj[sc.cleanName] = strVal;
+                            hasMarks = true;
+                        }
                     }
                 });
 
@@ -776,11 +848,39 @@ const CustomProgressReport = () => {
                     finalTotal = Number(totalMarksVal);
                 }
 
-                const wDays = workingDaysCol !== -1 ? Number(getCellValue(row.getCell(workingDaysCol))) || 0 : 0;
-                const abDays = absentCol !== -1 ? Number(getCellValue(row.getCell(absentCol))) || 0 : 0;
-                const prDays = presentCol !== -1 ? Number(getCellValue(row.getCell(presentCol))) || 0 : 0;
-                const skDays = sickCol !== -1 ? Number(getCellValue(row.getCell(sickCol))) || 0 : 0;
-                const totAtt = attTotalCol !== -1 ? Number(getCellValue(row.getCell(attTotalCol))) || (prDays + abDays + skDays) : (prDays + abDays + skDays);
+                // Attendance Extraction: Only set if user entered actual attendance data
+                const rawWDays = workingDaysCol !== -1 ? String(getCellValue(row.getCell(workingDaysCol)) ?? '').trim() : '';
+                const rawAbDays = absentCol !== -1 ? String(getCellValue(row.getCell(absentCol)) ?? '').trim() : '';
+                const rawPrDays = presentCol !== -1 ? String(getCellValue(row.getCell(presentCol)) ?? '').trim() : '';
+                const rawSkDays = sickCol !== -1 ? String(getCellValue(row.getCell(sickCol)) ?? '').trim() : '';
+                const rawTotAtt = attTotalCol !== -1 ? String(getCellValue(row.getCell(attTotalCol)) ?? '').trim() : '';
+
+                const hasAttendanceEntry = [rawWDays, rawAbDays, rawPrDays, rawSkDays, rawTotAtt].some(val => val !== '' && val !== '-');
+                let rowAttendance = null;
+
+                if (hasAttendanceEntry) {
+                    const numW = Number(rawWDays);
+                    const numP = Number(rawPrDays);
+                    const numA = Number(rawAbDays);
+                    const numS = Number(rawSkDays);
+                    const numT = Number(rawTotAtt);
+
+                    if ((!isNaN(numW) && numW > 0) || (!isNaN(numP) && numP > 0) || (!isNaN(numT) && numT > 0) || (!isNaN(numA) && numA > 0)) {
+                        const wDays = !isNaN(numW) && numW > 0 ? numW : (rawWDays || '-');
+                        const abDays = rawAbDays !== '' ? rawAbDays : '0';
+                        const prDays = !isNaN(numP) ? numP : (rawPrDays || '-');
+                        const skDays = rawSkDays !== '' ? rawSkDays : '0';
+                        const totAtt = !isNaN(numT) && numT > 0 ? numT : (rawTotAtt || wDays || '-');
+
+                        rowAttendance = {
+                            workingDays: wDays,
+                            absent: abDays,
+                            present: prDays,
+                            sick: skDays,
+                            total: totAtt
+                        };
+                    }
+                }
 
                 rawStudentRows.push({
                     studId: studId || studName,
@@ -791,16 +891,10 @@ const CustomProgressReport = () => {
                     examType,
                     testName: test || 'Exam',
                     date: dateVal,
-                    total: isAbsentRow ? 0 : finalTotal,
+                    total: isAbsentRow ? '-' : finalTotal,
                     marks: marksObj,
                     isAB: isAbsentRow,
-                    attendance: wDays > 0 ? {
-                        workingDays: wDays,
-                        absent: abDays,
-                        present: prDays,
-                        sick: skDays,
-                        total: totAtt || wDays
-                    } : null
+                    attendance: rowAttendance
                 });
             });
 
@@ -846,16 +940,16 @@ const CustomProgressReport = () => {
                 const streamAverages = {};
                 Object.keys(stud.streamTests).forEach(stKey => {
                     const tests = stud.streamTests[stKey] || [];
-                    const attended = tests.filter(t => !t.isAB);
+                    const attended = tests.filter(t => !t.isAB && (Number(t.total) > 0 || Object.values(t.marks || {}).some(m => !isAbsentMark(m))));
                     const count = attended.length;
-                    const avgTot = count > 0 ? Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / count) : 0;
+                    const avgTot = count > 0 ? Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / count) : '-';
 
                     const activeSubs = streamSubjects[stKey] || STREAM_PRESETS[stKey]?.defaultSubjects || [];
                     const subjectAverages = {};
                     activeSubs.forEach(sub => {
                         const validMarks = attended
-                            .map(t => t.marks[sub])
-                            .filter(m => m !== undefined && m !== null && m !== 'AB' && !isNaN(Number(m)))
+                            .map(t => t.marks?.[sub])
+                            .filter(m => m !== undefined && m !== null && m !== '' && !isAbsentMark(m))
                             .map(Number);
                         subjectAverages[sub] = validMarks.length > 0 ? Math.round(validMarks.reduce((a, b) => a + b, 0) / validMarks.length) : '-';
                     });
@@ -867,8 +961,8 @@ const CustomProgressReport = () => {
                 });
 
                 let attObj = stud.attendance;
-                if (attObj && attObj.workingDays > 0) {
-                    const pct = ((attObj.present / attObj.workingDays) * 100).toFixed(1);
+                if (attObj && Number(attObj.workingDays) > 0 && Number(attObj.present) >= 0) {
+                    const pct = ((Number(attObj.present) / Number(attObj.workingDays)) * 100).toFixed(1);
                     attObj.percentage = `${pct}%`;
                 }
 
@@ -1150,24 +1244,96 @@ const CustomProgressReport = () => {
             doc.text(`${stLabel} - Test-wise record`, infoX, currentY);
             currentY += 4;
 
-            // 2-TIER TABLE HEADER (Subject Names on Row 1, Out Of Marks on Row 2 as in Image 2!)
+            // Sizing columns dynamically to prevent subject header wrapping
+            const numSubs = subs.length;
+            const testW = numSubs <= 4 ? 28 : numSubs <= 6 ? 25 : 23;
+            const dateW = numSubs <= 4 ? 20 : numSubs <= 6 ? 17 : 16;
+            const totalW = numSubs <= 4 ? 18 : numSubs <= 6 ? 15 : 14;
+            const fixedW = testW + dateW + totalW;
+            const remainingW = infoW - fixedW;
+
+            // Subject length-based weights for intelligent proportional width allocation
+            const getSubWeight = (sub) => {
+                const len = (sub || '').length;
+                if (len <= 2) return 2.4; // e.g. IP, PE
+                if (len <= 4) return 3.4; // e.g. PHY, MAT
+                if (len <= 5) return 4.5; // e.g. MATHS
+                if (len <= 7) return 6.0; // e.g. PHYSICS, ENGLISH, BIOLOGY
+                if (len <= 9) return 7.5; // e.g. CHEMISTRY
+                if (len <= 12) return 9.0;
+                return 11.0; // e.g. COMPUTER SCIENCE
+            };
+
+            const weights = subs.map(getSubWeight);
+            const minColW = numSubs <= 6 ? 12 : 10;
+            const shortIndices = [];
+            let shortWidthSum = 0;
+            subs.forEach((s, i) => {
+                if ((s || '').length <= 2) {
+                    shortIndices.push(i);
+                    shortWidthSum += minColW;
+                }
+            });
+
+            const nonShortWeight = weights.reduce((sum, w, i) => shortIndices.includes(i) ? sum : sum + w, 0);
+            const remainingForNonShort = remainingW - shortWidthSum;
+
+            const proportionalWidths = subs.map((s, i) => {
+                if (shortIndices.includes(i)) return minColW;
+                return (weights[i] / (nonShortWeight || 1)) * remainingForNonShort;
+            });
+
+            let allocatedSum = 0;
+            const finalSubWidths = proportionalWidths.map((w, i) => {
+                if (i === proportionalWidths.length - 1) {
+                    return Math.max(minColW, Math.round((remainingW - allocatedSum) * 10) / 10);
+                }
+                const rounded = Math.max(minColW, Math.round(w * 10) / 10);
+                allocatedSum += rounded;
+                return rounded;
+            });
+
+            const tableFontSize = numSubs <= 4 ? 8.5 : numSubs <= 6 ? 7.6 : 7.0;
+
+            // 2-TIER TABLE HEADER (Subject Names on Row 1, Out Of Marks on Row 2)
             const headRow1 = [
-                { content: "Test", rowSpan: 2, styles: { valign: 'middle', halign: 'left' } },
-                { content: "Date", rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
-                { content: "Total", styles: { halign: 'center' } },
-                ...subs.map(sub => ({ content: sub, styles: { halign: 'center' } }))
+                { content: "Test", rowSpan: 2, styles: { valign: 'middle', halign: 'left', cellWidth: testW } },
+                { content: "Date", rowSpan: 2, styles: { valign: 'middle', halign: 'center', cellWidth: dateW } },
+                { content: "Total", styles: { halign: 'center', cellWidth: totalW } },
+                ...subs.map((sub, idx) => {
+                    const colW = finalSubWidths[idx];
+                    const usableW = colW - 1.2;
+                    let fSize = tableFontSize;
+                    doc.setFont('NunitoSans', 'bold');
+                    doc.setFontSize(fSize);
+                    while (doc.getTextWidth(sub) > usableW && fSize > 4.8) {
+                        fSize -= 0.2;
+                        doc.setFontSize(fSize);
+                    }
+                    return {
+                        content: sub,
+                        styles: {
+                            halign: 'center',
+                            valign: 'middle',
+                            fontSize: fSize,
+                            cellWidth: colW,
+                            cellPadding: { top: 1.8, bottom: 1.8, left: 0.5, right: 0.5 }
+                        }
+                    };
+                })
             ];
 
             const headRow2 = [
-                { content: String(totalMaxVal), styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.5, textColor: [252, 211, 77] } },
-                ...subs.map(sub => ({
+                { content: String(totalMaxVal), styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.2, textColor: [252, 211, 77], cellWidth: totalW } },
+                ...subs.map((sub, idx) => ({
                     content: String(streamMaxMarks[stKey]?.[sub] ?? (stKey.startsWith('KCET') ? 60 : 100)),
-                    styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.5, textColor: [252, 211, 77] }
+                    styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.2, textColor: [252, 211, 77], cellWidth: finalSubWidths[idx] }
                 }))
             ];
 
             const tableRows = tests.map(t => {
-                if (t.isAB) {
+                const hasSubjectMarks = t.marks && subs.some(s => t.marks[s] !== undefined && t.marks[s] !== null && String(t.marks[s]).trim() !== '');
+                if (t.isAB && !hasSubjectMarks) {
                     return [
                         { content: t.testName, styles: { textColor: [198, 45, 71], fontStyle: 'bold', halign: 'left' } },
                         { content: formatDate(t.date), styles: { textColor: [198, 45, 71], fontStyle: 'bold', halign: 'center' } },
@@ -1177,11 +1343,19 @@ const CustomProgressReport = () => {
                 return [
                     { content: t.testName, styles: { fontStyle: 'bold', halign: 'left' } },
                     { content: formatDate(t.date), styles: { fontStyle: 'bold', halign: 'center' } },
-                    { content: String(Math.round(t.total || 0)), styles: { fontStyle: 'bold', halign: 'center' } },
-                    ...subs.map(sub => ({
-                        content: String(t.marks && t.marks[sub] !== undefined && t.marks[sub] !== null ? Math.round(t.marks[sub]) : '-'),
-                        styles: { fontStyle: 'bold', halign: 'center' }
-                    }))
+                    { content: formatTotalDisplay(t.total), styles: { fontStyle: 'bold', halign: 'center' } },
+                    ...subs.map(sub => {
+                        const mVal = t.marks?.[sub];
+                        const isAb = isAbsentMark(mVal);
+                        return {
+                            content: formatMarkDisplay(mVal),
+                            styles: {
+                                fontStyle: 'bold',
+                                halign: 'center',
+                                textColor: isAb ? [198, 45, 71] : [20, 32, 74]
+                            }
+                        };
+                    })
                 ];
             });
 
@@ -1189,27 +1363,24 @@ const CustomProgressReport = () => {
             const avgData = student.streamAverages?.[stKey];
             tableRows.push([
                 { content: "Average", colSpan: 2, styles: { fontStyle: 'bold', halign: 'left', fillColor: [241, 244, 251] } },
-                { content: String(avgData?.avgTotal || '-'), styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } },
-                ...subs.map(sub => ({
-                    content: String(avgData?.subjectAverages?.[sub] !== undefined ? avgData.subjectAverages[sub] : '-'),
-                    styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] }
-                }))
+                { content: formatTotalDisplay(avgData?.avgTotal), styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] } },
+                ...subs.map(sub => {
+                    const avgVal = avgData?.subjectAverages?.[sub];
+                    return {
+                        content: formatMarkDisplay(avgVal),
+                        styles: { fontStyle: 'bold', halign: 'center', fillColor: [241, 244, 251] }
+                    };
+                })
             ]);
 
-            const fixedWidth = 32 + 24 + 22; // 78mm
-            const remainingW = infoW - fixedWidth;
-            const subWidth = Math.max(12, Math.floor(remainingW / subs.length));
-
             const columnStyles = {
-                0: { halign: 'left', fontStyle: 'bold', cellWidth: 32 },
-                1: { halign: 'center', fontStyle: 'bold', cellWidth: 24 },
-                2: { halign: 'center', fontStyle: 'bold', cellWidth: 22 }
+                0: { halign: 'left', fontStyle: 'bold', cellWidth: testW },
+                1: { halign: 'center', fontStyle: 'bold', cellWidth: dateW },
+                2: { halign: 'center', fontStyle: 'bold', cellWidth: totalW }
             };
             subs.forEach((_, idx) => {
-                columnStyles[3 + idx] = { halign: 'center', fontStyle: 'bold', cellWidth: subWidth };
+                columnStyles[3 + idx] = { halign: 'center', fontStyle: 'bold', cellWidth: finalSubWidths[idx] };
             });
-
-            const tableFontSize = subs.length <= 5 ? 8.5 : subs.length <= 8 ? 7.8 : 7.2;
 
             autoTable(doc, {
                 head: [headRow1, headRow2],
@@ -1225,7 +1396,7 @@ const CustomProgressReport = () => {
                     fontSize: tableFontSize,
                     halign: 'center',
                     valign: 'middle',
-                    cellPadding: 1.6,
+                    cellPadding: { top: 1.8, bottom: 1.8, left: 0.5, right: 0.5 },
                     lineColor: [207, 214, 232],
                     lineWidth: 0.2
                 },
@@ -1236,7 +1407,7 @@ const CustomProgressReport = () => {
                     lineColor: [207, 214, 232],
                     lineWidth: 0.2,
                     valign: 'middle',
-                    cellPadding: 1.5
+                    cellPadding: { top: 1.6, bottom: 1.6, left: 0.5, right: 0.5 }
                 },
                 columnStyles,
                 didDrawCell: (data) => {
@@ -1251,9 +1422,9 @@ const CustomProgressReport = () => {
             currentY = doc.lastAutoTable.finalY + 6;
         });
 
-        // 6. Attendance Table (Matching Image 2)
-        if (student.attendance || includeAttendance) {
-            const att = student.attendance || { workingDays: '-', absent: '0', present: '-', sick: '0', total: '-' };
+        // 6. Attendance Table (Render ONLY if attendance data is entered AND enabled)
+        if (includeAttendance && hasAttendanceData(student)) {
+            const att = student.attendance;
 
             if (currentY + 30 > 265) {
                 doc.addPage();
@@ -2321,22 +2492,28 @@ const CustomProgressReport = () => {
                                                         {/* 2-TIER TABLE HEADER */}
                                                         <thead>
                                                             <tr style={{ background: '#0F2057', color: '#ffffff' }}>
-                                                                <th rowSpan={2} style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle' }}>Test</th>
-                                                                <th rowSpan={2} style={{ padding: '8px 10px', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle' }}>Date</th>
-                                                                <th style={{ padding: '6px 10px', border: '1px solid #CFD6E8', fontSize: '13px' }}>Total Marks</th>
+                                                                <th rowSpan={2} style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Test</th>
+                                                                <th rowSpan={2} style={{ padding: '8px 10px', border: '1px solid #CFD6E8', fontSize: '13px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>Date</th>
+                                                                <th style={{ padding: '6px 10px', border: '1px solid #CFD6E8', fontSize: '13px', whiteSpace: 'nowrap' }}>Total Marks</th>
                                                                 {subs.map(sub => (
-                                                                    <th key={sub} style={{ padding: '6px 10px', border: '1px solid #CFD6E8', fontSize: '13px' }}>
+                                                                    <th key={sub} style={{
+                                                                        padding: '6px 8px',
+                                                                        border: '1px solid #CFD6E8',
+                                                                        fontSize: subs.length > 6 ? '11.5px' : subs.length > 4 ? '12px' : '13px',
+                                                                        whiteSpace: 'nowrap',
+                                                                        letterSpacing: '0.2px'
+                                                                    }}>
                                                                         {sub}
                                                                     </th>
                                                                 ))}
                                                             </tr>
                                                             {/* Second Tier Header: OUT OF / MAX MARKS */}
                                                             <tr style={{ background: '#172B6B', color: '#FCD34D' }}>
-                                                                <th style={{ padding: '4px 10px', border: '1px solid #CFD6E8', fontSize: '12px', fontWeight: '800' }}>
+                                                                <th style={{ padding: '4px 10px', border: '1px solid #CFD6E8', fontSize: '12px', fontWeight: '800', whiteSpace: 'nowrap' }}>
                                                                     {totalMaxVal}
                                                                 </th>
                                                                 {subs.map(sub => (
-                                                                    <th key={sub} style={{ padding: '4px 10px', border: '1px solid #CFD6E8', fontSize: '12px', fontWeight: '800' }}>
+                                                                    <th key={sub} style={{ padding: '4px 8px', border: '1px solid #CFD6E8', fontSize: '12px', fontWeight: '800', whiteSpace: 'nowrap' }}>
                                                                         {streamMaxMarks[stKey]?.[sub] ?? (stKey.startsWith('KCET') ? 60 : 100)}
                                                                     </th>
                                                                 ))}
@@ -2351,11 +2528,12 @@ const CustomProgressReport = () => {
                                                                 </tr>
                                                             ) : (
                                                                 tests.map((t, idx) => {
-                                                                    if (t.isAB) {
+                                                                    const hasSubjectMarks = t.marks && subs.some(s => t.marks[s] !== undefined && t.marks[s] !== null && String(t.marks[s]).trim() !== '');
+                                                                    if (t.isAB && !hasSubjectMarks) {
                                                                         return (
                                                                             <tr key={idx} style={{ background: '#FFF5F5', color: '#C62D47' }}>
-                                                                                <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', border: '1px solid #CFD6E8' }}>{t.testName}</td>
-                                                                                <td style={{ padding: '8px 10px', fontWeight: '700', border: '1px solid #CFD6E8' }}>{formatDate(t.date)}</td>
+                                                                                <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', border: '1px solid #CFD6E8', whiteSpace: 'nowrap' }}>{t.testName}</td>
+                                                                                <td style={{ padding: '8px 10px', fontWeight: '700', border: '1px solid #CFD6E8', whiteSpace: 'nowrap' }}>{formatDate(t.date)}</td>
                                                                                 <td colSpan={subs.length + 1} style={{ padding: '8px 10px', fontWeight: '700', textAlign: 'center', border: '1px solid #CFD6E8' }}>
                                                                                     Absent
                                                                                 </td>
@@ -2364,14 +2542,24 @@ const CustomProgressReport = () => {
                                                                     }
                                                                     return (
                                                                         <tr key={idx} style={{ borderBottom: '1px solid #CFD6E8' }}>
-                                                                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#14204A', border: '1px solid #CFD6E8' }}>{t.testName}</td>
-                                                                            <td style={{ padding: '8px 10px', fontWeight: '600', color: '#14204A', border: '1px solid #CFD6E8' }}>{formatDate(t.date)}</td>
-                                                                            <td style={{ padding: '8px 10px', fontWeight: '800', color: '#0F2057', border: '1px solid #CFD6E8' }}>{Math.round(t.total || 0)}</td>
-                                                                            {subs.map(sub => (
-                                                                                <td key={sub} style={{ padding: '8px 10px', fontWeight: '700', color: '#14204A', border: '1px solid #CFD6E8' }}>
-                                                                                    {t.marks && t.marks[sub] !== undefined && t.marks[sub] !== null ? Math.round(t.marks[sub]) : '-'}
-                                                                                </td>
-                                                                            ))}
+                                                                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '700', color: '#14204A', border: '1px solid #CFD6E8', whiteSpace: 'nowrap' }}>{t.testName}</td>
+                                                                            <td style={{ padding: '8px 10px', fontWeight: '600', color: '#14204A', border: '1px solid #CFD6E8', whiteSpace: 'nowrap' }}>{formatDate(t.date)}</td>
+                                                                            <td style={{ padding: '8px 10px', fontWeight: '800', color: '#0F2057', border: '1px solid #CFD6E8', whiteSpace: 'nowrap' }}>{formatTotalDisplay(t.total)}</td>
+                                                                            {subs.map(sub => {
+                                                                                const mVal = t.marks?.[sub];
+                                                                                const isAb = isAbsentMark(mVal);
+                                                                                return (
+                                                                                    <td key={sub} style={{
+                                                                                        padding: '8px 10px',
+                                                                                        fontWeight: '700',
+                                                                                        color: isAb ? '#C62D47' : '#14204A',
+                                                                                        border: '1px solid #CFD6E8',
+                                                                                        whiteSpace: 'nowrap'
+                                                                                    }}>
+                                                                                        {formatMarkDisplay(mVal)}
+                                                                                    </td>
+                                                                                );
+                                                                            })}
                                                                         </tr>
                                                                     );
                                                                 })
@@ -2380,11 +2568,11 @@ const CustomProgressReport = () => {
                                                             {/* Average Row */}
                                                             {tests.length > 0 && (
                                                                 <tr style={{ background: '#F1F4FB', borderTop: '2px solid #C9962B', fontWeight: '800', color: '#0F2057' }}>
-                                                                    <td colSpan={2} style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8' }}>Average</td>
-                                                                    <td style={{ padding: '8px 10px', border: '1px solid #CFD6E8' }}>{avgData?.avgTotal || '-'}</td>
+                                                                    <td colSpan={2} style={{ padding: '8px 12px', textAlign: 'left', border: '1px solid #CFD6E8', whiteSpace: 'nowrap' }}>Average</td>
+                                                                    <td style={{ padding: '8px 10px', border: '1px solid #CFD6E8', whiteSpace: 'nowrap' }}>{formatTotalDisplay(avgData?.avgTotal)}</td>
                                                                     {subs.map(sub => (
-                                                                        <td key={sub} style={{ padding: '8px 10px', border: '1px solid #CFD6E8' }}>
-                                                                            {avgData?.subjectAverages?.[sub] !== undefined ? avgData.subjectAverages[sub] : '-'}
+                                                                        <td key={sub} style={{ padding: '8px 10px', border: '1px solid #CFD6E8', whiteSpace: 'nowrap' }}>
+                                                                            {formatMarkDisplay(avgData?.subjectAverages?.[sub])}
                                                                         </td>
                                                                     ))}
                                                                 </tr>
@@ -2396,8 +2584,8 @@ const CustomProgressReport = () => {
                                         );
                                     })}
 
-                                {/* Attendance Table (Matching Image 2) */}
-                                {(activeStudent.attendance || includeAttendance) && (
+                                {/* Attendance Table (Render ONLY if attendance data is entered AND enabled) */}
+                                {includeAttendance && hasAttendanceData(activeStudent) && (
                                     <div style={{ marginTop: '26px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                             <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '20px', fontWeight: '700', color: '#0F2057', margin: 0 }}>
@@ -2413,22 +2601,22 @@ const CustomProgressReport = () => {
                                         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
                                             <thead>
                                                 <tr style={{ background: '#0F2057', color: '#ffffff' }}>
-                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>TOTAL NO.OF WORKING DAYS</th>
-                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>ABSENT</th>
-                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>PRESENT</th>
-                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>SICK</th>
-                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700' }}>TOTAL</th>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700', whiteSpace: 'nowrap' }}>TOTAL NO.OF WORKING DAYS</th>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700', whiteSpace: 'nowrap' }}>ABSENT</th>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700', whiteSpace: 'nowrap' }}>PRESENT</th>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700', whiteSpace: 'nowrap' }}>SICK</th>
+                                                    <th style={{ padding: '8px 12px', border: '1px solid #CFD6E8', fontSize: '12.5px', fontWeight: '700', whiteSpace: 'nowrap' }}>TOTAL</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <tr style={{ background: '#FFFDF8', fontWeight: '700', color: '#14204A' }}>
-                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px' }}>{activeStudent.attendance?.workingDays || '-'}</td>
-                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', color: (activeStudent.attendance?.absent > 0) ? '#C62D47' : '#14204A' }}>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', whiteSpace: 'nowrap' }}>{activeStudent.attendance?.workingDays || '-'}</td>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', whiteSpace: 'nowrap', color: (Number(activeStudent.attendance?.absent) > 0) ? '#C62D47' : '#14204A' }}>
                                                         {activeStudent.attendance?.absent || '0'}
                                                     </td>
-                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', color: '#0F2057' }}>{activeStudent.attendance?.present || '-'}</td>
-                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px' }}>{activeStudent.attendance?.sick || '0'}</td>
-                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', fontWeight: '800' }}>{activeStudent.attendance?.total || '-'}</td>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', whiteSpace: 'nowrap', color: '#0F2057' }}>{activeStudent.attendance?.present || '-'}</td>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', whiteSpace: 'nowrap' }}>{activeStudent.attendance?.sick || '0'}</td>
+                                                    <td style={{ padding: '9px 12px', border: '1px solid #CFD6E8', fontSize: '13px', whiteSpace: 'nowrap', fontWeight: '800' }}>{activeStudent.attendance?.total || '-'}</td>
                                                 </tr>
                                             </tbody>
                                         </table>
