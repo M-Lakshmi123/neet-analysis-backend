@@ -315,7 +315,7 @@ const AverageReport = ({ filters }) => {
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
-    const [includePhoto, setIncludePhoto] = useState(true); // Default checked
+    const [includePhoto, setIncludePhoto] = useState(false); // Default unchecked
     const [includeChart, setIncludeChart] = useState(false); // Default unchecked
     const [includeTopicDetails, setIncludeTopicDetails] = useState(false); // Default unchecked
     const [isDownloading, setIsDownloading] = useState(false);
@@ -598,7 +598,7 @@ const AverageReport = ({ filters }) => {
         erpQuestions = [],
         isTopicDetailsIncluded = true,
         customRemarksText = null,
-        isPhotoIncluded = true
+        isPhotoIncluded = false
     ) => {
         const doc = new jsPDF('p', 'mm', 'a4');
 
