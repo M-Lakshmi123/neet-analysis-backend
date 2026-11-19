@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import { formatDate } from '../utils/apiHelper';
+import { formatDate, API_URL } from '../utils/apiHelper';
 import { useAuth } from './auth/AuthProvider';
 import { logActivity } from '../utils/activityLogger';
 import {
@@ -29,7 +29,11 @@ import {
     Sparkles,
     Calendar,
     BookOpen,
-    Hash
+    Hash,
+    Eye,
+    Database,
+    X,
+    UserCheck
 } from 'lucide-react';
 
 // Stream Definitions & Subject Presets
@@ -43,6 +47,26 @@ const STREAM_PRESETS = {
         availableSubjects: ['BOTANY', 'ZOOLOGY', 'PHYSICS', 'CHEMISTRY'],
         defaultSubjectMax: { BOTANY: 180, ZOOLOGY: 180, PHYSICS: 180, CHEMISTRY: 180 },
         defaultMaxTotal: 720
+    },
+    ENGG_MAIN: {
+        id: 'ENGG_MAIN',
+        label: 'Engineering JEE Mains',
+        icon: '⚙️',
+        description: 'JEE Mains stream (Physics: 100, Chemistry: 100, Maths: 100 = 300)',
+        defaultSubjects: ['MATHS', 'PHYSICS', 'CHEMISTRY'],
+        availableSubjects: ['MATHS', 'PHYSICS', 'CHEMISTRY'],
+        defaultSubjectMax: { MATHS: 100, PHYSICS: 100, CHEMISTRY: 100 },
+        defaultMaxTotal: 300
+    },
+    ENGG_ADV: {
+        id: 'ENGG_ADV',
+        label: 'Engineering JEE Adv',
+        icon: '🚀',
+        description: 'JEE Advanced stream (Maths, Physics, Chemistry - variable out of marks per exam)',
+        defaultSubjects: ['MATHS', 'PHYSICS', 'CHEMISTRY'],
+        availableSubjects: ['MATHS', 'PHYSICS', 'CHEMISTRY'],
+        defaultSubjectMax: { MATHS: 60, PHYSICS: 60, CHEMISTRY: 60 },
+        defaultMaxTotal: 180
     },
     ENGG: {
         id: 'ENGG',
@@ -175,6 +199,8 @@ const CustomProgressReport = () => {
     // Per-stream subjects map
     const [streamSubjects, setStreamSubjects] = useState({
         MEDICAL: [...STREAM_PRESETS.MEDICAL.defaultSubjects],
+        ENGG_MAIN: [...STREAM_PRESETS.ENGG_MAIN.defaultSubjects],
+        ENGG_ADV: [...STREAM_PRESETS.ENGG_ADV.defaultSubjects],
         ENGG: [...STREAM_PRESETS.ENGG.defaultSubjects],
         KCET_MED: [...STREAM_PRESETS.KCET_MED.defaultSubjects],
         KCET_ENGG: [...STREAM_PRESETS.KCET_ENGG.defaultSubjects],
@@ -185,6 +211,8 @@ const CustomProgressReport = () => {
     // Per-stream Out of Marks (Max Marks) map
     const [streamMaxMarks, setStreamMaxMarks] = useState({
         MEDICAL: { ...STREAM_PRESETS.MEDICAL.defaultSubjectMax },
+        ENGG_MAIN: { ...STREAM_PRESETS.ENGG_MAIN.defaultSubjectMax },
+        ENGG_ADV: { ...STREAM_PRESETS.ENGG_ADV.defaultSubjectMax },
         ENGG: { ...STREAM_PRESETS.ENGG.defaultSubjectMax },
         KCET_MED: { ...STREAM_PRESETS.KCET_MED.defaultSubjectMax },
         KCET_ENGG: { ...STREAM_PRESETS.KCET_ENGG.defaultSubjectMax },
@@ -195,6 +223,8 @@ const CustomProgressReport = () => {
     // Custom added subjects map
     const [customAddedSubjects, setCustomAddedSubjects] = useState({
         MEDICAL: [],
+        ENGG_MAIN: [],
+        ENGG_ADV: [],
         ENGG: [],
         KCET_MED: [],
         KCET_ENGG: [],
@@ -211,6 +241,12 @@ const CustomProgressReport = () => {
     const [dragActive, setDragActive] = useState(false);
     const [statusMessage, setStatusMessage] = useState(null);
 
+    // Top Student ID Search & Download State
+    const [searchStudentId, setSearchStudentId] = useState('');
+    const [isSearchingStudent, setIsSearchingStudent] = useState(false);
+    const [searchSuggestions, setSearchSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
     // Students Data Array
     const [students, setStudents] = useState([]);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
@@ -221,13 +257,14 @@ const CustomProgressReport = () => {
     const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, status: '' });
 
     const fileInputRef = useRef(null);
+    const searchContainerRef = useRef(null);
 
     // Compute Total Max Marks for a Stream
-    const getStreamTotalMax = (streamKey, subsList) => {
+    const getStreamTotalMax = (streamKey, subsList, customMaxMap) => {
         const subs = subsList || streamSubjects[streamKey] || STREAM_PRESETS[streamKey]?.defaultSubjects || [];
-        const maxMap = streamMaxMarks[streamKey] || {};
+        const maxMap = customMaxMap || streamMaxMarks[streamKey] || {};
         return subs.reduce((sum, s) => {
-            const defaultM = streamKey?.startsWith('KCET') ? 60 : 100;
+            const defaultM = streamKey === 'ENGG_MAIN' ? 100 : streamKey?.startsWith('KCET') ? 60 : 100;
             const val = maxMap[s] !== undefined && maxMap[s] !== null ? Number(maxMap[s]) : defaultM;
             return sum + (isNaN(val) ? defaultM : val);
         }, 0);
@@ -476,6 +513,8 @@ const CustomProgressReport = () => {
                 const isFirst = sIdx === 0;
                 let sampleTestName = 'Unit Test - 1';
                 if (streamKey === 'MEDICAL') sampleTestName = 'Grand Test - 1 (NEET)';
+                else if (streamKey === 'ENGG_MAIN') sampleTestName = 'JEE Mains Mock Test - 1';
+                else if (streamKey === 'ENGG_ADV') sampleTestName = 'JEE Adv Practice Paper - 1';
                 else if (streamKey === 'ENGG') sampleTestName = 'Mains Mock Test (JEE)';
                 else if (streamKey === 'KCET_MED') sampleTestName = 'KCET Mock (PCB)';
                 else if (streamKey === 'KCET_ENGG') sampleTestName = 'KCET Mock (PCM)';
@@ -516,6 +555,8 @@ const CustomProgressReport = () => {
                 const isFirst = sIdx === 0;
                 let sampleTestName = 'Unit Test - 1';
                 if (streamKey === 'MEDICAL') sampleTestName = 'Grand Test - 1 (NEET)';
+                else if (streamKey === 'ENGG_MAIN') sampleTestName = 'JEE Mains Mock Test - 1';
+                else if (streamKey === 'ENGG_ADV') sampleTestName = 'JEE Adv Practice Paper - 1';
                 else if (streamKey === 'ENGG') sampleTestName = 'Mains Mock Test (JEE)';
                 else if (streamKey === 'KCET_MED') sampleTestName = 'KCET Mock (PCB)';
                 else if (streamKey === 'KCET_ENGG') sampleTestName = 'KCET Mock (PCM)';
@@ -584,8 +625,9 @@ const CustomProgressReport = () => {
 
             const instructions = [
                 ['Selected Streams', streamLabels],
+                ['Engineering Streams', 'Engineering JEE Mains has Physics (100), Chemistry (100), Maths (100) = Total 300. Engineering JEE Adv supports variable out of marks that change per test/exam.'],
                 ['KCET Support', 'KCET Medical (PCB) has Physics (60), Chemistry (60), Biology (60) = Total 180. KCET Engg (PCM) has Physics (60), Chemistry (60), Maths (60) = Total 180.'],
-                ['Out of / Max Marks', 'Row 2 indicates the Out of Marks (Max Marks) for each subject. You can adjust them directly.'],
+                ['Out of / Max Marks', 'Row 2 indicates the Out of Marks (Max Marks) for each subject. For JEE Adv or custom exams, you can adjust them directly.'],
                 ['Auto Total Calculation', 'NO NEED TO ENTER TOTAL MARKS! The system automatically calculates total marks for each exam and stream (NEET, CBSE, KCET, PU, JEE) from the subject marks and adds it into the progress report.'],
                 ['Attendance Enabled', includeAttendance ? 'Yes (Working Days, Absent, Present, Sick, Total)' : 'No'],
                 ['STUDENT ID', 'Mandatory unique ID. Multiple rows with the same ID will be grouped together.'],
@@ -856,11 +898,21 @@ const CustomProgressReport = () => {
                     if (examType.includes('MED') || examType.includes('PCB') || examType.includes('BIO')) examType = 'KCET_MED';
                     else if (examType.includes('ENG') || examType.includes('PCM') || examType.includes('MAT')) examType = 'KCET_ENGG';
                     else examType = selectedStreams.includes('KCET_MED') ? 'KCET_MED' : 'KCET_ENGG';
-                } else if (examType.includes('MED') || examType.includes('NEET')) examType = 'MEDICAL';
-                else if (examType.includes('ENG') || examType.includes('JEE')) examType = 'ENGG';
-                else if (examType.includes('CBSE')) examType = 'CBSE';
-                else if (examType.includes('PU')) examType = 'PU';
-                else examType = selectedStreams[0];
+                } else if (examType.includes('ADV') || examType.includes('ADVANCED')) {
+                    examType = 'ENGG_ADV';
+                } else if (examType.includes('MAIN') || examType.includes('MAINS')) {
+                    examType = 'ENGG_MAIN';
+                } else if (examType.includes('MED') || examType.includes('NEET')) {
+                    examType = 'MEDICAL';
+                } else if (examType.includes('ENG') || examType.includes('JEE')) {
+                    examType = selectedStreams.includes('ENGG_ADV') && !selectedStreams.includes('ENGG_MAIN') ? 'ENGG_ADV' : 'ENGG_MAIN';
+                } else if (examType.includes('CBSE')) {
+                    examType = 'CBSE';
+                } else if (examType.includes('PU')) {
+                    examType = 'PU';
+                } else {
+                    examType = selectedStreams[0] || 'MEDICAL';
+                }
 
                 // 2. Extract Marks and Automatically Calculate Total for this Stream's Test
                 const marksObj = {};
@@ -870,25 +922,37 @@ const CustomProgressReport = () => {
 
                 subjectCols.forEach(sc => {
                     // When multi-stream columns are present (tagged [STREAM]), only process columns matching this row's examType
-                    if (sc.streamTag && sc.streamTag !== examType) {
-                        return;
+                    if (sc.streamTag) {
+                        const tagMatches = sc.streamTag === examType ||
+                            (sc.streamTag === 'ENGG' && (examType === 'ENGG_MAIN' || examType === 'ENGG_ADV')) ||
+                            ((sc.streamTag === 'ENGG_MAIN' || sc.streamTag === 'ENGG_ADV') && examType === 'ENGG');
+                        if (!tagMatches) return;
                     }
 
                     const rawVal = getCellValue(row.getCell(sc.col));
                     const strVal = rawVal !== undefined && rawVal !== null ? String(rawVal).trim() : '';
 
                     if (strVal !== '') {
-                        const num = Number(strVal);
-                        if (!isNaN(num) && !isNaN(parseFloat(strVal))) {
-                            marksObj[sc.cleanName] = num;
-                            numericSum += num;
+                        const slashMatch = strVal.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+                        if (slashMatch) {
+                            const scoredNum = Number(slashMatch[1]);
+                            marksObj[sc.cleanName] = scoredNum;
+                            numericSum += scoredNum;
                             hasMarks = true;
                             isAllAbsent = false;
                         } else {
-                            // Non-numeric mark ('AB', 'A', 'Absent', 'Abset', etc.)
-                            // Store exactly as entered by user
-                            marksObj[sc.cleanName] = strVal;
-                            hasMarks = true;
+                            const num = Number(strVal);
+                            if (!isNaN(num) && !isNaN(parseFloat(strVal))) {
+                                marksObj[sc.cleanName] = num;
+                                numericSum += num;
+                                hasMarks = true;
+                                isAllAbsent = false;
+                            } else {
+                                // Non-numeric mark ('AB', 'A', 'Absent', 'Abset', etc.)
+                                // Store exactly as entered by user
+                                marksObj[sc.cleanName] = strVal;
+                                hasMarks = true;
+                            }
                         }
                     }
                 });
@@ -1037,10 +1101,37 @@ const CustomProgressReport = () => {
 
             setStudents(studentList);
             setCurrentStudentIndex(0);
-            setStatusMessage({
-                type: 'success',
-                text: `Parsed ${studentList.length} student(s) with ${rawStudentRows.length} total test records across selected streams!`
-            });
+
+            // Auto-save to TiDB
+            try {
+                setStatusMessage({ type: 'info', text: `Parsed ${studentList.length} students. Saving to TiDB database...` });
+                const saveRes = await fetch(`${API_URL}/api/custom-progress/bulk-save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        students: studentList,
+                        streamMaxMarks,
+                        academicYear: '2026'
+                    })
+                });
+                if (saveRes.ok) {
+                    setStatusMessage({
+                        type: 'success',
+                        text: `Parsed ${studentList.length} student(s) with ${rawStudentRows.length} test records and saved to TiDB database!`
+                    });
+                } else {
+                    setStatusMessage({
+                        type: 'success',
+                        text: `Parsed ${studentList.length} student(s) with ${rawStudentRows.length} total test records across selected streams!`
+                    });
+                }
+            } catch (saveErr) {
+                console.warn('Auto-save to TiDB error/warning:', saveErr);
+                setStatusMessage({
+                    type: 'success',
+                    text: `Parsed ${studentList.length} student(s) with ${rawStudentRows.length} total test records across selected streams!`
+                });
+            }
             logActivity(userData, 'Uploaded Multi-Stream Progress Excel', { studentsCount: studentList.length });
         } catch (err) {
             console.error('File parsing error:', err);
@@ -1108,7 +1199,7 @@ const CustomProgressReport = () => {
         });
     };
 
-    const renderStudentPDFPage = (doc, student, logoImg, fonts) => {
+    const renderStudentPDFPage = (doc, student, logoImg, fonts, customMaxMarks) => {
         if (fonts?.oswaldBold) {
             try {
                 doc.addFileToVFS("Oswald-Bold.ttf", fonts.oswaldBold);
@@ -1284,7 +1375,7 @@ const CustomProgressReport = () => {
         let currentY = infoY + infoH + 6;
 
         // 5. Render Tables for Each Active Stream (2-Tier Header matching Image 2!)
-        const streamOrder = ['MEDICAL', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU'];
+        const streamOrder = ['MEDICAL', 'ENGG_MAIN', 'ENGG_ADV', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU'];
         const activeStreamKeys = streamOrder.filter(k => student.streamTests[k] && student.streamTests[k].length > 0);
         const streamsToRender = activeStreamKeys.length > 0 ? activeStreamKeys : selectedStreams;
 
@@ -1298,7 +1389,8 @@ const CustomProgressReport = () => {
                 ...tests.flatMap(t => Object.keys(t.marks || {}))
             ])].filter(Boolean);
             const stLabel = STREAM_PRESETS[stKey]?.label || stKey;
-            const totalMaxVal = getStreamTotalMax(stKey, subs);
+            const maxMap = customMaxMarks?.[stKey] || student.streamMaxMarks?.[stKey] || streamMaxMarks[stKey] || {};
+            const totalMaxVal = getStreamTotalMax(stKey, subs, maxMap);
 
             if (currentY + 45 > 265) {
                 doc.addPage();
@@ -1394,7 +1486,7 @@ const CustomProgressReport = () => {
             const headRow2 = [
                 { content: String(totalMaxVal), styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.2, textColor: [252, 211, 77], cellWidth: totalW } },
                 ...subs.map((sub, idx) => ({
-                    content: String(streamMaxMarks[stKey]?.[sub] ?? (stKey.startsWith('KCET') ? 60 : 100)),
+                    content: String(maxMap[sub] ?? (stKey === 'ENGG_MAIN' ? 100 : stKey.startsWith('KCET') ? 60 : 100)),
                     styles: { halign: 'center', fontStyle: 'bold', fontSize: 7.2, textColor: [252, 211, 77], cellWidth: finalSubWidths[idx] }
                 }))
             ];
@@ -1605,7 +1697,7 @@ const CustomProgressReport = () => {
             if (mode === 'current') {
                 setDownloadProgress({ current: 1, total: 1, status: `Generating PDF for ${activeStudent.name}...` });
                 const doc = new jsPDF('p', 'mm', 'a4');
-                renderStudentPDFPage(doc, activeStudent, logoImg, fonts);
+                renderStudentPDFPage(doc, activeStudent, logoImg, fonts, streamMaxMarks);
                 const safeName = (activeStudent.name || 'Student').replace(/[/\\?%*:|"<>]/g, '_').trim();
                 const fileName = `${safeName}_${activeStudent.id}_Progress_Report.pdf`;
                 doc.save(fileName);
@@ -1619,7 +1711,7 @@ const CustomProgressReport = () => {
                     const st = students[i];
                     setDownloadProgress({ current: i + 1, total, status: `Appending student ${i + 1} of ${total}: ${st.name}` });
                     if (i > 0) doc.addPage();
-                    renderStudentPDFPage(doc, st, logoImg, fonts);
+                    renderStudentPDFPage(doc, st, logoImg, fonts, streamMaxMarks);
                     if (i % 5 === 0) await new Promise(r => setTimeout(r, 10));
                 }
 
@@ -1635,7 +1727,7 @@ const CustomProgressReport = () => {
                     const st = students[i];
                     setDownloadProgress({ current: i + 1, total, status: `Generating file ${i + 1} of ${total}: ${st.name}` });
                     const doc = new jsPDF('p', 'mm', 'a4');
-                    renderStudentPDFPage(doc, st, logoImg, fonts);
+                    renderStudentPDFPage(doc, st, logoImg, fonts, streamMaxMarks);
 
                     const pdfBuffer = doc.output('arraybuffer');
                     const safeName = (st.name || 'Student').replace(/[/\\?%*:|"<>]/g, '_').trim();
@@ -1659,6 +1751,255 @@ const CustomProgressReport = () => {
             setIsDownloading(false);
         }
     };
+
+    // Helper to generate a single student PDF directly
+    const generateSinglePDF = async (student, customMaxMarks) => {
+        const [
+            logoImg,
+            oswaldBold,
+            libreBaskerville,
+            cormorantBold,
+            cormorantItalic,
+            nunitoRegular,
+            nunitoBold
+        ] = await Promise.all([
+            loadImage('/logo.png'),
+            loadFont('/fonts/Oswald-Bold.ttf'),
+            loadFont('/fonts/LibreBaskerville-Regular.ttf'),
+            loadFont('/fonts/CormorantGaramond-Bold.ttf'),
+            loadFont('/fonts/CormorantGaramond-Italic.ttf'),
+            loadFont('/fonts/NunitoSans-Regular.ttf'),
+            loadFont('/fonts/NunitoSans-Bold.ttf')
+        ]);
+
+        const fonts = {
+            oswaldBold,
+            libreBaskerville,
+            cormorantBold,
+            cormorantItalic,
+            nunitoRegular,
+            nunitoBold
+        };
+
+        const doc = new jsPDF('p', 'mm', 'a4');
+        renderStudentPDFPage(doc, student, logoImg, fonts, customMaxMarks);
+        const safeName = (student.name || 'Student').replace(/[/\\?%*:|"<>]/g, '_').trim();
+        const fileName = `${safeName}_${student.id}_Progress_Report.pdf`;
+        doc.save(fileName);
+        return fileName;
+    };
+
+    // -------------------------------------------------------------
+    // TOP SEARCH BAR: SEARCH & QUICK DOWNLOAD BY STUDENT ID (From Memory or TiDB)
+    // -------------------------------------------------------------
+    const handleQuickDownloadStudent = async (targetIdInput) => {
+        const queryId = String(targetIdInput || searchStudentId || '').trim();
+        if (!queryId) {
+            setStatusMessage({ type: 'error', text: 'Please enter a Student ID to search and download the progress report.' });
+            return;
+        }
+
+        setShowSuggestions(false);
+        setIsSearchingStudent(true);
+        setStatusMessage({ type: 'info', text: `Searching for student ID "${queryId}"...` });
+
+        try {
+            // 1. Check in local uploaded state first
+            const normalized = queryId.toUpperCase();
+            let foundStudent = students.find(s =>
+                String(s.id).trim().toUpperCase() === normalized ||
+                String(s.name).trim().toUpperCase() === normalized
+            );
+
+            if (foundStudent) {
+                const sIdx = students.findIndex(s => s === foundStudent);
+                if (sIdx !== -1) setCurrentStudentIndex(sIdx);
+
+                setStatusMessage({ type: 'info', text: `Generating progress report PDF for "${foundStudent.name}"...` });
+                const fileName = await generateSinglePDF(foundStudent, streamMaxMarks);
+                setStatusMessage({
+                    type: 'success',
+                    text: `Downloaded progress report "${fileName}" for ${foundStudent.name} (${foundStudent.id})!`
+                });
+                logActivity(userData, 'Downloaded Progress Report by ID Search', { studentId: foundStudent.id, source: 'local' });
+                return;
+            }
+
+            // 2. Fetch from TiDB Database
+            setStatusMessage({ type: 'info', text: `Looking up student ID "${queryId}" in TiDB database...` });
+            const res = await fetch(`${API_URL}/api/custom-progress/student/${encodeURIComponent(queryId)}?academicYear=2026`);
+            if (res.ok) {
+                const data = await res.json();
+                const remoteStudent = data.student;
+                const remoteMaxMarks = data.streamMaxMarks || streamMaxMarks;
+
+                if (data.streamMaxMarks) {
+                    setStreamMaxMarks(prev => ({ ...prev, ...data.streamMaxMarks }));
+                }
+
+                // Add to students list and set as current
+                setStudents(prev => {
+                    const idx = prev.findIndex(s => String(s.id).toUpperCase() === String(remoteStudent.id).toUpperCase());
+                    if (idx !== -1) {
+                        const copy = [...prev];
+                        copy[idx] = remoteStudent;
+                        return copy;
+                    }
+                    return [remoteStudent, ...prev];
+                });
+                setCurrentStudentIndex(0);
+
+                // Auto-select stream if needed
+                const remoteStreams = Object.keys(remoteStudent.streamTests || {});
+                if (remoteStreams.length > 0) {
+                    setSelectedStreams(prev => [...new Set([...prev, ...remoteStreams])]);
+                }
+
+                setStatusMessage({ type: 'info', text: `Generating PDF for "${remoteStudent.name}" from TiDB...` });
+                const fileName = await generateSinglePDF(remoteStudent, remoteMaxMarks);
+                setStatusMessage({
+                    type: 'success',
+                    text: `Found student "${remoteStudent.name}" (${remoteStudent.id}) in TiDB (${data.source}) and downloaded "${fileName}"!`
+                });
+                logActivity(userData, 'Downloaded Progress Report by ID Search', { studentId: remoteStudent.id, source: data.source });
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                setStatusMessage({
+                    type: 'error',
+                    text: errData.error || `Student ID "${queryId}" was not found in uploaded list or TiDB database.`
+                });
+            }
+        } catch (err) {
+            console.error('Error downloading student by ID:', err);
+            setStatusMessage({ type: 'error', text: `Failed to download student progress: ${err.message}` });
+        } finally {
+            setIsSearchingStudent(false);
+        }
+    };
+
+    const handlePreviewStudent = async (targetIdInput) => {
+        const queryId = String(targetIdInput || searchStudentId || '').trim();
+        if (!queryId) {
+            setStatusMessage({ type: 'error', text: 'Please enter a Student ID to preview.' });
+            return;
+        }
+
+        setShowSuggestions(false);
+        setIsSearchingStudent(true);
+
+        try {
+            const normalized = queryId.toUpperCase();
+            let foundStudent = students.find(s =>
+                String(s.id).trim().toUpperCase() === normalized ||
+                String(s.name).trim().toUpperCase() === normalized
+            );
+
+            if (foundStudent) {
+                const sIdx = students.findIndex(s => s === foundStudent);
+                if (sIdx !== -1) setCurrentStudentIndex(sIdx);
+                setStatusMessage({
+                    type: 'success',
+                    text: `Loaded preview for ${foundStudent.name} (${foundStudent.id}).`
+                });
+                return;
+            }
+
+            // Lookup from TiDB
+            const res = await fetch(`${API_URL}/api/custom-progress/student/${encodeURIComponent(queryId)}?academicYear=2026`);
+            if (res.ok) {
+                const data = await res.json();
+                const remoteStudent = data.student;
+
+                if (data.streamMaxMarks) {
+                    setStreamMaxMarks(prev => ({ ...prev, ...data.streamMaxMarks }));
+                }
+
+                setStudents(prev => {
+                    const idx = prev.findIndex(s => String(s.id).toUpperCase() === String(remoteStudent.id).toUpperCase());
+                    if (idx !== -1) {
+                        const copy = [...prev];
+                        copy[idx] = remoteStudent;
+                        return copy;
+                    }
+                    return [remoteStudent, ...prev];
+                });
+                setCurrentStudentIndex(0);
+
+                const remoteStreams = Object.keys(remoteStudent.streamTests || {});
+                if (remoteStreams.length > 0) {
+                    setSelectedStreams(prev => [...new Set([...prev, ...remoteStreams])]);
+                }
+
+                setStatusMessage({
+                    type: 'success',
+                    text: `Loaded preview for "${remoteStudent.name}" (${remoteStudent.id}) from TiDB (${data.source})!`
+                });
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                setStatusMessage({
+                    type: 'error',
+                    text: errData.error || `Student ID "${queryId}" not found in uploaded list or TiDB database.`
+                });
+            }
+        } catch (err) {
+            console.error('Preview student error:', err);
+            setStatusMessage({ type: 'error', text: `Failed to load preview: ${err.message}` });
+        } finally {
+            setIsSearchingStudent(false);
+        }
+    };
+
+    // Auto-search suggestions debounce
+    useEffect(() => {
+        if (!searchStudentId || searchStudentId.trim().length < 2) {
+            setSearchSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        const query = searchStudentId.trim();
+        const normQ = query.toLowerCase();
+
+        // 1. Local suggestions
+        const localMatches = students.filter(s =>
+            (s.id && String(s.id).toLowerCase().includes(normQ)) ||
+            (s.name && String(s.name).toLowerCase().includes(normQ))
+        ).slice(0, 5).map(s => ({
+            id: s.id,
+            name: s.name,
+            campus: s.campus,
+            source: 'Uploaded'
+        }));
+
+        setSearchSuggestions(localMatches);
+        setShowSuggestions(localMatches.length > 0);
+
+        // 2. Fetch from TiDB suggestions
+        const timer = setTimeout(async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/custom-progress/search?q=${encodeURIComponent(query)}&academicYear=2026`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const remoteMatches = (data.results || []).map(r => ({
+                        ...r,
+                        source: r.source === 'CUSTOM_PROGRESS' ? 'TiDB' : 'TiDB (NEET)'
+                    }));
+
+                    // Deduplicate with localMatches
+                    const combined = [...localMatches];
+                    remoteMatches.forEach(rm => {
+                        if (!combined.some(c => String(c.id).toUpperCase() === String(rm.id).toUpperCase())) {
+                            combined.push(rm);
+                        }
+                    });
+                    setSearchSuggestions(combined.slice(0, 8));
+                    setShowSuggestions(combined.length > 0);
+                }
+            } catch (e) { }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchStudentId, students]);
 
     return (
         <div className="custom-progress-report-container" style={{ padding: '24px 28px', maxWidth: '1440px', margin: '0 auto' }}>
@@ -1843,6 +2184,221 @@ const CustomProgressReport = () => {
                 </div>
             )}
 
+            {/* Top Search Bar: Direct Student ID Download & Preview */}
+            <div style={{
+                background: '#FFFFFF',
+                border: '1.5px solid #C9962B',
+                borderRadius: '12px',
+                padding: '20px 24px',
+                marginBottom: '24px',
+                boxShadow: '0 4px 16px rgba(15, 32, 87, 0.08)',
+                position: 'relative'
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: '#0F2057',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#C9962B'
+                        }}>
+                            <Search size={18} />
+                        </div>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#0F2057', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                Download Student Progress Report by ID
+                                <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: '700',
+                                    padding: '2px 8px',
+                                    borderRadius: '10px',
+                                    background: '#ECFDF5',
+                                    color: '#059669',
+                                    border: '1px solid #A7F3D0',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                }}>
+                                    <Database size={11} /> TiDB Connected
+                                </span>
+                            </h2>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '12.5px', color: '#64748B' }}>
+                                Enter any Student ID below to instantly download their progress report PDF (retrieves from uploaded file or TiDB database).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Form Input + Action Buttons */}
+                <form
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        handleQuickDownloadStudent();
+                    }}
+                    style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', position: 'relative' }}
+                    ref={searchContainerRef}
+                >
+                    <div style={{ flex: '1 1 300px', position: 'relative' }}>
+                        <Search size={17} color="#94A3B8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+                        <input
+                            type="text"
+                            placeholder="Enter Student ID (e.g. SC1001, 2026012...)"
+                            value={searchStudentId}
+                            onChange={(e) => setSearchStudentId(e.target.value)}
+                            onFocus={() => { if (searchSuggestions.length > 0) setShowSuggestions(true); }}
+                            style={{
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                padding: '12px 38px 12px 40px',
+                                borderRadius: '8px',
+                                border: '1.5px solid #CBD5E1',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                color: '#0F2057',
+                                outline: 'none',
+                                transition: 'border-color 0.15s ease'
+                            }}
+                        />
+                        {searchStudentId && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchStudentId('');
+                                    setShowSuggestions(false);
+                                }}
+                                style={{
+                                    position: 'absolute',
+                                    right: '12px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#94A3B8',
+                                    cursor: 'pointer',
+                                    padding: '2px'
+                                }}
+                            >
+                                <X size={16} />
+                            </button>
+                        )}
+
+                        {/* Suggestions Dropdown */}
+                        {showSuggestions && searchSuggestions.length > 0 && (
+                            <div style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: 0,
+                                zIndex: 50,
+                                background: '#FFFFFF',
+                                border: '1px solid #CBD5E1',
+                                borderRadius: '8px',
+                                marginTop: '4px',
+                                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                maxHeight: '240px',
+                                overflowY: 'auto'
+                            }}>
+                                {searchSuggestions.map((s, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={() => {
+                                            setSearchStudentId(s.id);
+                                            setShowSuggestions(false);
+                                            handleQuickDownloadStudent(s.id);
+                                        }}
+                                        style={{
+                                            padding: '10px 14px',
+                                            cursor: 'pointer',
+                                            borderBottom: idx < searchSuggestions.length - 1 ? '1px solid #F1F5F9' : 'none',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            transition: 'background 0.1s ease'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = '#FFFFFF'}
+                                    >
+                                        <div>
+                                            <strong style={{ fontSize: '13.5px', color: '#0F2057' }}>{s.id}</strong>
+                                            <span style={{ margin: '0 8px', color: '#CBD5E1' }}>·</span>
+                                            <span style={{ fontSize: '13px', color: '#334155' }}>{s.name}</span>
+                                            {s.campus && <span style={{ fontSize: '11.5px', color: '#64748B', marginLeft: '6px' }}>({s.campus})</span>}
+                                        </div>
+                                        <span style={{
+                                            fontSize: '11px',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            background: s.source.includes('TiDB') ? '#EFF6FF' : '#F0FDF4',
+                                            color: s.source.includes('TiDB') ? '#1D4ED8' : '#15803D',
+                                            fontWeight: '700'
+                                        }}>
+                                            {s.source}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Download Button (Primary) */}
+                    <button
+                        type="submit"
+                        disabled={isSearchingStudent}
+                        style={{
+                            background: '#0F2057',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '12px 22px',
+                            fontSize: '13.5px',
+                            fontWeight: '700',
+                            cursor: isSearchingStudent ? 'wait' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            boxShadow: '0 2px 8px rgba(15, 32, 87, 0.25)',
+                            whiteSpace: 'nowrap',
+                            opacity: isSearchingStudent ? 0.75 : 1
+                        }}
+                    >
+                        {isSearchingStudent ? (
+                            <RefreshCw size={17} className="animate-spin" />
+                        ) : (
+                            <Download size={17} color="#C9962B" />
+                        )}
+                        <span>{isSearchingStudent ? 'Searching & Downloading...' : 'Download Progress Report (PDF)'}</span>
+                    </button>
+
+                    {/* Preview Button (Secondary) */}
+                    <button
+                        type="button"
+                        onClick={() => handlePreviewStudent()}
+                        disabled={isSearchingStudent}
+                        style={{
+                            background: '#F8FAFC',
+                            color: '#0F2057',
+                            border: '1.5px solid #CBD5E1',
+                            borderRadius: '8px',
+                            padding: '12px 18px',
+                            fontSize: '13.5px',
+                            fontWeight: '700',
+                            cursor: isSearchingStudent ? 'wait' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '7px',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        <Eye size={16} />
+                        <span>Preview Report</span>
+                    </button>
+                </form>
+            </div>
+
             {/* Top Control Grid: 1. Stream Selection | 2. Subjects & Out-of-Marks | 3. Template & Upload */}
             <div style={{
                 display: 'grid',
@@ -1868,9 +2424,9 @@ const CustomProgressReport = () => {
                         </span>
                     </div>
 
-                    {/* 6 Stream Cards */}
+                    {/* 7 Stream Cards (including Engineering JEE Mains and Engineering JEE Adv) */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-                        {Object.values(STREAM_PRESETS).map(st => {
+                        {Object.values(STREAM_PRESETS).filter(st => st.id !== 'ENGG').map(st => {
                             const isSelected = selectedStreams.includes(st.id);
                             return (
                                 <button
@@ -1965,7 +2521,7 @@ const CustomProgressReport = () => {
                         </div>
 
                         {/* Quick Preset Buttons */}
-                        <div style={{ display: 'flex', gap: '4px' }}>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                             <button
                                 type="button"
                                 onClick={() => handleSetAllMaxMarks(activeConfigTab, 60)}
@@ -1977,16 +2533,26 @@ const CustomProgressReport = () => {
                             <button
                                 type="button"
                                 onClick={() => handleSetAllMaxMarks(activeConfigTab, 100)}
-                                title="Set all checked subjects to 100"
+                                title="Set all checked subjects to 100 (JEE Mains standard)"
                                 style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '4px', padding: '2px 6px', fontSize: '10.5px', fontWeight: '700', color: '#0F2057', cursor: 'pointer' }}
                             >
-                                /100
+                                /100 (Mains)
                             </button>
-                            {activeConfigTab === 'MEDICAL' && (
+                            {(activeConfigTab === 'ENGG_ADV' || activeConfigTab === 'MEDICAL' || activeConfigTab === 'CBSE') && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSetAllMaxMarks(activeConfigTab, 120)}
+                                    title="Set all checked subjects to 120 (JEE Adv standard)"
+                                    style={{ background: '#EFF6FF', border: '1px solid #93C5FD', borderRadius: '4px', padding: '2px 6px', fontSize: '10.5px', fontWeight: '700', color: '#1D4ED8', cursor: 'pointer' }}
+                                >
+                                    /120 (Adv)
+                                </button>
+                            )}
+                            {(activeConfigTab === 'MEDICAL' || activeConfigTab === 'ENGG_ADV') && (
                                 <button
                                     type="button"
                                     onClick={() => handleSetAllMaxMarks(activeConfigTab, 180)}
-                                    title="Set all subjects to 180 (NEET full mark)"
+                                    title="Set all subjects to 180 (NEET / Adv total)"
                                     style={{ background: '#EFF6FF', border: '1px solid #93C5FD', borderRadius: '4px', padding: '2px 6px', fontSize: '10.5px', fontWeight: '700', color: '#1D4ED8', cursor: 'pointer' }}
                                 >
                                     /180
@@ -2530,7 +3096,7 @@ const CustomProgressReport = () => {
                                 </div>
 
                                 {/* Dynamic Tables for Each Selected Stream (2-Tier Header with Out-of-Marks) */}
-                                {['MEDICAL', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU']
+                                {['MEDICAL', 'ENGG_MAIN', 'ENGG_ADV', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU']
                                     .filter(stKey => (activeStudent.streamTests[stKey] && activeStudent.streamTests[stKey].length > 0) || selectedStreams.includes(stKey))
                                     .map(stKey => {
                                         const tests = activeStudent.streamTests[stKey] || [];
@@ -2587,7 +3153,7 @@ const CustomProgressReport = () => {
                                                                 </th>
                                                                 {subs.map(sub => (
                                                                     <th key={sub} style={{ padding: '4px 8px', border: '1px solid #CFD6E8', fontSize: '12px', fontWeight: '800', whiteSpace: 'nowrap' }}>
-                                                                        {streamMaxMarks[stKey]?.[sub] ?? (stKey.startsWith('KCET') ? 60 : 100)}
+                                                                        {streamMaxMarks[stKey]?.[sub] ?? (stKey === 'ENGG_MAIN' ? 100 : stKey.startsWith('KCET') ? 60 : 100)}
                                                                     </th>
                                                                 ))}
                                                             </tr>

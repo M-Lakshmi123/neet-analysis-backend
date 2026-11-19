@@ -89,6 +89,26 @@ async function connectToDb(year = '2026') {
             `);
             console.log(`Verified 'student_photos' table in TiDB (${targetYear})`);
 
+            // Ensure CUSTOM_PROGRESS_STUDENTS table exists
+            await poolRaw.query(`
+                CREATE TABLE IF NOT EXISTS CUSTOM_PROGRESS_STUDENTS (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    student_id VARCHAR(100) NOT NULL,
+                    student_name VARCHAR(255) NOT NULL,
+                    campus VARCHAR(255),
+                    section VARCHAR(100),
+                    stream VARCHAR(255),
+                    stream_tests LONGTEXT,
+                    stream_averages LONGTEXT,
+                    attendance LONGTEXT,
+                    stream_max_marks LONGTEXT,
+                    academic_year VARCHAR(10) DEFAULT '2026',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uniq_student_year (student_id, academic_year)
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+            `);
+            console.log(`Verified 'CUSTOM_PROGRESS_STUDENTS' table in TiDB (${targetYear})`);
+
             // Create a wrapper to mimic strict MSSQL interface
             pools[targetYear] = {
                 rawPool: poolRaw,

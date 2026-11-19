@@ -2359,6 +2359,253 @@ app.post('/api/internal-error/save-excel', async (req, res) => {
     }
 });
 
+// -------------------------------------------------------------
+// CUSTOM PROGRESS REPORT APIs (TiDB Persistence & Student Lookup)
+// -------------------------------------------------------------
+
+// Bulk save custom progress report student records to TiDB
+app.post('/api/custom-progress/bulk-save', async (req, res) => {
+    try {
+        const { students, streamMaxMarks, academicYear = '2026' } = req.body;
+        if (!students || !Array.isArray(students) || students.length === 0) {
+            return res.status(400).json({ success: false, error: 'No students provided for saving' });
+        }
+
+        const pool = await connectToDb(academicYear);
+        const maxMarksJson = streamMaxMarks ? JSON.stringify(streamMaxMarks) : null;
+
+        // Process in batches of 50 to prevent packet size limits
+        const batchSize = 50;
+        let savedCount = 0;
+
+        for (let i = 0; i < students.length; i += batchSize) {
+            const chunk = students.slice(i, i + batchSize);
+            const values = [];
+            const placeholders = chunk.map(s => {
+                const sid = String(s.id || s.studId || '').trim();
+                const sname = String(s.name || s.studName || sid).trim();
+                const campus = String(s.campus || '').trim();
+                const section = String(s.section || '').trim();
+                const stream = String(s.stream || '').trim();
+                const testsJson = JSON.stringify(s.streamTests || {});
+                const avgsJson = JSON.stringify(s.streamAverages || {});
+                const attJson = s.attendance ? JSON.stringify(s.attendance) : null;
+
+                values.push(sid, sname, campus, section, stream, testsJson, avgsJson, attJson, maxMarksJson, academicYear);
+                return '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            }).join(', ');
+
+            const sql = `
+                INSERT INTO CUSTOM_PROGRESS_STUDENTS 
+                (student_id, student_name, campus, section, stream, stream_tests, stream_averages, attendance, stream_max_marks, academic_year)
+                VALUES ${placeholders}
+                ON DUPLICATE KEY UPDATE 
+                    student_name = VALUES(student_name),
+                    campus = VALUES(campus),
+                    section = VALUES(section),
+                    stream = VALUES(stream),
+                    stream_tests = VALUES(stream_tests),
+                    stream_averages = VALUES(stream_averages),
+                    attendance = VALUES(attendance),
+                    stream_max_marks = VALUES(stream_max_marks),
+                    updated_at = CURRENT_TIMESTAMP
+            `;
+
+            await pool.rawPool.query(sql, values);
+            savedCount += chunk.length;
+        }
+
+        console.log(`[CustomProgress] Saved ${savedCount} student records to TiDB (${academicYear})`);
+        res.json({ success: true, count: savedCount, message: `Successfully saved ${savedCount} students to TiDB` });
+    } catch (err) {
+        console.error('[CustomProgress BulkSave] ERROR:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Lookup individual student by ID from TiDB (CUSTOM_PROGRESS_STUDENTS or fallback to MEDICAL_RESULT)
+app.get('/api/custom-progress/student/:studentId', async (req, res) => {
+    try {
+        const { studentId } = req.params;
+        const academicYear = req.query.academicYear || '2026';
+        if (!studentId) {
+            return res.status(400).json({ success: false, error: 'Student ID is required' });
+        }
+
+        const pool = await connectToDb(academicYear);
+        const trimmedId = String(studentId).trim();
+
+        // 1. First check CUSTOM_PROGRESS_STUDENTS table
+        const [rows] = await pool.rawPool.query(
+            'SELECT * FROM CUSTOM_PROGRESS_STUDENTS WHERE student_id = ? AND academic_year = ? LIMIT 1',
+            [trimmedId, academicYear]
+        );
+
+        if (rows && rows.length > 0) {
+            const row = rows[0];
+            let streamTests = {};
+            let streamAverages = {};
+            let attendance = null;
+            let streamMaxMarks = null;
+
+            try { streamTests = JSON.parse(row.stream_tests || '{}'); } catch (e) { }
+            try { streamAverages = JSON.parse(row.stream_averages || '{}'); } catch (e) { }
+            try { if (row.attendance) attendance = JSON.parse(row.attendance); } catch (e) { }
+            try { if (row.stream_max_marks) streamMaxMarks = JSON.parse(row.stream_max_marks); } catch (e) { }
+
+            const student = {
+                id: row.student_id,
+                name: row.student_name,
+                campus: row.campus,
+                section: row.section,
+                stream: row.stream,
+                streamTests,
+                streamAverages,
+                attendance,
+                streamMaxMarks
+            };
+
+            return res.json({ success: true, source: 'CUSTOM_PROGRESS', student, streamMaxMarks });
+        }
+
+        // 2. Fallback: Search in MEDICAL_RESULT in TiDB
+        const [medRows] = await pool.rawPool.query(
+            `SELECT Test, DATE, Tot_720, Botany, Zoology, Physics, Chemistry, NAME_OF_THE_STUDENT, CAMPUS_NAME, Stream, STUD_ID
+             FROM MEDICAL_RESULT 
+             WHERE STUD_ID = ? 
+             ORDER BY STR_TO_DATE(REPLACE(DATE, '/', '-'), '%d-%m-%Y') ASC`,
+            [trimmedId]
+        );
+
+        if (medRows && medRows.length > 0) {
+            const first = medRows[0];
+            const tests = medRows.map(r => {
+                const bot = r.Botany;
+                const zoo = r.Zoology;
+                const phy = r.Physics;
+                const chem = r.Chemistry;
+                const tot = r.Tot_720;
+
+                const isAbsent = (val) => val === 'AB' || val === 'A' || val === 'Absent' || val === '-' || val === null || val === undefined;
+                const allAbsent = isAbsent(bot) && isAbsent(zoo) && isAbsent(phy) && isAbsent(chem);
+
+                return {
+                    testName: r.Test || 'Grand Test',
+                    date: r.DATE || '',
+                    total: allAbsent ? '-' : (tot || 0),
+                    marks: {
+                        BOTANY: isAbsent(bot) ? 'AB' : (!isNaN(Number(bot)) ? Number(bot) : bot),
+                        ZOOLOGY: isAbsent(zoo) ? 'AB' : (!isNaN(Number(zoo)) ? Number(zoo) : zoo),
+                        PHYSICS: isAbsent(phy) ? 'AB' : (!isNaN(Number(phy)) ? Number(phy) : phy),
+                        CHEMISTRY: isAbsent(chem) ? 'AB' : (!isNaN(Number(chem)) ? Number(chem) : chem)
+                    },
+                    isAB: allAbsent
+                };
+            });
+
+            // Calculate stream averages
+            const attended = tests.filter(t => !t.isAB);
+            const count = attended.length;
+            const avgTot = count > 0 ? Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / count) : '-';
+
+            const subs = ['BOTANY', 'ZOOLOGY', 'PHYSICS', 'CHEMISTRY'];
+            const subjectAverages = {};
+            subs.forEach(s => {
+                const valid = attended.map(t => Number(t.marks?.[s])).filter(n => !isNaN(n));
+                subjectAverages[s] = valid.length > 0 ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : '-';
+            });
+
+            const student = {
+                id: String(first.STUD_ID),
+                name: first.NAME_OF_THE_STUDENT || 'Student',
+                campus: first.CAMPUS_NAME || 'Campus',
+                section: '',
+                stream: first.Stream || 'Medical (NEET)',
+                streamTests: {
+                    MEDICAL: tests
+                },
+                streamAverages: {
+                    MEDICAL: {
+                        avgTotal: avgTot,
+                        subjectAverages,
+                        subjects: subs
+                    }
+                },
+                attendance: null
+            };
+
+            const streamMaxMarks = {
+                MEDICAL: { BOTANY: 180, ZOOLOGY: 180, PHYSICS: 180, CHEMISTRY: 180 }
+            };
+
+            return res.json({ success: true, source: 'MEDICAL_RESULT', student, streamMaxMarks });
+        }
+
+        return res.status(404).json({ success: false, error: `Student ID "${studentId}" not found in TiDB database` });
+    } catch (err) {
+        console.error('[CustomProgress Student Lookup] ERROR:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Search suggestions for student ID or student name
+app.get('/api/custom-progress/search', async (req, res) => {
+    try {
+        const query = String(req.query.q || '').trim();
+        const academicYear = req.query.academicYear || '2026';
+        if (!query) return res.json({ success: true, results: [] });
+
+        const pool = await connectToDb(academicYear);
+        const searchPattern = `%${query}%`;
+
+        const [rows] = await pool.rawPool.query(
+            `SELECT student_id, student_name, campus, section, stream 
+             FROM CUSTOM_PROGRESS_STUDENTS 
+             WHERE academic_year = ? AND (student_id LIKE ? OR student_name LIKE ?) 
+             LIMIT 10`,
+            [academicYear, searchPattern, searchPattern]
+        );
+
+        let results = rows.map(r => ({
+            id: r.student_id,
+            name: r.student_name,
+            campus: r.campus,
+            section: r.section,
+            stream: r.stream,
+            source: 'CUSTOM_PROGRESS'
+        }));
+
+        if (results.length < 5) {
+            const [medRows] = await pool.rawPool.query(
+                `SELECT DISTINCT STUD_ID, NAME_OF_THE_STUDENT, CAMPUS_NAME, Stream 
+                 FROM MEDICAL_RESULT 
+                 WHERE STUD_ID LIKE ? OR NAME_OF_THE_STUDENT LIKE ? 
+                 LIMIT ?`,
+                [searchPattern, searchPattern, 10 - results.length]
+            );
+
+            medRows.forEach(r => {
+                const sid = String(r.STUD_ID);
+                if (!results.some(existing => existing.id === sid)) {
+                    results.push({
+                        id: sid,
+                        name: r.NAME_OF_THE_STUDENT,
+                        campus: r.CAMPUS_NAME,
+                        section: '',
+                        stream: r.Stream || 'Medical (NEET)',
+                        source: 'MEDICAL_RESULT'
+                    });
+                }
+            });
+        }
+
+        res.json({ success: true, results });
+    } catch (err) {
+        console.error('[CustomProgress Search] ERROR:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 // SERVE REACT APP FOR ANY OTHER ROUTE
 // app.get('*', (req, res) => {
 //     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
