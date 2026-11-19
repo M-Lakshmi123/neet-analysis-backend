@@ -3927,6 +3927,10 @@ body {
     align-items: stretch;
 }
 
+.rc-student-section.no-photo .rc-info-label {
+    width: 25%;
+}
+
 .rc-info-table {
     flex: 1;
     border-collapse: collapse;

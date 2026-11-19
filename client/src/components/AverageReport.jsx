@@ -315,6 +315,7 @@ const AverageReport = ({ filters }) => {
     const [loading, setLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
+    const [includePhoto, setIncludePhoto] = useState(true); // Default checked
     const [includeChart, setIncludeChart] = useState(false); // Default unchecked
     const [includeTopicDetails, setIncludeTopicDetails] = useState(false); // Default unchecked
     const [isDownloading, setIsDownloading] = useState(false);
@@ -596,7 +597,8 @@ const AverageReport = ({ filters }) => {
         isChartIncluded,
         erpQuestions = [],
         isTopicDetailsIncluded = true,
-        customRemarksText = null
+        customRemarksText = null,
+        isPhotoIncluded = true
     ) => {
         const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -733,7 +735,6 @@ const AverageReport = ({ filters }) => {
         // 4. Student Info Table & Photo Box (4 rows only - removed Date of Report and Status of Student as requested)
         const infoY = 49.5;
         const infoX = 14;
-        const infoW = 142;
         const infoH = 29.6;
         const rowH = infoH / 4;
 
@@ -744,64 +745,101 @@ const AverageReport = ({ filters }) => {
             { label: "Campus and Stream", value: `${campus} · ${stream}`, isBold: false }
         ];
 
-        infoData.forEach((row, i) => {
-            const y = infoY + (i * rowH);
-            // Label cell
-            doc.setFillColor(241, 244, 251); // #F1F4FB
-            doc.setDrawColor(207, 214, 232); // #CFD6E8
-            doc.setLineWidth(0.25);
-            doc.rect(infoX, y, 48, rowH, 'FD');
+        if (isPhotoIncluded) {
+            const labelW = 48;
+            const valueW = 94;
 
-            setFontNunitoBold();
-            doc.setFontSize(8.5);
-            doc.setTextColor(15, 32, 87); // #0F2057
-            doc.text(row.label, infoX + 3, y + 4.8);
+            infoData.forEach((row, i) => {
+                const y = infoY + (i * rowH);
+                // Label cell
+                doc.setFillColor(241, 244, 251); // #F1F4FB
+                doc.setDrawColor(207, 214, 232); // #CFD6E8
+                doc.setLineWidth(0.25);
+                doc.rect(infoX, y, labelW, rowH, 'FD');
 
-            // Value cell
-            doc.setFillColor(255, 253, 248); // #FFFDF8
-            doc.rect(infoX + 48, y, 94, rowH, 'FD');
-
-            if (row.isBold) {
                 setFontNunitoBold();
+                doc.setFontSize(8.5);
+                doc.setTextColor(15, 32, 87); // #0F2057
+                doc.text(row.label, infoX + 3, y + 4.8);
+
+                // Value cell
+                doc.setFillColor(255, 253, 248); // #FFFDF8
+                doc.rect(infoX + labelW, y, valueW, rowH, 'FD');
+
+                if (row.isBold) {
+                    setFontNunitoBold();
+                } else {
+                    setFontNunitoRegular();
+                }
+                doc.setFontSize(8.5);
+                doc.setTextColor(20, 32, 74); // #14204A
+                doc.text(row.value, infoX + 51, y + 4.8);
+            });
+
+            // Photo Box on Right (Matches 4 rows height with 3px gold border)
+            const photoX = 160;
+            const photoY = infoY;
+            const photoW = 36;
+            const photoH = infoH;
+
+            doc.setFillColor(255, 253, 248);
+            doc.setDrawColor(201, 150, 43); // #C9962B
+            doc.setLineWidth(0.9); // 3px gold border
+            doc.rect(photoX, photoY, photoW, photoH, 'FD');
+
+            if (studentPhoto) {
+                try {
+                    doc.addImage(studentPhoto, 'JPEG', photoX + 0.6, photoY + 0.6, photoW - 1.2, photoH - 1.2, undefined, 'FAST');
+                } catch (imgErr) {
+                    console.warn("Could not render photo in PDF, falling back to initials:", imgErr);
+                    setFontCormorantBold();
+                    doc.setFontSize(22);
+                    doc.setTextColor(15, 32, 87);
+                    doc.text(getStudentInitials(studentName), photoX + (photoW / 2), photoY + 16, { align: 'center' });
+                }
             } else {
-                setFontNunitoRegular();
-            }
-            doc.setFontSize(8.5);
-            doc.setTextColor(20, 32, 74); // #14204A
-            doc.text(row.value, infoX + 51, y + 4.8);
-        });
-
-        // Photo Box on Right (Matches 4 rows height with 3px gold border)
-        const photoX = 160;
-        const photoY = infoY;
-        const photoW = 36;
-        const photoH = infoH;
-
-        doc.setFillColor(255, 253, 248);
-        doc.setDrawColor(201, 150, 43); // #C9962B
-        doc.setLineWidth(0.9); // 3px gold border
-        doc.rect(photoX, photoY, photoW, photoH, 'FD');
-
-        if (studentPhoto) {
-            try {
-                doc.addImage(studentPhoto, 'JPEG', photoX + 0.6, photoY + 0.6, photoW - 1.2, photoH - 1.2, undefined, 'FAST');
-            } catch (imgErr) {
-                console.warn("Could not render photo in PDF, falling back to initials:", imgErr);
                 setFontCormorantBold();
                 doc.setFontSize(22);
                 doc.setTextColor(15, 32, 87);
                 doc.text(getStudentInitials(studentName), photoX + (photoW / 2), photoY + 16, { align: 'center' });
+
+                setFontNunitoRegular();
+                doc.setFontSize(7);
+                doc.setTextColor(93, 103, 136); // #5D6788
+                doc.text("Student Photo", photoX + (photoW / 2), photoY + 23, { align: 'center' });
             }
         } else {
-            setFontCormorantBold();
-            doc.setFontSize(22);
-            doc.setTextColor(15, 32, 87);
-            doc.text(getStudentInitials(studentName), photoX + (photoW / 2), photoY + 16, { align: 'center' });
+            // Full Width Student Info Table (No Photo Box)
+            const infoW = 182;
+            const labelW = 48;
+            const valueW = infoW - labelW;
 
-            setFontNunitoRegular();
-            doc.setFontSize(7);
-            doc.setTextColor(93, 103, 136); // #5D6788
-            doc.text("Student Photo", photoX + (photoW / 2), photoY + 23, { align: 'center' });
+            infoData.forEach((row, i) => {
+                const y = infoY + (i * rowH);
+                // Label cell
+                doc.setFillColor(241, 244, 251); // #F1F4FB
+                doc.setDrawColor(207, 214, 232); // #CFD6E8
+                doc.setLineWidth(0.25);
+                doc.rect(infoX, y, labelW, rowH, 'FD');
+
+                setFontNunitoBold();
+                doc.setFontSize(8.5);
+                doc.setTextColor(15, 32, 87); // #0F2057
+                doc.text(row.label, infoX + 3, y + 4.8);
+
+                // Value cell
+                doc.setFillColor(255, 253, 248); // #FFFDF8
+                doc.rect(infoX + labelW, y, valueW, rowH, 'FD');
+
+                if (row.isBold) {
+                    setFontNunitoBold();
+                } else {
+                    setFontNunitoRegular();
+                }
+                doc.setFontSize(8.5);
+                doc.setTextColor(20, 32, 74); // #14204A
+                doc.text(row.value, infoX + labelW + 3, y + 4.8);
+            });
         }
 
         // 5. Section Heading
@@ -1272,24 +1310,27 @@ const AverageReport = ({ filters }) => {
                 const erpQ = await fetchStudentErpQuestionsForPdf(sid, sName);
 
                 // Fetch student photo from TiDB if not already loaded in currentPhoto
-                let studentPhoto = (sid.toString() === previewStudentId?.toString()) ? currentPhoto : null;
-                if (!studentPhoto) {
-                    try {
-                        const pRes = await fetch(`${API_URL}/api/student-photo/${encodeURIComponent(sid)}?academicYear=${filters.academicYear || '2026'}`);
-                        if (pRes.ok) {
-                            const pData = await pRes.json();
-                            studentPhoto = pData.photo?.photo_data || null;
+                let studentPhoto = null;
+                if (includePhoto) {
+                    studentPhoto = (sid.toString() === previewStudentId?.toString()) ? currentPhoto : null;
+                    if (!studentPhoto) {
+                        try {
+                            const pRes = await fetch(`${API_URL}/api/student-photo/${encodeURIComponent(sid)}?academicYear=${filters.academicYear || '2026'}`);
+                            if (pRes.ok) {
+                                const pData = await pRes.json();
+                                studentPhoto = pData.photo?.photo_data || null;
+                            }
+                        } catch (photoErr) {
+                            console.warn("Could not load photo for student in PDF:", photoErr);
                         }
-                    } catch (photoErr) {
-                        console.warn("Could not load photo for student in PDF:", photoErr);
                     }
                 }
 
                 const studentRem = customRemarks[sid] || null;
-                const doc = generateStudentPDF(sRows, logoImg, fonts, studentPhoto, chartImgData, transformed, includeChart, erpQ, includeTopicDetails, studentRem);
+                const doc = generateStudentPDF(sRows, logoImg, fonts, studentPhoto, chartImgData, transformed, includeChart, erpQ, includeTopicDetails, studentRem, includePhoto);
                 const sanitizedName = String(sName || 'Report').replace(/[/\\?%*:|"<>]/g, '_').trim();
                 doc.save(`${sanitizedName}_Progress_Report.pdf`);
-                logActivity(userData, 'Downloaded Progress PDF', { student: sName, includeChart, includeTopicDetails });
+                logActivity(userData, 'Downloaded Progress PDF', { student: sName, includeChart, includeTopicDetails, includePhoto });
             } else {
                 const zip = new JSZip();
                 const campusName = grouped[studentIds[0]][0].CAMPUS_NAME || 'Campus';
@@ -1298,21 +1339,23 @@ const AverageReport = ({ filters }) => {
 
                 // Pre-fetch all student photos in batch from TiDB!
                 let photosMap = {};
-                try {
-                    const batchRes = await fetch(`${API_URL}/api/student-photos/batch`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            studentIds: studentIds,
-                            academicYear: filters.academicYear || '2026'
-                        })
-                    });
-                    if (batchRes.ok) {
-                        const batchData = await batchRes.json();
-                        photosMap = batchData.photos || {};
+                if (includePhoto) {
+                    try {
+                        const batchRes = await fetch(`${API_URL}/api/student-photos/batch`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                studentIds: studentIds,
+                                academicYear: filters.academicYear || '2026'
+                            })
+                        });
+                        if (batchRes.ok) {
+                            const batchData = await batchRes.json();
+                            photosMap = batchData.photos || {};
+                        }
+                    } catch (batchErr) {
+                        console.warn("[Bulk PDF] Batch photos fetch failed:", batchErr);
                     }
-                } catch (batchErr) {
-                    console.warn("[Bulk PDF] Batch photos fetch failed:", batchErr);
                 }
 
                 // High Performance: Pre-fetch all ERP questions in a single batch request
@@ -1387,10 +1430,10 @@ const AverageReport = ({ filters }) => {
                         }
                         erpQ = erpQ || [];
 
-                        const studentPhoto = photosMap[id] || null;
+                        const studentPhoto = includePhoto ? (photosMap[id] || null) : null;
                         const studentRem = customRemarks[id] || null;
 
-                        const doc = generateStudentPDF(sRows, logoImg, fonts, studentPhoto, chartImgData, transformed, includeChart, erpQ, includeTopicDetails, studentRem);
+                        const doc = generateStudentPDF(sRows, logoImg, fonts, studentPhoto, chartImgData, transformed, includeChart, erpQ, includeTopicDetails, studentRem, includePhoto);
                         const pdfArrayBuffer = doc.output('arraybuffer');
                         zip.file(fileName, pdfArrayBuffer);
                     } catch (singleStudentErr) {
@@ -1406,7 +1449,7 @@ const AverageReport = ({ filters }) => {
                 });
                 const sanitizedCampus = String(campusName).replace(/[/\\?%*:|"<>]/g, '_').trim();
                 saveAs(content, `${sanitizedCampus}_Progress_Reports.zip`);
-                logActivity(userData, 'Downloaded Bulk Progress PDF', { count: studentIds.length, campus: campusName, includeChart });
+                logActivity(userData, 'Downloaded Bulk Progress PDF', { count: studentIds.length, campus: campusName, includeChart, includePhoto });
             }
 
         } catch (err) {
@@ -2327,6 +2370,15 @@ const AverageReport = ({ filters }) => {
                         <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '0.86rem', color: '#334155', fontWeight: '600', userSelect: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                             <input
                                 type="checkbox"
+                                checked={includePhoto}
+                                onChange={(e) => setIncludePhoto(e.target.checked)}
+                                style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#2563eb' }}
+                            />
+                            Include Student Photo
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '0.86rem', color: '#334155', fontWeight: '600', userSelect: 'none', background: '#f1f5f9', padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                            <input
+                                type="checkbox"
                                 checked={includeChart}
                                 onChange={(e) => setIncludeChart(e.target.checked)}
                                 style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#2563eb' }}
@@ -2459,7 +2511,7 @@ const AverageReport = ({ filters }) => {
                                     </div>
 
                                     {/* Student Info & Photo Section */}
-                                    <div className="rc-student-section">
+                                    <div className={`rc-student-section ${!includePhoto ? 'no-photo' : ''}`}>
                                         <table className="rc-info-table">
                                             <tbody>
                                                 <tr>
@@ -2484,61 +2536,63 @@ const AverageReport = ({ filters }) => {
                                         </table>
 
                                         {/* Photo Box */}
-                                        <div 
-                                            className="rc-photo-box" 
-                                            onClick={() => photoInputRef.current?.click()}
-                                            title={currentPhoto ? "Click to change photo" : "Click to upload student photo (saved directly to TiDB)"}
-                                        >
-                                            <input 
-                                                type="file" 
-                                                ref={photoInputRef} 
-                                                onChange={handlePhotoUpload} 
-                                                accept="image/*" 
-                                                style={{ display: 'none' }} 
-                                            />
+                                        {includePhoto && (
+                                            <div 
+                                                className="rc-photo-box" 
+                                                onClick={() => photoInputRef.current?.click()}
+                                                title={currentPhoto ? "Click to change photo" : "Click to upload student photo (saved directly to TiDB)"}
+                                            >
+                                                <input 
+                                                    type="file" 
+                                                    ref={photoInputRef} 
+                                                    onChange={handlePhotoUpload} 
+                                                    accept="image/*" 
+                                                    style={{ display: 'none' }} 
+                                                />
 
-                                            {photoUploading ? (
-                                                <div className="rc-photo-placeholder">
-                                                    <span style={{ fontSize: '11px', color: '#5D6788' }}>Saving to TiDB...</span>
-                                                </div>
-                                            ) : currentPhoto ? (
-                                                <>
-                                                    <img src={currentPhoto} alt="Student" className="rc-photo-img" />
-                                                    <div className="rc-photo-overlay">
-                                                        <span style={{ fontSize: '10px', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            <Camera size={12} /> Change
-                                                        </span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleDeletePhoto}
-                                                            style={{
-                                                                background: '#ef4444',
-                                                                color: '#ffffff',
-                                                                border: 'none',
-                                                                borderRadius: '4px',
-                                                                padding: '2px 6px',
-                                                                fontSize: '10px',
-                                                                cursor: 'pointer',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '3px'
-                                                            }}
-                                                        >
-                                                            <Trash2 size={10} /> Delete
-                                                        </button>
+                                                {photoUploading ? (
+                                                    <div className="rc-photo-placeholder">
+                                                        <span style={{ fontSize: '11px', color: '#5D6788' }}>Saving to TiDB...</span>
                                                     </div>
-                                                </>
-                                            ) : (
-                                                <div className="rc-photo-placeholder">
-                                                    <div className="rc-photo-initials">
-                                                        {getStudentInitials(previewRows[0]?.NAME_OF_THE_STUDENT)}
+                                                ) : currentPhoto ? (
+                                                    <>
+                                                        <img src={currentPhoto} alt="Student" className="rc-photo-img" />
+                                                        <div className="rc-photo-overlay">
+                                                            <span style={{ fontSize: '10px', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                <Camera size={12} /> Change
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleDeletePhoto}
+                                                                style={{
+                                                                    background: '#ef4444',
+                                                                    color: '#ffffff',
+                                                                    border: 'none',
+                                                                    borderRadius: '4px',
+                                                                    padding: '2px 6px',
+                                                                    fontSize: '10px',
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '3px'
+                                                                }}
+                                                            >
+                                                                <Trash2 size={10} /> Delete
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="rc-photo-placeholder">
+                                                        <div className="rc-photo-initials">
+                                                            {getStudentInitials(previewRows[0]?.NAME_OF_THE_STUDENT)}
+                                                        </div>
+                                                        <div className="rc-photo-add-text">
+                                                            <Camera size={12} /> Click to add photo
+                                                        </div>
                                                     </div>
-                                                    <div className="rc-photo-add-text">
-                                                        <Camera size={12} /> Click to add photo
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Section Heading */}
