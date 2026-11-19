@@ -233,7 +233,6 @@ const CustomProgressReport = () => {
     });
 
     const [newSubjectInput, setNewSubjectInput] = useState('');
-    const [showInstructions, setShowInstructions] = useState(true);
 
     // Upload & Parsed Data States
     const [uploadedFileName, setUploadedFileName] = useState('');
@@ -1104,7 +1103,7 @@ const CustomProgressReport = () => {
 
             // Auto-save to TiDB
             try {
-                setStatusMessage({ type: 'info', text: `Parsed ${studentList.length} students. Saving to TiDB database...` });
+                setStatusMessage({ type: 'info', text: `Parsed ${studentList.length} students. Saving records...` });
                 const saveRes = await fetch(`${API_URL}/api/custom-progress/bulk-save`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1117,7 +1116,7 @@ const CustomProgressReport = () => {
                 if (saveRes.ok) {
                     setStatusMessage({
                         type: 'success',
-                        text: `Parsed ${studentList.length} student(s) with ${rawStudentRows.length} test records and saved to TiDB database!`
+                        text: `Parsed ${studentList.length} student(s) with ${rawStudentRows.length} test records and saved to database!`
                     });
                 } else {
                     setStatusMessage({
@@ -1825,8 +1824,8 @@ const CustomProgressReport = () => {
                 return;
             }
 
-            // 2. Fetch from TiDB Database
-            setStatusMessage({ type: 'info', text: `Looking up student ID "${queryId}" in TiDB database...` });
+            // 2. Fetch from Database
+            setStatusMessage({ type: 'info', text: `Looking up student ID "${queryId}"...` });
             const res = await fetch(`${API_URL}/api/custom-progress/student/${encodeURIComponent(queryId)}?academicYear=2026`);
             if (res.ok) {
                 const data = await res.json();
@@ -1855,18 +1854,18 @@ const CustomProgressReport = () => {
                     setSelectedStreams(prev => [...new Set([...prev, ...remoteStreams])]);
                 }
 
-                setStatusMessage({ type: 'info', text: `Generating PDF for "${remoteStudent.name}" from TiDB...` });
+                setStatusMessage({ type: 'info', text: `Generating PDF for "${remoteStudent.name}"...` });
                 const fileName = await generateSinglePDF(remoteStudent, remoteMaxMarks);
                 setStatusMessage({
                     type: 'success',
-                    text: `Found student "${remoteStudent.name}" (${remoteStudent.id}) in TiDB (${data.source}) and downloaded "${fileName}"!`
+                    text: `Found student "${remoteStudent.name}" (${remoteStudent.id}) and downloaded "${fileName}"!`
                 });
                 logActivity(userData, 'Downloaded Progress Report by ID Search', { studentId: remoteStudent.id, source: data.source });
             } else {
                 const errData = await res.json().catch(() => ({}));
                 setStatusMessage({
                     type: 'error',
-                    text: errData.error || `Student ID "${queryId}" was not found in uploaded list or TiDB database.`
+                    text: errData.error || `Student ID "${queryId}" was not found in uploaded list or database.`
                 });
             }
         } catch (err) {
@@ -1904,7 +1903,7 @@ const CustomProgressReport = () => {
                 return;
             }
 
-            // Lookup from TiDB
+            // Lookup from Database
             const res = await fetch(`${API_URL}/api/custom-progress/student/${encodeURIComponent(queryId)}?academicYear=2026`);
             if (res.ok) {
                 const data = await res.json();
@@ -1932,13 +1931,13 @@ const CustomProgressReport = () => {
 
                 setStatusMessage({
                     type: 'success',
-                    text: `Loaded preview for "${remoteStudent.name}" (${remoteStudent.id}) from TiDB (${data.source})!`
+                    text: `Loaded preview for "${remoteStudent.name}" (${remoteStudent.id})!`
                 });
             } else {
                 const errData = await res.json().catch(() => ({}));
                 setStatusMessage({
                     type: 'error',
-                    text: errData.error || `Student ID "${queryId}" not found in uploaded list or TiDB database.`
+                    text: errData.error || `Student ID "${queryId}" not found in uploaded list or database.`
                 });
             }
         } catch (err) {
@@ -1974,7 +1973,7 @@ const CustomProgressReport = () => {
         setSearchSuggestions(localMatches);
         setShowSuggestions(localMatches.length > 0);
 
-        // 2. Fetch from TiDB suggestions
+        // 2. Fetch from Database suggestions
         const timer = setTimeout(async () => {
             try {
                 const res = await fetch(`${API_URL}/api/custom-progress/search?q=${encodeURIComponent(query)}&academicYear=2026`);
@@ -1982,7 +1981,7 @@ const CustomProgressReport = () => {
                     const data = await res.json();
                     const remoteMatches = (data.results || []).map(r => ({
                         ...r,
-                        source: r.source === 'CUSTOM_PROGRESS' ? 'TiDB' : 'TiDB (NEET)'
+                        source: r.source === 'CUSTOM_PROGRESS' ? 'Saved' : 'NEET'
                     }));
 
                     // Deduplicate with localMatches
@@ -2040,130 +2039,7 @@ const CustomProgressReport = () => {
                         Generate combined progress reports with KCET support (Medical PCB: Physics, Chemistry, Biology; Engg PCM: Physics, Chemistry, Maths), custom out-of-marks, and attendance records.
                     </p>
                 </div>
-
-                <button
-                    onClick={() => setShowInstructions(prev => !prev)}
-                    style={{
-                        background: 'rgba(255, 255, 255, 0.12)',
-                        border: '1px solid rgba(255, 255, 255, 0.25)',
-                        color: '#ffffff',
-                        padding: '8px 16px',
-                        borderRadius: '8px',
-                        fontSize: '13px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        transition: 'all 0.2s ease'
-                    }}
-                >
-                    <HelpCircle size={16} />
-                    {showInstructions ? 'Hide Instructions' : 'View Instructions'}
-                </button>
             </div>
-
-            {/* Step-by-Step Instructions Card */}
-            {showInstructions && (
-                <div style={{
-                    background: '#FFFFFF',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '12px',
-                    padding: '20px 24px',
-                    marginBottom: '24px',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)'
-                }}>
-                    <h3 style={{
-                        fontSize: '15px',
-                        fontWeight: '700',
-                        color: '#0F2057',
-                        marginTop: 0,
-                        marginBottom: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        <Sparkles size={18} color="#C9962B" />
-                        How to Generate Multi-Stream & Attendance Progress Reports (Step-by-Step)
-                    </h3>
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                        gap: '14px'
-                    }}>
-                        {[
-                            {
-                                num: '1',
-                                title: 'Select Stream(s) including KCET',
-                                desc: 'Choose between Medical (NEET), Engineering (JEE), KCET Medical (PCB), KCET Engg (PCM), CBSE, or PU.'
-                            },
-                            {
-                                num: '2',
-                                title: 'Configure Subjects & Out-Of-Marks',
-                                desc: 'KCET defaults to 60 marks per subject (180 total). Easily adjust any subject max marks.'
-                            },
-                            {
-                                num: '3',
-                                title: 'Download Multi-Stream Template',
-                                desc: 'Click "Download Template" to get the formatted .xlsx with pre-configured subject columns and attendance (no manual total marks column needed!).'
-                            },
-                            {
-                                num: '4',
-                                title: 'Fill Marks (Auto-Total Calculation)',
-                                desc: 'Enter student details, section, and individual subject marks. Total marks for each exam and stream are automatically calculated by the system!'
-                            },
-                            {
-                                num: '5',
-                                title: 'Upload Completed Excel File',
-                                desc: 'Upload the sheet. The parser segregates competitive tests, board tests, and attendance automatically.'
-                            },
-                            {
-                                num: '6',
-                                title: 'Review 2-Tier Header Webview',
-                                desc: 'Test tables stack in order with subject names and out-of-marks in header; attendance table at the end.'
-                            },
-                            {
-                                num: '7',
-                                title: 'Download Combined or Individual PDFs',
-                                desc: 'Generate a Single Combined PDF for all students, an Individual PDFs ZIP bundle, or single student PDF.'
-                            }
-                        ].map(step => (
-                            <div key={step.num} style={{
-                                display: 'flex',
-                                gap: '12px',
-                                background: '#F8FAFC',
-                                padding: '12px 14px',
-                                borderRadius: '8px',
-                                border: '1px solid #E2E8F0'
-                            }}>
-                                <span style={{
-                                    width: '24px',
-                                    height: '24px',
-                                    borderRadius: '50%',
-                                    background: '#0F2057',
-                                    color: '#FFFFFF',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '12px',
-                                    fontWeight: '800',
-                                    flexShrink: 0
-                                }}>
-                                    {step.num}
-                                </span>
-                                <div>
-                                    <h4 style={{ margin: '0 0 3px 0', fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>
-                                        {step.title}
-                                    </h4>
-                                    <p style={{ margin: 0, fontSize: '12px', color: '#64748B', lineHeight: '1.4' }}>
-                                        {step.desc}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
 
             {/* Notification Alert */}
             {statusMessage && (
@@ -2209,25 +2085,11 @@ const CustomProgressReport = () => {
                             <Search size={18} />
                         </div>
                         <div>
-                            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#0F2057', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '800', color: '#0F2057' }}>
                                 Download Student Progress Report by ID
-                                <span style={{
-                                    fontSize: '11px',
-                                    fontWeight: '700',
-                                    padding: '2px 8px',
-                                    borderRadius: '10px',
-                                    background: '#ECFDF5',
-                                    color: '#059669',
-                                    border: '1px solid #A7F3D0',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                }}>
-                                    <Database size={11} /> TiDB Connected
-                                </span>
                             </h2>
                             <p style={{ margin: '2px 0 0 0', fontSize: '12.5px', color: '#64748B' }}>
-                                Enter any Student ID below to instantly download their progress report PDF (retrieves from uploaded file or TiDB database).
+                                Enter any Student ID below to instantly download or preview their progress report PDF.
                             </p>
                         </div>
                     </div>
@@ -2332,8 +2194,8 @@ const CustomProgressReport = () => {
                                             fontSize: '11px',
                                             padding: '2px 6px',
                                             borderRadius: '4px',
-                                            background: s.source.includes('TiDB') ? '#EFF6FF' : '#F0FDF4',
-                                            color: s.source.includes('TiDB') ? '#1D4ED8' : '#15803D',
+                                            background: s.source === 'Uploaded' ? '#F0FDF4' : '#EFF6FF',
+                                            color: s.source === 'Uploaded' ? '#15803D' : '#1D4ED8',
                                             fontWeight: '700'
                                         }}>
                                             {s.source}
