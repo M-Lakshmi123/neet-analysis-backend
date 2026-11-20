@@ -433,8 +433,8 @@ const AverageCountReport = ({ filters }) => {
     };
 
     const SortIcon = ({ config, columnKey }) => {
-        if (config.key !== columnKey) return <span style={{ opacity: 0.2, marginLeft: '4px' }}>⇅</span>;
-        return <span style={{ marginLeft: '4px', fontWeight: 'bold', color: '#6366f1' }}>{config.direction === 'desc' ? '↓' : '↑'}</span>;
+        if (config.key !== columnKey) return <span style={{ opacity: 0.6, marginLeft: '4px', color: '#ffffff' }}>⇅</span>;
+        return <span style={{ marginLeft: '4px', fontWeight: 'bold', color: '#38bdf8' }}>{config.direction === 'desc' ? '↓' : '↑'}</span>;
     };
     const requestSort = (setter, key) => setter(prev => ({ key, direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc' }));
 
@@ -585,6 +585,17 @@ const AverageCountReport = ({ filters }) => {
                 .bg-purple { background-color: #f3e8ff !important; }
                 .bg-dark-blue { background-color: #1e3a8a !important; color: white !important; }
                 .bg-yellow-bright { background-color: #facc15 !important; }
+                th.bg-yellow, th.bg-blue, th.bg-orange, th.bg-green, th.bg-pink, th.bg-purple, th.bg-yellow-soft, th.bg-yellow-bright {
+                    color: #0f172a !important;
+                    text-shadow: none !important;
+                    font-weight: 800 !important;
+                }
+                th.bg-dark-blue {
+                    background-color: #1e3a8a !important;
+                    color: #ffffff !important;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+                    font-weight: 800 !important;
+                }
                 .text-red { color: #dc2626; font-weight: bold; }
                 .text-purple { color: #7c3aed; }
                 .text-blue-dark { color: #1e40af; }

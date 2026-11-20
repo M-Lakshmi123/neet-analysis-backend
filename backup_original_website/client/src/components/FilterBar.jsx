@@ -1,0 +1,753 @@
+import React, { useState, useEffect } from 'react';
+import Select, { components } from 'react-select';
+import AsyncSelect from 'react-select/async';
+import { buildQueryParams, API_URL } from '../utils/apiHelper';
+import { useAuth } from './auth/AuthProvider';
+import { logActivity } from '../utils/activityLogger';
+
+const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restrictedCampus, apiEndpoints = {} }) => {
+    const { userData } = useAuth();
+    // Normalize restriction to array for uniform handling
+    const allowedCampuses = Array.isArray(restrictedCampus) ? restrictedCampus : (restrictedCampus ? [restrictedCampus] : []);
+    const isRestricted = allowedCampuses.length > 0;
+    // Normalize allowed campuses for robust comparison
+    const normalizedAllowed = allowedCampuses.map(c => c.trim().toUpperCase());
+
+    const [options, setOptions] = useState({
+        campuses: [],
+        streams: [],
+        testTypes: [],
+        tests: [],
+        topAll: []
+    });
+    const [students, setStudents] = useState([]);
+    const [top18List, setTop18List] = useState([]);
+    const [loadingFilters, setLoadingFilters] = useState(false);
+    const [loadingStudents, setLoadingStudents] = useState(false);
+    const [openMenu, setOpenMenu] = useState(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            const isInsideFilterBar = event.target.closest('.filter-bar-container');
+            const isInsidePortalMenu = event.target.closest('[class*="-Menu"]') || 
+                                       event.target.closest('[class*="-menu"]') || 
+                                       event.target.closest('[class*="option"]') ||
+                                       event.target.closest('.react-select__menu') ||
+                                       event.target.closest('.react-select__option');
+
+            if (!isInsideFilterBar && !isInsidePortalMenu) {
+                setOpenMenu(null);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
+        };
+    }, []);
+
+    // Default Endpoints
+    const endpoints = {
+        filters: apiEndpoints.filters || '/api/filters',
+        students: apiEndpoints.students || '/api/studentsByCampus'
+    };
+
+    const isTop18Allowed = userData?.email === 'yenjarappa.s@varsitymgmt.com';
+
+    useEffect(() => {
+        if (!isTop18Allowed && filters?.isTop18) {
+            setFilters(prev => ({
+                ...prev,
+                isTop18: false,
+                studentSearch: [],
+                quickSearch: ''
+            }));
+        }
+    }, [isTop18Allowed, filters?.isTop18, setFilters]);
+
+    useEffect(() => {
+        if (!isTop18Allowed) return;
+        fetch(`${API_URL}/api/config/top-18`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && Array.isArray(data.students) && data.students.length > 0) {
+                    setTop18List(data.students);
+                }
+            })
+            .catch(err => console.error("Error fetching top 18 config:", err));
+    }, [isTop18Allowed]);
+
+    // Transform string array to { value, label } for React Select
+    const toOptions = (arr) => {
+        if (arr.length === 1 && arr[0] === "__ALL__") return []; // Should not happen in options list
+        return arr.map(item => ({ value: item, label: item }));
+    };
+
+    // Helper to get current value for React Select from simple array in state
+    const getValue = (field, currentOptions = []) => {
+        const val = filters[field];
+        if (!val || val.length === 0) return [];
+
+        if (val.length === 1 && val[0] === "__ALL__") {
+            const raw = Array.isArray(currentOptions) ? currentOptions : [];
+            const formatted = raw.map(item => typeof item === 'object' ? item : { value: item, label: item });
+            return [{ value: "SELECT_ALL", label: "ALL SELECTED" }, ...formatted];
+        }
+
+        // For studentSearch, map IDs back to labels using the students list or top18 list or quickSearch label
+        if (field === 'studentSearch') {
+            return val.map(v => {
+                const s = students.find(st => st.id?.toString() === v.toString()) || top18List.find(st => (st.STUD_ID || st.id)?.toString() === v.toString());
+                if (s) {
+                    const name = s.name || s.STUD_NAME || s.NAME;
+                    const id = s.id || s.STUD_ID;
+                    const labelText = name ? (name.includes('(') ? name : `${name} (${id})`) : id;
+                    return { value: id, label: labelText };
+                }
+                if (filters.quickSearch && filters.quickSearch.toString().includes(v.toString())) {
+                    return { value: v, label: filters.quickSearch };
+                }
+                return { value: v, label: v };
+            });
+        }
+        return val.map(v => ({ value: v, label: v }));
+    };
+
+    // Generic handler for React Select changes with "Select All" support
+    const handleSelectChange = (field, selectedOptions, actionMeta) => {
+        if (actionMeta.action === "select-option" && selectedOptions.some(opt => opt.value === "SELECT_ALL")) {
+            // Select All clicked
+            if (field === 'campus' && isRestricted) {
+                // For restricted users, "Select All" means select all ALLOWED campuses
+                setFilters(prev => ({ ...prev, [field]: allowedCampuses }));
+            } else {
+                setFilters(prev => ({ ...prev, [field]: ["__ALL__"] }));
+            }
+        } else if (actionMeta.action === "deselect-option" && actionMeta.option && actionMeta.option.value === "SELECT_ALL") {
+            // Deselect All clicked
+            setFilters(prev => ({ ...prev, [field]: [] }));
+        } else {
+            // Normal selection
+            let values = selectedOptions ? selectedOptions.map(opt => opt.value).filter(v => v !== 'SELECT_ALL') : [];
+
+            setFilters(prev => ({ ...prev, [field]: values }));
+        }
+    };
+
+    useEffect(() => {
+        const fetchFilters = async () => {
+            const paramsOptions = buildQueryParams({
+                campus: filters.campus,
+                stream: filters.stream,
+                testType: filters.testType,
+                test: filters.test,
+                topAll: filters.topAll,
+                academicYear: filters.academicYear
+            });
+            const urlOptions = `${API_URL}${endpoints.filters}?${paramsOptions.toString()}`;
+
+            setLoadingFilters(true);
+            try {
+                const res = await fetch(urlOptions);
+                const data = await res.json();
+
+                setOptions({
+                    campuses: data.campuses
+                        ? (isRestricted 
+                            ? data.campuses.filter(c => normalizedAllowed.includes(c.trim().toUpperCase())) 
+                            : data.campuses)
+                        : [],
+                    streams: data.streams || [],
+                    testTypes: data.testTypes || [],
+                    tests: data.tests || [],
+                    topAll: data.topAll || []
+                });
+
+                // CASCADING RESET LOGIC: 
+                setFilters(prev => {
+                    const next = { ...prev };
+                    let changed = false;
+
+                    const validateField = (key, available) => {
+                        const currentValues = prev[key];
+                        if (!currentValues || currentValues.length === 0 || currentValues[0] === "__ALL__") return;
+                        if (!available || available.length === 0) return;
+
+                        const filtered = currentValues.filter(v => available.includes(v));
+                        if (filtered.length !== currentValues.length) {
+                            next[key] = filtered;
+                            changed = true;
+                        }
+                    };
+
+                    validateField('stream', data.streams || []);
+                    validateField('testType', data.testTypes || []);
+                    validateField('test', data.tests || []);
+                    validateField('topAll', data.topAll || []);
+
+                    return changed ? next : prev;
+                });
+            } catch (err) {
+                console.error("[FilterBar] Options Fetch Error:", err);
+            } finally {
+                setLoadingFilters(false);
+            }
+        };
+
+        const timeoutId = setTimeout(() => {
+            fetchFilters();
+        }, 300); // 300ms debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [filters.campus, filters.stream, filters.testType, filters.test, filters.academicYear]);
+
+    useEffect(() => {
+        const fetchStudents = async () => {
+            const filtersForStudents = { ...filters };
+            delete filtersForStudents.studentSearch;
+
+            // Ensure TOP_ALL is sent as TOP_ALL for backend compatibility
+            if (filtersForStudents.topAll && filtersForStudents.topAll.length > 0) {
+                filtersForStudents.TOP_ALL = filtersForStudents.topAll;
+            }
+
+            const paramsStudents = buildQueryParams(filtersForStudents);
+            const urlStudents = `${API_URL}${endpoints.students}?${paramsStudents.toString()}`;
+
+            setLoadingStudents(true);
+            try {
+                const res = await fetch(urlStudents);
+                const data = await res.json();
+                setStudents(data);
+            } catch (err) {
+                console.error("[FilterBar] Students Fetch Error:", err);
+            } finally {
+                setLoadingStudents(false);
+            }
+        };
+
+        const timeoutId = setTimeout(() => {
+            fetchStudents();
+        }, 400); // slightly longer debounce for students list
+
+        return () => clearTimeout(timeoutId);
+    }, [filters.campus, filters.stream, filters.testType, filters.test, filters.topAll, filters.academicYear]);
+
+    // Helper to wrap options with Select All
+    const withSelectAll = (arr, labelPrefix = "Options") => [
+        { value: "SELECT_ALL", label: `Select All ${labelPrefix}` },
+        ...toOptions(arr)
+    ];
+
+    // prepared initial student options for the normal dropdown
+    const studentOptions = [
+        { value: "SELECT_ALL", label: "Select All Students" },
+        ...(students || [])
+            .filter(s => s && s.name && s.id && String(s.name).trim() !== '' && String(s.id).trim() !== '')
+            .map(s => ({ value: s.id, label: `${s.name} (${s.id})` }))
+    ];
+
+    // Load options for the Async Search (progressive live typing N -> NA -> NAI)
+    const loadStudentOptions = async (inputValue) => {
+        if (!inputValue || inputValue.trim().length === 0) {
+            return studentOptions;
+        }
+
+        const trimmedInput = inputValue.trim();
+
+        try {
+            // First try with current active filters
+            const searchParams = buildQueryParams({
+                quickSearch: trimmedInput,
+                academicYear: filters.academicYear,
+                campus: filters.campus,
+                stream: filters.stream,
+                testType: filters.testType,
+                test: filters.test,
+                topAll: filters.topAll
+            });
+
+            // If restricted user, enforce allowed campuses
+            if (isRestricted && (!filters.campus || filters.campus.length === 0)) {
+                allowedCampuses.forEach(c => {
+                    searchParams.append('campus', c);
+                });
+            }
+
+            let url = `${API_URL}${endpoints.students}?${searchParams.toString()}`;
+            let res = await fetch(url);
+            let data = await res.json();
+
+            // Fallback: If strict filters return 0 results, search globally across all streams/tests for that year
+            if ((!data || data.length === 0) && (filters.stream?.length > 0 || filters.test?.length > 0 || filters.testType?.length > 0)) {
+                const fallbackParams = buildQueryParams({
+                    quickSearch: trimmedInput,
+                    academicYear: filters.academicYear
+                });
+                if (isRestricted) {
+                    allowedCampuses.forEach(c => fallbackParams.append('campus', c));
+                }
+                const fallbackUrl = `${API_URL}${endpoints.students}?${fallbackParams.toString()}`;
+                const fallbackRes = await fetch(fallbackUrl);
+                data = await fallbackRes.json();
+            }
+
+            const formatted = (data || [])
+                .filter(s => s && s.name && s.id && String(s.name).trim() !== '' && String(s.id).trim() !== '')
+                .map(s => ({
+                    value: s.id,
+                    label: `${s.name} (${s.id})`,
+                    campus: s.campus,
+                    streams: s.streams ? s.streams.split(',').map(v => v.trim()) : []
+                }));
+
+            return [
+                { value: "SELECT_ALL", label: "Select All Students" },
+                ...formatted
+            ];
+        } catch (err) {
+            console.error("Async Search Error:", err);
+            return [];
+        }
+    };
+
+    // Check if "Select All" is active for a field
+    const isSelectAllActive = (field) => {
+        return filters[field] && filters[field].length === 1 && filters[field][0] === "__ALL__";
+    };
+
+    // Custom Option component with visible checkboxes & full label popup tooltip on hover
+    const CheckboxOption = (props) => {
+        return (
+            <components.Option {...props}>
+                <div 
+                    title={props.label} 
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', width: '100%' }}
+                >
+                    <input
+                        type="checkbox"
+                        checked={props.isSelected}
+                        onChange={() => null}
+                        style={{
+                            margin: 0,
+                            cursor: 'pointer',
+                            accentColor: '#1e40af',
+                            pointerEvents: 'none',
+                            width: '14px',
+                            height: '14px',
+                            flexShrink: 0
+                        }}
+                    />
+                    <span 
+                        title={props.label}
+                        style={{
+                            fontSize: '0.8rem',
+                            color: props.isSelected ? '#1e40af' : '#1e293b',
+                            fontWeight: props.isSelected ? '600' : '400',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}
+                    >
+                        {props.label}
+                    </span>
+                </div>
+            </components.Option>
+        );
+    };
+
+    // Custom ValueContainer to show summary when too many items are selected
+    const CompactValueContainer = ({ children, ...props }) => {
+        const selected = props.getValue();
+        const hasSelectAll = selected.some(opt => opt.value === "SELECT_ALL");
+        const realSelectedCount = hasSelectAll ? selected.length - 1 : selected.length;
+
+        if (realSelectedCount > 3 || hasSelectAll) {
+            return (
+                <components.ValueContainer {...props}>
+                    <div style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '800',
+                        color: '#1e3a8a',
+                        whiteSpace: 'nowrap',
+                        background: '#eff6ff',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                    }}>
+                        <span style={{ opacity: 0.7 }}>📊</span>
+                        {hasSelectAll ? 'ALL SELECTED' : `${realSelectedCount} Selected`}
+                    </div>
+                    {/* Ensure we still render the input part for searchability */}
+                    {Array.isArray(children) ? children.filter(c => c && (c.key === 'placeholder' || (c.props && (c.props.editable || (c.props.className && c.props.className.includes('input')))))) : children}
+                </components.ValueContainer>
+            );
+        }
+        return <components.ValueContainer {...props}>{children}</components.ValueContainer>;
+    };
+
+    // Custom styles for React Select
+    const customStyles = {
+        control: (base, state) => ({
+            ...base,
+            background: 'white',
+            borderColor: state.isFocused ? '#172554' : '#e2e8f0',
+            minHeight: '35px',
+            height: '35px',
+            borderRadius: '8px',
+            boxShadow: 'none',
+            '&:hover': { borderColor: '#172554' },
+            overflow: 'hidden',
+            width: '100%',
+            minWidth: 0
+        }),
+        valueContainer: (base) => ({
+            ...base,
+            height: '35px',
+            padding: '0 8px',
+            display: 'flex',
+            flexWrap: 'nowrap',
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '35px',
+        }),
+        input: (base) => ({
+            ...base,
+            margin: '0px',
+            padding: '0px',
+        }),
+        placeholder: (base) => ({
+            ...base,
+            fontSize: '0.75rem',
+            color: '#94a3b8',
+            whiteSpace: 'nowrap'
+        }),
+        multiValue: (base) => ({
+            ...base,
+            backgroundColor: '#eff6ff',
+            borderRadius: '4px',
+            margin: '2px 2px 2px 0',
+            flexShrink: 0, // Prevent chips from shrinking
+        }),
+        multiValueLabel: (base) => ({
+            ...base,
+            color: '#1e40af',
+            fontSize: '0.65rem',
+            fontWeight: '700',
+            padding: '1px 4px'
+        }),
+        multiValueRemove: (base) => ({
+            ...base,
+            padding: '0 2px',
+            ':hover': { backgroundColor: '#ef4444', color: 'white' },
+        }),
+        option: (base, state) => ({
+            ...base,
+            backgroundColor: state.isSelected
+                ? '#eff6ff'
+                : state.isFocused
+                    ? '#f8fafc'
+                    : 'white',
+            color: state.isSelected ? '#1e40af' : '#1e293b',
+            cursor: 'pointer',
+            padding: '6px 12px',
+            ':active': {
+                backgroundColor: '#dbeafe',
+            },
+        }),
+        menuPortal: (base) => ({
+            ...base,
+            zIndex: 99999
+        }),
+        menu: (base) => ({
+            ...base,
+            zIndex: 99999
+        })
+    };
+
+    const compactStyles = {
+        ...customStyles,
+        control: (base, state) => ({
+            ...customStyles.control(base, state),
+            minHeight: '32px',
+            height: '32px',
+        }),
+        valueContainer: (base) => ({
+            ...customStyles.valueContainer(base),
+            height: '32px',
+        }),
+        indicatorsContainer: (base) => ({
+            ...base,
+            height: '32px',
+        }),
+    };
+
+    const handleToggleTop18 = () => {
+        const isCurrentlyActive = filters.isTop18 || (filters.studentSearch && filters.studentSearch.length === 18 && filters.quickSearch?.includes('TOP 18'));
+
+        if (isCurrentlyActive) {
+            // Toggle OFF
+            setFilters(prev => ({
+                ...prev,
+                isTop18: false,
+                studentSearch: [],
+                quickSearch: ''
+            }));
+            if (userData) logActivity(userData, 'Deactivated TOP 18 Filter');
+        } else {
+            // Toggle ON
+            const fallbackIds = ['257403546', '257404738', '257403653', '257427698', '213309261', '246556423', '246555884', '246555726', '257407693', '246556345', '213307653', '257420307', '257400127', '257403537', '257409631', '257402548', '257405810', '257406595'];
+            const ids = top18List.length > 0 ? top18List.map(s => String(s.STUD_ID || s.id)) : fallbackIds;
+
+            setFilters(prev => ({
+                ...prev,
+                isTop18: true,
+                studentSearch: ids,
+                quickSearch: '⭐ TOP 18 Members (18 Selected)'
+            }));
+            if (userData) logActivity(userData, 'Activated TOP 18 Filter');
+        }
+    };
+
+    const resetFilters = () => {
+        setFilters({
+            campus: [], // Principals now start empty as requested
+            stream: [],
+            testType: [],
+            test: [],
+            topAll: [],
+            studentSearch: [],
+            quickSearch: '',
+            isTop18: false
+        });
+    };
+
+    return (
+        <div className="filter-bar-container compact-mode">
+            {/* Top Action Row: Years, Top 18, Search, Clear */}
+            <div className="filter-top-row">
+                <div className="year-selector-nav">
+                    <button
+                        className={`year-nav-btn ${academicYear === '2025' ? 'active' : ''}`}
+                        onClick={() => {
+                            onYearChange('2025');
+                            if (userData) logActivity(userData, 'Switched to Academic Year 2025');
+                        }}
+                    >
+                        ACADEMIC YEAR 2025
+                    </button>
+                    <button
+                        className={`year-nav-btn ${academicYear === '2026' ? 'active' : ''}`}
+                        onClick={() => {
+                            onYearChange('2026');
+                            if (userData) logActivity(userData, 'Switched to Academic Year 2026');
+                        }}
+                    >
+                        ACADEMIC YEAR 2026
+                    </button>
+                    {isTop18Allowed && (
+                        <button
+                            type="button"
+                            className={`year-nav-btn top18-nav-btn ${filters.isTop18 ? 'active' : ''}`}
+                            onClick={handleToggleTop18}
+                            title="Filter all reports for TOP 18 students"
+                        >
+                            ⭐ TOP 18
+                        </button>
+                    )}
+                </div>
+
+                <div className="search-engine-compact">
+                    <div className="engine-icon">🔍</div>
+                    <AsyncSelect
+                        cacheOptions
+                        loadOptions={loadStudentOptions}
+                        defaultOptions={[]}
+                        placeholder="Search Student..."
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'quickSearch'}
+                        onMenuOpen={() => setOpenMenu('quickSearch')}
+                        onChange={(opt) => {
+                            if (opt) {
+                                const finalCampus = isRestricted
+                                    ? (normalizedAllowed.includes(opt.campus?.trim().toUpperCase()) ? [opt.campus] : [])
+                                    : (opt.campus ? [opt.campus] : []);
+                                setFilters(prev => ({
+                                    ...prev,
+                                    studentSearch: [opt.value],
+                                    quickSearch: opt.label,
+                                    campus: finalCampus,
+                                    stream: opt.streams && opt.streams.length > 0 ? opt.streams : [],
+                                    testType: [],
+                                    test: [],
+                                    topAll: [],
+                                    isTop18: false
+                                }));
+                            } else {
+                                setFilters(prev => ({ ...prev, studentSearch: [], quickSearch: '', campus: [], isTop18: false }));
+                            }
+                        }}
+                        styles={{
+                            ...compactStyles,
+                            container: (base) => ({ ...base, flex: 1 }),
+                            control: (base, state) => ({
+                                ...compactStyles.control(base, state),
+                                border: 'none',
+                                background: 'transparent'
+                            })
+                        }}
+                        isClearable
+                        value={filters.isTop18 ? { value: 'TOP_18', label: '⭐ TOP 18 Members (18 Selected)' } : (filters.studentSearch && filters.studentSearch.length === 1 ? { value: filters.studentSearch[0], label: filters.quickSearch } : null)}
+                    />
+                </div>
+
+                <button onClick={resetFilters} className="btn-primary reset-compact">
+                    CLEAR ALL
+                </button>
+            </div>
+
+            {/* Bottom Filter Row: Detailed Drilling */}
+            <div className="filter-bottom-grid">
+                <div className={`filter-item ${isRestricted && allowedCampuses.length === 1 ? 'disabled' : ''}`}>
+                    <label>CAMPUS</label>
+                    <Select
+                        isMulti
+                        name="campus"
+                        options={withSelectAll(options.campuses, "Campuses")}
+                        value={getValue('campus', options.campuses)}
+                        onChange={(opts, meta) => handleSelectChange('campus', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
+                        placeholder="Select..."
+                        isDisabled={isRestricted && allowedCampuses.length === 1}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'campus'}
+                        onMenuOpen={() => setOpenMenu('campus')}
+                    />
+                </div>
+
+                <div className={`filter-item ${loadingFilters || (!isRestricted && filters.campus.length === 0) ? 'disabled-logic' : ''}`}>
+                    <label>STREAM</label>
+                    <Select
+                        isMulti
+                        name="stream"
+                        options={withSelectAll(options.streams, "Streams")}
+                        value={getValue('stream', options.streams)}
+                        onChange={(opts, meta) => handleSelectChange('stream', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
+                        placeholder="Select..."
+                        isDisabled={loadingFilters || (!isRestricted && filters.campus.length === 0)}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'stream'}
+                        onMenuOpen={() => setOpenMenu('stream')}
+                    />
+                </div>
+
+                <div className={`filter-item ${loadingFilters || filters.stream.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>TYPE</label>
+                    <Select
+                        isMulti
+                        name="testType"
+                        options={withSelectAll(options.testTypes, "Types")}
+                        value={getValue('testType', options.testTypes)}
+                        onChange={(opts, meta) => handleSelectChange('testType', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
+                        placeholder="Select..."
+                        isDisabled={loadingFilters || filters.stream.length === 0}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'testType'}
+                        onMenuOpen={() => setOpenMenu('testType')}
+                    />
+                </div>
+
+                <div className={`filter-item ${loadingFilters || filters.testType.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>TEST</label>
+                    <Select
+                        isMulti
+                        name="test"
+                        options={withSelectAll(options.tests, "Tests")}
+                        value={getValue('test', options.tests)}
+                        onChange={(opts, meta) => handleSelectChange('test', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
+                        placeholder="Select..."
+                        isDisabled={loadingFilters || filters.testType.length === 0}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'test'}
+                        onMenuOpen={() => setOpenMenu('test')}
+                    />
+                </div>
+
+                <div className={`filter-item ${loadingFilters || filters.test.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>TOP_ALL</label>
+                    <Select
+                        isMulti
+                        name="topAll"
+                        options={withSelectAll(options.topAll || [], "Top_ALL")}
+                        value={getValue('topAll', options.topAll || [])}
+                        onChange={(opts, meta) => handleSelectChange('topAll', opts, meta)}
+                        isLoading={loadingFilters}
+                        styles={compactStyles}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
+                        placeholder="Select..."
+                        isDisabled={loadingFilters || filters.test.length === 0}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'topAll'}
+                        onMenuOpen={() => setOpenMenu('topAll')}
+                    />
+                </div>
+
+                <div className={`filter-item wide-item ${loadingStudents || filters.test.length === 0 ? 'disabled-logic' : ''}`}>
+                    <label>STUDENT LIST</label>
+                    <AsyncSelect
+                        isMulti
+                        name="studentSearch"
+                        cacheOptions
+                        defaultOptions={studentOptions}
+                        loadOptions={loadStudentOptions}
+                        value={getValue('studentSearch', studentOptions)}
+                        onChange={(opts, meta) => handleSelectChange('studentSearch', opts, meta)}
+                        isLoading={loadingStudents}
+                        styles={compactStyles}
+                        components={{ Option: CheckboxOption, ValueContainer: CompactValueContainer }}
+                        placeholder="Select Students..."
+                        isDisabled={loadingStudents || filters.test.length === 0}
+                        closeMenuOnSelect={false}
+                        hideSelectedOptions={false}
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        menuIsOpen={openMenu === 'studentSearch'}
+                        onMenuOpen={() => setOpenMenu('studentSearch')}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default FilterBar;

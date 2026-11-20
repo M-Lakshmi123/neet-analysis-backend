@@ -433,14 +433,16 @@ const TargetVsAchieved = ({ filters }) => {
                 
                 .modern-table { width: 100%; border-collapse: collapse; background: #fff; }
                 .modern-table th {
-                    background: #EBF1DE;
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
                     padding: 10px 14px;
-                    font-size: 0.75rem;
-                    font-weight: 900;
-                    color: #000066;
+                    font-size: 0.78rem;
+                    font-weight: 800 !important;
+                    color: #ffffff !important;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
                     text-align: left;
-                    border-bottom: 2px solid #000066;
+                    border-bottom: 2px solid #0f172a;
                     position: sticky; top: 0;
+                    z-index: 10;
                 }
                 .modern-table td {
                     padding: 8px 14px;

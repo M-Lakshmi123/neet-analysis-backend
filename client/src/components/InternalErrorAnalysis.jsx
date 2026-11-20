@@ -1995,25 +1995,25 @@ const InternalErrorAnalysis = ({ academicYear = '2026', restrictedCampus = [] })
                             <thead>
                                 {/* Header Row 1 */}
                                 <tr>
-                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #cbd5e1', textAlign: 'center', minWidth: '100px', fontWeight: 700 }}>
+                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #cbd5e1', textAlign: 'center', minWidth: '100px', fontWeight: 800, color: '#0f172a' }}>
                                         Roll Number
                                     </th>
-                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #cbd5e1', textAlign: 'left', minWidth: '150px', fontWeight: 700 }}>
+                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #cbd5e1', textAlign: 'left', minWidth: '150px', fontWeight: 800, color: '#0f172a' }}>
                                         Name
                                     </th>
-                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #cbd5e1', textAlign: 'center', minWidth: '110px', fontWeight: 700 }}>
+                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#f8fafc', border: '1px solid #cbd5e1', textAlign: 'center', minWidth: '110px', fontWeight: 800, color: '#0f172a' }}>
                                         Section
                                     </th>
-                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#C6E0B4', border: '1px solid #94a3b8', textAlign: 'center', minWidth: '150px', fontWeight: 700, color: '#166534' }}>
+                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#C6E0B4', border: '1px solid #94a3b8', textAlign: 'center', minWidth: '150px', fontWeight: 800, color: '#166534' }}>
                                         TOTAL WRONG Q COUNT
                                     </th>
-                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#8EA9DB', border: '1px solid #64748b', textAlign: 'center', minWidth: '200px', fontWeight: 700, color: '#1e3a8a' }}>
+                                    <th rowSpan={2} style={{ padding: '8px 12px', background: '#8EA9DB', border: '1px solid #64748b', textAlign: 'center', minWidth: '200px', fontWeight: 800, color: '#1e3a8a' }}>
                                         TOTAL UN COUNT Q
                                     </th>
-                                    <th colSpan={analysisResults.isEngineering ? 6 : 8} style={{ padding: '8px 12px', background: '#FFE699', border: '1px solid #d97706', textAlign: 'center', fontWeight: 700, color: '#854d0e', fontSize: '13px' }}>
+                                    <th colSpan={analysisResults.isEngineering ? 6 : 8} style={{ padding: '8px 12px', background: '#FFE699', border: '1px solid #d97706', textAlign: 'center', fontWeight: 800, color: '#854d0e', fontSize: '13px' }}>
                                         WRONG QUESTIONS
                                     </th>
-                                    <th colSpan={analysisResults.isEngineering ? 6 : 8} style={{ padding: '8px 12px', background: '#A9D08E', border: '1px solid #16a34a', textAlign: 'center', fontWeight: 700, color: '#14532d', fontSize: '13px' }}>
+                                    <th colSpan={analysisResults.isEngineering ? 6 : 8} style={{ padding: '8px 12px', background: '#A9D08E', border: '1px solid #16a34a', textAlign: 'center', fontWeight: 800, color: '#14532d', fontSize: '13px' }}>
                                         UN QUESTIONS
                                     </th>
                                 </tr>
@@ -2023,42 +2023,42 @@ const InternalErrorAnalysis = ({ academicYear = '2026', restrictedCampus = [] })
                                     {analysisResults.isEngineering ? (
                                         <>
                                             {/* Engineering Wrong Subheaders: Math, Physics, Chem */}
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>M.Q. C</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>M.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>P.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>P.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>C.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>C.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '55px' }}>M.Q. C</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '120px' }}>M.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '55px' }}>P.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '120px' }}>P.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '55px' }}>C.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '120px' }}>C.Q</th>
 
                                             {/* Engineering UN Subheaders: Math, Physics, Chem */}
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>M.Q. C</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>M.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>P.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>P.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>C.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>C.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '55px' }}>M.Q. C</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '120px' }}>M.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '55px' }}>P.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '120px' }}>P.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '55px' }}>C.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '120px' }}>C.Q</th>
                                         </>
                                     ) : (
                                         <>
                                             {/* NEET Wrong Subheaders: Botany, Zoology, Physics, Chem */}
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>B.Q. C</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>B.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>Z.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>Z.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>P.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>P.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>C.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>C.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '55px' }}>B.Q. C</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '120px' }}>B.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '55px' }}>Z.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '120px' }}>Z.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '55px' }}>P.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '120px' }}>P.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '55px' }}>C.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#FFF2CC', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#854d0e', minWidth: '120px' }}>C.Q</th>
 
                                             {/* NEET UN Subheaders: Botany, Zoology, Physics, Chem */}
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>B.Q. C</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>B.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>Z.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>Z.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>P.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>P.Q</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '55px' }}>C.Q.C</th>
-                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 600, minWidth: '120px' }}>C.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '55px' }}>B.Q. C</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '120px' }}>B.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '55px' }}>Z.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '120px' }}>Z.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '55px' }}>P.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '120px' }}>P.Q</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '55px' }}>C.Q.C</th>
+                                            <th style={{ padding: '6px 8px', background: '#C6E0B4', border: '1px solid #cbd5e1', textAlign: 'center', fontWeight: 800, color: '#14532d', minWidth: '120px' }}>C.Q</th>
                                         </>
                                     )}
                                 </tr>

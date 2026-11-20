@@ -1,4 +1,5 @@
 /* Modern CSS Reset */
+@import './3d-theme.css';
 @font-face {
     font-family: 'ImpactCustom';
     src: url('/fonts/unicode.impact.ttf') format('truetype');
@@ -71,14 +72,8 @@ body {
 body {
     margin: 0;
     font-family: 'Trebuchet MS', 'Arial', Helvetica, sans-serif;
-    background-color: var(--bg-light);
+    background-color: #0f172a;
     color: var(--text-primary);
-    background-image:
-        linear-gradient(rgba(240, 249, 255, 0.94), rgba(240, 249, 255, 0.94)),
-        url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1920&q=80');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
     height: 100vh;
     overflow: hidden;
 }
@@ -338,11 +333,15 @@ body {
     flex: 1;
     padding: 1.25rem 2rem;
     overflow: visible;
+    position: relative;
+    z-index: 2;
 }
 
 /* Ensure report sections take full width */
 .report-sections {
     width: 100%;
+    position: relative;
+    z-index: 2;
 }
 
 .main-header h1 {
@@ -724,13 +723,14 @@ body {
 }
 
 .analysis-table th {
-    background: var(--table-header);
-    color: var(--text-secondary);
-    padding: 0.5rem 0.75rem;
-    font-weight: 600;
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    padding: 0.6rem 0.75rem;
+    font-weight: 800 !important;
     text-transform: uppercase;
-    border: 1px solid var(--border-light);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     text-align: center;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .analysis-table td {
@@ -751,6 +751,29 @@ body {
 .total-row td {
     background: #f1f5f9 !important;
     font-weight: 700;
+}
+
+.clean-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.clean-table th {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    padding: 12px 18px;
+    font-size: 11px;
+    font-weight: 800 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 2px solid #0f172a !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
+.clean-table th * {
+    color: #ffffff !important;
 }
 
 /* Column Color Utilities */
@@ -1759,14 +1782,16 @@ body {
 
 .modern-table th {
     text-align: left;
-    background: #f8fafc;
-    padding: 1rem 1.5rem;
-    font-size: 0.75rem;
-    font-weight: 700;
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 800 !important;
     text-transform: uppercase;
-    color: #64748b;
+    color: #ffffff !important;
     letter-spacing: 0.05em;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 2px solid #0f172a;
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .modern-table td {

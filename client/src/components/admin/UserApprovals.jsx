@@ -214,8 +214,11 @@ const UserApprovals = ({ academicYear }) => {
 
     return (
         <div className="tab-pane">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-slate-800">Staff Access Management</h2>
+            <div className="report-actions-top">
+                <h3 className="section-title">Staff Access Management</h3>
+                <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#1e3a8a', background: '#eff6ff', padding: '6px 14px', borderRadius: '8px' }}>
+                    {pendingUsers.length} Pending Approval{pendingUsers.length !== 1 ? 's' : ''}
+                </div>
             </div>
 
             <div className="admin-grid">

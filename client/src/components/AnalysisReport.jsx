@@ -272,8 +272,8 @@ const AnalysisReport = ({ filters }) => {
     const sortedStudentMarks = sortData(studentMarks, meritSortConfig.key, meritSortConfig.direction);
 
     const SortIcon = ({ config, columnKey }) => {
-        if (config.key !== columnKey) return <span style={{ opacity: 0.2, marginLeft: '4px', fontSize: '0.8rem' }}>⇅</span>;
-        return <span style={{ marginLeft: '4px', fontSize: '0.8rem', fontWeight: 'bold', color: '#6366f1' }}>{config.direction === 'desc' ? '↓' : '↑'}</span>;
+        if (config.key !== columnKey) return <span style={{ opacity: 0.6, marginLeft: '4px', fontSize: '0.8rem', color: '#ffffff' }}>⇅</span>;
+        return <span style={{ marginLeft: '4px', fontSize: '0.8rem', fontWeight: 'bold', color: '#38bdf8' }}>{config.direction === 'desc' ? '↓' : '↑'}</span>;
     };
 
     const loadImage = (src) => {
@@ -635,10 +635,10 @@ const AnalysisReport = ({ filters }) => {
                         <div className="table-responsive">
                             <table className="analysis-table">
                                 <thead>
-                                    <tr style={{ cursor: 'pointer' }}>
+                                    <tr style={{ cursor: 'pointer', color: '#ffffff' }}>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'DATE')}>Date <SortIcon config={statsSortConfig} columnKey="DATE" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'Test')} style={{ whiteSpace: 'nowrap' }}>Test Name <SortIcon config={statsSortConfig} columnKey="Test" /></th>
-                                        <th onClick={() => requestSort(setStatsSortConfig, 'Attn')} style={{ color: 'var(--accent)' }}>Attn <SortIcon config={statsSortConfig} columnKey="Attn" /></th>
+                                        <th onClick={() => requestSort(setStatsSortConfig, 'Attn')} style={{ color: '#ffffff' }}>Attn <SortIcon config={statsSortConfig} columnKey="Attn" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'Max_T')}>Max_T <SortIcon config={statsSortConfig} columnKey="Max_T" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'T_700')}>T&gt;700 <SortIcon config={statsSortConfig} columnKey="T_700" /></th>
                                         <th onClick={() => requestSort(setStatsSortConfig, 'T_680')}>T&gt;680 <SortIcon config={statsSortConfig} columnKey="T_680" /></th>
@@ -726,7 +726,7 @@ const AnalysisReport = ({ filters }) => {
                         <div className="table-responsive">
                             <table className="analysis-table merit-table">
                                 <thead style={{ cursor: 'pointer' }}>
-                                    <tr style={{ color: '#000066' }}>
+                                    <tr style={{ color: '#ffffff' }}>
                                         <th className="w-id-col" onClick={() => requestSort(setMeritSortConfig, 'STUD_ID')}>ID <SortIcon config={meritSortConfig} columnKey="STUD_ID" /></th>
                                         <th className="w-name-col" onClick={() => requestSort(setMeritSortConfig, 'name')}>Name <SortIcon config={meritSortConfig} columnKey="name" /></th>
                                         <th className="w-campus-col" onClick={() => requestSort(setMeritSortConfig, 'campus')}>Campus <SortIcon config={meritSortConfig} columnKey="campus" /></th>
@@ -801,6 +801,15 @@ const AnalysisReport = ({ filters }) => {
                 .analysis-table {
                     table-layout: auto;
                     width: 100%;
+                }
+                .analysis-table thead th {
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+                    color: #ffffff !important;
+                    font-weight: 800 !important;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+                }
+                .analysis-table thead th * {
+                    color: #ffffff !important;
                 }
                 .merit-table {
                     font-size: 0.7rem !important;

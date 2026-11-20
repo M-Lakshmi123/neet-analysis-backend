@@ -6,6 +6,7 @@ import './index.css';
 import NotificationBot from './components/NotificationBot';
 
 import Header from './components/Header';
+import VideoBackground from './components/VideoBackground';
 import FilterBar from './components/FilterBar';
 import AnalysisReport from './components/AnalysisReport';
 import ToppersPerformanceReport from './components/ToppersPerformanceReport';
@@ -67,6 +68,20 @@ const Dashboard = () => {
     const [academicYear, setAcademicYear] = useState(() => {
         return sessionStorage.getItem('academic_year') || '2026';
     });
+
+    const [is3DEnabled, setIs3DEnabled] = useState(() => {
+        const saved = localStorage.getItem('3d_mode_active');
+        return saved !== null ? saved === 'true' : true;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('3d_mode_active', is3DEnabled);
+        if (is3DEnabled) {
+            document.body.classList.add('mode-3d-active');
+        } else {
+            document.body.classList.remove('mode-3d-active');
+        }
+    }, [is3DEnabled]);
 
     const [activePage, setActivePage] = useState(() => {
         const stored = sessionStorage.getItem('dashboard_active_page');
@@ -435,8 +450,9 @@ const Dashboard = () => {
     const showFilterBar = ['principal_dashboard', 'analysis', 'toppers_performance', 'topper_marks_loss', 'test_improvements', 'averages', 'average_count', 'progress', 'errors', 'error_top', 'error_count', 'target_vs_achieved', 'student_performance'].includes(activePage);
 
     return (
-        <div className="dashboard-root">
-            <Sidebar activePage={activePage} setActivePage={setActivePage} />
+        <div className={`dashboard-root ${is3DEnabled ? 'spatial-3d-active' : ''}`}>
+            <VideoBackground is3DEnabled={is3DEnabled} />
+            <Sidebar activePage={activePage} setActivePage={setActivePage} is3DEnabled={is3DEnabled} />
             <main className="dashboard-main-content">
                 <Header 
                     title={
@@ -458,6 +474,8 @@ const Dashboard = () => {
                                                                 activePage === 'approvals' ? 'User Approvals' :
                                                                     activePage === 'file_management' ? 'Schedules & Timetable & Files' : 'Activity Logs'
                     } 
+                    is3DEnabled={is3DEnabled}
+                    setIs3DEnabled={setIs3DEnabled}
                     updates={updates}
                     onNotificationClick={handleNotificationClick}
                 />

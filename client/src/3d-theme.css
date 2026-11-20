@@ -1,0 +1,1069 @@
+/* ==========================================================================
+   TRENDING 3D SPATIAL UI THEME
+   Elevated decks, tactile 3D menus, 3D filters, and floating 3D tables
+   ========================================================================== */
+
+:root {
+    /* 3D Depth & Elevation Palette */
+    --3d-elevation-low: 0 4px 10px -2px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+    --3d-elevation-mid: 0 12px 28px -6px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.06);
+    --3d-elevation-high: 0 24px 48px -12px rgba(15, 23, 42, 0.18), 0 8px 16px -4px rgba(15, 23, 42, 0.08);
+    --3d-elevation-floating: 0 30px 60px -15px rgba(15, 23, 42, 0.22), 0 10px 20px -5px rgba(15, 23, 42, 0.1);
+
+    /* 3D Surface Bevels & Specular Rims */
+    --3d-rim-light: inset 0 1.5px 0.5px rgba(255, 255, 255, 0.9), inset 1.5px 0 0.5px rgba(255, 255, 255, 0.6);
+    --3d-rim-inset: inset 0 2px 4px rgba(15, 23, 42, 0.08), inset 0 1px 2px rgba(15, 23, 42, 0.06);
+    --3d-bevel-border: 1px solid rgba(255, 255, 255, 0.75);
+
+    /* Glowing Accents */
+    --3d-glow-indigo: 0 0 20px -3px rgba(99, 102, 241, 0.45);
+    --3d-glow-cyan: 0 0 20px -3px rgba(14, 165, 233, 0.45);
+    --3d-glow-gold: 0 0 20px -3px rgba(245, 158, 11, 0.45);
+}
+
+/* --------------------------------------------------------------------------
+   1. GLOBAL 3D PERSPECTIVE ENVIRONMENT
+   -------------------------------------------------------------------------- */
+.dashboard-root {
+    background: transparent;
+    position: relative;
+    z-index: 1;
+}
+
+.dashboard-main-content {
+    background: transparent !important;
+    position: relative;
+    z-index: 2;
+}
+
+.content-inner {
+    position: relative;
+    z-index: 2;
+}
+
+/* Modal overlays must always float above all dashboard elements */
+.modal-overlay,
+.modal-overlay.immersive {
+    z-index: 9999999 !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. 3D SIDEBAR & MENUS
+   -------------------------------------------------------------------------- */
+.sidebar {
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(20px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(190%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 1) !important;
+    box-shadow: 10px 0 36px rgba(0, 0, 0, 0.25), 
+                inset -1px 0 0 rgba(255, 255, 255, 0.8) !important;
+    z-index: 40 !important;
+}
+
+.branding-wrapper {
+    background: rgba(255, 255, 255, 0.96) !important;
+    border-radius: 16px;
+    margin: 0.75rem 0.5rem 0.75rem 0.5rem;
+    padding: 1rem 0.5rem 0.75rem 0.5rem !important;
+    border: 1px solid rgba(255, 255, 255, 1) !important;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12), inset 0 1px 0 #ffffff !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.branding-wrapper:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--3d-elevation-mid), var(--3d-rim-light);
+}
+
+.branding-header-3d {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+/* 3D Menu Items */
+.menu-items {
+    perspective: 800px;
+    gap: 0.5rem !important;
+}
+
+.menu-btn {
+    background: rgba(255, 255, 255, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.8) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.04), 
+                var(--3d-rim-light) !important;
+    transform: translateZ(0);
+    transform-style: preserve-3d;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+    position: relative;
+    overflow: visible !important;
+}
+
+/* 3D Button Depth Ridge */
+.menu-btn::after {
+    content: '';
+    position: absolute;
+    bottom: -3px;
+    left: 8px;
+    right: 8px;
+    height: 3px;
+    background: rgba(148, 163, 184, 0.2);
+    border-radius: 0 0 10px 10px;
+    transition: all 0.25s ease;
+}
+
+/* 3D Hover State: Lifts up towards user */
+.menu-btn:hover {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 1) !important;
+    transform: translateY(-3px) translateZ(12px) scale(1.02) !important;
+    box-shadow: 0 12px 24px -4px rgba(30, 41, 59, 0.12),
+                0 4px 8px -2px rgba(30, 41, 59, 0.06),
+                inset 0 2px 0 rgba(255, 255, 255, 1) !important;
+    color: #1e293b !important;
+}
+
+.menu-btn:hover::after {
+    bottom: -4px;
+    background: rgba(99, 102, 241, 0.25);
+    filter: blur(1px);
+}
+
+/* 3D Active Item: Elevated Glowing Tile */
+.menu-btn.active {
+    background: linear-gradient(135deg, #ffffff 0%, #eff6ff 60%, #e0e7ff 100%) !important;
+    border: 1px solid rgba(99, 102, 241, 0.45) !important;
+    transform: translateY(-2px) translateZ(16px) !important;
+    box-shadow: 0 12px 28px -4px rgba(99, 102, 241, 0.35),
+                0 4px 10px -2px rgba(99, 102, 241, 0.2),
+                inset 0 2px 0 rgba(255, 255, 255, 1),
+                inset 0 -2px 0 rgba(99, 102, 241, 0.2) !important;
+    color: #4338ca !important;
+    font-weight: 800 !important;
+}
+
+.menu-btn.active::after {
+    bottom: -4px;
+    background: rgba(99, 102, 241, 0.5);
+    filter: blur(2px);
+}
+
+.menu-btn.active .btn-icon {
+    color: #4f46e5 !important;
+    filter: drop-shadow(0 2px 8px rgba(99, 102, 241, 0.6)) !important;
+    transform: scale(1.15) translateZ(10px);
+}
+
+/* 3D Push-Down Response */
+.menu-btn:active {
+    transform: translateY(2px) translateZ(-4px) scale(0.98) !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1),
+                var(--3d-rim-inset) !important;
+}
+
+.menu-btn:active::after {
+    bottom: 0;
+    opacity: 0;
+}
+
+/* --------------------------------------------------------------------------
+   3. 3D FLOATING HEADER & CONTROLS
+   -------------------------------------------------------------------------- */
+.main-header {
+    background: rgba(255, 255, 255, 0.82) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.9) !important;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 10px 30px -8px rgba(15, 23, 42, 0.08),
+                0 0 0 1px rgba(255, 255, 255, 0.6) !important;
+    padding: 0.85rem 2rem !important;
+    position: relative;
+    z-index: 40;
+    transform-style: preserve-3d;
+}
+
+.main-header h1 {
+    font-weight: 800 !important;
+    letter-spacing: -0.02em;
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.9);
+}
+
+/* 3D Mode Toggle Switch */
+.header-3d-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(240, 245, 255, 0.85));
+    color: #4338ca;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.15), var(--3d-rim-light);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform: translateZ(0);
+}
+
+.header-3d-toggle-btn:hover {
+    transform: translateY(-2px) translateZ(8px);
+    box-shadow: 0 8px 18px rgba(99, 102, 241, 0.25), var(--3d-rim-light);
+}
+
+.header-3d-toggle-btn.active {
+    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    color: white;
+    border-color: #4338ca;
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.header-3d-toggle-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+    animation: pulse3d 2s infinite;
+}
+
+@keyframes pulse3d {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.8; }
+}
+
+.user-profile-compact {
+    gap: 12px !important;
+}
+
+.header-user-info {
+    background: rgba(255, 255, 255, 0.65) !important;
+    border: var(--3d-bevel-border) !important;
+    border-radius: 24px !important;
+    box-shadow: var(--3d-elevation-low), var(--3d-rim-light) !important;
+    padding: 4px 12px !important;
+}
+
+.header-logout-btn {
+    border-radius: 10px !important;
+    box-shadow: 0 3px 8px rgba(239, 68, 68, 0.15), var(--3d-rim-light) !important;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.header-logout-btn:hover {
+    transform: translateY(-2px) scale(1.03) !important;
+    box-shadow: 0 6px 14px rgba(239, 68, 68, 0.25) !important;
+}
+
+.header-logout-btn:active {
+    transform: translateY(2px) scale(0.97) !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. 3D FILTER BAR (FLOATING CONTROL COCKPIT)
+   -------------------------------------------------------------------------- */
+.filter-bar-container.compact-mode,
+.filter-bar-container.ultra-compact {
+    background: rgba(255, 255, 255, 0.88) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255, 255, 255, 0.95) !important;
+    box-shadow: 0 16px 36px -8px rgba(15, 23, 42, 0.09),
+                0 4px 12px -2px rgba(15, 23, 42, 0.04),
+                var(--3d-rim-light) !important;
+    transform-style: preserve-3d;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 1.25rem !important;
+}
+
+.filter-bar-container:hover {
+    box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.12),
+                var(--3d-rim-light) !important;
+}
+
+/* 3D Year & Filter Buttons */
+.year-selector-nav,
+.year-toggle-container {
+    background: rgba(241, 245, 249, 0.75) !important;
+    border: 1px solid rgba(226, 232, 240, 0.8) !important;
+    box-shadow: var(--3d-rim-inset);
+    border-radius: 12px !important;
+    padding: 4px !important;
+}
+
+.year-nav-btn,
+.year-filter-btn,
+.year-btn {
+    border-radius: 9px !important;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+    position: relative;
+    border: 1px solid transparent !important;
+}
+
+.year-nav-btn:hover:not(.active),
+.year-filter-btn:hover:not(.active),
+.year-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.9) !important;
+    transform: translateY(-2px) translateZ(6px);
+    box-shadow: 0 6px 12px rgba(15, 23, 42, 0.08), var(--3d-rim-light);
+}
+
+.year-nav-btn.active,
+.year-filter-btn.active,
+.year-btn.active {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 6px 16px rgba(23, 37, 84, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.35),
+                0 2px 0 #0f172a !important;
+    transform: translateY(-1px) translateZ(8px) !important;
+}
+
+.year-nav-btn:active,
+.year-filter-btn:active,
+.year-btn:active {
+    transform: translateY(2px) scale(0.97) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Top 18 Gem Button */
+.top18-nav-btn {
+    border-radius: 9px !important;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.top18-nav-btn.active {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    color: white !important;
+    box-shadow: 0 6px 18px rgba(245, 158, 11, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                0 2px 0 #b45309 !important;
+    transform: translateY(-1px) translateZ(8px) !important;
+}
+
+.top18-nav-btn:hover:not(.active) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(245, 158, 11, 0.25);
+}
+
+/* 3D Dropdown Inputs (React Select) */
+.react-select__control,
+[class*="-control"] {
+    border-radius: 10px !important;
+    border: 1px solid rgba(203, 213, 225, 0.8) !important;
+    box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(255, 255, 255, 0.9) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    transition: all 0.2s ease !important;
+}
+
+.react-select__control--is-focused,
+[class*="-control"]:focus-within {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2),
+                inset 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+    transform: translateY(-1px);
+}
+
+/* 3D Floating Popover Menus */
+.react-select__menu,
+[class*="-menu"] {
+    border-radius: 12px !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(226, 232, 240, 0.9) !important;
+    box-shadow: 0 24px 48px -8px rgba(15, 23, 42, 0.22),
+                0 8px 16px -4px rgba(15, 23, 42, 0.1),
+                var(--3d-rim-light) !important;
+    z-index: 9999 !important;
+}
+
+/* --------------------------------------------------------------------------
+   5. 3D TABLES & REPORT SECTIONS (DATA REPORTS & ANALYTICS)
+   -------------------------------------------------------------------------- */
+.report-section {
+    background: rgba(255, 255, 255, 0.94) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-radius: 16px !important;
+    border: var(--3d-bevel-border) !important;
+    box-shadow: 0 18px 40px -8px rgba(15, 23, 42, 0.1),
+                0 4px 12px -2px rgba(15, 23, 42, 0.04),
+                var(--3d-rim-light) !important;
+    transform-style: preserve-3d;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    overflow: visible !important;
+    margin-bottom: 1.75rem !important;
+}
+
+.report-section:hover {
+    box-shadow: 0 24px 50px -10px rgba(15, 23, 42, 0.14),
+                var(--3d-rim-light) !important;
+}
+
+.report-header {
+    background: linear-gradient(135deg, #172554 0%, #1e3a8a 60%, #1e293b 100%) !important;
+    color: white !important;
+    padding: 0.75rem 1.25rem !important;
+    font-weight: 800 !important;
+    font-size: 0.88rem !important;
+    letter-spacing: 0.03em;
+    border-top-left-radius: 15px !important;
+    border-top-right-radius: 15px !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35),
+                0 4px 12px rgba(23, 37, 84, 0.25) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.table-container,
+.table-wrapper,
+.table-responsive {
+    border-radius: 14px !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.1),
+                0 4px 12px -2px rgba(15, 23, 42, 0.05),
+                0 0 0 1px rgba(255, 255, 255, 0.8),
+                var(--3d-rim-light) !important;
+    position: relative;
+    overflow-x: auto;
+    transition: box-shadow 0.3s ease;
+}
+
+.table-container:hover,
+.table-responsive:hover {
+    box-shadow: 0 25px 55px -12px rgba(15, 23, 42, 0.14),
+                var(--3d-rim-light) !important;
+}
+
+.analysis-table,
+.modern-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100% !important;
+}
+
+/* 3D Chiseled Sticky Header */
+.analysis-table th,
+.modern-table th,
+.table-main-header th,
+.clean-table th,
+.pdf-report-table th,
+.drawer-mini-table th,
+.rc-test-table th,
+.admin-table th,
+.table-container th,
+.compact-table-container th {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    font-size: 0.82rem !important;
+    letter-spacing: 0.04em !important;
+    border-bottom: 2px solid #0f172a !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3),
+                0 3px 6px -2px rgba(15, 23, 42, 0.15) !important;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+    padding: 10px 8px !important;
+    text-align: center !important;
+}
+
+/* All standard table headers must have consistent, crystal-clear white text */
+.analysis-table th,
+.modern-table th,
+.table-main-header th,
+.clean-table th,
+.pdf-report-table th,
+.drawer-mini-table th,
+.rc-test-table th {
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
+.analysis-table th *,
+.modern-table th *,
+.table-main-header th *,
+.clean-table th *,
+.pdf-report-table th *,
+.drawer-mini-table th *,
+.rc-test-table th * {
+    color: #ffffff !important;
+}
+
+/* Category top borders for thead on dark navy headers */
+.table-main-header th.col-yellow,
+.analysis-table thead th.col-yellow {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    border-top: 3px solid #facc15 !important;
+}
+.table-main-header th.col-green,
+.analysis-table thead th.col-green {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    border-top: 3px solid #4ade80 !important;
+}
+.table-main-header th.col-blue-light,
+.analysis-table thead th.col-blue-light {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    border-top: 3px solid #38bdf8 !important;
+}
+.table-main-header th.col-blue-med,
+.analysis-table thead th.col-blue-med {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    border-top: 3px solid #818cf8 !important;
+}
+.table-main-header th.col-green-pale,
+.analysis-table thead th.col-green-pale {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    border-top: 3px solid #a3e635 !important;
+}
+.table-main-header th.col-pink-pale,
+.analysis-table thead th.col-pink-pale {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    border-top: 3px solid #f472b6 !important;
+}
+.table-main-header th.col-exams,
+.analysis-table thead th.col-exams {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    border-top: 3px solid #fb923c !important;
+}
+
+.report-actions-top {
+    background: rgba(255, 255, 255, 0.95) !important;
+    padding: 12px 20px !important;
+    border-radius: 14px !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), var(--3d-rim-light) !important;
+    border: 1px solid rgba(255, 255, 255, 1) !important;
+    margin-bottom: 1.25rem !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.report-actions-top .section-title {
+    color: #0f172a !important;
+    font-weight: 900 !important;
+    font-size: 1.25rem !important;
+    margin: 0 !important;
+    text-shadow: none !important;
+}
+
+/* 3D Table Body Rows: Interactive 3D Lift */
+.analysis-table tbody tr,
+.modern-table tbody tr {
+    transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+                box-shadow 0.18s ease,
+                background-color 0.18s ease !important;
+    position: relative;
+}
+
+.analysis-table tbody tr:hover,
+.modern-table tbody tr:hover {
+    transform: translateY(-2px) scale(1.002) !important;
+    box-shadow: 0 8px 20px -3px rgba(15, 23, 42, 0.12),
+                0 3px 6px -2px rgba(15, 23, 42, 0.06) !important;
+    z-index: 8 !important;
+}
+
+.analysis-table tbody tr:hover td,
+.modern-table tbody tr:hover td {
+    background: #f0f7ff !important;
+    border-color: #93c5fd !important;
+}
+
+/* Cells */
+.analysis-table td,
+.modern-table td {
+    border-bottom: 1px solid rgba(226, 232, 240, 0.8) !important;
+    border-right: 1px solid rgba(226, 232, 240, 0.6) !important;
+    transition: background-color 0.18s ease;
+}
+
+/* 3D Total Row */
+.total-row td,
+tr.total-row td {
+    background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%) !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    border-top: 2px solid #94a3b8 !important;
+    box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.05),
+                inset 0 1px 0 #ffffff !important;
+}
+
+/* 3D Gem Badges & Score Tokens */
+.rank-badge,
+.score-badge,
+.badge-3d {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-weight: 800;
+    box-shadow: 0 3px 6px -1px rgba(15, 23, 42, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    transition: transform 0.2s ease;
+}
+
+.rank-badge:hover,
+.score-badge:hover,
+.badge-3d:hover {
+    transform: scale(1.08) translateY(-1px);
+}
+
+/* --------------------------------------------------------------------------
+   6. 3D BUTTONS & CARDS
+   -------------------------------------------------------------------------- */
+.btn-primary,
+.btn-standard,
+.admin-btn {
+    border-radius: 10px !important;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.28),
+                inset 0 1px 0 rgba(255, 255, 255, 0.35),
+                0 2px 0 rgba(67, 56, 202, 0.8) !important;
+    transform: translateZ(0);
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.btn-primary:hover,
+.btn-standard:hover,
+.admin-btn:hover {
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.38),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5),
+                0 3px 0 rgba(67, 56, 202, 0.9) !important;
+}
+
+.btn-primary:active,
+.btn-standard:active,
+.admin-btn:active {
+    transform: translateY(2px) scale(0.98) !important;
+    box-shadow: 0 1px 4px rgba(99, 102, 241, 0.2) !important;
+}
+
+.btn-whatsapp {
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4),
+                0 2px 0 #15803d !important;
+}
+
+.btn-whatsapp:hover {
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 8px 20px rgba(37, 211, 102, 0.4) !important;
+}
+
+.btn-whatsapp:active {
+    transform: translateY(2px) scale(0.98) !important;
+}
+
+/* 3D Dashboard Cards & Containers */
+.admin-card,
+.stat-card,
+.analysis-card,
+.chart-card {
+    background: rgba(255, 255, 255, 0.88) !important;
+    backdrop-filter: blur(20px) !important;
+    border-radius: 16px !important;
+    border: var(--3d-bevel-border) !important;
+    box-shadow: var(--3d-elevation-mid), var(--3d-rim-light) !important;
+    transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+.admin-card:hover,
+.stat-card:hover,
+.analysis-card:hover,
+.chart-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--3d-elevation-high), var(--3d-rim-light) !important;
+}
+
+/* --------------------------------------------------------------------------
+   7. AMBIENT 3D LOGO VIDEO BACKGROUND & BADGES
+   -------------------------------------------------------------------------- */
+.ambient-video-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1 !important;
+    overflow: hidden;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+}
+
+/* Ensure all main content containers have elevated 3D cards over video background */
+.webpage-dashboard-container,
+.marks-loss-executive-card,
+.compact-table-container,
+.report-section,
+.report-block,
+.admin-card,
+.avg-main-layout,
+.avg-table-section,
+.test-wise-container,
+.custom-progress-container,
+.top-control-row,
+.topper-control-row,
+.toppers-controls-bar,
+.pill-bar-executive,
+.student-pill-list,
+.student-buttons-bar,
+.admin-toolbar,
+.pane-header,
+.report-actions-top,
+.glass-card {
+    background: rgba(255, 255, 255, 0.96) !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255, 255, 255, 1) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12), var(--3d-rim-light) !important;
+    position: relative;
+    z-index: 2;
+}
+
+.pane-header h3 {
+    color: #0f172a !important;
+    font-weight: 900 !important;
+    margin: 0 0 4px 0 !important;
+}
+
+.pane-header p {
+    color: #475569 !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+}
+
+.student-buttons-bar {
+    padding: 12px 14px !important;
+    margin-bottom: 1.25rem !important;
+}
+
+.student-tab-btn {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    font-weight: 700 !important;
+}
+
+.student-tab-btn:hover {
+    background: #f1f5f9 !important;
+    border-color: #94a3b8 !important;
+    color: #0f172a !important;
+}
+
+.student-tab-btn.selected {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%) !important;
+    color: #ffffff !important;
+    border-color: #1e3a8a !important;
+}
+
+.student-tab-btn.selected * {
+    color: #ffffff !important;
+}
+
+.ambient-video-element {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 28% 50%;
+    opacity: 1 !important;
+    filter: contrast(1.12) saturate(1.18) brightness(1.02);
+}
+
+.ambient-video-overlay {
+    position: absolute;
+    inset: 0;
+    /* Soft directional shading leaving the 3D logo completely clear and unblurred */
+    background: linear-gradient(
+        90deg, 
+        rgba(15, 23, 42, 0.04) 0%, 
+        rgba(15, 23, 42, 0.18) 42%, 
+        rgba(15, 23, 42, 0.55) 100%
+    );
+    /* NO BLUR: Crystal clear 3D logo */
+}
+
+/* 3D Sidebar Animated Emblem Medallion - Single Primary Logo */
+.sidebar-3d-video-badge {
+    width: 88px;
+    height: 88px;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 2.5px solid #f59e0b;
+    box-shadow: 0 0 22px rgba(245, 158, 11, 0.45), 
+                0 8px 24px rgba(0, 0, 0, 0.35),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                0 0 0 3px rgba(255, 255, 255, 0.95);
+    margin: 0 auto 0.5rem auto;
+    background: #090d16;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateZ(12px);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+}
+
+.sidebar-3d-video-badge:hover {
+    transform: scale(1.08) translateZ(18px);
+    box-shadow: 0 0 30px rgba(245, 158, 11, 0.65),
+                0 12px 30px rgba(0, 0, 0, 0.45),
+                0 0 0 4px #ffffff;
+}
+
+.sidebar-video-loop {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 23% center;
+    transform: scale(1.32);
+    pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   8. HIGH CONTRAST & CRYSTAL-CLEAR TYPOGRAPHY
+   -------------------------------------------------------------------------- */
+/* Sidebar group titles */
+.group-label {
+    color: #0f172a !important;
+    font-size: 0.82rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+    opacity: 1 !important;
+}
+
+/* Sidebar navigation buttons */
+.menu-btn {
+    color: #0f172a !important;
+    background: rgba(255, 255, 255, 0.90) !important;
+    border: 1px solid rgba(255, 255, 255, 1) !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06), inset 0 1px 0 #ffffff !important;
+}
+
+.menu-btn .btn-label {
+    color: #0f172a !important;
+    font-weight: 800 !important;
+    font-size: 0.86rem !important;
+}
+
+.menu-btn .btn-icon {
+    color: #1e3a8a !important;
+}
+
+.menu-btn:hover {
+    background: #ffffff !important;
+    color: #000000 !important;
+}
+
+.menu-btn:hover .btn-label {
+    color: #000000 !important;
+}
+
+.menu-btn.active {
+    background: linear-gradient(135deg, #ffffff 0%, #eff6ff 60%, #dbeafe 100%) !important;
+    border: 1px solid rgba(37, 99, 235, 0.5) !important;
+}
+
+.menu-btn.active .btn-label {
+    color: #1e1b4b !important;
+    font-weight: 900 !important;
+}
+
+.menu-btn.active .btn-icon {
+    color: #2563eb !important;
+}
+
+/* Header typography */
+.main-header h1 {
+    color: #0f172a !important;
+    font-weight: 900 !important;
+    font-size: 1.4rem !important;
+    text-shadow: 0 1px 0 #ffffff !important;
+}
+
+.user-name-text {
+    color: #0f172a !important;
+    font-weight: 800 !important;
+}
+
+.user-role-badge {
+    color: #1e40af !important;
+    font-weight: 800 !important;
+}
+
+/* Filter Bar controls & text */
+.results-indicator {
+    color: #0f172a !important;
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+}
+
+.results-indicator strong {
+    color: #1e3a8a !important;
+    font-weight: 900 !important;
+}
+
+.filter-bar-container label,
+.filter-bar-container .group-label {
+    color: #0f172a !important;
+    font-weight: 800 !important;
+}
+
+.react-select__placeholder,
+[class*="-placeholder"] {
+    color: #334155 !important;
+    font-weight: 600 !important;
+    font-size: 0.78rem !important;
+}
+
+.react-select__single-value,
+[class*="-singleValue"] {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+
+/* Empty states, alerts & helper cards */
+.toppers-report-container > div:last-child:not(.pdf-report-preview),
+.report-section .empty-state,
+.empty-state-card {
+    background: rgba(255, 255, 255, 0.96) !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(255, 255, 255, 1) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18), inset 0 1px 0 #ffffff !important;
+    color: #0f172a !important;
+    padding: 30px !important;
+}
+
+.toppers-report-container h3,
+.report-section h3 {
+    color: #0f172a !important;
+    font-weight: 800 !important;
+    font-size: 1.25rem !important;
+}
+
+.toppers-report-container p,
+.report-section p {
+    color: #334155 !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+}
+
+/* Table header text: crystal clear white contrast on dark navy headers across ALL tables */
+table th,
+thead th,
+.analysis-table th,
+.modern-table th,
+.table-main-header th,
+.clean-table th,
+.pdf-report-table th,
+.drawer-mini-table th,
+.rc-test-table th,
+.admin-table th,
+.table-container th,
+.table-wrapper th,
+.compact-table-container th {
+    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+}
+
+table th *,
+thead th *,
+.analysis-table th *,
+.modern-table th *,
+.table-main-header th *,
+.clean-table th *,
+.pdf-report-table th *,
+.drawer-mini-table th *,
+.rc-test-table th *,
+.admin-table th * {
+    color: #ffffff !important;
+}
+
+/* Headers with explicit pastel backgrounds must use dark text */
+th.bg-yellow, th.bg-blue, th.bg-orange, th.bg-green, th.bg-pink, th.bg-purple, th.bg-yellow-soft, th.bg-yellow-bright,
+th[style*="ffffcc"], th[style*="FFFFCC"], th[style*="fff2cc"], th[style*="FFF2CC"], th[style*="fde9d9"],
+th[style*="daeef3"], th[style*="ebf1de"], th[style*="f2dcdb"], th[style*="C6E0B4"], th[style*="c6e0b4"], th[style*="ffff00"],
+th[style*="FFE699"], th[style*="ffe699"], th[style*="A9D08E"], th[style*="a9d08e"], th[style*="8EA9DB"], th[style*="8ea9db"],
+th[style*="f8fafc"], th[style*="F8FAFC"] {
+    color: #0f172a !important;
+    text-shadow: none !important;
+    font-weight: 800 !important;
+}
+
+th.bg-yellow *, th.bg-blue *, th.bg-orange *, th.bg-green *, th.bg-pink *, th.bg-purple *, th.bg-yellow-soft *, th.bg-yellow-bright *,
+th[style*="ffffcc"] *, th[style*="FFFFCC"] *, th[style*="fff2cc"] *, th[style*="FFF2CC"] *, th[style*="fde9d9"] *,
+th[style*="daeef3"] *, th[style*="ebf1de"] *, th[style*="f2dcdb"] *, th[style*="C6E0B4"] *, th[style*="c6e0b4"] *, th[style*="ffff00"] *,
+th[style*="FFE699"] *, th[style*="ffe699"] *, th[style*="A9D08E"] *, th[style*="a9d08e"] *, th[style*="8EA9DB"] *, th[style*="8ea9db"] *,
+th[style*="f8fafc"] *, th[style*="F8FAFC"] * {
+    color: #0f172a !important;
+    text-shadow: none !important;
+}
+
+.analysis-table td,
+.modern-table td {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+
+.pill-btn {
+    color: #1e293b !important;
+    font-weight: 800 !important;
+}
+
+.pill-btn.active {
+    color: #ffffff !important;
+    background: #172554 !important;
+}
+
+/* Auth Pages Hero Video */
+.auth-hero-video-container {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+}
+
+.auth-hero-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 30% 50%;
+    filter: saturate(1.2) contrast(1.1);
+}
+
+.auth-hero-video-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        135deg, 
+        rgba(15, 23, 42, 0.55) 0%, 
+        rgba(15, 23, 42, 0.75) 100%
+    );
+}

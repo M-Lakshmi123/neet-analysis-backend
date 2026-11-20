@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
     Upload,
     FileText,
@@ -432,7 +433,16 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                                         )}
                                         <td className="actions-td text-right">
                                             <div className="actions-group" onClick={e => e.stopPropagation()}>
-                                                <button onClick={() => openPreview(file)} className="btn-action-pill view" title="Preview Document">
+                                                <button 
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        openPreview(file);
+                                                    }} 
+                                                    className="btn-action-pill view" 
+                                                    title="Preview Document"
+                                                >
                                                     <Eye size={13} />
                                                     <span>View</span>
                                                 </button>
@@ -465,9 +475,11 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 )}
             </div>
 
-            <AnimatePresence>
-                {previewFile && (
-                    <motion.div 
+            {typeof document !== 'undefined' && createPortal(
+                <AnimatePresence>
+                    {previewFile && (
+                        <motion.div 
+                            key="file-preview-modal-overlay"
                         initial={{ opacity: 0 }} 
                         animate={{ opacity: 1 }} 
                         exit={{ opacity: 0 }} 
@@ -588,9 +600,11 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                         </motion.div>
                     </motion.div>
                 )}
-            </AnimatePresence>
+            </AnimatePresence>,
+            document.body
+        )}
 
-            <style jsx>{`
+            <style>{`
                 .file-mgmt-clean { 
                     padding: 0; 
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -622,13 +636,15 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 .clean-table th { 
                     text-align: left; 
                     padding: 12px 18px; 
-                    background: #f8fafc; 
-                    font-size: 10.5px; 
-                    font-weight: 800; 
-                    color: #64748b; 
-                    border-bottom: 1px solid #e2e8f0; 
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important; 
+                    font-size: 11px; 
+                    font-weight: 800 !important; 
+                    color: #ffffff !important; 
+                    border-bottom: 2px solid #0f172a; 
+                    border-right: 1px solid rgba(255, 255, 255, 0.15);
                     text-transform: uppercase; 
                     letter-spacing: 0.06em; 
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
                 }
                 .clean-table td { 
                     padding: 12px 18px; 
@@ -822,8 +838,8 @@ const FileManagement = ({ academicYear, setAcademicYear, userData }) => {
                 }
 
                 /* Modal Overlay */
-                .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px; transition: all 0.3s; }
-                .modal-overlay.immersive { background: rgba(0, 0, 0, 0.95); padding: 0; backdrop-filter: none; }
+                .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999999 !important; padding: 20px; transition: all 0.3s; }
+                .modal-overlay.immersive { background: rgba(0, 0, 0, 0.95); padding: 0; backdrop-filter: none; z-index: 9999999 !important; }
                 
                 .modal-body { width: 92vw; height: 92vh; background: white; display: flex; flex-direction: column; overflow: hidden; position: relative; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); transition: all 0.3s; }
                 .modal-overlay.immersive .modal-body { width: 100vw; height: 100vh; border-radius: 0; }

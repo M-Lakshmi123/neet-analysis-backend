@@ -1290,10 +1290,10 @@ const ToppersPerformanceReport = ({ filters, setFilters, setActivePage }) => {
 
                 </div>
             ) : (
-                <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b' }}>
-                    <HelpCircle size={40} style={{ marginBottom: '12px', opacity: 0.5 }} />
-                    <h3>No Student Selected or Matching Filters</h3>
-                    <p>Please adjust your filters in the top FilterBar to view student performance report.</p>
+                <div className="toppers-empty-state-card" style={{ textAlign: 'center', padding: '60px 20px', background: 'rgba(255, 255, 255, 0.96)', borderRadius: '16px', boxShadow: '0 16px 36px rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255, 255, 255, 1)', color: '#0f172a', margin: '20px 0' }}>
+                    <HelpCircle size={48} style={{ marginBottom: '14px', color: '#1e3a8a', opacity: 0.85 }} />
+                    <h3 style={{ color: '#0f172a', fontWeight: '800', fontSize: '1.3rem', marginBottom: '8px' }}>No Student Selected or Matching Filters</h3>
+                    <p style={{ color: '#334155', fontWeight: '600', fontSize: '1rem', margin: 0 }}>Please adjust your filters in the top FilterBar to view student performance report.</p>
                 </div>
             )}
         </div>

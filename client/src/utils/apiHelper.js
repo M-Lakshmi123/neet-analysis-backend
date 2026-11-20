@@ -4,16 +4,7 @@ const BACKEND_SERVICES = [
 ];
 
 const getActiveBackend = () => {
-    const hostname = window.location.hostname;
-    const isLocal = hostname === 'localhost' || 
-                   hostname === '127.0.0.1' || 
-                   hostname.startsWith('192.168.') || 
-                   hostname.startsWith('10.') || 
-                   hostname === '0.0.0.0';
-
-    if (isLocal) return `http://${hostname}:5000`;
-
-    // Priority: 1. LocalSession (cached working one), 2. Env Var, 3. First Default
+    // Priority: 1. LocalSession (cached working one), 2. Env Var, 3. Render Default
     const cached = sessionStorage.getItem('WORKING_BACKEND_URL');
     if (cached) return cached;
 

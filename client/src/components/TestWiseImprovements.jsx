@@ -478,9 +478,15 @@ const TestWiseImprovements = ({ filters }) => {
                     position: sticky;
                     top: 0;
                     z-index: 30;
-                    background: #ffffff !important;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-                    border-bottom: 2px solid #e2e8f0;
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important;
+                    color: #ffffff !important;
+                    font-weight: 800 !important;
+                    font-size: 0.82rem !important;
+                    letter-spacing: 0.04em !important;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+                    border-bottom: 2px solid #0f172a !important;
+                    border-right: 1px solid rgba(255, 255, 255, 0.15) !important;
                 }
                 .modern-table {
                     width: 100%;
@@ -500,11 +506,12 @@ const TestWiseImprovements = ({ filters }) => {
                 }
                 .modern-table th {
                     min-width: 140px;
-                    color: #475569;
-                    font-weight: 700;
+                    color: #ffffff !important;
+                    font-weight: 800 !important;
                     text-transform: uppercase;
-                    font-size: 0.8rem;
-                    letter-spacing: 0.05em;
+                    font-size: 0.82rem !important;
+                    letter-spacing: 0.04em;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
                 }
                 .category-label {
                     position: sticky;

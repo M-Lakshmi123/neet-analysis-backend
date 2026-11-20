@@ -348,7 +348,7 @@ const AverageMarksReport = ({ filters }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {loading ? (<tr><td colSpan={10} align="center">Loading data...</td></tr>) : rankedStudents.length === 0 ? (<tr><td colSpan={10} align="center">No data matching criteria</td></tr>) : (
+                                {loading ? (<tr><td colSpan={10} align="center" style={{ padding: '24px', color: '#1e293b', fontWeight: 600 }}>Loading data...</td></tr>) : rankedStudents.length === 0 ? (<tr><td colSpan={10} align="center" style={{ padding: '24px', color: '#1e293b', fontWeight: 600 }}>No data matching criteria</td></tr>) : (
                                     <>
                                         {rankedStudents.map((s, idx) => (
                                             <tr key={idx}>
@@ -419,14 +419,48 @@ const AverageMarksReport = ({ filters }) => {
                 .avg-main-layout { display: grid; grid-template-columns: 1fr 200px; gap: 20px; }
                 .table-header-title { background: #1e293b; color: white; padding: 10px 15px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 0.95rem; text-align: center; }
                 .table-container { overflow-x: auto; background: white; border-radius: 0 0 8px 8px; }
-                .analysis-table.merit-style { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid #00b0f0; }
-                .analysis-table.merit-style th { font-size: 0.7rem; padding: 8px 4px; border: 1px solid #00b0f0; color: #000000; }
-                .analysis-table.merit-style td { font-size: 0.75rem; padding: 6px 4px; border: 1px solid #00b0f0; text-align: center; color: #000000; }
-                .col-yellow { background-color: #fffbeb !important; }
-                .col-green { background-color: #f0fdf4 !important; }
-                .col-blue-light { background-color: #eff6ff !important; }
-                .col-green-pale { background-color: #f7fee7 !important; }
-                .col-pink-pale { background-color: #fdf2f8 !important; }
+                .analysis-table.merit-style { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid rgba(255, 255, 255, 0.2); }
+                .analysis-table.merit-style thead th { 
+                    font-size: 0.75rem; 
+                    padding: 9px 6px; 
+                    border: 1px solid rgba(255, 255, 255, 0.15); 
+                    color: #ffffff !important; 
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important; 
+                    font-weight: 800 !important; 
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important; 
+                    letter-spacing: 0.03em;
+                }
+                .analysis-table.merit-style thead th.col-yellow { 
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important; 
+                    color: #ffffff !important; 
+                    border-top: 3px solid #facc15 !important; 
+                }
+                .analysis-table.merit-style thead th.col-green { 
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important; 
+                    color: #ffffff !important; 
+                    border-top: 3px solid #4ade80 !important; 
+                }
+                .analysis-table.merit-style thead th.col-blue-light { 
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important; 
+                    color: #ffffff !important; 
+                    border-top: 3px solid #38bdf8 !important; 
+                }
+                .analysis-table.merit-style thead th.col-green-pale { 
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important; 
+                    color: #ffffff !important; 
+                    border-top: 3px solid #a3e635 !important; 
+                }
+                .analysis-table.merit-style thead th.col-pink-pale { 
+                    background: linear-gradient(180deg, #1e3a8a 0%, #172554 100%) !important; 
+                    color: #ffffff !important; 
+                    border-top: 3px solid #f472b6 !important; 
+                }
+                .analysis-table.merit-style tbody td { font-size: 0.75rem; padding: 6px 4px; border: 1px solid #e2e8f0; text-align: center; color: #000000; }
+                .analysis-table.merit-style tbody td.col-yellow { background-color: #fffbeb !important; color: #000000 !important; }
+                .analysis-table.merit-style tbody td.col-green { background-color: #f0fdf4 !important; color: #000000 !important; }
+                .analysis-table.merit-style tbody td.col-blue-light { background-color: #eff6ff !important; color: #000000 !important; }
+                .analysis-table.merit-style tbody td.col-green-pale { background-color: #f7fee7 !important; color: #000000 !important; }
+                .analysis-table.merit-style tbody td.col-pink-pale { background-color: #fdf2f8 !important; color: #000000 !important; }
                 .sub-th.bot { background: #ffffcc; color: #000000; }
                 .sub-th.zoo { background: #fde9d9; color: #000000; }
                 .sub-th.phy { background: #e4dfec; color: #000000; }

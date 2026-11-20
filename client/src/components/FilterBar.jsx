@@ -435,16 +435,18 @@ const FilterBar = ({ filters, setFilters, academicYear, onYearChange, restricted
         multiValue: (base) => ({
             ...base,
             backgroundColor: '#eff6ff',
-            borderRadius: '4px',
-            margin: '2px 2px 2px 0',
+            borderRadius: '6px',
+            boxShadow: '0 2px 4px rgba(30, 64, 175, 0.12), inset 0 1px 0 #ffffff',
+            border: '1px solid #bfdbfe',
+            margin: '2px 3px 2px 0',
             flexShrink: 0, // Prevent chips from shrinking
         }),
         multiValueLabel: (base) => ({
             ...base,
             color: '#1e40af',
-            fontSize: '0.65rem',
+            fontSize: '0.68rem',
             fontWeight: '700',
-            padding: '1px 4px'
+            padding: '2px 5px'
         }),
         multiValueRemove: (base) => ({
             ...base,

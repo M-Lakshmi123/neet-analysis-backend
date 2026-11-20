@@ -136,18 +136,27 @@ const LoginPage = () => {
         <>
             <div className="auth-container">
                 <div className="auth-card">
-                    {/* Left Side: Slideshow */}
+                    {/* Left Side: 3D Video Hero & Inspiring Stats */}
                     <div className="auth-slides-side">
+                        <div className="auth-hero-video-container">
+                            <video
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                className="auth-hero-video"
+                            >
+                                <source src="/product.mp4" type="video/mp4" />
+                            </video>
+                            <div className="auth-hero-video-overlay" />
+                        </div>
                         {slides.map((slide, index) => (
-                            <div key={index} className={`slide ${currentSlide === index ? 'active' : ''}`}>
-                                {slide.image && (
-                                    <img src={slide.image} alt="Slide" className="slide-img" />
-                                )}
-                                <div className={`slide-content ${slide.animClass}`}>
+                            <div key={index} className={`slide ${currentSlide === index ? 'active' : ''}`} style={{ background: 'transparent' }}>
+                                <div className={`slide-content ${slide.animClass}`} style={{ position: 'relative', zIndex: 2 }}>
                                     <h3 className="slide-quote">{slide.quote}</h3>
                                     <div className="slide-stats">
                                         {slide.stats.map((stat, sIndex) => (
-                                            <div key={sIndex} className="stat-item">
+                                            <div key={sIndex} className="stat-item" style={{ background: 'rgba(255, 255, 255, 0.15)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.25)' }}>
                                                 <h4>{stat.value}</h4>
                                                 <p>{stat.label}</p>
                                             </div>

@@ -10,7 +10,7 @@ import {
     FileSpreadsheet
 } from 'lucide-react';
 
-const Sidebar = ({ activePage, setActivePage }) => {
+const Sidebar = ({ activePage, setActivePage, is3DEnabled = true }) => {
     const { isAdmin, isCoAdmin } = useAuth();
     const canSeeErrorTop = isAdmin || isCoAdmin;
 
