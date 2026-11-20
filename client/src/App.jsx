@@ -69,19 +69,11 @@ const Dashboard = () => {
         return sessionStorage.getItem('academic_year') || '2026';
     });
 
-    const [is3DEnabled, setIs3DEnabled] = useState(() => {
-        const saved = localStorage.getItem('3d_mode_active');
-        return saved !== null ? saved === 'true' : true;
-    });
+    const is3DEnabled = true;
 
     useEffect(() => {
-        localStorage.setItem('3d_mode_active', is3DEnabled);
-        if (is3DEnabled) {
-            document.body.classList.add('mode-3d-active');
-        } else {
-            document.body.classList.remove('mode-3d-active');
-        }
-    }, [is3DEnabled]);
+        document.body.classList.add('mode-3d-active');
+    }, []);
 
     const [activePage, setActivePage] = useState(() => {
         const stored = sessionStorage.getItem('dashboard_active_page');
@@ -474,8 +466,6 @@ const Dashboard = () => {
                                                                 activePage === 'approvals' ? 'User Approvals' :
                                                                     activePage === 'file_management' ? 'Schedules & Timetable & Files' : 'Activity Logs'
                     } 
-                    is3DEnabled={is3DEnabled}
-                    setIs3DEnabled={setIs3DEnabled}
                     updates={updates}
                     onNotificationClick={handleNotificationClick}
                 />
