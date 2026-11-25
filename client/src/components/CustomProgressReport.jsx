@@ -375,7 +375,288 @@ const CustomProgressReport = () => {
     };
 
     // -------------------------------------------------------------
-    // 1. DYNAMIC EXCEL TEMPLATE GENERATION (With Out Of / Max Marks)
+    // 1A. CAMPUS MULTI-TEST LEDGER TEMPLATE GENERATION (CBSE & STATE/PU TRACK SHEETS)
+    // -------------------------------------------------------------
+    const handleDownloadCampusLedgerTemplate = async () => {
+        try {
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'Sri Chaitanya Educational Institutions';
+            workbook.created = new Date();
+
+            const headerFillNavy = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F2057' } };
+            const subHeaderFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF172B6B' } };
+            const botHeaderFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F4FB' } };
+            const borderGold = {
+                top: { style: 'thin', color: { argb: 'FFC9962B' } },
+                bottom: { style: 'medium', color: { argb: 'FFC9962B' } },
+                left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+            };
+
+            // 1. CBSE Track Sheet
+            const cbseSheet = workbook.addWorksheet('CBSE_Track_Sheet', { views: [{ showGridLines: true }] });
+            const cbseR1 = [];
+            cbseR1[1] = 'S NO';
+            cbseR1[2] = 'OMR';
+            cbseR1[3] = 'OMR';
+            cbseR1[4] = 'STUDENT NAME';
+            cbseR1[5] = 'BOARD';
+            cbseR1[6] = 'SECTION';
+            cbseR1[7] = 'WET- 1\nDATE :-16-06-2025';
+            cbseR1[13] = 'WET- 2\nDATE: 23-06-2025';
+            cbseR1[19] = 'WET-3\nDATE : 30-06-2025';
+            cbseR1[25] = 'UT-1\nDATE 07-07-2025';
+            cbseR1[31] = 'WET-4\nDATE :14-07-2025';
+            cbseR1[37] = 'WET-5\nDATE 20-07-2025';
+            cbseR1[43] = 'WET-7\nDATE: 18-08-2025';
+            cbseR1[49] = 'WET-8\nDATE: 25-08-2025';
+            cbseR1[55] = 'WET-09\n01-09-2025';
+            cbseR1[57] = 'WET-13\n21-10-2025';
+            cbseR1[59] = 'UT-5\n27-10-2025';
+            cbseR1[61] = 'PRE-MID-TERM(CBSE)';
+            cbseR1[69] = 'ATTENDANCE';
+            cbseSheet.addRow(cbseR1);
+
+            const cbseR2 = [];
+            cbseR2[61] = 'ENG\n40';
+            cbseR2[62] = 'BIO\n35';
+            cbseR2[63] = 'PHY\n35';
+            cbseR2[64] = 'CHE\n35';
+            cbseR2[65] = 'OPTIONALS';
+            cbseR2[68] = 'TOT\n185/180';
+            cbseR2[69] = 'TOTAL NO.OF WORKING DAYS';
+            cbseR2[70] = 'ABSENT';
+            cbseR2[71] = 'PRESENT';
+            cbseR2[72] = 'SICK';
+            cbseR2[73] = 'TOTAL';
+            cbseSheet.addRow(cbseR2);
+
+            const cbseR3 = [];
+            const subs6 = ['BOT', 'ZOO', 'PHY', 'CHE', 'TOT', 'AIR'];
+            const subs2 = ['TOT', 'AIR'];
+            for (let t = 0; t < 8; t++) {
+                const start = 7 + (t * 6);
+                subs6.forEach((sub, sIdx) => { cbseR3[start + sIdx] = sub; });
+            }
+            for (let t = 0; t < 3; t++) {
+                const start = 55 + (t * 2);
+                subs2.forEach((sub, sIdx) => { cbseR3[start + sIdx] = sub; });
+            }
+            cbseR3[65] = 'MAT\n40';
+            cbseR3[66] = 'IP\n35';
+            cbseR3[67] = 'PE\n35';
+            cbseSheet.addRow(cbseR3);
+
+            // Merges
+            cbseSheet.mergeCells(1, 1, 3, 1);
+            cbseSheet.mergeCells(1, 2, 3, 2);
+            cbseSheet.mergeCells(1, 3, 3, 3);
+            cbseSheet.mergeCells(1, 4, 3, 4);
+            cbseSheet.mergeCells(1, 5, 3, 5);
+            cbseSheet.mergeCells(1, 6, 3, 6);
+
+            for (let t = 0; t < 8; t++) {
+                const c = 7 + (t * 6);
+                cbseSheet.mergeCells(1, c, 1, c + 5);
+            }
+            for (let t = 0; t < 3; t++) {
+                const c = 55 + (t * 2);
+                cbseSheet.mergeCells(1, c, 1, c + 1);
+            }
+            cbseSheet.mergeCells(1, 61, 1, 68);
+            cbseSheet.mergeCells(2, 61, 3, 61);
+            cbseSheet.mergeCells(2, 62, 3, 62);
+            cbseSheet.mergeCells(2, 63, 3, 63);
+            cbseSheet.mergeCells(2, 64, 3, 64);
+            cbseSheet.mergeCells(2, 65, 2, 67);
+            cbseSheet.mergeCells(2, 68, 3, 68);
+
+            cbseSheet.mergeCells(1, 69, 1, 73);
+            cbseSheet.mergeCells(2, 69, 3, 69);
+            cbseSheet.mergeCells(2, 70, 3, 70);
+            cbseSheet.mergeCells(2, 71, 3, 71);
+            cbseSheet.mergeCells(2, 72, 3, 72);
+            cbseSheet.mergeCells(2, 73, 3, 73);
+
+            // Styling CBSE Rows 1, 2, 3
+            cbseSheet.getRow(1).height = 32;
+            cbseSheet.getRow(1).eachCell(cell => {
+                cell.fill = headerFillNavy;
+                cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                cell.border = borderGold;
+            });
+            cbseSheet.getRow(2).height = 24;
+            cbseSheet.getRow(2).eachCell(cell => {
+                cell.fill = subHeaderFill;
+                cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FFFCD34D' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                cell.border = borderGold;
+            });
+            cbseSheet.getRow(3).height = 22;
+            cbseSheet.getRow(3).eachCell(cell => {
+                cell.fill = botHeaderFill;
+                cell.font = { name: 'Segoe UI', size: 8.5, bold: true, color: { argb: 'FF0F2057' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                cell.border = borderGold;
+            });
+
+            // Sample CBSE Students
+            const cbseSamples = [
+                [1, '257403819', '7403819', 'M G YASHASWINI', 'CBSE', 'ELITE C', 165, 175, 150, 150, 640, 1322, 135, 143, 84, 74, 436, 2721, 146, 116, 67, 90, 419, 1896, '-', '-', '-', '-', '-', '-', 115, 97, 112, 72, 396, 2487, 116, 128, 96, 92, 432, 2390, 115, 126, 74, 108, 423, 1888, 136, 161, 90, 83, 470, 920, '-', '-', 370, 1912, 458, 1671, 36, 34, 31, 34, 23, 0, 0, 158, 180, 6, 170, 4, 180],
+                [2, '257404580', '7404580', 'AMRUTHA LAKSHMI S N', 'CBSE', 'ELITE A', 170, 175, 145, 145, 635, 1416, 145, 127, 81, 111, 464, 2309, 140, 126, 72, 102, 440, 1603, 175, 95, 51, 56, 377, 2242, 150, 145, 122, 44, 461, 1516, 117, 106, 122, 117, 462, 1962, 100, 115, 89, 59, 363, 2798, 111, 125, 115, 60, 411, 1588, 395, 2419, 432, 1165, 493, 1227, 39, 35, 33, 31, 0, 0, 28, 166, 180, 4, 172, 4, 180]
+            ];
+            cbseSamples.forEach(rowArr => {
+                const added = cbseSheet.addRow(rowArr);
+                added.height = 20;
+                added.eachCell((cell, colNum) => {
+                    cell.font = { name: 'Segoe UI', size: 9 };
+                    cell.alignment = { vertical: 'middle', horizontal: colNum === 4 ? 'left' : 'center' };
+                });
+            });
+
+            // 2. STATE / PU Track Sheet
+            const puSheet = workbook.addWorksheet('STATE_PU_Track_Sheet', { views: [{ showGridLines: true }] });
+            const puR1 = [];
+            puR1[1] = 'S NO';
+            puR1[2] = 'OMR';
+            puR1[3] = 'OMR';
+            puR1[4] = 'STUDENT NAME';
+            puR1[5] = 'BOARD';
+            puR1[6] = 'SECTION';
+            puR1[7] = 'WET- 1\nDATE :-16-06-2025';
+            puR1[13] = 'WET- 2\nDATE: 23-06-2025';
+            puR1[19] = 'WET-3\nDATE : 30-06-2025';
+            puR1[25] = 'UT-1\nDATE 07-07-2025';
+            puR1[31] = 'WET-8\nDATE: 25-08-2025';
+            puR1[37] = 'PRE-MID-TERM(PU)';
+            puR1[48] = 'ATTENDANCE';
+            puSheet.addRow(puR1);
+
+            const puR2 = [];
+            puR2[37] = 'ENG\n40';
+            puR2[38] = 'LANGUAGES';
+            puR2[41] = 'BIO\n35';
+            puR2[42] = 'PHY\n35';
+            puR2[43] = 'CHE\n35';
+            puR2[44] = 'OPT';
+            puR2[47] = 'TOTAL\n225/';
+            puR2[48] = 'TOTAL NO.OF WORKING DAYS';
+            puR2[49] = 'ABSENT';
+            puR2[50] = 'PRESENT';
+            puR2[51] = 'SICK';
+            puR2[52] = 'TOTAL';
+            puSheet.addRow(puR2);
+
+            const puR3 = [];
+            for (let t = 0; t < 5; t++) {
+                const start = 7 + (t * 6);
+                subs6.forEach((sub, sIdx) => { puR3[start + sIdx] = sub; });
+            }
+            puR3[38] = 'KAN\n40';
+            puR3[39] = 'HIN\n40';
+            puR3[40] = 'SAN\n40';
+            puR3[44] = 'MAT\n40';
+            puR3[45] = 'CS\n35';
+            puR3[46] = 'ELE\n35';
+            puSheet.addRow(puR3);
+
+            // Merges
+            puSheet.mergeCells(1, 1, 3, 1);
+            puSheet.mergeCells(1, 2, 3, 2);
+            puSheet.mergeCells(1, 3, 3, 3);
+            puSheet.mergeCells(1, 4, 3, 4);
+            puSheet.mergeCells(1, 5, 3, 5);
+            puSheet.mergeCells(1, 6, 3, 6);
+
+            for (let t = 0; t < 5; t++) {
+                const c = 7 + (t * 6);
+                puSheet.mergeCells(1, c, 1, c + 5);
+            }
+            puSheet.mergeCells(1, 37, 1, 47);
+            puSheet.mergeCells(2, 37, 3, 37);
+            puSheet.mergeCells(2, 38, 2, 40);
+            puSheet.mergeCells(2, 41, 3, 41);
+            puSheet.mergeCells(2, 42, 3, 42);
+            puSheet.mergeCells(2, 43, 3, 43);
+            puSheet.mergeCells(2, 44, 2, 46);
+            puSheet.mergeCells(2, 47, 3, 47);
+
+            puSheet.mergeCells(1, 48, 1, 52);
+            puSheet.mergeCells(2, 48, 3, 48);
+            puSheet.mergeCells(2, 49, 3, 49);
+            puSheet.mergeCells(2, 50, 3, 50);
+            puSheet.mergeCells(2, 51, 3, 51);
+            puSheet.mergeCells(2, 52, 3, 52);
+
+            // Styling PU Rows 1, 2, 3
+            puSheet.getRow(1).height = 32;
+            puSheet.getRow(1).eachCell(cell => {
+                cell.fill = headerFillNavy;
+                cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                cell.border = borderGold;
+            });
+            puSheet.getRow(2).height = 24;
+            puSheet.getRow(2).eachCell(cell => {
+                cell.fill = subHeaderFill;
+                cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FFFCD34D' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                cell.border = borderGold;
+            });
+            puSheet.getRow(3).height = 22;
+            puSheet.getRow(3).eachCell(cell => {
+                cell.fill = botHeaderFill;
+                cell.font = { name: 'Segoe UI', size: 8.5, bold: true, color: { argb: 'FF0F2057' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                cell.border = borderGold;
+            });
+
+            // Sample PU Students
+            const puSamples = [
+                [1, '257403848', '7403848', 'Akshara P Achar', 'STATE', 'ELITE S1', 165, 175, 162, 150, 652, 1108, 146, 157, 86, 106, 495, 1891, 135, 126, 81, 117, 459, 1335, 156, 105, 28, 91, 380, 2192, 131, 103, 75, 49, 358, 2462, 35, 40, 0, 0, 34, 35, 34, 38, 0, 0, 216, 180, 5, 172, 3, 180]
+            ];
+            puSamples.forEach(rowArr => {
+                const added = puSheet.addRow(rowArr);
+                added.height = 20;
+                added.eachCell((cell, colNum) => {
+                    cell.font = { name: 'Segoe UI', size: 9 };
+                    cell.alignment = { vertical: 'middle', horizontal: colNum === 4 ? 'left' : 'center' };
+                });
+            });
+
+            // Column widths
+            [cbseSheet, puSheet].forEach(sheet => {
+                sheet.getColumn(1).width = 7;
+                sheet.getColumn(2).width = 14;
+                sheet.getColumn(3).width = 12;
+                sheet.getColumn(4).width = 28;
+                sheet.getColumn(5).width = 11;
+                sheet.getColumn(6).width = 13;
+                for (let col = 7; col <= 75; col++) {
+                    const c = sheet.getColumn(col);
+                    if (!c.width) c.width = 10;
+                }
+            });
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const fileName = 'Sri_Chaitanya_Campus_Track_Sheet_Template.xlsx';
+            saveAs(blob, fileName);
+
+            setStatusMessage({
+                type: 'success',
+                text: `Downloaded "${fileName}" with CBSE & State/PU Track Sheets!`
+            });
+            logActivity(userData, 'Downloaded Campus Track Sheet Template', { fileName });
+        } catch (err) {
+            console.error('Error generating ledger template:', err);
+            setStatusMessage({ type: 'error', text: `Failed to create Campus Track Sheet template: ${err.message}` });
+        }
+    };
+
+    // -------------------------------------------------------------
+    // 1B. STANDARD VERTICAL TEMPLATE GENERATION (With Out Of / Max Marks)
     // -------------------------------------------------------------
     const handleDownloadTemplate = async () => {
         try {
@@ -673,6 +954,330 @@ const CustomProgressReport = () => {
         return cell.value;
     };
 
+    // Helper functions for horizontal multi-test campus ledger sheets
+    const parseDateStr = (str) => {
+        if (!str) return '';
+        const clean = str.replace(/\n/g, ' ').trim();
+        const m = clean.match(/DATE\s*[:-]?\s*(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/i) ||
+                  clean.match(/(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);
+        if (m) {
+            let [ , d, mon, y ] = m;
+            if (y === '225') y = '2025';
+            else if (y.length === 2) y = '20' + y;
+            return `${y}-${mon.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        }
+        return '';
+    };
+
+    const parseTestName = (str) => {
+        if (!str) return 'Exam';
+        const firstLine = str.split('\n')[0].replace(/DATE.*/i, '').trim();
+        return firstLine.replace(/[-_:\s]+$/, '').trim() || str.trim();
+    };
+
+    const parseNumericOrMark = (val) => {
+        if (val === undefined || val === null) return null;
+        const str = String(val).trim();
+        if (str === '' || str === '-' || str === 'NaN') return null;
+        const up = str.toUpperCase();
+        if (up === 'OPT') return 'OPT';
+        if (up === 'AB' || up === 'A' || up === 'AN') return 'AB';
+        if (up === 'SICK') return 'SICK';
+        if (str.includes('W') && str.includes('R') && str.includes('O')) return 'WRONG ID';
+        const num = Number(str);
+        if (!isNaN(num) && !isNaN(parseFloat(str))) return num;
+        return str;
+    };
+
+    const parseCSVTextToGrid = (text) => {
+        const rows = [];
+        let currentRow = [];
+        let currentCell = '';
+        let insideQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            const nextChar = text[i + 1];
+            if (char === '"') {
+                if (insideQuotes && nextChar === '"') { currentCell += '"'; i++; }
+                else { insideQuotes = !insideQuotes; }
+            } else if (char === ',' && !insideQuotes) {
+                currentRow.push(currentCell.trim());
+                currentCell = '';
+            } else if ((char === '\r' || char === '\n') && !insideQuotes) {
+                if (char === '\r' && nextChar === '\n') i++;
+                currentRow.push(currentCell.trim());
+                if (currentRow.some(c => c !== '')) rows.push(currentRow);
+                currentRow = [];
+                currentCell = '';
+            } else { currentCell += char; }
+        }
+        if (currentCell || currentRow.length > 0) {
+            currentRow.push(currentCell.trim());
+            if (currentRow.some(c => c !== '')) rows.push(currentRow);
+        }
+        return rows;
+    };
+
+    const isHorizontalLedgerGrid = (rows) => {
+        if (!rows || rows.length === 0) return false;
+        for (let r = 0; r < Math.min(rows.length, 6); r++) {
+            const rowStr = (rows[r] || []).join(' ').toUpperCase();
+            if ((rowStr.includes('WET') || rowStr.includes('UT-')) && (rowStr.includes('BOT') || rowStr.includes('PHY') || rowStr.includes('PRE-MID-TERM'))) {
+                return true;
+            }
+            if (rowStr.includes('PRE-MID-TERM') && (rowStr.includes('CBSE') || rowStr.includes('PU') || rowStr.includes('STATE'))) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    const parseHorizontalLedger = (rows) => {
+        const sections = [];
+        let currentSec = null;
+
+        rows.forEach((r, idx) => {
+            const rowStr = (r || []).join(' ').toUpperCase();
+            const isHeaderMatch = (rowStr.includes('STUDENT NAME') || rowStr.includes('NAME')) &&
+                                  (rowStr.includes('WET') || rowStr.includes('UT-') || rowStr.includes('PRE-MID-TERM'));
+
+            if (isHeaderMatch && (!currentSec || idx > currentSec.headerRowIdx + 2)) {
+                if (currentSec) sections.push(currentSec);
+                currentSec = {
+                    headerRowIdx: idx,
+                    headerRow: r,
+                    subHeader1: rows[idx + 1] || [],
+                    subHeader2: rows[idx + 2] || [],
+                    dataRows: []
+                };
+            } else if (currentSec && idx > currentSec.headerRowIdx + 2) {
+                if (r.some(c => c !== '')) {
+                    currentSec.dataRows.push(r);
+                }
+            }
+        });
+        if (currentSec) sections.push(currentSec);
+
+        const students = [];
+
+        sections.forEach(sec => {
+            const h0 = sec.headerRow;
+            const h1 = sec.subHeader1;
+            const h2 = sec.subHeader2;
+
+            const secStr = h0.join(' ') + ' ' + h1.join(' ') + ' ' + h2.join(' ');
+            const isCBSE = secStr.toUpperCase().includes('CBSE');
+
+            let idCol = 2;
+            let nameCol = 3;
+            let boardCol = 4;
+            let secCol = 5;
+
+            for (let c = 0; c < 8; c++) {
+                const val = (h0[c] || '').toUpperCase();
+                if (val.includes('STUDENT NAME') || val === 'NAME') nameCol = c;
+                else if (val.includes('BOARD')) boardCol = c;
+                else if (val.includes('SECTION') || val === 'SEC') secCol = c;
+            }
+
+            const testBlocks = [];
+            let curBlock = null;
+
+            for (let c = secCol + 1; c < h0.length; c++) {
+                const topH = (h0[c] || '').trim();
+                const midH = (h1[c] || '').trim();
+                const botH = (h2[c] || '').trim();
+
+                if (topH && (topH.toUpperCase().includes('WET') || topH.toUpperCase().includes('UT-') || topH.toUpperCase().includes('PRE-MID-TERM'))) {
+                    if (!curBlock || curBlock.rawName !== topH) {
+                        if (curBlock) testBlocks.push(curBlock);
+                        curBlock = {
+                            startCol: c,
+                            endCol: c,
+                            rawName: topH,
+                            testName: parseTestName(topH),
+                            date: parseDateStr(topH),
+                            isBoard: topH.toUpperCase().includes('PRE-MID-TERM'),
+                            cols: []
+                        };
+                    }
+                } else if (topH && topH.toUpperCase().includes('ATTENDANCE')) {
+                    if (!curBlock || curBlock.rawName !== topH) {
+                        if (curBlock) testBlocks.push(curBlock);
+                        curBlock = {
+                            startCol: c,
+                            endCol: c,
+                            rawName: topH,
+                            testName: 'ATTENDANCE',
+                            isAttendance: true,
+                            cols: []
+                        };
+                    }
+                }
+
+                if (curBlock) {
+                    curBlock.endCol = c;
+                    curBlock.cols.push({ colIdx: c, top: topH, mid: midH, bot: botH });
+                }
+            }
+            if (curBlock) testBlocks.push(curBlock);
+
+            sec.dataRows.forEach(row => {
+                const studId = (row[idCol] || row[1] || '').trim();
+                const name = (row[nameCol] || '').trim();
+                const board = (row[boardCol] || '').trim() || (isCBSE ? 'CBSE' : 'STATE');
+                const section = (row[secCol] || '').trim();
+
+                if (!name && !studId) return;
+
+                const boardKey = board.toUpperCase().includes('CBSE') ? 'CBSE' : 'PU';
+                const boardLabel = boardKey === 'CBSE' ? 'CBSE Board' : 'PU Board';
+
+                const student = {
+                    id: studId,
+                    name: name || studId,
+                    campus: 'Sri Chaitanya Campus',
+                    board,
+                    section,
+                    stream: `Medical (NEET) & ${boardLabel}`,
+                    streamTests: {
+                        MEDICAL: [],
+                        [boardKey]: []
+                    },
+                    attendance: null
+                };
+
+                testBlocks.forEach(tb => {
+                    if (tb.isAttendance) {
+                        const wDays = row[tb.startCol];
+                        const abs = row[tb.startCol + 1];
+                        const pres = row[tb.startCol + 2];
+                        const sick = row[tb.startCol + 3];
+                        const tot = row[tb.startCol + 4];
+                        if (wDays && Number(wDays) > 0) {
+                            student.attendance = {
+                                workingDays: wDays,
+                                absent: abs || '0',
+                                present: pres || '-',
+                                sick: sick || '0',
+                                total: tot || wDays
+                            };
+                        }
+                        return;
+                    }
+
+                    if (!tb.isBoard) {
+                        const marks = {};
+                        let totVal = null;
+                        let airVal = null;
+                        let hasMarks = false;
+                        let allAbsent = true;
+                        let isOpt = false;
+
+                        tb.cols.forEach(ci => {
+                            const raw = row[ci.colIdx];
+                            const val = parseNumericOrMark(raw);
+                            if (val === 'OPT') isOpt = true;
+
+                            const label = (ci.bot || ci.mid || ci.top).toUpperCase();
+                            if (label.includes('BOT')) {
+                                if (val !== null) { marks['BOTANY'] = val; hasMarks = true; if (typeof val === 'number') allAbsent = false; }
+                            } else if (label.includes('ZOO')) {
+                                if (val !== null) { marks['ZOOLOGY'] = val; hasMarks = true; if (typeof val === 'number') allAbsent = false; }
+                            } else if (label.includes('PHY')) {
+                                if (val !== null) { marks['PHYSICS'] = val; hasMarks = true; if (typeof val === 'number') allAbsent = false; }
+                            } else if (label.includes('CHE')) {
+                                if (val !== null) { marks['CHEMISTRY'] = val; hasMarks = true; if (typeof val === 'number') allAbsent = false; }
+                            } else if (label.includes('TOT')) {
+                                totVal = val;
+                            } else if (label.includes('AIR')) {
+                                airVal = val;
+                            }
+                        });
+
+                        if (isOpt) return;
+
+                        if (hasMarks) {
+                            const numSum = Object.values(marks).filter(v => typeof v === 'number').reduce((a, b) => a + b, 0);
+                            const finalTot = (typeof totVal === 'number' && totVal > 0) ? totVal : numSum;
+                            student.streamTests.MEDICAL.push({
+                                testName: tb.testName,
+                                date: tb.date,
+                                total: allAbsent ? '-' : finalTot,
+                                marks,
+                                air: airVal,
+                                isAB: allAbsent
+                            });
+                        } else if (typeof totVal === 'number' && totVal > 0) {
+                            student.streamTests.MEDICAL.push({
+                                testName: tb.testName,
+                                date: tb.date,
+                                total: totVal,
+                                marks: {},
+                                air: airVal,
+                                isAB: false
+                            });
+                        }
+                    } else {
+                        const marks = {};
+                        let totVal = null;
+                        let hasMarks = false;
+
+                        tb.cols.forEach(ci => {
+                            const raw = row[ci.colIdx];
+                            const val = parseNumericOrMark(raw);
+                            const sub = (ci.bot || ci.mid || ci.top).toUpperCase();
+
+                            if (sub.includes('ENG')) {
+                                if (val !== null) { marks['ENGLISH'] = val; hasMarks = true; }
+                            } else if (sub.includes('BIO')) {
+                                if (val !== null) { marks['BIOLOGY'] = val; hasMarks = true; }
+                            } else if (sub.includes('PHY')) {
+                                if (val !== null) { marks['PHYSICS'] = val; hasMarks = true; }
+                            } else if (sub.includes('CHE')) {
+                                if (val !== null) { marks['CHEMISTRY'] = val; hasMarks = true; }
+                            } else if (sub.includes('MAT')) {
+                                if (val !== null && (typeof val !== 'number' || val > 0)) { marks['MATHS'] = val; hasMarks = true; }
+                            } else if (sub.includes('IP')) {
+                                if (val !== null && (typeof val !== 'number' || val > 0)) { marks['IP'] = val; hasMarks = true; }
+                            } else if (sub.includes('PE')) {
+                                if (val !== null && (typeof val !== 'number' || val > 0)) { marks['PE'] = val; hasMarks = true; }
+                            } else if (sub.includes('KAN')) {
+                                if (val !== null && (typeof val !== 'number' || val > 0)) { marks['KANNADA'] = val; hasMarks = true; }
+                            } else if (sub.includes('HIN')) {
+                                if (val !== null && (typeof val !== 'number' || val > 0)) { marks['HINDI'] = val; hasMarks = true; }
+                            } else if (sub.includes('SAN')) {
+                                if (val !== null && (typeof val !== 'number' || val > 0)) { marks['SANSKRIT'] = val; hasMarks = true; }
+                            } else if (sub.includes('CS') || sub.includes('COMP')) {
+                                if (val !== null && (typeof val !== 'number' || val > 0)) { marks['COMPUTER SCIENCE'] = val; hasMarks = true; }
+                            } else if (sub.includes('ELE')) {
+                                if (val !== null && (typeof val !== 'number' || val > 0)) { marks['ELECTRONICS'] = val; hasMarks = true; }
+                            } else if (sub.includes('TOT')) {
+                                totVal = val;
+                            }
+                        });
+
+                        if (hasMarks) {
+                            const numSum = Object.values(marks).filter(v => typeof v === 'number').reduce((a, b) => a + b, 0);
+                            const finalTot = (typeof totVal === 'number' && totVal > 0) ? totVal : numSum;
+                            student.streamTests[boardKey].push({
+                                testName: 'Pre-Mid-Term Board Exam',
+                                date: tb.date || '2025-10-27',
+                                total: finalTot,
+                                marks,
+                                isAB: false
+                            });
+                        }
+                    }
+                });
+
+                students.push(student);
+            });
+        });
+
+        return students;
+    };
+
     const handleFile = async (file) => {
         if (!file) return;
         setIsParsing(true);
@@ -680,12 +1285,155 @@ const CustomProgressReport = () => {
         setStatusMessage({ type: 'info', text: `Parsing "${file.name}"... Please wait.` });
 
         try {
-            const arrayBuffer = await file.arrayBuffer();
-            const workbook = new ExcelJS.Workbook();
-            await workbook.xlsx.load(arrayBuffer);
+            const fileName = file.name.toLowerCase();
+            const isCSV = fileName.endsWith('.csv');
+            let sheetGrids = [];
 
-            const worksheet = workbook.worksheets.find(ws => ws.name !== 'Instructions') || workbook.worksheets[0];
-            if (!worksheet) throw new Error('No valid worksheet found in the Excel file.');
+            if (isCSV) {
+                const text = await file.text();
+                const rows = parseCSVTextToGrid(text);
+                if (rows.length > 0) {
+                    sheetGrids.push({ name: 'CSV_Data', rows });
+                }
+            } else {
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = new ExcelJS.Workbook();
+                await workbook.xlsx.load(arrayBuffer);
+
+                workbook.worksheets.forEach(ws => {
+                    if (ws.name === 'Instructions') return;
+                    const wsRows = [];
+                    ws.eachRow({ includeEmpty: false }, row => {
+                        const rVals = [];
+                        for (let col = 1; col <= Math.max(ws.columnCount, 75); col++) {
+                            const val = getCellValue(row.getCell(col));
+                            rVals.push(val !== undefined && val !== null ? String(val).trim() : '');
+                        }
+                        wsRows.push(rVals);
+                    });
+                    if (wsRows.length > 0) {
+                        sheetGrids.push({ name: ws.name, rows: wsRows, worksheet: ws });
+                    }
+                });
+            }
+
+            // Check if any sheet is a horizontal ledger (Campus Multi-Test Track Sheet)
+            const ledgerSheets = sheetGrids.filter(sg => isHorizontalLedgerGrid(sg.rows));
+            if (ledgerSheets.length > 0) {
+                let allLedgerStudents = [];
+                ledgerSheets.forEach(sg => {
+                    const parsed = parseHorizontalLedger(sg.rows);
+                    allLedgerStudents.push(...parsed);
+                });
+
+                if (allLedgerStudents.length === 0) {
+                    throw new Error('No student data rows could be found in the Campus Track Sheet.');
+                }
+
+                // Detect active streams from the parsed students
+                const detectedStreams = [...new Set(allLedgerStudents.flatMap(s => Object.keys(s.streamTests)))];
+                setSelectedStreams(prev => [...new Set([...prev, ...detectedStreams])]);
+
+                // Extract or configure out-of-marks for Medical NEET & Board exams
+                const ledgerMaxMarks = {
+                    MEDICAL: { BOTANY: 180, ZOOLOGY: 180, PHYSICS: 180, CHEMISTRY: 180 },
+                    CBSE: { ENGLISH: 40, BIOLOGY: 35, PHYSICS: 35, CHEMISTRY: 35, MATHS: 40, IP: 35, PE: 35 },
+                    PU: { ENGLISH: 40, KANNADA: 40, HINDI: 40, SANSKRIT: 40, BIOLOGY: 35, PHYSICS: 35, CHEMISTRY: 35, MATHS: 40, 'COMPUTER SCIENCE': 35, ELECTRONICS: 35 }
+                };
+
+                setStreamMaxMarks(prev => ({
+                    ...prev,
+                    ...ledgerMaxMarks
+                }));
+
+                // Calculate stream averages (avgTotal and subject averages)
+                const studentList = allLedgerStudents.map(stud => {
+                    const streamAverages = {};
+                    Object.keys(stud.streamTests).forEach(stKey => {
+                        const tests = stud.streamTests[stKey] || [];
+                        const attended = tests.filter(t => !t.isAB && (Number(t.total) > 0 || Object.values(t.marks || {}).some(m => !isAbsentMark(m))));
+                        const count = attended.length;
+                        const avgTot = count > 0 ? Math.round(attended.reduce((a, b) => a + (Number(b.total) || 0), 0) / count) : '-';
+
+                        const activeSubs = [...new Set([
+                            ...(STREAM_PRESETS[stKey]?.defaultSubjects || []),
+                            ...tests.flatMap(t => Object.keys(t.marks || {}))
+                        ])].filter(Boolean);
+
+                        const subjectAverages = {};
+                        activeSubs.forEach(sub => {
+                            const validMarks = attended
+                                .map(t => t.marks?.[sub])
+                                .filter(m => m !== undefined && m !== null && m !== '' && !isAbsentMark(m))
+                                .map(Number);
+                            subjectAverages[sub] = validMarks.length > 0 ? Math.round(validMarks.reduce((a, b) => a + b, 0) / validMarks.length) : '-';
+                        });
+
+                        streamAverages[stKey] = {
+                            avgTotal: avgTot,
+                            subjectAverages,
+                            subjects: activeSubs
+                        };
+                    });
+
+                    let attObj = stud.attendance;
+                    if (attObj && Number(attObj.workingDays) > 0 && Number(attObj.present) >= 0) {
+                        const pct = ((Number(attObj.present) / Number(attObj.workingDays)) * 100).toFixed(1);
+                        attObj.percentage = `${pct}%`;
+                    }
+
+                    return {
+                        ...stud,
+                        streamAverages,
+                        attendance: attObj
+                    };
+                });
+
+                setStudents(studentList);
+                setCurrentStudentIndex(0);
+
+                // Auto-save to TiDB
+                try {
+                    setStatusMessage({ type: 'info', text: `Parsed ${studentList.length} students from Campus Track Sheet. Saving records...` });
+                    const saveRes = await fetch(`${API_URL}/api/custom-progress/bulk-save`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            students: studentList,
+                            streamMaxMarks: { ...streamMaxMarks, ...ledgerMaxMarks },
+                            academicYear: '2026'
+                        })
+                    });
+                    if (saveRes.ok) {
+                        setStatusMessage({
+                            type: 'success',
+                            text: `Parsed ${studentList.length} students with all WET/UT & Board exams and saved to database!`
+                        });
+                    } else {
+                        setStatusMessage({
+                            type: 'success',
+                            text: `Parsed ${studentList.length} students with all WET/UT & Board exams across sheets!`
+                        });
+                    }
+                } catch (saveErr) {
+                    setStatusMessage({
+                        type: 'success',
+                        text: `Parsed ${studentList.length} students with all WET/UT & Board exams across sheets!`
+                    });
+                }
+                logActivity(userData, 'Uploaded Campus Track Sheet', {
+                    fileName: file.name,
+                    totalStudents: studentList.length,
+                    sheets: ledgerSheets.map(s => s.name)
+                });
+                return;
+            }
+
+            // Fallback: If not a horizontal ledger, continue with standard vertical parser on worksheet
+            const worksheet = sheetGrids[0]?.worksheet;
+            if (!worksheet) {
+                throw new Error('No valid worksheet found in the uploaded file.');
+            }
 
             let headerRowIndex = 1;
             let headerValues = [];
@@ -867,65 +1615,51 @@ const CustomProgressReport = () => {
 
                 if (!studId && !studName) return;
 
-                // 1. Determine Exam Type for this row
-                let examType = examTypeCol !== -1 ? String(getCellValue(row.getCell(examTypeCol)) || '').trim().toUpperCase() : '';
-
-                if (!examType) {
-                    for (const sc of subjectCols) {
-                        const rawVal = getCellValue(row.getCell(sc.col));
-                        const strVal = String(rawVal || '').trim().toUpperCase();
-                        if (strVal !== '') {
-                            if (sc.streamTag) {
-                                examType = sc.streamTag;
-                                break;
-                            } else if (['BOTANY', 'ZOOLOGY'].includes(sc.cleanName)) {
-                                examType = 'MEDICAL';
-                                break;
-                            } else if (['COMPUTER SCIENCE', 'KANNADA', 'SANSKRIT', 'HINDI'].includes(sc.cleanName)) {
-                                examType = 'PU';
-                                break;
-                            } else if (['IP', 'PE'].includes(sc.cleanName)) {
-                                examType = 'CBSE';
-                                break;
-                            }
-                        }
+                // Canonical examType mapping helper
+                const toCanonicalStreamKey = (typeStr) => {
+                    if (!typeStr) return null;
+                    const up = typeStr.trim().toUpperCase();
+                    if (up.includes('KCET')) {
+                        if (up.includes('MED') || up.includes('PCB') || up.includes('BIO')) return 'KCET_MED';
+                        if (up.includes('ENG') || up.includes('PCM') || up.includes('MAT')) return 'KCET_ENGG';
+                        return selectedStreams.includes('KCET_MED') ? 'KCET_MED' : 'KCET_ENGG';
                     }
-                }
+                    if (up.includes('ADV') || up.includes('ADVANCED')) return 'ENGG_ADV';
+                    if (up.includes('MAIN') || up.includes('MAINS')) return 'ENGG_MAIN';
+                    if (up.includes('MED') || up.includes('NEET')) return 'MEDICAL';
+                    if (up.includes('ENG') || up.includes('JEE')) {
+                        return selectedStreams.includes('ENGG_ADV') && !selectedStreams.includes('ENGG_MAIN') ? 'ENGG_ADV' : 'ENGG_MAIN';
+                    }
+                    if (up.includes('CBSE')) return 'CBSE';
+                    if (up.includes('PU')) return 'PU';
+                    return up;
+                };
 
-                // Canonical examType mapping
-                if (examType.includes('KCET')) {
-                    if (examType.includes('MED') || examType.includes('PCB') || examType.includes('BIO')) examType = 'KCET_MED';
-                    else if (examType.includes('ENG') || examType.includes('PCM') || examType.includes('MAT')) examType = 'KCET_ENGG';
-                    else examType = selectedStreams.includes('KCET_MED') ? 'KCET_MED' : 'KCET_ENGG';
-                } else if (examType.includes('ADV') || examType.includes('ADVANCED')) {
-                    examType = 'ENGG_ADV';
-                } else if (examType.includes('MAIN') || examType.includes('MAINS')) {
-                    examType = 'ENGG_MAIN';
-                } else if (examType.includes('MED') || examType.includes('NEET')) {
-                    examType = 'MEDICAL';
-                } else if (examType.includes('ENG') || examType.includes('JEE')) {
-                    examType = selectedStreams.includes('ENGG_ADV') && !selectedStreams.includes('ENGG_MAIN') ? 'ENGG_ADV' : 'ENGG_MAIN';
-                } else if (examType.includes('CBSE')) {
-                    examType = 'CBSE';
-                } else if (examType.includes('PU')) {
-                    examType = 'PU';
-                } else {
-                    examType = selectedStreams[0] || 'MEDICAL';
-                }
+                // 1. Determine Fallback Exam Type for this row
+                let rawRowExamType = examTypeCol !== -1 ? String(getCellValue(row.getCell(examTypeCol)) || '').trim() : '';
+                let rowCanonicalExamType = toCanonicalStreamKey(rawRowExamType);
 
-                // 2. Extract Marks and Automatically Calculate Total for this Stream's Test
-                const marksObj = {};
-                let numericSum = 0;
-                let hasMarks = false;
-                let isAllAbsent = true;
+                // 2. Extract Marks grouped by Stream to support BOTH:
+                //    - Multi-row format (1 exam per row)
+                //    - Single-row multi-stream format (marks for MEDICAL, CBSE, KCET all entered in same row)
+                const streamMarksData = {};
 
                 subjectCols.forEach(sc => {
-                    // When multi-stream columns are present (tagged [STREAM]), only process columns matching this row's examType
-                    if (sc.streamTag) {
-                        const tagMatches = sc.streamTag === examType ||
-                            (sc.streamTag === 'ENGG' && (examType === 'ENGG_MAIN' || examType === 'ENGG_ADV')) ||
-                            ((sc.streamTag === 'ENGG_MAIN' || sc.streamTag === 'ENGG_ADV') && examType === 'ENGG');
-                        if (!tagMatches) return;
+                    let colStream = sc.streamTag ? toCanonicalStreamKey(sc.streamTag) : null;
+                    if (!colStream) {
+                        if (['BOTANY', 'ZOOLOGY'].includes(sc.cleanName)) colStream = 'MEDICAL';
+                        else if (['COMPUTER SCIENCE', 'KANNADA', 'SANSKRIT', 'HINDI'].includes(sc.cleanName)) colStream = 'PU';
+                        else if (['IP', 'PE'].includes(sc.cleanName)) colStream = 'CBSE';
+                        else colStream = rowCanonicalExamType || selectedStreams[0] || 'MEDICAL';
+                    }
+
+                    if (!streamMarksData[colStream]) {
+                        streamMarksData[colStream] = {
+                            marksObj: {},
+                            numericSum: 0,
+                            hasMarks: false,
+                            isAllAbsent: true
+                        };
                     }
 
                     const rawVal = getCellValue(row.getCell(sc.col));
@@ -935,34 +1669,40 @@ const CustomProgressReport = () => {
                         const slashMatch = strVal.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
                         if (slashMatch) {
                             const scoredNum = Number(slashMatch[1]);
-                            marksObj[sc.cleanName] = scoredNum;
-                            numericSum += scoredNum;
-                            hasMarks = true;
-                            isAllAbsent = false;
+                            streamMarksData[colStream].marksObj[sc.cleanName] = scoredNum;
+                            streamMarksData[colStream].numericSum += scoredNum;
+                            streamMarksData[colStream].hasMarks = true;
+                            streamMarksData[colStream].isAllAbsent = false;
                         } else {
                             const num = Number(strVal);
                             if (!isNaN(num) && !isNaN(parseFloat(strVal))) {
-                                marksObj[sc.cleanName] = num;
-                                numericSum += num;
-                                hasMarks = true;
-                                isAllAbsent = false;
+                                streamMarksData[colStream].marksObj[sc.cleanName] = num;
+                                streamMarksData[colStream].numericSum += num;
+                                streamMarksData[colStream].hasMarks = true;
+                                streamMarksData[colStream].isAllAbsent = false;
                             } else {
                                 // Non-numeric mark ('AB', 'A', 'Absent', 'Abset', etc.)
-                                // Store exactly as entered by user
-                                marksObj[sc.cleanName] = strVal;
-                                hasMarks = true;
+                                streamMarksData[colStream].marksObj[sc.cleanName] = strVal;
+                                streamMarksData[colStream].hasMarks = true;
                             }
                         }
                     }
                 });
 
-                const isAbsentRow = hasMarks && isAllAbsent;
+                // Determine active streams that should receive a test record for this row:
+                const streamsWithMarks = Object.keys(streamMarksData).filter(stKey => streamMarksData[stKey].hasMarks);
+                let activeRowStreams = [];
 
-                // Total is automatically computed from individual subject marks!
-                let totalMarksVal = totalCol !== -1 ? getCellValue(row.getCell(totalCol)) : null;
-                let finalTotal = numericSum;
-                if (numericSum === 0 && !isAbsentRow && totalMarksVal !== null && totalMarksVal !== '' && !isNaN(Number(totalMarksVal))) {
-                    finalTotal = Number(totalMarksVal);
+                if (streamsWithMarks.length > 0) {
+                    activeRowStreams = streamsWithMarks;
+                    // If row explicitly named an examType (e.g. MEDICAL) and it's not already in list, include it
+                    if (rowCanonicalExamType && !activeRowStreams.includes(rowCanonicalExamType)) {
+                        activeRowStreams.push(rowCanonicalExamType);
+                    }
+                } else if (rowCanonicalExamType) {
+                    activeRowStreams = [rowCanonicalExamType];
+                } else {
+                    activeRowStreams = [selectedStreams[0] || 'MEDICAL'];
                 }
 
                 // Attendance Extraction: Only set if user entered actual attendance data
@@ -999,19 +1739,33 @@ const CustomProgressReport = () => {
                     }
                 }
 
-                rawStudentRows.push({
-                    studId: studId || studName,
-                    studName: studName || studId,
-                    campus,
-                    section,
-                    stream,
-                    examType,
-                    testName: test || 'Exam',
-                    date: dateVal,
-                    total: isAbsentRow ? '-' : finalTotal,
-                    marks: marksObj,
-                    isAB: isAbsentRow,
-                    attendance: rowAttendance
+                activeRowStreams.forEach(stKey => {
+                    const stData = streamMarksData[stKey] || { marksObj: {}, numericSum: 0, hasMarks: false, isAllAbsent: false };
+                    const isAbsentRow = stData.hasMarks && stData.isAllAbsent;
+
+                    let finalTotal = stData.numericSum;
+                    // If row has only 1 stream and user explicitly gave a number in TOTAL column
+                    if (stData.numericSum === 0 && !isAbsentRow && totalCol !== -1 && activeRowStreams.length === 1) {
+                        const totalMarksVal = getCellValue(row.getCell(totalCol));
+                        if (totalMarksVal !== null && totalMarksVal !== '' && !isNaN(Number(totalMarksVal))) {
+                            finalTotal = Number(totalMarksVal);
+                        }
+                    }
+
+                    rawStudentRows.push({
+                        studId: studId || studName,
+                        studName: studName || studId,
+                        campus,
+                        section,
+                        stream,
+                        examType: stKey,
+                        testName: test || 'Exam',
+                        date: dateVal,
+                        total: isAbsentRow ? '-' : finalTotal,
+                        marks: stData.marksObj,
+                        isAB: isAbsentRow,
+                        attendance: rowAttendance
+                    });
                 });
             });
 
@@ -1374,19 +2128,21 @@ const CustomProgressReport = () => {
         let currentY = infoY + infoH + 6;
 
         // 5. Render Tables for Each Active Stream (2-Tier Header matching Image 2!)
-        const streamOrder = ['MEDICAL', 'ENGG_MAIN', 'ENGG_ADV', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU'];
+        const streamOrder = [...new Set([...selectedStreams, 'MEDICAL', 'ENGG_MAIN', 'ENGG_ADV', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU'])];
         const activeStreamKeys = streamOrder.filter(k => student.streamTests[k] && student.streamTests[k].length > 0);
         const streamsToRender = activeStreamKeys.length > 0 ? activeStreamKeys : selectedStreams;
 
         streamsToRender.forEach(stKey => {
             const tests = student.streamTests[stKey] || [];
-            // Dynamically determine all active subjects: configured, defaults, or from test marks!
-            const subs = [...new Set([
-                ...(student.streamAverages?.[stKey]?.subjects || []),
-                ...(streamSubjects[stKey] || []),
-                ...(STREAM_PRESETS[stKey]?.defaultSubjects || []),
-                ...tests.flatMap(t => Object.keys(t.marks || {}))
-            ])].filter(Boolean);
+            // Dynamically determine all active subjects: prioritize subjects with marks for this student
+            const studentTestSubjects = [...new Set(tests.flatMap(t => Object.keys(t.marks || {})))].filter(Boolean);
+            const subs = studentTestSubjects.length > 0
+                ? studentTestSubjects
+                : [...new Set([
+                    ...(student.streamAverages?.[stKey]?.subjects || []),
+                    ...(streamSubjects[stKey] || []),
+                    ...(STREAM_PRESETS[stKey]?.defaultSubjects || [])
+                ])].filter(Boolean);
             const stLabel = STREAM_PRESETS[stKey]?.label || stKey;
             const maxMap = customMaxMarks?.[stKey] || student.streamMaxMarks?.[stKey] || streamMaxMarks[stKey] || {};
             const totalMaxVal = getStreamTotalMax(stKey, subs, maxMap);
@@ -2600,31 +3356,54 @@ const CustomProgressReport = () => {
                             3. Download Template & Upload
                         </h3>
 
-                        {/* Download Template Button */}
-                        <button
-                            type="button"
-                            onClick={handleDownloadTemplate}
-                            style={{
-                                width: '100%',
-                                background: '#0F2057',
-                                color: '#FFFFFF',
-                                border: 'none',
-                                borderRadius: '8px',
-                                padding: '10px 16px',
-                                fontSize: '13px',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '8px',
-                                marginBottom: '14px',
-                                boxShadow: '0 2px 6px rgba(15, 32, 87, 0.2)'
-                            }}
-                        >
-                            <Download size={16} color="#C9962B" />
-                            Download {selectedStreams.map(k => STREAM_PRESETS[k].label).join(' & ')} Template (.xlsx)
-                        </button>
+                        {/* Download Template Buttons */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                            <button
+                                type="button"
+                                onClick={handleDownloadCampusLedgerTemplate}
+                                style={{
+                                    width: '100%',
+                                    background: '#0F2057',
+                                    color: '#FFFFFF',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    padding: '10px 14px',
+                                    fontSize: '12.5px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    boxShadow: '0 2px 6px rgba(15, 32, 87, 0.2)'
+                                }}
+                            >
+                                <Download size={16} color="#C9962B" />
+                                Download Campus Track Sheet (.xlsx)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDownloadTemplate}
+                                style={{
+                                    width: '100%',
+                                    background: '#F8FAFC',
+                                    color: '#475569',
+                                    border: '1px solid #CBD5E1',
+                                    borderRadius: '8px',
+                                    padding: '7px 12px',
+                                    fontSize: '11px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px'
+                                }}
+                            >
+                                <FileSpreadsheet size={13} color="#64748B" />
+                                Download Standard Single-Test Template (.xlsx)
+                            </button>
+                        </div>
                     </div>
 
                     {/* Drag and Drop Zone */}
@@ -2656,7 +3435,7 @@ const CustomProgressReport = () => {
                             {uploadedFileName ? `Loaded: ${uploadedFileName}` : 'Click to Upload or Drag & Drop File'}
                         </span>
                         <span style={{ fontSize: '11px', color: '#94A3B8' }}>
-                            Reads marks, attendance, and out-of-marks references
+                            Accepts Campus Track Sheets (.xlsx, .csv) & Standard templates
                         </span>
                     </div>
                 </div>
@@ -2677,28 +3456,51 @@ const CustomProgressReport = () => {
                         No Custom Progress Data Uploaded Yet
                     </h3>
                     <p style={{ fontSize: '14px', color: '#64748B', maxWidth: '520px', margin: '0 auto 20px auto', lineHeight: '1.5' }}>
-                        Configure streams (including KCET Medical & Engineering), out-of-marks, download the Excel template, and upload your file.
+                        Download the Sri Chaitanya Campus Track Sheet template (.xlsx) with CBSE & State/PU sheets or upload your existing progress Excel/CSV file.
                     </p>
-                    <button
-                        type="button"
-                        onClick={handleDownloadTemplate}
-                        style={{
-                            background: '#0F2057',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '10px 20px',
-                            fontSize: '13px',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}
-                    >
-                        <Download size={16} color="#C9962B" />
-                        Download Template Now
-                    </button>
+                    <div style={{ display: 'inline-flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <button
+                            type="button"
+                            onClick={handleDownloadCampusLedgerTemplate}
+                            style={{
+                                background: '#0F2057',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: '8px',
+                                padding: '10px 20px',
+                                fontSize: '13px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                boxShadow: '0 2px 6px rgba(15, 32, 87, 0.2)'
+                            }}
+                        >
+                            <Download size={16} color="#C9962B" />
+                            Download Campus Track Sheet (.xlsx)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDownloadTemplate}
+                            style={{
+                                background: '#F8FAFC',
+                                color: '#475569',
+                                border: '1px solid #CBD5E1',
+                                borderRadius: '8px',
+                                padding: '10px 16px',
+                                fontSize: '12.5px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                        >
+                            <FileSpreadsheet size={15} color="#64748B" />
+                            Download Standard Template (.xlsx)
+                        </button>
+                    </div>
                 </div>
             ) : (
                 <>
@@ -2958,16 +3760,18 @@ const CustomProgressReport = () => {
                                 </div>
 
                                 {/* Dynamic Tables for Each Selected Stream (2-Tier Header with Out-of-Marks) */}
-                                {['MEDICAL', 'ENGG_MAIN', 'ENGG_ADV', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU']
+                                {[...new Set([...selectedStreams, 'MEDICAL', 'ENGG_MAIN', 'ENGG_ADV', 'ENGG', 'KCET_MED', 'KCET_ENGG', 'CBSE', 'PU'])]
                                     .filter(stKey => (activeStudent.streamTests[stKey] && activeStudent.streamTests[stKey].length > 0) || selectedStreams.includes(stKey))
                                     .map(stKey => {
                                         const tests = activeStudent.streamTests[stKey] || [];
-                                        const subs = [...new Set([
-                                            ...(activeStudent.streamAverages?.[stKey]?.subjects || []),
-                                            ...(streamSubjects[stKey] || []),
-                                            ...(STREAM_PRESETS[stKey]?.defaultSubjects || []),
-                                            ...tests.flatMap(t => Object.keys(t.marks || {}))
-                                        ])].filter(Boolean);
+                                        const studentTestSubjects = [...new Set(tests.flatMap(t => Object.keys(t.marks || {})))].filter(Boolean);
+                                        const subs = studentTestSubjects.length > 0
+                                            ? studentTestSubjects
+                                            : [...new Set([
+                                                ...(activeStudent.streamAverages?.[stKey]?.subjects || []),
+                                                ...(streamSubjects[stKey] || []),
+                                                ...(STREAM_PRESETS[stKey]?.defaultSubjects || [])
+                                            ])].filter(Boolean);
                                         const avgData = activeStudent.streamAverages?.[stKey];
                                         const stLabel = STREAM_PRESETS[stKey]?.label || stKey;
                                         const totalMaxVal = getStreamTotalMax(stKey, subs);
